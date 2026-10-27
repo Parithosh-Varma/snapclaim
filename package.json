@@ -10,7 +10,10 @@
   },
   "scripts": {
     "test": "node --test tests/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "backend:start": "node --experimental-strip-types --no-warnings backend/server.ts",
+    "backend:live": "node --experimental-strip-types --no-warnings --env-file=.env backend/server.ts",
+    "backend:smoke": "node backend/smoke.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

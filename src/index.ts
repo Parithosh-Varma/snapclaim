@@ -12,6 +12,8 @@ export type {
 export { areaRatio, calibratedLengthMm, mmPerPx, ratioToPercent, round } from "./engine/math.ts";
 export { DEFAULT_SEVERITY_THRESHOLDS, classifySeverity } from "./engine/severity.ts";
 export { measureSession } from "./engine/measure.ts";
+export { renderAnnexureSvg } from "./render/svg.ts";
+export type { AnnexureInput } from "./render/svg.ts";
 export { ReceiptLedger } from "./receipts/ledger.ts";
 export type { Receipt, ReceiptDraft, ReceiptMethod, ReceiptUnit } from "./receipts/types.ts";
 export { EvidenceError, gateFindings, validateFindings } from "./findings/evidence-gate.ts";

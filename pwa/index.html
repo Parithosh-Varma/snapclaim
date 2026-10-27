@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SnapClaim — capture (mock)</title>
+<style>
+body { font-family: system-ui, sans-serif; max-width: 860px; margin: 24px auto; padding: 0 16px; }
+textarea { width: 100%; font-family: monospace; }
+pre { background: #f4f4f4; padding: 12px; overflow: auto; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+.ok { background: #d9f2d9; } .fail { background: #ffd7d7; }
+svg.schematic { border: 1px solid #ccc; width: 100%; height: auto; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; }
+.row > div { flex: 1 1 240px; }
+</style>
+</head>
+<body>
+<h1>SnapClaim capture (mock, $0)</h1>
+<p>Photo + one line in, measured report out. Mock mode invents no masks — paste fixture or edited masks JSON.</p>
+
+<div class="row">
+<div>
+<label>Backend <input id="base" value="http://127.0.0.1:8787" size="28" /></label>
+<button id="health">health</button> <span id="healthOut"></span>
+</div>
+<div>
+<label>Photo (preview only in mock) <input id="photo" type="file" accept="image/*" /></label>
+<div><img id="preview" alt="" style="max-width:100%;display:none" /></div>
+</div>
+</div>
+
+<h2>1. Masks JSON (fixture shape)</h2>
+<textarea id="payload" rows="16"></textarea><br/>
+<button id="fixture">load fixture</button>
+<button id="send">send to /v1/report</button>
+<span id="status"></span>
+
+<h2>2. Transcript (one line)</h2>
+<input id="transcript" value="wall crack near the window, coin for scale" size="60" />
+
+<h2>3. Findings + gate</h2>
+<div id="findings"></div>
+<svg id="scheme" class="schematic" viewBox="0 0 400 140" role="img" aria-label="schematic damage bars"></svg>
+
+<h2>4. Annexure SVG (code-drawn)</h2>
+<button id="render">render annexure</button>
+<a id="dl" style="display:none">download svg</a>
+<div id="annex"></div>
+
+<h2>5. Raw report</h2>
+<pre id="raw">{}</pre>
+
+<script src="./app.js"></script>
+</body>
+</html>
