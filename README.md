@@ -4,7 +4,15 @@
 
 Built during the **Meta Global AI Developer Hackathon** (Oct 26 – Nov 4, 2026) · Indie track · solo build · public by default.
 
-**Status: Day 0 — design committed; code begins Oct 27.** Progress lives in `DEV-LOG.md`.
+**Status: Day 1 — deterministic core in mock mode: 24/24 tests green, typecheck clean, $0 spent.** Progress lives in `DEV-LOG.md`.
+
+## Run it
+
+```bash
+npm install
+npm test         # 24 tests, mock mode, zero API spend
+npm run typecheck
+```
 
 ---
 
