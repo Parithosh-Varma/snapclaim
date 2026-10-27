@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SnapClaim: listicle (4:5, 20 s)</title>
+<link rel="stylesheet" href="lib/kit.css">
+<script src="lib/gsap.min.js"></script>
+<script src="lib/kit.js"></script>
+<style>
+  #root { width: 1080px; height: 1350px; background: var(--bg); }
+  #stage { position: absolute; inset: 0; transform-origin: 540px 700px; overflow: hidden; }
+
+  #band { position: absolute; left: 0; top: 0; width: 1080px; height: 190px; background: var(--ink); z-index: 20; }
+  #title { position: absolute; left: 50px; top: 38px; font-size: 54px; line-height: 1.1; font-weight: 800; letter-spacing: -.02em; color: #fff; white-space: nowrap; }
+  #save { position: absolute; right: 40px; top: 62px; display: flex; align-items: center; gap: 10px; padding: 14px 22px 14px 18px;
+    border-radius: 40px; background: var(--go); color: #fff; font-size: 30px; font-weight: 700; white-space: nowrap; }
+  #save svg { width: 22px; height: 30px; }
+  #dots { position: absolute; left: 0; right: 0; top: 214px; height: 18px; z-index: 5; }
+  #dots i { position: absolute; top: 0; height: 18px; border-radius: 9px; background: var(--go); }
+
+  .tip { position: absolute; left: 0; top: 0; width: 1080px; height: 1350px; }
+  .num1 { position: absolute; left: 50px; top: 236px; font-size: 330px; line-height: .9; font-weight: 800; letter-spacing: -.04em;
+    color: transparent; -webkit-text-stroke: 7px var(--go); }
+  .hd { position: absolute; left: 330px; top: 262px; width: 700px; font-size: 66px; line-height: 1.04; font-weight: 800; letter-spacing: -.02em; }
+  .sup { position: absolute; left: 60px; top: 540px; width: 960px; font-size: 38px; line-height: 1.25; font-weight: 500; color: var(--ink-2); }
+  .card { position: absolute; left: 60px; top: 690px; width: 960px; height: 600px; border-radius: 36px; background: var(--sand); overflow: hidden; }
+
+  /* Tip 1 */
+  #wall1 { position: absolute; left: 0; top: -330px; width: 960px; height: 1200px; display: block; }
+  #coin { position: absolute; left: 720px; top: 270px; width: 120px; height: 120px; }
+  #br { position: absolute; left: 720px; top: 404px; width: 120px; height: 26px; border: 6px solid var(--go); border-top: none; transform-origin: 50% 50%; }
+  #lab { position: absolute; left: 680px; top: 448px; width: 200px; text-align: center; padding: 10px 0; border-radius: 30px; background: #fff;
+    font-size: 34px; font-weight: 800; color: var(--ink); }
+
+  /* Tip 2 */
+  #mic { position: absolute; left: 40px; top: 50px; width: 150px; height: 150px; border-radius: 50%; background: var(--go); }
+  #mic svg { position: absolute; left: 45px; top: 35px; width: 60px; height: 80px; }
+  #bars { position: absolute; left: 230px; top: 125px; width: 700px; height: 0; }
+  #bars i { position: absolute; width: 14px; border-radius: 7px; background: var(--go); }
+  #tr { position: absolute; left: 24px; right: 24px; top: 250px; height: 326px; border-radius: 28px; background: var(--paper); }
+  #tr .l { position: absolute; left: 32px; top: 26px; font-size: 28px; font-weight: 600; color: var(--ink-3); }
+  #tr .t { position: absolute; left: 32px; right: 32px; top: 84px; font-size: 58px; line-height: 1.15; font-weight: 800; letter-spacing: -.02em; }
+  #tr .w { display: inline-block; opacity: 0; }
+
+  /* Tip 3 */
+  #strip { position: absolute; left: 24px; top: 24px; width: 912px; height: 300px; border-radius: 24px; overflow: hidden; }
+  #strip img { position: absolute; left: 0; top: -420px; width: 912px; height: 1140px; display: block; }
+  #mask { mix-blend-mode: multiply; }
+  #chip { position: absolute; left: 610px; top: 110px; padding: 12px 24px; border-radius: 30px; background: #fff; font-size: 40px; font-weight: 800; color: var(--damage); white-space: nowrap; }
+  .tile { position: absolute; top: 352px; width: 288px; height: 224px; border-radius: 24px; background: var(--paper); text-align: center; }
+  .tile b { position: absolute; left: 0; right: 0; top: 40px; font-size: 62px; line-height: 1.05; font-weight: 800; letter-spacing: -.03em; white-space: nowrap; }
+  .tile span { position: absolute; left: 0; right: 0; bottom: 30px; font-size: 28px; font-weight: 600; color: var(--ink-3); }
+  #t3 b { font-size: 50px; color: var(--go); top: 46px; }
+
+  /* Outro */
+  #list { position: absolute; left: 0; top: 0; width: 1080px; height: 700px; }
+  .ck { position: absolute; left: 60px; width: 960px; height: 100px; display: flex; align-items: center; gap: 28px; font-size: 54px; font-weight: 800; letter-spacing: -.02em; white-space: nowrap; }
+  .ck .c { flex: none; width: 84px; height: 84px; border-radius: 50%; background: var(--go); color: #fff; display: grid; place-items: center; font-size: 50px; }
+  #panel { position: absolute; left: 0; top: 700px; width: 1080px; height: 650px; background: var(--deep); border-radius: 48px 48px 0 0; text-align: center; color: #fff; z-index: 10; }
+  #pMark { position: absolute; left: 50%; top: 36px; width: 120px; height: 120px; margin-left: -60px; }
+  #pHead { position: absolute; left: 0; right: 0; top: 180px; font-size: 88px; line-height: 1.04; font-weight: 800; letter-spacing: -.03em; }
+  #pPill { position: absolute; left: 50%; top: 400px; transform: translateX(-50%); padding: 24px 56px; border-radius: 60px; background: #fff; color: var(--deep); font-size: 52px; font-weight: 800; white-space: nowrap; }
+  #pFoot { position: absolute; left: 0; right: 0; bottom: 44px; font-size: 26px; color: rgba(255, 255, 255, .62); }
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="root" data-width="1080" data-height="1350" data-duration="20" data-fps="30">
+  <div id="stage">
+    <div id="band">
+      <div id="title">3 things to do before<br>you hand back the keys</div>
+      <div id="save"><svg viewBox="0 0 22 30"><path d="M2 2h18v26l-9-7-9 7z" fill="#fff"/></svg>Save this</div>
+    </div>
+    <div id="dots"><i id="d0"></i><i id="d1"></i><i id="d2"></i></div>
+
+    <div class="tip" id="tip1">
+      <div class="num1" id="n1">1</div>
+      <div class="hd" id="h1">Photograph every wall.</div>
+      <div class="sup" id="s1">Put a coin in the shot, so the size can't be argued.</div>
+      <div class="card" id="c1">
+        <img id="wall1" src="assets/sample-wall.jpg" alt="">
+        <svg id="coin" viewBox="0 0 100 100">
+          <defs><radialGradient id="cg" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#f1f2f4"/><stop offset=".6" stop-color="#b9bec6"/><stop offset="1" stop-color="#8a9099"/></radialGradient></defs>
+          <circle cx="50" cy="50" r="48" fill="url(#cg)" stroke="#7b818a" stroke-width="2"/>
+          <circle cx="50" cy="50" r="40" fill="none" stroke="#9ba1aa" stroke-width="1.5"/>
+          <ellipse cx="47" cy="48" rx="15" ry="20" fill="#a9afb7"/>
+        </svg>
+        <div id="br"></div>
+        <div id="lab" class="num">24.26 mm</div>
+      </div>
+    </div>
+
+    <div class="tip" id="tip2">
+      <div class="num1" id="n2">2</div>
+      <div class="hd" id="h2">Say what you see, out loud.</div>
+      <div class="sup" id="s2">Your words get attached to the report, exactly as you said them.</div>
+      <div class="card" id="c2">
+        <div id="mic"><svg viewBox="0 0 60 80"><rect x="18" y="0" width="24" height="46" rx="12" fill="#fff"/><path d="M6 34v6a24 24 0 0 0 48 0v-6" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/><path d="M30 64v14" stroke="#fff" stroke-width="6" stroke-linecap="round"/></svg></div>
+        <div id="bars"></div>
+        <div id="tr"><div class="l">What you said</div>
+          <div class="t"><span class="w">Small</span> <span class="w">crack</span> <span class="w">by</span> <span class="w">the</span> <span class="w">bedroom</span> <span class="w">window.</span></div></div>
+      </div>
+    </div>
+
+    <div class="tip" id="tip3">
+      <div class="num1" id="n3">3</div>
+      <div class="hd" id="h3">Get numbers, not just pictures.</div>
+      <div class="sup" id="s3">Length, area, and a second check that has to agree.</div>
+      <div class="card" id="c3">
+        <div id="strip"><img src="assets/sample-wall.jpg" alt=""><img id="mask" src="assets/sample-wall-mask.png" alt=""></div>
+        <div id="chip" class="num">312 mm</div>
+        <div class="tile" id="t1" style="left:24px"><b class="num" id="v1">0 mm</b><span>Crack length</span></div>
+        <div class="tile" id="t2" style="left:336px"><b class="num" id="v2">0.0 %</b><span>Of the wall</span></div>
+        <div class="tile" id="t3" style="left:648px"><b>Checked<br>twice ✓</b><span>Second check</span></div>
+      </div>
+    </div>
+
+    <div id="list">
+      <div class="ck" id="k1" style="top:262px"><div class="c">✓</div>Photograph every wall.</div>
+      <div class="ck" id="k2" style="top:392px"><div class="c">✓</div>Say what you see, out loud.</div>
+      <div class="ck" id="k3" style="top:522px"><div class="c">✓</div>Get numbers, not just pictures.</div>
+    </div>
+
+    <div id="panel">
+      <img id="pMark" src="assets/snapclaim-mark-dark.png" alt="">
+      <div id="pHead">SnapClaim does<br>all three.</div>
+      <div id="pPill">Snap it first.</div>
+      <div id="pFoot">Sample photo by Brina Blum on Unsplash · values illustrative</div>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  var $ = K.$, ex = K.ex, sp = K.sp, lerp = K.lerp, cl = K.cl, P = K.p;
+  var START = [1.0, 6.0, 11.0], END = [6.0, 11.0, 16.0];
+  var t = 0;
+
+  var bars = $("bars");
+  for (var i = 0; i < 30; i++) { var b = document.createElement("i"); bars.appendChild(b); }
+  var barEls = bars.children;
+
+  // Element that springs in from the right at time t0
+  function item(id, t0, dx) {
+    var q = sp(t, t0, 0.55, 11, 0.55), el = $(id);
+    el.style.opacity = cl(q * 2.5);
+    el.style.transform = "translateX(" + (1 - q) * (dx || 120) + "px)";
+  }
+  function rise(id, t0) {
+    var q = sp(t, t0, 0.55, 11, 0.55), el = $(id);
+    el.style.opacity = cl(q * 2.5);
+    el.style.transform = "translateY(" + (1 - q) * 80 + "px)";
+  }
+  function pop(el, t0, extra) {
+    var q = sp(t, t0, 0.4, 14, 0.4);
+    el.style.opacity = t < t0 ? 0 : cl(q * 3);
+    el.style.transform = (extra || "") + "scale(" + q + ")";
+  }
+  function numeral(id, t0) {
+    var el = $(id), w = K.outQuint(P(t, t0, 0.5));
+    el.style.opacity = t < t0 ? 0 : 1;
+    el.style.clipPath = "inset(0 0 0 " + (1 - w) * 100 + "%)";
+    el.style.transform = "translateX(" + (1 - w) * 160 + "px)";
+    var f = K.inOut(P(t, t0 + 0.35, 0.5));
+    el.style.color = "rgba(15,122,54," + f + ")";
+  }
+
+  function frame(now) {
+    t = now;
+
+    // Title band and save chip (pops at 0.5 and again at the end)
+    var bq = ex(t, 0, 0.35);
+    $("band").style.transform = "translateY(" + (bq - 1) * 190 + "px)";
+    var sq = sp(t, 0.5, 0.45, 13, 0.4), s2 = t >= 18.5 ? Math.sin(Math.PI * P(t, 18.5, 0.45)) * 0.25 : 0;
+    $("save").style.opacity = t < 0.5 ? 0 : cl(sq * 3);
+    $("save").style.transform = "scale(" + (sq + s2) + ")";
+
+    // Progress dots
+    for (var d = 0; d < 3; d++) {
+      var a = ex(t, START[d] - 0.5, 0.3) * (1 - ex(t, END[d] - 0.5, 0.3));
+      var el = $("d" + d), w = 18 + 44 * a;
+      el.style.width = w + "px"; el.style.left = (540 - 100 + d * 66 + (d > 0 ? 0 : 0)) + "px";
+      el.style.opacity = (d === 0 ? 1 : 1) * ex(t, 0.4, 0.3) * (1 - ex(t, 15.7, 0.3)) * (0.35 + 0.65 * a);
+    }
+    // keep dots in a tidy row: widths vary, so lay out from the left
+    var x = 540 - 100, acc = x;
+    for (d = 0; d < 3; d++) {
+      var a2 = ex(t, START[d] - 0.5, 0.3) * (1 - ex(t, END[d] - 0.5, 0.3));
+      var e2 = $("d" + d), w2 = 18 + 44 * a2;
+      e2.style.left = acc + "px"; acc += w2 + 14;
+    }
+
+    // Tip containers: exit left on the beat, then gone
+    for (var k = 0; k < 3; k++) {
+      var tipEl = $("tip" + (k + 1));
+      var vis = t >= START[k] - 0.01 && t < END[k] + 0.01;
+      tipEl.style.display = vis ? "block" : "none";
+      var out = k < 2 ? K.inOut(P(t, END[k] - 0.5, 0.5)) : 0;
+      var col = k === 2 ? K.inOut(P(t, 15.7, 0.3)) : 0;
+      tipEl.style.transform = "translateX(" + (-1080 * out) + "px) scale(" + (1 - 0.08 * col) + ")";
+      tipEl.style.opacity = 1 - col;
+    }
+
+    // Tip 1 (1.0)
+    numeral("n1", 1.0);
+    item("h1", 1.25); item("s1", 1.6); rise("c1", 1.9);
+    var cq = sp(t, 3.0, 0.5, 9, 0.5);
+    $("coin").style.opacity = t < 3 ? 0 : cl(cq * 4);
+    $("coin").style.transform = "translateY(" + (1 - cq) * -360 + "px) rotate(" + (1 - cq) * -60 + "deg)";
+    var bw = K.outCubic(P(t, 4.0, 0.4));
+    $("br").style.opacity = t < 4 ? 0 : 1;
+    $("br").style.transform = "scaleX(" + bw + ")";
+    pop($("lab"), 4.5);
+
+    // Tip 2 (6.0)
+    numeral("n2", 6.0);
+    item("h2", 6.25); item("s2", 6.6); rise("c2", 6.9);
+    pop($("mic"), 7.0);
+    var act = ex(t, 7.4, 0.3) * (1 - ex(t, 9.9, 0.4));
+    for (var i = 0; i < barEls.length; i++) {
+      var amp = 0.5 + 0.5 * Math.sin(t * 7 + i * 0.8), amp2 = 0.5 + 0.5 * Math.sin(t * 11 - i * 1.7);
+      var h = 14 + act * (22 + 110 * amp * (0.35 + 0.65 * amp2)) * (0.5 + 0.5 * Math.sin(i * 0.21 + 1));
+      barEls[i].style.left = i * 24 + "px"; barEls[i].style.height = h + "px"; barEls[i].style.top = -h / 2 + "px";
+      barEls[i].style.opacity = ex(t, 7.2, 0.3);
+    }
+    document.querySelectorAll("#tr .w").forEach(function (el, j) {
+      var q = sp(t, 8.0 + j * 0.25, 0.4, 13, 0.5);
+      el.style.opacity = cl(q * 2.5); el.style.transform = "translateY(" + (1 - q) * 30 + "px)";
+    });
+    $("tr").style.opacity = ex(t, 7.6, 0.3);
+
+    // Tip 3 (11.0, the drop)
+    numeral("n3", 11.0);
+    item("h3", 11.25); item("s3", 11.6); rise("c3", 11.9);
+    $("mask").style.clipPath = "inset(0 0 " + (100 - 100 * K.inOut(P(t, 12.0, 1.0))) + "% 0)";
+    $("mask").style.opacity = 0.9;
+    pop($("chip"), 13.0);
+    var cnt = K.outCubic(P(t, 13.5, 0.9)), cnt2 = K.outCubic(P(t, 14.0, 0.9));
+    $("v1").textContent = Math.round(312 * cnt) + " mm";
+    $("v2").textContent = (3.9 * cnt2).toFixed(1) + " %";
+    pop($("t1"), 13.5); pop($("t2"), 14.0); pop($("t3"), 14.5);
+
+    // Zoom punch on the drop
+    var punch = t >= 11 ? 0.05 * Math.exp(-(t - 11) * 5) * Math.cos((t - 11) * 9) : 0;
+    $("stage").style.transform = "scale(" + (1 + punch) + ")";
+
+    // Outro checklist, ticks on 16.0 / 16.5 / 17.0
+    [16.0, 16.5, 17.0].forEach(function (t0, j) {
+      var id = "k" + (j + 1), q = sp(t, t0, 0.5, 12, 0.5), el = $(id);
+      el.style.opacity = t < t0 ? 0 : cl(q * 3);
+      el.style.transform = "translateX(" + (1 - q) * 160 + "px)";
+      var c = el.firstChild, cq2 = sp(t, t0 + 0.1, 0.4, 14, 0.4);
+      c.style.transform = "scale(" + (t < t0 + 0.1 ? 0 : cq2) + ")";
+    });
+
+    // Panel slides up at 17.5
+    var pq = sp(t, 17.5, 0.7, 9, 0.7);
+    $("panel").style.transform = "translateY(" + (1 - (t < 17.5 ? 0 : pq)) * 700 + "px)";
+    pop($("pMark"), 17.9);
+    rise("pHead", 18.1);
+    var qq = sp(t, 18.6, 0.5, 12, 0.5);
+    $("pPill").style.opacity = t < 18.6 ? 0 : cl(qq * 2);
+    $("pPill").style.transform = "translateX(-50%) scale(" + lerp(0.7, 1, cl(qq)) + ")";
+    K.op("pFoot", ex(t, 19.0, 0.4));
+  }
+  K.mount(20, frame);
+})();
+</script>
+</body>
+</html>
