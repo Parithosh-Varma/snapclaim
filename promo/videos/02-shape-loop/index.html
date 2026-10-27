@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SnapClaim: shape loop (1:1, 14 s)</title>
+<link rel="stylesheet" href="lib/kit.css">
+<script src="lib/gsap.min.js"></script>
+<script src="lib/kit.js"></script>
+<style>
+  #root { width: 1080px; height: 1080px; }
+  #stage { position: absolute; inset: 0; transform-origin: 540px 460px; }
+
+  #shape { position: absolute; overflow: hidden; background: var(--go); will-change: transform; }
+  .lay { position: absolute; left: 50%; top: 50%; opacity: 0; }
+  .ctr { display: grid; place-items: center; color: #fff; white-space: nowrap; font-weight: 800; letter-spacing: -.02em; }
+
+  #pl { width: 560px; height: 700px; margin: -350px 0 0 -280px; }
+  #pl img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #mask { mix-blend-mode: multiply; }
+  #coin { position: absolute; left: 66%; top: 60%; width: 72px; height: 72px; margin: -36px 0 0 -36px; }
+  #chip { position: absolute; left: 24px; top: 96px; padding: 12px 22px 12px 18px; border-radius: 30px; background: #fff;
+    font-size: 30px; font-weight: 700; color: var(--ink); box-shadow: 0 8px 24px rgba(11, 37, 87, .22); white-space: nowrap; transform-origin: left center; }
+  #chip::before { content: ""; display: inline-block; width: 16px; height: 16px; border-radius: 50%; background: var(--damage); margin-right: 10px; }
+  #corners span { position: absolute; width: 56px; height: 56px; border: 0 solid #fff; }
+  #flash { position: absolute; inset: 0; background: #fff; opacity: 0; }
+
+  #pt1 { width: 520px; height: 136px; margin: -68px 0 0 -260px; font-size: 54px; }
+  #rep { width: 700px; height: 500px; margin: -250px 0 0 -350px; color: var(--ink); }
+  #rep h2 { position: absolute; left: 48px; top: 40px; margin: 0; font-size: 58px; font-weight: 800; letter-spacing: -.02em; }
+  .row { position: absolute; left: 48px; right: 48px; height: 100px; border-top: 2px solid var(--line); display: flex;
+    align-items: center; justify-content: space-between; font-size: 38px; opacity: 0; white-space: nowrap; }
+  .row span { color: var(--ink-3); font-weight: 500; }
+  .row b { font-weight: 800; }
+  #pt2 { width: 600px; height: 136px; margin: -68px 0 0 -300px; font-size: 54px; }
+  #pt3 { width: 760px; height: 190px; margin: -95px 0 0 -380px; }
+  #pt3 .t { position: absolute; left: 0; right: 0; top: 30px; text-align: center; color: #fff; font-size: 54px; font-weight: 800; letter-spacing: -.02em; }
+  #trk { position: absolute; left: 100px; top: 122px; width: 560px; height: 14px; border-radius: 7px; background: rgba(255, 255, 255, .25); overflow: hidden; }
+  #fill { height: 100%; width: 0; background: var(--go-bright); border-radius: 7px; }
+  #pt4 { width: 860px; height: 136px; margin: -68px 0 0 -430px; font-size: 48px; }
+  #pt4 i { font-style: normal; font-weight: 500; margin-left: 14px; opacity: .85; }
+  #brand { width: 760px; height: 560px; margin: -280px 0 0 -380px; text-align: center; color: #fff; }
+  #brand img { position: absolute; left: 50%; top: 70px; width: 150px; height: 150px; margin-left: -75px; }
+  #bName { position: absolute; left: 0; right: 0; top: 250px; font-size: 100px; font-weight: 800; letter-spacing: -.03em; font-stretch: 108%; }
+  #bLine { position: absolute; left: 0; right: 0; top: 390px; font-size: 46px; font-weight: 700; color: var(--go-bright); }
+
+  #cap { position: absolute; left: 0; right: 0; top: 868px; text-align: center; font-size: 34px; font-weight: 700; color: var(--ink); }
+  #credit { position: absolute; left: 0; right: 0; bottom: 34px; text-align: center; font-size: 26px; color: var(--ink-3); opacity: 0; }
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="root" data-width="1080" data-height="1080" data-duration="14" data-fps="30">
+  <div id="stage">
+    <div id="shape">
+      <div class="lay ctr" id="pt1">Snap a photo</div>
+      <div class="lay" id="pl">
+        <img src="assets/sample-wall.jpg" alt="">
+        <img id="mask" src="assets/sample-wall-mask.png" alt="">
+        <svg id="coin" viewBox="0 0 100 100">
+          <defs><radialGradient id="cg" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#f1f2f4"/><stop offset=".6" stop-color="#b9bec6"/><stop offset="1" stop-color="#8a9099"/></radialGradient></defs>
+          <circle cx="50" cy="50" r="48" fill="url(#cg)" stroke="#7b818a" stroke-width="2"/>
+          <circle cx="50" cy="50" r="40" fill="none" stroke="#9ba1aa" stroke-width="1.5"/>
+          <ellipse cx="47" cy="48" rx="15" ry="20" fill="#a9afb7"/>
+        </svg>
+        <div id="corners"><span id="c1"></span><span id="c2"></span><span id="c3"></span><span id="c4"></span></div>
+        <div id="chip">Crack · 312 mm</div>
+        <div id="flash"></div>
+      </div>
+      <div class="lay" id="rep">
+        <h2>Damage report</h2>
+        <div class="row" id="r1" style="top:150px"><span>Length</span><b class="num">312 mm</b></div>
+        <div class="row" id="r2" style="top:255px"><span>Of the wall</span><b class="num">3.9 %</b></div>
+        <div class="row" id="r3" style="top:360px"><b style="font-weight:600">Scale: quarter, 24.26 mm</b></div>
+      </div>
+      <div class="lay ctr" id="pt2">Second check…</div>
+      <div class="lay" id="pt3"><div class="t">Checking 312 mm</div><div id="trk"><div id="fill"></div></div></div>
+      <div class="lay ctr" id="pt4"><div>Matches ✓<i>Double-checked</i></div></div>
+      <div class="lay" id="brand">
+        <img src="assets/snapclaim-mark-dark.png" alt="">
+        <div id="bName">SnapClaim</div>
+        <div id="bLine">Damage you can prove.</div>
+      </div>
+    </div>
+    <div id="cap"></div>
+    <div id="credit">Sample photo by Brina Blum on Unsplash · values illustrative</div>
+  </div>
+</div>
+<script>
+(function () {
+  var $ = K.$, ex = K.ex, sp = K.sp, io = K.io, lerp = K.lerp, cl = K.cl;
+  var GO = [15, 122, 54], INK = [11, 37, 87], DEEP = [14, 59, 38], RED = [196, 31, 41], PAPER = [255, 255, 255];
+  function mix(a, b, p) { return "rgb(" + a.map(function (v, i) { return Math.round(lerp(v, b[i], p)); }).join(",") + ")"; }
+
+  var CY = 460;
+  function box(w, h, r) { return { x: 540 - w / 2, y: CY - h / 2, w: w, h: h, r: r }; }
+  var S = {
+    dot: box(56, 56, 28), pill1: box(520, 136, 68), photo: box(560, 700, 36), rep: box(700, 500, 36),
+    red: box(600, 136, 68), navy: box(760, 190, 70), ok: box(860, 136, 68), brand: box(760, 560, 56)
+  };
+  // [start, length, from, to, colour]
+  var MOVES = [
+    [1.0, 0.5, S.dot, S.pill1, GO], [2.0, 0.7, S.pill1, S.photo, GO], [5.5, 0.7, S.photo, S.rep, PAPER],
+    [8.0, 0.6, S.rep, S.red, RED], [9.0, 0.5, S.red, S.navy, INK], [10.0, 0.5, S.navy, S.ok, GO],
+    [11.0, 0.7, S.ok, S.brand, DEEP], [12.75, 0.75, S.brand, S.dot, GO]
+  ];
+  function rectAt(t) {
+    var cur = S.dot, col = GO;
+    for (var i = 0; i < MOVES.length; i++) {
+      var m = MOVES[i];
+      if (t < m[0]) break;
+      var x = (t - m[0]) / m[1];
+      var q = x >= 1 ? 1 : K.spring(x, 9, 0.62);
+      cur = {};
+      for (var k in m[2]) cur[k] = lerp(m[2][k], m[3][k], q);
+      col = mix(i ? MOVES[i - 1][4] : GO, m[4], ex(t, m[0], 0.35));
+    }
+    return { r: cur, c: col };
+  }
+  var CAPS = [[2.0, "Measure it"], [5.5, "Report it"], [8.0, "Check it twice"], [11.0, "Send it"]];
+
+  function frame(t) {
+    var o = rectAt(t), r = o.r, s = $("shape");
+    s.style.left = r.x + "px"; s.style.top = r.y + "px"; s.style.width = r.w + "px"; s.style.height = r.h + "px";
+    s.style.borderRadius = Math.max(0, Math.min(r.r, r.h / 2, r.w / 2)) + "px";
+    s.style.background = o.c;
+    s.style.boxShadow = "0 24px 60px rgba(11,37,87," + (0.18 * cl((r.w - 60) / 100)) + ")";
+
+    // Dot pulses on the beat at both ends of the loop
+    var ph = t % 0.5;
+    var pw = t < 2 ? 1 - K.p(t, 0.75, 0.25) : K.p(t, 13.25, 0.25);
+    var pulse = 1 + 0.22 * Math.exp(-ph * 9) * pw;
+    var tilt = -3 * sp(t, 4.0, 0.5, 12, 0.5) * (1 - ex(t, 5.1, 0.4));
+    s.style.transform = "rotate(" + tilt + "deg) scale(" + pulse + ")";
+
+    // Pill 1
+    K.op("pt1", io(t, 1.15, 2.0, 0.15));
+    // Photo card
+    K.op("pl", io(t, 2.1, 5.9, 0.25));
+    var vf = io(t, 2.2, 3.9, 0.2);
+    [["c1", 24, 24, "Top", "Left"], ["c2", 480, 24, "Top", "Right"], ["c3", 24, 620, "Bottom", "Left"], ["c4", 480, 620, "Bottom", "Right"]]
+      .forEach(function (c) {
+        var el = $(c[0]), pull = (1 - ex(t, 2.2, 0.4)) * 24 * (c[4] === "Left" ? -1 : 1);
+        el.style.left = c[1] + pull + "px"; el.style.top = c[2] + "px";
+        el.style.borderWidth = 0; el.style["border" + c[3] + "Width"] = "6px"; el.style["border" + c[4] + "Width"] = "6px";
+        el.style.opacity = vf;
+      });
+    var cq = sp(t, 2.5, 0.5, 11, 0.45);
+    $("coin").style.opacity = t < 2.5 ? 0 : cl(cq * 3);
+    $("coin").style.transform = "translateY(" + (1 - cq) * -420 + "px) rotate(" + (1 - cq) * -50 + "deg)";
+    $("flash").style.opacity = t >= 3.0 && t < 3.8 ? 0.9 * Math.exp(-(t - 3.0) * 10) : 0;
+    $("mask").style.clipPath = "inset(0 0 " + (100 - 100 * K.inOut(K.p(t, 3.5, 0.5))) + "% 0)";
+    $("mask").style.opacity = 0.9;
+    var chq = sp(t, 4.0, 0.4, 14, 0.4);
+    $("chip").style.opacity = t < 4.0 ? 0 : cl(chq * 3);
+    $("chip").style.transform = "scale(" + chq + ")";
+
+    // Report
+    K.op("rep", io(t, 5.7, 8.0, 0.15));
+    $("rep").getElementsByTagName("h2")[0].style.opacity = ex(t, 6.0, 0.3);
+    ["r1", "r2", "r3"].forEach(function (id, i) {
+      var q = ex(t, 6.5 + i * 0.5, 0.35);
+      $(id).style.opacity = q; $(id).style.transform = "translateX(" + (1 - q) * 40 + "px)";
+    });
+    // Checks
+    K.op("pt2", io(t, 8.15, 9.0, 0.15));
+    K.op("pt3", io(t, 9.15, 10.0, 0.15));
+    $("fill").style.width = 100 * K.p(t, 9.25, 0.7) + "%";
+    K.op("pt4", io(t, 10.15, 11.0, 0.15));
+    // Brand
+    K.op("brand", io(t, 11.25, 12.75, 0.2));
+    var bq = sp(t, 11.25, 0.5, 11, 0.45);
+    $("bName").style.transform = "translateY(" + (1 - bq) * 30 + "px)";
+    $("bLine").style.transform = "translateY(" + (1 - sp(t, 11.6, 0.5, 11, 0.5)) * 30 + "px)";
+
+    // Drop: zoom punch on the beat at 4 s
+    var punch = t >= 4 ? 0.06 * Math.exp(-(t - 4) * 5) * Math.cos((t - 4) * 9) : 0;
+    $("stage").style.transform = "scale(" + (1 + punch) + ")";
+
+    // Caption
+    var txt = "Snap it", a = 1, st = 0;
+    CAPS.forEach(function (c) { if (t >= c[0] && t < 13.4) { txt = c[1]; st = c[0]; } });
+    if (st) a = ex(t, st, 0.3); else if (t >= 13.4) a = ex(t, 13.4, 0.3);
+    var cap = $("cap");
+    if (cap.textContent !== txt) cap.textContent = txt;
+    cap.style.opacity = a;
+    cap.style.transform = "translateY(" + (st || t >= 13.4 ? (1 - a) * 16 : 0) + "px)";
+
+    // Photo credit
+    K.op("credit", Math.max(io(t, 2.1, 5.9, 0.25), io(t, 11.25, 12.75, 0.2)));
+  }
+  K.mount(14, frame);
+})();
+</script>
+</body>
+</html>
