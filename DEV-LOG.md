@@ -22,6 +22,6 @@ Honest, dated build log. Mock mode by default; every live API call gets recorded
 
 **Spend:** $0.00 (mock mode only).
 
-**Credits:** $150 hackathon credits received and confirmed on 2026-10-27 (builder's own registration — no pooling). Billing/card verification is still pending, so live calls remain blocked until it clears; mock CI is unaffected.
+Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 
 **Next:** live adapters behind the spend guard; real-photo intake; then the renderer.
