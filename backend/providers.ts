@@ -212,24 +212,24 @@ export class BasetenSkepticProvider implements FindingsProvider {
     }
     const content = data.choices?.[0]?.message?.content;
     if (!content) throw new HttpError(502, "Baseten skeptic returned no content");
-    return parseFindingDrafts(content);
+    return parseFindingDrafts(content, "Baseten skeptic");
   }
 }
 
-export function parseFindingDrafts(content: string): FindingDraft[] {  let parsed: unknown;
+export function parseFindingDrafts(content: string, source = "Meta findings"): FindingDraft[] {  let parsed: unknown;
   try {
     parsed = JSON.parse(content);
   } catch {
-    throw new HttpError(502, "Meta findings did not return JSON");
+    throw new HttpError(502, `${source} did not return JSON`);
   }
   const list = Array.isArray(parsed)
     ? parsed
     : (parsed as { findings?: unknown })?.findings;
-  if (!Array.isArray(list)) throw new HttpError(502, "Meta findings JSON must be an array");
+  if (!Array.isArray(list)) throw new HttpError(502, `${source} JSON must be an array`);
   return list.map((item, i) => {
     const draft = item as { statement?: unknown; citations?: unknown };
     if (typeof draft.statement !== "string" || !Array.isArray(draft.citations)) {
-      throw new HttpError(502, `Meta findings[${i}] must be {statement: string, citations: string[]}`);
+      throw new HttpError(502, `${source}[${i}] must be {statement: string, citations: string[]}`);
     }
     return { statement: draft.statement, citations: draft.citations.map(String) };
   });

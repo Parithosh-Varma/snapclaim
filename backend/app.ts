@@ -117,6 +117,7 @@ export async function findingsBody(body: unknown, env: Env, requestId = newReque
   const findings = body.findings as MeasuredFinding[];
   const receipts = body.receipts as Receipt[];
   if (!Array.isArray(findings) || !Array.isArray(receipts)) throw new Error("findings and receipts arrays are required");
+  crossCheckMeasurement(body, findings, receipts);
   const provider = findingsProvider(env, configFromEnv(env), fetchFn, guardFor(env));
   const drafts = await provider.draftFindings({
     transcript: typeof body.transcript === "string" ? body.transcript : "",
@@ -138,6 +139,7 @@ export async function skepticBody(body: unknown, env: Env, requestId = newReques
   const findings = body.findings as MeasuredFinding[];
   const receipts = body.receipts as Receipt[];
   if (!Array.isArray(findings) || !Array.isArray(receipts)) throw new Error("findings and receipts arrays are required");
+  crossCheckMeasurement(body, findings, receipts);
   const provider = skepticProvider(env, configFromEnv(env), fetchFn, guardFor(env));
   const drafts = await provider.draftFindings({
     transcript: typeof body.transcript === "string" ? body.transcript : "",
@@ -176,6 +178,24 @@ export async function renderBody(body: unknown, env: Env, requestId = newRequest
 
 export function errorBody(message: string, code: number, requestId: string, details?: unknown): VerboseError {
   return { ok: false, error: message, code, requestId, details };
+}
+
+/**
+ * Trust boundary: /v1/findings and /v1/skeptic accept client-supplied
+ * findings + receipts. When the body also carries the measurement inputs
+ * (component + masks), recompute server-side and reject mismatches — a
+ * client must not be able to smuggle fake receipts past the gate.
+ * Bodies without measurement inputs keep the old behavior (trusted client,
+ * e.g. replay tooling); the PWA must always send the inputs.
+ */
+export function crossCheckMeasurement(body: Record<string, unknown>, findings: unknown, receipts: unknown): void {
+  if (body.component === undefined || body.masks === undefined) return;
+  const recomputed = measureSession(toMeasureInput(body));
+  if (JSON.stringify(findings) !== JSON.stringify(recomputed.findings) || JSON.stringify(receipts) !== JSON.stringify(recomputed.receipts)) {
+    const err = new HttpError(422, "supplied findings/receipts do not match server recomputation from component + masks");
+    (err as HttpError & { details?: unknown }).details = ["re-measured server-side; resubmit via /v1/report or send matching receipts"];
+    throw err;
+  }
 }
 
 export function corsHeaders(): Record<string, string> {

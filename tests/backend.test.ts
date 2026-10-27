@@ -79,8 +79,31 @@ test("live findings without a key fails closed with 503", async () => {
   assert.equal(res.status, 503);
 });
 
-test("mock segment requires a fixture and invents no masks", async () => {
-  const missing = await handleRequest({ method: "POST", path: "/v1/segment", body: { imageId: "img-1", labels: ["crack"] }, env: {} });
+test("findings with masks cross-checks receipts and rejects tampered ones", async () => {
+  const p = payload();
+  const measured = await handleRequest({ method: "POST", path: "/v1/measure", body: p, env: {} });
+  const result = (measured.body as { result: { findings: unknown[]; receipts: unknown[] } }).result;
+
+  const ok = await handleRequest({
+    method: "POST",
+    path: "/v1/findings",
+    body: { ...p, transcript: "x", findings: result.findings, receipts: result.receipts },
+    env: {},
+  });
+  assert.equal(ok.status, 200);
+
+  const tampered = JSON.parse(JSON.stringify(result.receipts)) as Array<{ output: { value: unknown } }>;
+  (tampered[0] as { output: { value: unknown } }).output.value = 99.99;
+  const bad = await handleRequest({
+    method: "POST",
+    path: "/v1/findings",
+    body: { ...p, transcript: "x", findings: result.findings, receipts: tampered },
+    env: {},
+  });
+  assert.equal(bad.status, 422);
+});
+
+test("mock segment requires a fixture and invents no masks", async () => {  const missing = await handleRequest({ method: "POST", path: "/v1/segment", body: { imageId: "img-1", labels: ["crack"] }, env: {} });
   assert.equal(missing.status, 400);
 
   const f = loadWallFixture();
