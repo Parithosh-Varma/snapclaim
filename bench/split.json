@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "note": "Held-out split for the eval. heldOut is frozen before any prompt or threshold tuning; once frozenAt is set, cases only get added, never moved.",
+  "frozenAt": null,
+  "dev": [
+    {
+      "id": "fixture-wall-crack-01",
+      "source": "fixtures/masks/wall-crack.json",
+      "surface": "wall",
+      "hasScaleReference": true
+    }
+  ],
+  "heldOut": []
+}
