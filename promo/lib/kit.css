@@ -1,0 +1,34 @@
+/* Shared look for every promo video: the landing page's palette B and type. */
+@font-face {
+  font-family: "Archivo";
+  src: url("../assets/fonts/archivo.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+}
+:root {
+  --bg: #fbfaf7;
+  --sand: #f3eee4;
+  --sand-deep: #e8e0d1;
+  --paper: #fff;
+  --ink: #0b2557;
+  --ink-2: #3a4f78;
+  --ink-3: #6b7a99;
+  --line: #e2ddd2;
+  --go: #0f7a36;
+  --go-deep: #0b6129;
+  --go-tint: #e3f4e8;
+  --go-bright: #a8ecc0;
+  --damage: #c41f29;
+  --damage-tint: #fde8e8;
+  --deep: #0e3b26;
+}
+html, body { margin: 0; padding: 0; background: var(--bg); }
+#root {
+  position: relative; overflow: hidden;
+  background: var(--bg); color: var(--ink);
+  font-family: "Archivo", sans-serif;
+  font-kerning: normal; -webkit-font-smoothing: antialiased;
+}
+.abs { position: absolute; }
+.wide { font-stretch: 112%; }
+.num { font-variant-numeric: tabular-nums; }

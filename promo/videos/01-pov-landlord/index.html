@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SnapClaim: POV landlord (9:16, 28 s)</title>
+<link rel="stylesheet" href="lib/kit.css">
+<script src="lib/gsap.min.js"></script>
+<script src="lib/kit.js"></script>
+<style>
+  #root { width: 1080px; height: 1920px; }
+  #stage { position: absolute; inset: 0; transform-origin: 540px 900px; }
+
+  /* Hook, styled like an on-screen caption */
+  #hook { position: absolute; left: 80px; right: 80px; top: 120px; text-align: center; }
+  #hook .k { font-size: 44px; font-weight: 600; color: var(--ink-3); letter-spacing: .01em; }
+  #hook .q { margin-top: 18px; font-size: 92px; line-height: 1.02; font-weight: 800; letter-spacing: -.02em; }
+  #hook .w { display: inline-block; opacity: 0; }
+
+  /* The one shape that morphs through every scene */
+  #shape { position: absolute; overflow: hidden; background: var(--go); will-change: transform; }
+  #pl { position: absolute; }
+  #pl img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #mask { mix-blend-mode: multiply; }
+  #coin { position: absolute; left: 66%; top: 60%; width: 10%; aspect-ratio: 1; margin: -5% 0 0 -5%; }
+  #pillTxt { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font-size: 54px; font-weight: 700; white-space: nowrap; }
+
+  #corners span { position: absolute; width: 90px; height: 90px; border: 0 solid #fff; }
+  #hint { position: absolute; left: 50%; top: 470px; transform: translateX(-50%); padding: 18px 32px; border-radius: 40px;
+    background: rgba(11, 37, 87, .78); color: #fff; font-size: 36px; font-weight: 600; white-space: nowrap; }
+  #flash { position: absolute; inset: 0; background: #fff; opacity: 0; }
+
+  /* Phone */
+  #phone { position: absolute; left: 225px; top: 330px; width: 630px; height: 1290px; border-radius: 84px;
+    background: var(--ink); box-shadow: 0 50px 120px rgba(11, 37, 87, .28); }
+  #screen { position: absolute; left: 16px; top: 16px; right: 16px; bottom: 16px; border-radius: 68px; background: var(--paper); overflow: hidden; }
+  #notch { position: absolute; left: 50%; top: 14px; width: 130px; height: 32px; margin-left: -65px; border-radius: 16px; background: var(--ink); }
+  #bar { position: absolute; left: 40px; top: 62px; font-size: 30px; font-weight: 700; display: flex; gap: 18px; align-items: center; }
+  #bar i { font-style: normal; color: var(--ink-3); font-weight: 500; }
+  #res { position: absolute; left: 40px; right: 40px; top: 760px; }
+  #res h3 { margin: 0; font-size: 44px; font-weight: 800; display: flex; align-items: center; justify-content: space-between; }
+  .badge { font-size: 26px; font-weight: 700; padding: 10px 18px; border-radius: 30px; }
+  #sig { background: var(--damage-tint); color: var(--damage); }
+  #meas { display: grid; grid-template-columns: 1.25fr 1fr .55fr; gap: 24px; margin-top: 34px; }
+  #meas b { display: block; font-size: 52px; font-weight: 800; letter-spacing: -.02em; white-space: nowrap; }
+  #meas span { font-size: 26px; color: var(--ink-3); font-weight: 500; }
+  #chk { margin-top: 30px; font-size: 30px; font-weight: 700; color: var(--go); }
+  #send { position: absolute; left: 40px; right: 40px; bottom: 56px; height: 104px; border-radius: 52px; background: var(--go);
+    color: #fff; font-size: 40px; font-weight: 700; display: grid; place-items: center; }
+  #tag { position: absolute; left: 272px; top: 1000px; padding: 14px 24px; border-radius: 30px; background: #fff;
+    font-size: 32px; font-weight: 700; box-shadow: 0 8px 24px rgba(11, 37, 87, .18); white-space: nowrap; }
+  #tag::before { content: ""; display: inline-block; width: 18px; height: 18px; border-radius: 50%; background: var(--damage); margin-right: 12px; }
+
+  /* Report */
+  #doc { position: absolute; left: 110px; top: 380px; width: 860px; height: 1180px; border-radius: 36px; background: var(--paper);
+    box-shadow: 0 40px 110px rgba(11, 37, 87, .2); }
+  #docHead { position: absolute; left: 60px; top: 50px; display: flex; gap: 22px; align-items: center; }
+  #docHead img { width: 64px; height: 64px; }
+  #docHead b { display: block; font-size: 50px; font-weight: 800; }
+  #docHead span { font-size: 30px; color: var(--ink-3); }
+  #docNum { position: absolute; left: 470px; top: 220px; }
+  #docNum span { font-size: 30px; color: var(--ink-3); font-weight: 600; }
+  #docNum b { display: block; white-space: nowrap; font-size: 92px; font-weight: 800; letter-spacing: -.03em; line-height: 1.05; }
+  #docNum i { font-style: normal; font-size: 32px; color: var(--ink-2); }
+  .row { position: absolute; left: 60px; right: 60px; height: 104px; border-top: 2px solid var(--line); display: flex;
+    align-items: center; justify-content: space-between; font-size: 34px; opacity: 0; }
+  .row span { color: var(--ink-3); font-weight: 500; }
+  .row b { font-weight: 700; }
+  .ok { color: var(--go); } .bad { color: var(--damage); }
+  #stamp { position: absolute; left: 50%; top: 1078px; transform-origin: center; padding: 18px 34px; border: 6px solid var(--damage);
+    border-radius: 16px; color: var(--damage); font-size: 48px; font-weight: 800; letter-spacing: .02em; white-space: nowrap; opacity: 0; }
+
+  /* Breakdown type */
+  .big { position: absolute; left: 90px; right: 90px; font-size: 104px; line-height: 1.04; font-weight: 800; letter-spacing: -.03em; }
+  .big .w { display: inline-block; opacity: 0; }
+
+  /* End card */
+  #end { position: absolute; inset: 0; text-align: center; color: #fff; }
+  #endMark { position: absolute; left: 50%; top: 560px; width: 210px; height: 210px; margin-left: -105px; }
+  #endName { position: absolute; left: 0; right: 0; top: 820px; font-size: 128px; font-weight: 800; letter-spacing: -.03em; font-stretch: 108%; }
+  #endLine { position: absolute; left: 0; right: 0; top: 990px; font-size: 62px; font-weight: 700; color: var(--go-bright); }
+  #endCta { position: absolute; left: 50%; top: 1190px; transform: translateX(-50%); padding: 26px 56px; border-radius: 60px;
+    background: #fff; color: var(--deep); font-size: 48px; font-weight: 800; white-space: nowrap; }
+  #endFoot { position: absolute; left: 0; right: 0; bottom: 90px; font-size: 26px; color: rgba(255, 255, 255, .62); }
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="root" data-width="1080" data-height="1920" data-duration="28" data-fps="30">
+  <div id="stage">
+    <div id="hook">
+      <div class="k" id="hk">POV: your landlord at move-out</div>
+      <div class="q"><span class="w">“That</span> <span class="w">crack</span> <span class="w">was</span><br><span class="w">always</span> <span class="w">there.”</span></div>
+    </div>
+
+    <div id="phone">
+      <div id="screen">
+        <div id="notch"></div>
+        <div id="bar"><i>‹</i> Bedroom wall</div>
+        <div id="res">
+          <h3>Crack found <span class="badge" id="sig">Significant</span></h3>
+          <div id="meas">
+            <div><b class="num" id="m1">0 mm</b><span>Length</span></div>
+            <div><b class="num" id="m2">0.0 %</b><span>Of the wall</span></div>
+            <div><b class="num" id="m3">0</b><span>Cracks</span></div>
+          </div>
+          <div id="chk">✓ Double-checked</div>
+        </div>
+        <div id="send">Send report</div>
+      </div>
+    </div>
+
+    <div id="doc">
+      <div id="docHead"><img src="assets/snapclaim-mark.png" alt=""><div><b>Damage report</b><span>Apt 4B · Bedroom wall</span></div></div>
+      <div id="docNum"><span>Crack length</span><b class="num">312 mm</b><i>3.9 % of the wall</i></div>
+      <div class="row" id="r1" style="top:640px"><span>Move-in, Sep 1</span><b class="ok">No damage found ✓</b></div>
+      <div class="row" id="r2" style="top:744px"><span>Move-out, today</span><b class="bad">Crack, 312 mm</b></div>
+      <div class="row" id="r3" style="top:848px"><span>Scale reference</span><b>Quarter, 24.26 mm</b></div>
+      <div class="row" id="r4" style="top:952px"><span>Second check</span><b class="ok">Matches ✓</b></div>
+      <div id="stamp">NEW SINCE MOVE-IN</div>
+    </div>
+
+    <div id="shape">
+      <div id="pl">
+        <img src="assets/sample-wall.jpg" alt="">
+        <img id="mask" src="assets/sample-wall-mask.png" alt="">
+        <svg id="coin" viewBox="0 0 100 100">
+          <defs><radialGradient id="cg" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#f1f2f4"/><stop offset=".6" stop-color="#b9bec6"/><stop offset="1" stop-color="#8a9099"/></radialGradient></defs>
+          <circle cx="50" cy="50" r="48" fill="url(#cg)" stroke="#7b818a" stroke-width="2"/>
+          <circle cx="50" cy="50" r="40" fill="none" stroke="#9ba1aa" stroke-width="1.5"/>
+          <ellipse cx="47" cy="48" rx="15" ry="20" fill="#a9afb7"/>
+        </svg>
+      </div>
+      <div id="pillTxt"></div>
+    </div>
+    <div id="tag">Crack · 312 mm</div>
+
+    <div id="corners"><span id="c1"></span><span id="c2"></span><span id="c3"></span><span id="c4"></span></div>
+    <div id="hint">Add a coin for scale</div>
+
+    <div class="big" id="b1" style="top:700px"><span class="w">A</span> <span class="w">photo</span> <span class="w">shows</span><br><span class="w">that</span> <span class="w">it</span> <span class="w">happened.</span></div>
+    <div class="big" id="b2" style="top:1010px"><span class="w">SnapClaim</span> <span class="w">shows</span><br><span class="w" style="color:var(--go)">how much.</span></div>
+
+    <div id="end">
+      <img id="endMark" src="assets/snapclaim-mark-dark.png" alt="">
+      <div id="endName">SnapClaim</div>
+      <div id="endLine">Damage you can prove.</div>
+      <div id="endCta">Snap it first.</div>
+      <div id="endFoot">Sample photo by Brina Blum on Unsplash · values illustrative</div>
+    </div>
+  </div>
+  <div id="flash"></div>
+</div>
+<script>
+(function () {
+  var $ = K.$, ex = K.ex, sp = K.sp, io = K.io, lerp = K.lerp, cl = K.cl;
+  var GO = [15, 122, 54], INK = [11, 37, 87], DEEP = [14, 59, 38];
+  function mix(a, b, p) { return "rgb(" + a.map(function (v, i) { return Math.round(lerp(v, b[i], p)); }).join(",") + ")"; }
+
+  // Shape states and the time each transition starts, with its length.
+  var R = {
+    dot:   { x: 516, y: 1196, w: 48, h: 48, r: 24 },
+    photo: { x: 100, y: 420, w: 880, h: 1100, r: 44 },
+    phone: { x: 241, y: 466, w: 598, h: 620, r: 0 },
+    thumb: { x: 170, y: 540, w: 250, h: 312, r: 18 },
+    seed:  { x: 508, y: 896, w: 64, h: 64, r: 32 },
+    flood: { x: 0, y: 0, w: 1080, h: 1920, r: 0 }
+  };
+  function pill(w) { return { x: 540 - w / 2, y: 868, w: w, h: 128, r: 64 }; }
+  var MOVES = [
+    [2.0, 0.8, R.dot, R.photo], [4.3, 0.7, R.photo, R.phone], [11.0, 0.8, R.phone, R.thumb],
+    [18.2, 0.5, R.seed, pill(720)], [19.5, 0.35, pill(720), pill(380)], [20.5, 0.35, pill(380), pill(640)],
+    [21.5, 0.35, pill(640), pill(560)], [22.5, 0.7, pill(560), R.flood]
+  ];
+  function rectAt(t) {
+    if (t < 18.2 && t >= 14.6) return R.seed;
+    var cur = R.dot;
+    for (var i = 0; i < MOVES.length; i++) {
+      var m = MOVES[i];
+      if (t < m[0]) break;
+      var q = m[3] === R.flood ? K.inOut(K.p(t, m[0], m[1])) : K.spring((t - m[0]) / m[1], 9, 0.62);
+      cur = {};
+      for (var k in m[2]) cur[k] = lerp(m[2][k], m[3][k], q);
+    }
+    return cur;
+  }
+  function words(sel, t0, step) {
+    document.querySelectorAll(sel + " .w").forEach(function (el, i) {
+      var q = sp(t, t0 + i * step, 0.5, 12, 0.5);
+      el.style.opacity = cl(q * 2);
+      el.style.transform = "translateY(" + (1 - q) * 60 + "px)";
+    });
+  }
+  var t = 0;
+  var STATES = ["Sent to landlord", "Opened", "Checked: 312 mm", "No argument."];
+
+  function frame(now) {
+    t = now;
+    // Hook caption
+    K.op("hk", ex(t, 0.1, 0.4) * (1 - ex(t, 4.0, 0.3)));
+    words("#hook", 0.5, 0.25);
+    $("hook").style.opacity = 1 - ex(t, 4.0, 0.3);
+
+    // Shape
+    var r = rectAt(t), s = $("shape");
+    var vis = t < 1.75 ? 0 : (t >= 14.3 && t < 18.2 ? 1 - ex(t, 14.3, 0.3) : 1);
+    if (t >= 18.2) vis = 1;
+    var grow = t < 2.0 ? sp(t, 1.75, 0.35, 14, 0.4) : 1;
+    s.style.left = r.x + "px"; s.style.top = r.y + "px"; s.style.width = r.w + "px"; s.style.height = r.h + "px";
+    s.style.borderRadius = r.r + "px"; s.style.opacity = vis;
+    s.style.transform = "scale(" + grow + ")";
+    var bg = t < 22.5 ? (t >= 21.5 ? mix(INK, GO, ex(t, 21.5, 0.3)) : (t >= 18.2 ? mix(INK, INK, 0) : "rgb(15,122,54)")) : mix(GO, DEEP, ex(t, 22.6, 0.6));
+    s.style.background = bg;
+    s.style.boxShadow = (t > 4.3 && t < 11) || t > 22.5 ? "none" : "0 30px 80px rgba(11,37,87,.18)";
+
+    // Photo layer, covering the shape at the photo's 4:5 ratio
+    var pw = Math.max(r.w, r.h * 0.8), ph = pw / 0.8, pl = $("pl");
+    pl.style.width = pw + "px"; pl.style.height = ph + "px";
+    pl.style.left = (r.w - pw) / 2 + "px"; pl.style.top = (r.h - ph) / 2 + "px";
+    pl.style.opacity = t < 18.2 ? ex(t, 2.25, 0.4) : 0;
+    $("mask").style.clipPath = "inset(0 0 " + (100 - 100 * K.inOut(K.p(t, 5.5, 1.4))) + "% 0)";
+    $("mask").style.opacity = 0.9;
+    var cq = sp(t, 3.4, 0.5, 11, 0.45);
+    $("coin").style.opacity = cl(cq * 3);
+    $("coin").style.transform = "translateY(" + (1 - cq) * -260 + "px) rotate(" + (1 - cq) * -40 + "deg)";
+
+    // Pill labels
+    var idx = t < 19.5 ? 0 : t < 20.5 ? 1 : t < 21.5 ? 2 : 3;
+    var pt = $("pillTxt");
+    if (pt.textContent !== STATES[idx]) pt.textContent = STATES[idx];
+    var since = [18.4, 19.6, 20.6, 21.6][idx];
+    pt.style.opacity = t >= 18.4 && t < 22.5 ? ex(t, since, 0.25) * (1 - ex(t, 22.5, 0.2)) : 0;
+
+    // Viewfinder
+    var vf = io(t, 3.0, 4.25, 0.2);
+    var C = R.photo, inset = 40;
+    [["c1", C.x + inset, C.y + inset, "top", "left"], ["c2", C.x + C.w - inset - 90, C.y + inset, "top", "right"],
+     ["c3", C.x + inset, C.y + C.h - inset - 90, "bottom", "left"], ["c4", C.x + C.w - inset - 90, C.y + C.h - inset - 90, "bottom", "right"]]
+      .forEach(function (c) {
+        var el = $(c[0]), pull = (1 - ex(t, 3.0, 0.4)) * 30 * (c[4] === "left" ? -1 : 1);
+        el.style.left = c[1] + pull + "px"; el.style.top = c[2] + "px";
+        el.style.borderWidth = 0; el.style["border" + (c[3] === "top" ? "Top" : "Bottom") + "Width"] = "7px";
+        el.style["border" + (c[4] === "left" ? "Left" : "Right") + "Width"] = "7px";
+        el.style.opacity = vf;
+      });
+    K.op("hint", io(t, 3.1, 4.0, 0.2));
+    $("hint").style.transform = "translateX(-50%) translateY(" + (1 - ex(t, 3.1, 0.3)) * 20 + "px)";
+    $("flash").style.opacity = t >= 4.0 ? 0.85 * Math.exp(-(t - 4.0) * 9) : 0;
+
+    // Phone
+    var phIn = sp(t, 4.25, 0.6, 9, 0.6), phOut = ex(t, 10.9, 0.4);
+    $("phone").style.opacity = t < 4.25 ? 0 : cl(phIn * 2) * (1 - phOut);
+    $("phone").style.transform = "scale(" + lerp(1.12, 1, phIn) * (1 - 0.1 * phOut) + ")";
+    var tq = sp(t, 7.0, 0.4, 14, 0.4);
+    $("tag").style.opacity = t < 7 ? 0 : cl(tq * 3) * (1 - phOut);
+    $("tag").style.transform = "scale(" + tq + ")";
+    var mq = K.outCubic(K.p(t, 7.2, 1.2));
+    $("m1").textContent = Math.round(312 * mq) + " mm";
+    $("m2").textContent = (3.9 * mq).toFixed(1) + " %";
+    $("m3").textContent = Math.round(mq);
+    K.op("res", ex(t, 6.9, 0.4));
+    var bq = sp(t, 8.5, 0.4, 14, 0.4);
+    $("sig").style.opacity = t < 8.5 ? 0 : cl(bq * 3); $("sig").style.transform = "scale(" + bq + ")";
+    K.op("chk", ex(t, 9.0, 0.3));
+    var press = t >= 10.8 ? 1 - 0.06 * Math.sin(Math.PI * K.p(t, 10.8, 0.25)) : 1;
+    $("send").style.transform = "scale(" + press + ")";
+    $("send").style.opacity = ex(t, 9.5, 0.3);
+
+    // Drop: zoom punch on the beat at 10 s
+    var punch = t >= 10 ? 0.06 * Math.exp(-(t - 10) * 5) * Math.cos((t - 10) * 9) : 0;
+    $("stage").style.transform = "scale(" + (1 + punch) + ")";
+
+    // Report
+    var dIn = sp(t, 11.0, 0.7, 9, 0.6), dOut = ex(t, 14.3, 0.3);
+    $("doc").style.opacity = t < 11 ? 0 : cl(dIn * 2) * (1 - dOut);
+    $("doc").style.transform = "translateY(" + (1 - dIn) * 120 + "px)";
+    ["r1", "r2", "r3", "r4"].forEach(function (id, i) {
+      var q = ex(t, 12 + i * 0.5, 0.35);
+      $(id).style.opacity = q; $(id).style.transform = "translateX(" + (1 - q) * 40 + "px)";
+    });
+    var stq = sp(t, 14.0, 0.35, 16, 0.45);
+    $("stamp").style.opacity = t < 14 ? 0 : cl(stq * 3);
+    $("stamp").style.transform = "translateX(-50%) rotate(-5deg) scale(" + lerp(1.6, 1, cl(stq)) + ")";
+
+    // Breakdown type
+    words("#b1", 14.75, 0.25);
+    words("#b2", 16.5, 0.3);
+    var bo = 1 - ex(t, 18.0, 0.25);
+    $("b1").style.opacity = bo; $("b2").style.opacity = bo;
+
+    // End card
+    var e = t >= 23.2 ? 1 : 0;
+    $("end").style.opacity = e;
+    var mk = sp(t, 23.3, 0.5, 11, 0.45);
+    $("endMark").style.opacity = cl(mk * 3); $("endMark").style.transform = "scale(" + mk + ")";
+    [["endName", 23.9], ["endLine", 24.5], ["endCta", 25.5], ["endFoot", 26.2]].forEach(function (x) {
+      var q = sp(t, x[1], 0.5, 12, 0.55);
+      $(x[0]).style.opacity = cl(q * 2);
+      var base = x[0] === "endCta" ? "translateX(-50%) " : "";
+      $(x[0]).style.transform = base + "translateY(" + (1 - q) * 40 + "px)";
+    });
+  }
+  K.mount(28, frame);
+})();
+</script>
+</body>
+</html>
