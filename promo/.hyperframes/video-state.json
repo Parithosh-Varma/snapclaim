@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "historyId": "567ab732-c751-491e-9213-4dc44f5eed6c",
+  "currentRevision": null,
+  "pendingChanges": false,
+  "files": {
+    "assets/snapclaim-logo.png": {
+      "hash": "637e8f6c5d29d881f09b6b14f471c09a8d64a21d6e595c82153f53bd4f33b8f9",
+      "content": "C:\\Users\\there\\.cache\\hyperframes\\history\\567ab732-c751-491e-9213-4dc44f5eed6c\\blobs\\63\\637e8f6c5d29d881f09b6b14f471c09a8d64a21d6e595c82153f53bd4f33b8f9"
+    },
+    "index.html": {
+      "hash": "f3dc30b6ea33da19b9c885f63a7d0ac1ac607fe40addebc063b6f3702a66431e",
+      "content": "C:\\Users\\there\\.cache\\hyperframes\\history\\567ab732-c751-491e-9213-4dc44f5eed6c\\blobs\\f3\\f3dc30b6ea33da19b9c885f63a7d0ac1ac607fe40addebc063b6f3702a66431e"
+    },
+    "package-lock.json": {
+      "hash": "f2190d48e7fe228b3593eac76f0579bb58d4691d62ff7246567cb7ef8e1136dd",
+      "content": "C:\\Users\\there\\.cache\\hyperframes\\history\\567ab732-c751-491e-9213-4dc44f5eed6c\\blobs\\f2\\f2190d48e7fe228b3593eac76f0579bb58d4691d62ff7246567cb7ef8e1136dd"
+    },
+    "package.json": {
+      "hash": "6bd746808d4114defe583450837e63709a71bd46345ac05b507b87106a8096d2",
+      "content": "C:\\Users\\there\\.cache\\hyperframes\\history\\567ab732-c751-491e-9213-4dc44f5eed6c\\blobs\\6b\\6bd746808d4114defe583450837e63709a71bd46345ac05b507b87106a8096d2"
+    }
+  },
+  "revisions": {},
+  "checks": {
+    "latest": null,
+    "revisions": {},
+    "unversioned": []
+  },
+  "snapshots": {
+    "latest": null,
+    "revisions": {},
+    "unversioned": []
+  },
+  "renders": {
+    "latest": {
+      "id": "a4b8936b-b1f7-46f6-89b8-13a864bca7be",
+      "completedAt": 1793130879110,
+      "output": "C:\\Users\\there\\Desktop\\Transfer\\Hackathons\\snapclaim\\promo\\out\\snapclaim-promo.mp4",
+      "status": "completed",
+      "revision": null
+    },
+    "retainedRevisions": []
+  },
+  "pendingArtifactCleanup": []
+}

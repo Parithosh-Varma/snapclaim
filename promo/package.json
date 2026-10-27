@@ -1,0 +1,1 @@
+{"name":"snapclaim-promo","version":"1.0.0","private":true,"type":"module","scripts":{"render":"hyperframes render -o out/snapclaim-promo.mp4"},"devDependencies":{"hyperframes":"^0.8.209"}}
