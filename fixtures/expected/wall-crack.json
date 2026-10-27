@@ -1,0 +1,1 @@
+{"cases":[{"crackLengthMm":85.9,"maskId":"crack-1","percent":5.17,"severity":"significant"},{"crackLengthMm":null,"maskId":"stain-1","percent":1.29,"severity":"moderate"}],"tolerance":{"crackLengthMm":0.051,"percent":0.005}}

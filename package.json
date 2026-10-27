@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "backend:start": "node --experimental-strip-types --no-warnings backend/server.ts",
     "backend:live": "node --experimental-strip-types --no-warnings --env-file=.env backend/server.ts",
-    "backend:smoke": "node backend/smoke.mjs"
+    "backend:smoke": "node backend/smoke.mjs",
+    "eval": "node --experimental-strip-types --no-warnings eval/bench.ts"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

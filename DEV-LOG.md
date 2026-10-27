@@ -117,3 +117,14 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 - SAM masks (`501`), voice transcribe (shape unresolved), skeptic inference (`403` pending form), D1 (stub), PDF (per no-docs constraint — SVG only).
 
 **Spend:** $0.00 recorded (Meta pricing unconfirmed; Baseten pricing verified but unused — no successful inference yet).
+
+## 2026-10-28 — Worker deployed (mock, $0)
+
+- URL: `https://snapclaim-backend.parithosh.workers.dev` — `GET /v1/health` → `mock`, `POST /v1/report` → 2 findings, gate ok, absolute mode.
+- Mock by default (no secrets on the Worker). Live keys stay local only.
+
+## 2026-10-28 — PWA defaults to Worker + eval bench live
+
+- PWA backend field now defaults to `https://snapclaim-backend.parithosh.workers.dev` (localhost still typeable). Shareable demo on any phone.
+- `npm run eval` — deterministic guessed-vs-measured bench. Wall-crack locked as regression baseline (2 pass). Missing expected file = SKIP. README in `eval/` for Constantine.
+- 40 tests green, `tsc` clean, eval 2 pass. $0.
