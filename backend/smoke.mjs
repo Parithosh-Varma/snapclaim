@@ -26,9 +26,17 @@ async function main() {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ ...payload, transcript: "crack near window" }),
-  }).then((r) => r.json());
-  if (!reported?.ok || reported?.result?.gate?.ok !== true) throw new Error("report failed: " + JSON.stringify(reported));
-  console.log("report ok", JSON.stringify({ findings: reported.result.findings.length, gate: reported.result.gate.ok }));
+  });
+  const live = health.mode === "live";
+  if (live) {
+    const body = await reported.json();
+    if (!body?.ok || body?.result?.gate?.ok !== true) throw new Error("report failed: " + JSON.stringify(body));
+    console.log("report ok", JSON.stringify({ findings: body.result.findings.length, gate: body.result.gate.ok }));
+  } else {
+    // No keys: the backend must refuse, never fake findings.
+    if (reported.status !== 503) throw new Error("report without keys should 503, got " + reported.status);
+    console.log("report fails closed 503 (no META_API_KEY)");
+  }
 
   const gated = await fetch(`${base}/v1/report`, {
     method: "POST",
@@ -39,10 +47,10 @@ async function main() {
   console.log("gate ok 422");
 
   const spend = await fetch(`${base}/v1/spend`).then((r) => r.json());
-  if (typeof spend?.spentUsd !== "number" || spend.spentUsd !== 0) {
-    throw new Error("spend should be $0 after mock run: " + JSON.stringify(spend));
+  if (typeof spend?.spentUsd !== "number" || (!live && spend.spentUsd !== 0)) {
+    throw new Error("spend should be $0 after this run: " + JSON.stringify(spend));
   }
-  console.log("spend ok $0");
+  console.log("spend ok", spend.spentUsd);
 }
 
 main().catch((e) => {

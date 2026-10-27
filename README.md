@@ -4,13 +4,13 @@
 
 Built during the **Meta Global AI Developer Hackathon** (Oct 26 – Nov 4, 2026) · Indie track · solo build · public by default.
 
-**Status: Day 1 — deterministic core in mock mode: 24/24 tests green, typecheck clean, $0 spent.** Progress lives in `DEV-LOG.md`.
+**Status: live-only, no mock mode. Photo intake segments on-device (SlimSAM); measure and observe are pure math; findings and skeptic need `META_API_KEY` / `BASETEN_API_KEY` and fail closed with 503 without them. 54/54 tests green, typecheck clean.** Progress lives in `DEV-LOG.md`.
 
 ## Run it
 
 ```bash
 npm install
-npm test         # 24 tests, mock mode, zero API spend
+npm test         # 54 tests, real provider code with the network stubbed, zero API spend
 npm run typecheck
 ```
 
@@ -79,7 +79,7 @@ No image generation anywhere: every visual is drawn in code from the masks and t
 - **Protocol:** the reasoning model receives only measured facts and the named evidence — never the raw photo alone; otherwise the benchmark measures vision reading comprehension, not the measurement pipeline.
 - **Baselines:** (a) model-only qualitative estimate ("looks moderately damaged"), (b) no-measurement photo report. **The demo metric is the guessed-vs-measured gap** — the same pattern that made the best projects in this hackathon's server credible.
 - **Held-out split** published before tuning; weak results printed, not buried.
-- **Mock-mode CI:** all tests run offline against recorded responses — zero API spend; one live run recorded as a JSON artifact. Per-call spend guard in config.
+- **Offline CI, no mock mode:** tests run the real Meta/Baseten provider code with only `fetch` stubbed, so zero API spend. The app itself never fakes data: no key means a 503. Per-call spend guard in config.
 
 ## Demo video (3 minutes)
 

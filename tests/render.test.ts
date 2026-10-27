@@ -1,11 +1,9 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { MockFindingsProvider } from "../src/adapters/mock.ts";
 import { measureSession } from "../src/engine/measure.ts";
-import { gateFindings } from "../src/findings/evidence-gate.ts";
 import { renderAnnexureSvg } from "../src/render/svg.ts";
 import { handleRequest } from "../backend/app.ts";
-import { loadWallFixture } from "./helpers.ts";
+import { citingDrafts, LIVE_ENV, loadWallFixture, modelFetch, wallSession } from "./helpers.ts";
 
 test("renderer is deterministic and cites receipts", () => {
   const fixture = loadWallFixture();
@@ -54,30 +52,12 @@ test("renderer escapes hostile strings", () => {
 
 test("backend /v1/render returns gated svg", async () => {
   const fixture = loadWallFixture();
-  const drafts = await new MockFindingsProvider().draftFindings({
-    transcript: "t",
-    findings: measureSession({
-      component: fixture.component,
-      masks: fixture.masks,
-      scaleReference: fixture.scaleReference,
-    }).findings,
-    receipts: measureSession({
-      component: fixture.component,
-      masks: fixture.masks,
-      scaleReference: fixture.scaleReference,
-    }).receipts,
-  });
-  const session = measureSession({
-    component: fixture.component,
-    masks: fixture.masks,
-    scaleReference: fixture.scaleReference,
-  });
-  gateFindings(drafts, session.receipts);
   const res = await handleRequest({
     method: "POST",
     path: "/v1/render",
     body: { ...fixture, transcript: "wall crack" },
-    env: {},
+    env: LIVE_ENV,
+    fetchFn: modelFetch(citingDrafts(wallSession().findings)),
   });
   assert.equal(res.status, 200);
   const body = res.body as { result: { svg: string; gate: { ok: boolean } } };

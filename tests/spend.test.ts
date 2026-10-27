@@ -6,9 +6,9 @@ import { loadConfig } from "../src/config/config.ts";
 import { handleRequest } from "../backend/app.ts";
 import { resetSpendForTests, spendStatus } from "../backend/spend.ts";
 import { measureSession } from "../src/engine/measure.ts";
-import { loadWallFixture } from "./helpers.ts";
+import { citingDrafts, LIVE_ENV, loadWallFixture, modelFetch } from "./helpers.ts";
 
-test("spend starts at zero and mock calls charge nothing", async () => {
+test("spend starts at zero", async () => {
   resetSpendForTests();
   const status = spendStatus({});
   assert.equal(status.spentUsd, 0);
@@ -21,7 +21,7 @@ test("spend starts at zero and mock calls charge nothing", async () => {
 
 test("live findings record token usage with $0 until pricing is confirmed", async () => {
   resetSpendForTests();
-  const config = loadConfig({ MOCK_MODE: "0", SPEND_GUARD_USD: "10" });
+  const config = loadConfig({ SPEND_GUARD_USD: "10" });
   const guard = new SpendGuard(10);
   const stubFetch = (async () =>
     ({
@@ -32,7 +32,7 @@ test("live findings record token usage with $0 until pricing is confirmed", asyn
       }),
     }) as unknown as Response) as typeof fetch;
 
-  const provider = findingsProvider({ MOCK_MODE: "0", META_API_KEY: "test" }, config, stubFetch, guard);
+  const provider = findingsProvider({ META_API_KEY: "test" }, config, stubFetch, guard);
   const fixture = loadWallFixture();
   const session = measureSession({
     component: fixture.component,
@@ -46,7 +46,7 @@ test("live findings record token usage with $0 until pricing is confirmed", asyn
 });
 
 test("skeptic charges real Baseten pricing from usage", async () => {
-  const config = loadConfig({ MOCK_MODE: "0", SPEND_GUARD_USD: "10", BASETEN_API_KEY: "test" });
+  const config = loadConfig({ SPEND_GUARD_USD: "10", BASETEN_API_KEY: "test" });
   const guard = new SpendGuard(10);
   const stubFetch = (async () =>
     ({
@@ -57,7 +57,7 @@ test("skeptic charges real Baseten pricing from usage", async () => {
       }),
     }) as unknown as Response) as typeof fetch;
 
-  const provider = skepticProvider({ MOCK_MODE: "0", BASETEN_API_KEY: "test" }, config, stubFetch, guard);
+  const provider = skepticProvider({ BASETEN_API_KEY: "test" }, config, stubFetch, guard);
   const fixture = loadWallFixture();
   const session = measureSession({
     component: fixture.component,
@@ -71,18 +71,18 @@ test("skeptic charges real Baseten pricing from usage", async () => {
 });
 
 test("skeptic without a key fails closed with 503", async () => {
-  const config = loadConfig({ MOCK_MODE: "0", SPEND_GUARD_USD: "10" });
+  const config = loadConfig({ SPEND_GUARD_USD: "10" });
   const res = await handleRequest({
     method: "POST",
     path: "/v1/skeptic",
     body: { transcript: "x", findings: [], receipts: [] },
-    env: { MOCK_MODE: "0", META_API_KEY: "test" },
+    env: { META_API_KEY: "test" },
   });
   assert.equal(res.status, 503);
   void config;
 });
 
-test("skeptic mock mode returns gated mock drafts", async () => {
+test("skeptic returns gated drafts from the live provider", async () => {
   resetSpendForTests();
   const p = {
     component: loadWallFixture().component,
@@ -96,19 +96,20 @@ test("skeptic mock mode returns gated mock drafts", async () => {
     method: "POST",
     path: "/v1/skeptic",
     body: { transcript: "t", findings: result.findings, receipts: result.receipts },
-    env: {},
+    env: LIVE_ENV,
+    fetchFn: modelFetch(citingDrafts(result.findings as Parameters<typeof citingDrafts>[0])),
   });
   assert.equal(res.status, 200);
 });
 
 test("live findings fail closed at $0 remaining with 429", async () => {
-  const config = loadConfig({ MOCK_MODE: "0", SPEND_GUARD_USD: "0" });
+  const config = loadConfig({ SPEND_GUARD_USD: "0" });
   // Limit 0 means no spend allowed: remaining starts at 0, pre-check must trip before any fetch.
   const guard = new SpendGuard(0);
   const stubFetch = (() => {
     throw new Error("must not call live");
   }) as unknown as typeof fetch;
-  const provider = findingsProvider({ MOCK_MODE: "0", META_API_KEY: "test" }, config, stubFetch, guard);
+  const provider = findingsProvider({ META_API_KEY: "test" }, config, stubFetch, guard);
   const fixture = loadWallFixture();
   const session = measureSession({
     component: fixture.component,

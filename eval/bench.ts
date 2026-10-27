@@ -11,7 +11,8 @@
  * Usage: `npm run eval` — exit 0 on pass/skip, 1 on any gap over tolerance.
  */
 import { readdirSync, readFileSync } from "node:fs";
-import { join, basename } from "node:path";
+import { basename } from "node:path";
+import { fileURLToPath } from "node:url";
 import { measureSession } from "../src/engine/measure.ts";
 
 interface ExpectedCase {
@@ -41,7 +42,7 @@ function main(): void {
 
   for (const file of files) {
     const stem = basename(file, ".json");
-    const input = readJson(join(MASKS_DIR.pathname, file)) as {
+    const input = readJson(fileURLToPath(new URL(file, MASKS_DIR))) as {
       component: never;
       masks: never[];
       scaleReference?: never;
@@ -54,7 +55,7 @@ function main(): void {
 
     let expected: ExpectedFile | null = null;
     try {
-      expected = readJson(join(EXPECTED_DIR.pathname, `${stem}.json`)) as ExpectedFile;
+      expected = readJson(fileURLToPath(new URL(`${stem}.json`, EXPECTED_DIR))) as ExpectedFile;
     } catch {
       expected = null;
     }

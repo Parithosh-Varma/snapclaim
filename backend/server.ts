@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { pathToFileURL } from "node:url";
 import { corsHeaders, handleRequest } from "./app.ts";
 
 const PORT = Number(process.env.PORT ?? 8787);
@@ -52,6 +53,6 @@ export const server = createServer(async (req, res) => {
   sendJson(res, handled.status, handled.body);
 });
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   server.listen(PORT, () => console.log(`snapclaim backend :${PORT}`));
 }
