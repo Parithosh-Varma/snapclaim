@@ -14,5 +14,5 @@ for n in $names; do
   cp -r lib "$d/lib"
   cp -r assets "$d/assets"
   npx hyperframes render "$d" -q delivery -o "out/$n.mp4" --quiet
-  python sfx/make.py "$n" ${MUSIC:+--music "$MUSIC"}
+  python sfx/make.py "$n" ${MUSIC:+--music "$MUSIC"} ${MUSIC_START:+--music-start "$MUSIC_START"}
 done

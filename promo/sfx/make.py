@@ -1,6 +1,6 @@
 """Build the audio for a rendered promo video and mux it.
 
-    python sfx/make.py 01-pov-landlord [--music song.mp3]
+    python sfx/make.py 01-pov-landlord [--music song.mp3 [--music-start 10.5]]
 
 Reads videos/<name>/cues.json and out/<name>.mp4, writes:
   out/<name>-sfx.mp4    sound effects only (add a trending sound in the app)
@@ -186,6 +186,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("name")
     ap.add_argument("--music")
+    ap.add_argument("--music-start", type=float, default=0.0,
+                    help="seconds into the track to start, so its chorus lands on the drop")
     a = ap.parse_args()
     spec = json.loads((ROOT / "videos" / a.name / "cues.json").read_text())
     video = ROOT / "out" / f"{a.name}.mp4"
@@ -213,7 +215,7 @@ def main():
     if a.music:
         ffmpeg("-i", str(video), "-i", a.music, "-i", str(tmp / f"{a.name}-sfx.wav"),
                "-filter_complex",
-               f"[1:a]atrim=0:{dur},volume=0.8[m];[2:a]volume=0.9[s];[m][s]amix=inputs=2:normalize=0,{loud}[a]",
+               f"[1:a]atrim={a.music_start}:{a.music_start + dur},asetpts=PTS-STARTPTS,afade=t=out:st={dur - 1}:d=1,volume=0.8[m];[2:a]volume=0.9[s];[m][s]amix=inputs=2:normalize=0,{loud}[a]",
                "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest",
                str(ROOT / "out" / f"{a.name}-music.mp4"))
     print("wrote", a.name, "sfx + beat" + (" + music" if a.music else ""))
