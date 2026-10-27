@@ -92,3 +92,28 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 - Skeptic: key valid for `/v1/models` (`200`, 19 models) but inference returns `403 "please check the api-key"`. Access pending — likely the unsubmitted Baseten form / workspace grant. Code complete; live smoke waits on access.
 
 **Next:** submit the Baseten form for `meta-models/muse-spark-open`; real-photo intake; Worker deploy.
+
+## 2026-10-28 — Text-first PWA + skeptic view
+
+**Shipped**
+
+- PWA section 4: "ask skeptic" sends last gated measurement + same transcript text to `/v1/skeptic`, renders AGREED vs DISPUTED badges with citations. Text input is the primary path; voice deferred (no voice UI, no transcribe call).
+- Mock skeptic verified `200` with gated drafts. Live skeptic still `403`-blocked on Baseten access — PWA surfaces the `503` hint inline.
+
+**Next:** voice transcribe probe once text demo lands; real photos; Worker deploy.
+
+## 2026-10-28 — Backend finished (honest scope)
+
+**Complete and verified**
+
+- 7 routes: health, measure, report, findings, skeptic, render (`POST /v1/render` returns gated SVG), spend. Enveloped replies, verbose errors, 50-mask / 1MB caps, open CORS.
+- Live Spark findings: `200`, gate holds, usage ledgered. Spend guard pre-checks (`429`) and records (`GET /v1/spend`).
+- Skeptic wired with real verified Baseten pricing; mock-safe; `503`/`429` fail-closed.
+- PWA text path end-to-end: transcript → report → skeptic AGREED/DISPUTED → SVG annexure.
+- 40 tests green, `tsc` clean, live smoke green (`mode:live`, gate `422` on tampered, spend `$0`).
+
+**Explicitly out (documented in backend README, not silently missing)**
+
+- SAM masks (`501`), voice transcribe (shape unresolved), skeptic inference (`403` pending form), D1 (stub), PDF (per no-docs constraint — SVG only).
+
+**Spend:** $0.00 recorded (Meta pricing unconfirmed; Baseten pricing verified but unused — no successful inference yet).

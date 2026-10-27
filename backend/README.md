@@ -37,6 +37,12 @@ All replies are enveloped `{ok, requestId, durationMs, result}`; errors are verb
 - 50 masks per measure call (chunk above that), 1 MB JSON body on Node, extra JSON fields ignored.
 - Stateless: replay comes from the request + receipts. `store.ts` defines the `Store` contract; `D1StoreStub` throws until a real D1 binding is wired in Day 3+.
 
+## Not yet (verified live, honestly blocked)
+
+- SAM 3.1 masks: live on `/v1/responses` (`200`, `images_processed:1`) but text channel returns empty — mask output shape unresolved. `/v1/segment` stays `501`.
+- Voice transcribe: `muse-voice-transcribe-1.0` listed in `/v1/models` but `model_not_found` on `/chat/completions` and `/v1/responses`. Audio endpoint shape unresolved — text path is primary until then.
+- Skeptic inference: `403` until the Baseten form/access is granted. Code complete with real pricing.
+
 ## Deploy (Worker)
 
 ```bash

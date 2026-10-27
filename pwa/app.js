@@ -34,6 +34,8 @@ $("photo").onchange = () => {
   img.style.display = "block";
 };
 
+let lastMeasurement = null;
+
 $("send").onclick = async () => {
   $("status").textContent = "sending…";
   $("findings").innerHTML = "";
@@ -66,6 +68,8 @@ $("send").onclick = async () => {
     return;
   }
   $("status").textContent = `ok ${j.requestId} ${j.durationMs}ms`;
+  lastMeasurement = j.result.measurement ?? null;
+  $("skepStatus").textContent = lastMeasurement ? "ready for skeptic" : "";
   const rows = j.result.findings.map((f) => {
     const mm = f.crackLengthMm === null ? "—" : `${f.crackLengthMm} mm`;
     return `<li><b>${f.label}</b> ${f.percent}% · ${mm} · <span class="badge ok">${f.severity}</span><br/><small>${f.statement ?? ""}</small></li>`;
@@ -101,6 +105,49 @@ function drawScheme(findings) {
     t.textContent = "no findings — gated or empty";
     svg.appendChild(t);
   }
+}
+
+$("skeptic").onclick = async () => {
+  if (!lastMeasurement) {
+    $("skepStatus").textContent = "run report first";
+    return;
+  }
+  $("skepStatus").textContent = "asking…";
+  $("skepticOut").innerHTML = "";
+  let res, j;
+  try {
+    res = await fetch(base() + "/v1/skeptic", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        transcript: $("transcript").value,
+        findings: lastMeasurement.findings,
+        receipts: lastMeasurement.receipts
+      })
+    });
+    j = await res.json();
+  } catch {
+    $("skepStatus").textContent = "backend unreachable";
+    return;
+  }
+  if (!res.ok || !j.ok) {
+    const msg = j.error ?? "skeptic failed";
+    $("skepStatus").textContent = `skeptic ${res.status}: ${msg}`;
+    if (res.status === 503) $("skepticOut").innerHTML = "<small>live skeptic needs BASETEN_API_KEY; mock mode works offline.</small>";
+    return;
+  }
+  $("skepStatus").textContent = `skeptic ok ${j.requestId}`;
+  const rows = j.result.findings.map((f) => {
+    const disputed = /disputed/i.test(f.statement);
+    const badge = disputed ? `<span class="badge fail">DISPUTED</span>` : `<span class="badge ok">AGREED</span>`;
+    const cites = (f.citations ?? []).join(", ");
+    return `<li>${badge} ${escapeHtml(f.statement)}<br/><small>cites: ${escapeHtml(cites)}</small></li>`;
+  }).join("");
+  $("skepticOut").innerHTML = `<ul>${rows}</ul>`;
+};
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 $("render").onclick = async () => {
