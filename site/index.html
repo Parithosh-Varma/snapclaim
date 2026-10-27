@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SnapClaim · Measured damage reports</title>
+  <meta name="description" content="Point a phone at damage, say one line, get a report where every number is measured from the pixels, cited to a receipt and re-checked by an independent model. Computed, not generated.">
+  <meta property="og:title" content="SnapClaim · Computed, not generated">
+  <meta property="og:description" content="Damage reports where every number has a receipt you can recompute.">
+  <meta property="og:image" content="__SITE__/assets/snapclaim-logo.png">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="SnapClaim">
+  <meta property="og:url" content="__SITE__/">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="SnapClaim · Computed, not generated">
+  <meta name="twitter:description" content="Damage reports where every number has a receipt you can recompute.">
+  <meta name="twitter:image" content="__SITE__/assets/snapclaim-logo.png">
+  <meta name="theme-color" content="#0b2557">
+  <link rel="canonical" href="__SITE__/">
+  <link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="manifest" href="site.webmanifest">
+  <link rel="preload" href="assets/fonts/archivo.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <nav class="topbar" aria-label="Main">
+    <a class="brand" href="./" aria-label="SnapClaim home"><img src="assets/snapclaim-mark.png" alt="" width="34" height="32"><span>Snap<b>Claim</b></span></a>
+    <ul class="navlinks">
+      <li><a href="#number">How it works</a></li>
+      <li><a href="#calc">Receipts</a></li>
+      <li><a href="#gate">Evidence gate</a></li>
+      <li><a href="#skeptic">Skeptic</a></li>
+      <li><a href="#models">Models</a></li>
+      <li><a class="nav-gh" href="https://github.com/Parithosh-Varma/snapclaim">GitHub</a></li>
+    </ul>
+    <details class="menu">
+      <summary aria-label="Menu"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2"/></svg><span>Menu</span></summary>
+      <ul>
+        <li><a href="#number">How it works</a></li>
+        <li><a href="#calc">Receipts</a></li>
+        <li><a href="#gate">Evidence gate</a></li>
+        <li><a href="#skeptic">Skeptic</a></li>
+        <li><a href="#refuse">Refusing to guess</a></li>
+        <li><a href="#models">Models</a></li>
+        <li><a href="#replay">Run it</a></li>
+        <li><a href="https://github.com/Parithosh-Varma/snapclaim">GitHub</a></li>
+      </ul>
+    </details>
+  </nav>
+
+  <header class="sheet hero" aria-labelledby="hero-title">
+    <figure class="drawing" aria-label="Survey drawing of a cracked wall panel with a 10-rupee coin for scale. Balloons link each measurement to its receipt.">
+      <svg viewBox="0 0 1200 780" role="img" aria-labelledby="dwg-title" class="dwg">
+        <title id="dwg-title">Wall panel north: crack-1 and stain-1 masks, coin reference, receipts R001 to R008</title>
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+            <path d="M0 1.5 L10 5 L0 8.5 z" class="ink-fill"/>
+          </marker>
+          <marker id="arrow-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+            <path d="M0 1.5 L10 5 L0 8.5 z" class="scale-fill"/>
+          </marker>
+          <pattern id="hatch" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="9" class="hatch-line"/>
+          </pattern>
+        </defs>
+
+        <!-- overall dimensions -->
+        <g class="dim">
+          <line x1="60" y1="50" x2="60" y2="80"/><line x1="860" y1="50" x2="860" y2="80"/>
+          <line x1="60" y1="62" x2="860" y2="62" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+          <text x="460" y="52" text-anchor="middle">800 px</text>
+          <line x1="20" y1="90" x2="50" y2="90"/><line x1="20" y1="690" x2="50" y2="690"/>
+          <line x1="32" y1="90" x2="32" y2="690" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+          <text x="24" y="390" text-anchor="middle" transform="rotate(-90 24 390)">600 px</text>
+        </g>
+
+        <!-- component -->
+        <rect x="60" y="90" width="800" height="600" class="panel"/>
+        <text x="76" y="676" class="label">wall-panel-north · 480,000 px² · conf 0.93</text>
+
+        <!-- crack mask + skeleton -->
+        <polyline class="mask" points="230,128 251.2,144.6 258.5,174.4 287.5,183.5 300.8,207.7 326.2,220.2 344.2,239.8 361.4,260.2 369.7,289.2 390.9,305.7 414.8,319.7 449.3,323.5 424.3,384.3 483.5,364.5 485.8,399.1 521.1,402.2 504.8,454.7 542.7,455.2 531.5,502.9 560.4,512 598.8,512.1 613.6,534.8 605.8,579.2 638.1,585.1 649,611.5 667.9,630.3 690,646"/>
+        <polyline class="crack" pathLength="913" points="230,128 251.2,144.6 258.5,174.4 287.5,183.5 300.8,207.7 326.2,220.2 344.2,239.8 361.4,260.2 369.7,289.2 390.9,305.7 414.8,319.7 449.3,323.5 424.3,384.3 483.5,364.5 485.8,399.1 521.1,402.2 504.8,454.7 542.7,455.2 531.5,502.9 560.4,512 598.8,512.1 613.6,534.8 605.8,579.2 638.1,585.1 649,611.5 667.9,630.3 690,646"/>
+        <text x="702" y="660" class="label markup">crack-1 · skeleton 913 px</text>
+
+        <!-- stain masks (two regions) -->
+        <ellipse cx="722" cy="268" rx="40" ry="30" class="stain"/>
+        <ellipse cx="780" cy="346" rx="32" ry="24" class="stain"/>
+        <text x="700" y="398" class="label markup">stain-1 · 2 regions</text>
+
+        <!-- coin reference -->
+        <g class="coin">
+          <circle cx="1032" cy="548" r="143.5" class="coin-rim"/>
+          <circle cx="1032" cy="548" r="118" class="coin-inner"/>
+          <text x="1032" y="556" text-anchor="middle" class="coin-text">₹10</text>
+          <line x1="888.5" y1="560" x2="888.5" y2="732" class="scale-line"/>
+          <line x1="1175.5" y1="560" x2="1175.5" y2="732" class="scale-line"/>
+          <line x1="888.5" y1="720" x2="1175.5" y2="720" class="scale-line" marker-start="url(#arrow-g)" marker-end="url(#arrow-g)"/>
+          <text x="1032" y="752" text-anchor="middle" class="scale-text">Ø 27 mm = 287 px</text>
+        </g>
+
+        <!-- balloons: each links to its receipt row -->
+        <g class="leaders">
+          <line x1="1032" y1="336" x2="1032" y2="404"/>
+          <line x1="172" y1="476" x2="380" y2="300"/>
+          <line x1="722" y1="174" x2="722" y2="238"/>
+        </g>
+        <g class="balloons">
+          <a href="#R001" data-r="R001" class="b b-scale"><circle cx="1032" cy="312" r="24"/><text x="1032" y="317">R001</text></a>
+
+          <a href="#R002" data-r="R002" class="b"><circle cx="150" cy="490" r="24"/><text x="150" y="495">R002</text></a>
+          <a href="#R003" data-r="R003" class="b"><circle cx="150" cy="538" r="24"/><text x="150" y="543">R003</text></a>
+          <a href="#R004" data-r="R004" class="b"><circle cx="150" cy="586" r="24"/><text x="150" y="591">R004</text></a>
+          <a href="#R005" data-r="R005" class="b"><circle cx="150" cy="634" r="24"/><text x="150" y="639">R005</text></a>
+
+          <a href="#R006" data-r="R006" class="b"><circle cx="674" cy="150" r="24"/><text x="674" y="155">R006</text></a>
+          <a href="#R007" data-r="R007" class="b"><circle cx="722" cy="150" r="24"/><text x="722" y="155">R007</text></a>
+          <a href="#R008" data-r="R008" class="b"><circle cx="770" cy="150" r="24"/><text x="770" y="155">R008</text></a>
+        </g>
+      </svg>
+      <figcaption>Drawn in code from <code>fixtures/masks/wall-crack.json</code>: synthetic mask statistics, not a real photo. Drawn to scale in pixels.</figcaption>
+    </figure>
+
+    <div class="titleblock">
+      <div class="tb-logo">
+        <img src="assets/snapclaim-lockup.png" alt="SnapClaim" width="880" height="750">
+      </div>
+      <h1 id="hero-title">A claim is an argument. Arguments need evidence.</h1>
+      <p class="lede">Point a phone at damage and say one line. SnapClaim returns a report where every number is measured from the pixels, cited to a receipt, and re-checked by a second model before it ships.</p>
+      <div class="actions">
+        <a class="btn btn-go" href="https://github.com/Parithosh-Varma/snapclaim">Read the code</a>
+        <a class="btn" href="#number">How a number is made</a>
+      </div>
+
+      <output class="readout" id="readout" aria-live="polite">
+        <span class="ro-id">R004</span>
+        <span class="ro-method">calibrated_length</span>
+        <span class="ro-calc">913 px × 0.094077 mm/px = <b>85.9 mm</b></span>
+      </output>
+
+      <dl class="tb-rows">
+        <div><dt>Masked by</dt><dd>SAM 3.1</dd></div>
+        <div><dt>Measured by</dt><dd>Plain code, no model</dd></div>
+        <div><dt>Written by</dt><dd>Muse Spark 1.3</dd></div>
+        <div><dt>Checked by</dt><dd>Spark Open</dd></div>
+        <div><dt>Scale</dt><dd><a class="num" href="#R001">0.094077 mm/px</a></dd></div>
+        <div><dt>Drawing</dt><dd>SC-001 · Wall panel north</dd></div>
+      </dl>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="sheet" id="number" aria-labelledby="number-title">
+      <h2 id="number-title" class="strip">How one number is made</h2>
+      <div class="worked">
+        <p class="worked-q">How long is crack-1?</p>
+        <ol class="chain">
+          <li>
+            <span class="step-what">SAM 3.1 masks the crack</span>
+            <span class="step-val">24,800 px of mask</span>
+          </li>
+          <li>
+            <span class="step-what">Thin the mask to a one-pixel skeleton, count its length</span>
+            <span class="step-val">913 px</span>
+          </li>
+          <li>
+            <span class="step-what">The coin is 27 mm across and 287 px wide in the same plane</span>
+            <span class="step-val"><a class="num num-scale" href="#R001">0.094077 mm/px</a></span>
+          </li>
+          <li class="chain-out">
+            <span class="step-what">Multiply</span>
+            <span class="step-val big">913 × 0.094077 = <a class="num" href="#R004">85.9 mm</a></span>
+          </li>
+        </ol>
+        <p class="aside">No language model touches the arithmetic. The writer only receives the results, and every result arrives with an id.</p>
+      </div>
+    </section>
+
+    <section class="sheet calc" id="calc" aria-labelledby="calc-title">
+      <h2 id="calc-title" class="strip">Calculation sheet · wall-crack fixture</h2>
+      <div class="table-wrap" tabindex="0" role="region" aria-labelledby="calc-title">
+        <table>
+          <thead>
+            <tr><th scope="col">Ref</th><th scope="col">Method</th><th scope="col">Calculation</th><th scope="col">Output</th><th scope="col">Conf.</th></tr>
+          </thead>
+          <tbody>
+            <tr id="R001" class="row-scale"><th scope="row">R001</th><td>scale_calibration</td><td>27 mm ÷ 287 px <span class="src">coin-10inr</span></td><td class="out">0.094077 mm/px</td><td>0.88</td></tr>
+            <tr id="R002"><th scope="row">R002</th><td>area_ratio</td><td>24,800 px ÷ 480,000 px × 100 <span class="src">crack-1</span></td><td class="out">5.17 %</td><td>0.88</td></tr>
+            <tr id="R003"><th scope="row">R003</th><td>region_count</td><td>disconnected mask components <span class="src">crack-1</span></td><td class="out">1</td><td>0.88</td></tr>
+            <tr id="R004"><th scope="row">R004</th><td>calibrated_length</td><td>913 px × 0.094077 mm/px <span class="src">uses R001</span></td><td class="out">85.9 mm</td><td>0.774</td></tr>
+            <tr id="R005"><th scope="row">R005</th><td>severity_classification</td><td>5.17 % &gt; 5 % moderate ceiling <span class="src">crack-1</span></td><td class="out">significant</td><td>–</td></tr>
+            <tr id="R006"><th scope="row">R006</th><td>area_ratio</td><td>6,200 px ÷ 480,000 px × 100 <span class="src">stain-1</span></td><td class="out">1.29 %</td><td>0.71</td></tr>
+            <tr id="R007"><th scope="row">R007</th><td>region_count</td><td>disconnected mask components <span class="src">stain-1</span></td><td class="out">2</td><td>0.71</td></tr>
+            <tr id="R008"><th scope="row">R008</th><td>severity_classification</td><td>1 % &lt; 1.29 % ≤ 5 %, no calibrated length <span class="src">stain-1</span></td><td class="out">moderate</td><td>–</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Thresholds are printed in every report: cosmetic ≤ 1 %, moderate ≤ 5 %, significant above that, or a crack ≥ 150 mm, or 3+ regions. Confidence on R004 is the mask's 0.88 times the coin's 0.88.</p>
+    </section>
+
+    <section class="sheet" id="gate" aria-labelledby="gate-title">
+      <h2 id="gate-title" class="strip">The evidence gate</h2>
+      <div class="split">
+        <div class="doc">
+          <p class="doc-line ok">The crack covers 5.17% of the panel <a class="cite" href="#R002">R002</a>, runs 85.9 mm <a class="cite" href="#R004">R004</a> and is classed significant <a class="cite" href="#R005">R005</a>.</p>
+          <p class="doc-line bad"><s>The crack is about 12 cm long.</s> <a class="cite" href="#R002">R002</a></p>
+        </div>
+        <div class="explain">
+          <p>Muse Spark 1.3 writes the findings. Each sentence has to cite receipts, and every number in it has to match one of them. The second sentence cites R002, which says 5.17&nbsp;%, not 12, and it uses a unit the engine never emits. The build stops:</p>
+          <pre class="err"><code>EvidenceError: Evidence gate failed:
+- finding[1]: number 12 is not backed by any cited receipt
+- finding[1]: statement uses a unit this engine never emits
+  (use mm or %): "The crack is about 12 cm long."</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="sheet" id="skeptic" aria-labelledby="skeptic-title">
+      <h2 id="skeptic-title" class="strip">The skeptic</h2>
+      <div class="split">
+        <div class="explain">
+          <p>Spark Open, open weights on Baseten, gets the same receipts and the written findings, and nothing else. It re-derives each claim. Anything it cannot reproduce is printed as disputed in the report, next to the claim, never removed.</p>
+        </div>
+        <div class="verdicts">
+          <div class="verdict">
+            <span class="v-claim">crack-1 runs 85.9 mm <a class="cite" href="#R004">R004</a></span>
+            <span class="v-state">reproduced</span>
+          </div>
+          <div class="verdict disputed">
+            <span class="v-claim">stain-1 is moderate <a class="cite" href="#R008">R008</a></span>
+            <span class="v-state">DISPUTED</span>
+            <span class="v-why">no calibrated length; two regions of 1.29 % may be one patch</span>
+          </div>
+          <p class="illus">Illustrative verdicts. The skeptic call is being wired live this week.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="sheet" id="refuse" aria-labelledby="refuse-title">
+      <h2 id="refuse-title" class="strip">Refuse rather than guess</h2>
+      <div class="split">
+        <svg viewBox="0 0 420 300" class="mini" role="img" aria-labelledby="occ-title">
+          <title id="occ-title">A coin half hidden behind a shoe edge, rejected as a scale reference</title>
+          <circle cx="210" cy="160" r="110" class="coin-rim rejected"/>
+          <rect x="210" y="30" width="190" height="250" class="occluder"/>
+          <line x1="70" y1="160" x2="350" y2="160" class="dim-line"/>
+          <text x="210" y="22" text-anchor="middle" class="label">coin visible: 0.52 of a disc</text>
+        </svg>
+        <div class="explain">
+          <p>When the coin is half covered, its outline no longer fits a circle. Confidence drops below the 0.60 floor, the scale is rejected with its own receipt, and the report falls back to percentages. Millimetres are printed as empty, not estimated.</p>
+          <dl class="ghost">
+            <div><dt>Area</dt><dd>5.17 %</dd></div>
+            <div><dt>Length</dt><dd class="empty"><span aria-hidden="true">––.–</span><span class="sr">not measured</span> mm</dd></div>
+            <div><dt>Scale</dt><dd>scale_rejected</dd></div>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <section class="blueprint" id="models" aria-labelledby="models-title">
+      <h2 id="models-title" class="strip strip-inv">Four Meta models, four jobs</h2>
+      <ol class="flow">
+        <li><span class="m-name">Muse Voice Transcribe</span><span class="m-job">Turns the spoken line into text. Hindi, Telugu, Hinglish.</span></li>
+        <li><span class="m-name">SAM 3.1</span><span class="m-job">Masks the damage and the coin. Pixels only, no opinions.</span></li>
+        <li class="flow-code"><span class="m-name">Plain code</span><span class="m-job">Area, skeleton length, scale, severity. Every result becomes a receipt.</span></li>
+        <li><span class="m-name">Muse Spark 1.3</span><span class="m-job">Writes the findings. Cites receipts or the build fails.</span></li>
+        <li><span class="m-name">Spark Open</span><span class="m-job">Re-checks the findings independently. Disagreement is printed.</span></li>
+      </ol>
+      <p class="bp-note">No image generation anywhere. Every visual in the report is drawn in code from the masks and the math.</p>
+    </section>
+
+    <section class="sheet close" id="replay" aria-labelledby="replay-title">
+      <h2 id="replay-title" class="strip">Replay it yourself</h2>
+      <div class="split">
+        <div class="explain">
+          <p>Every number on this page comes from the engine running on a fixture in the repo. Clone it and the tests recompute them, offline, without spending a cent on API calls.</p>
+          <a class="btn btn-go" href="https://github.com/Parithosh-Varma/snapclaim">Open the repository</a>
+        </div>
+        <pre class="cmd"><code>git clone https://github.com/Parithosh-Varma/snapclaim
+cd snapclaim
+npm install
+npm test</code></pre>
+      </div>
+      <ul class="bounds">
+        <li>Documentation, not advice. A person decides; SnapClaim produces the evidence.</li>
+        <li>Measurement is not causation. It proves what was measured, not who broke it.</li>
+        <li>Photo metadata (GPS, device) is stripped on intake.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="sheet foot">
+    <div class="foot-cols">
+      <div class="foot-brand">
+        <img src="assets/snapclaim-lockup.png" alt="SnapClaim" width="141" height="120">
+        <p>Measured damage reports with receipts. Computed, not generated.</p>
+        <p class="foot-small">Built for the Meta Global AI Developer Hackathon, Oct 26 – Nov 4, 2026.</p>
+      </div>
+      <nav aria-label="On this page">
+        <h2>On this page</h2>
+        <ul>
+          <li><a href="#number">How a number is made</a></li>
+          <li><a href="#calc">Calculation sheet</a></li>
+          <li><a href="#gate">Evidence gate</a></li>
+          <li><a href="#skeptic">The skeptic</a></li>
+          <li><a href="#refuse">Refusing to guess</a></li>
+          <li><a href="#replay">Run it yourself</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Project">
+        <h2>Project</h2>
+        <ul>
+          <li><a href="https://github.com/Parithosh-Varma/snapclaim">Source on GitHub</a></li>
+          <li><a href="https://github.com/Parithosh-Varma/snapclaim#readme">README</a></li>
+          <li><a href="https://github.com/Parithosh-Varma/snapclaim/blob/main/DEV-LOG.md">Dev log</a></li>
+          <li><a href="https://github.com/Parithosh-Varma/snapclaim/issues">Issues</a></li>
+        </ul>
+      </nav>
+      <div>
+        <h2>Built on</h2>
+        <ul>
+          <li>SAM 3.1</li>
+          <li>Muse Spark 1.3</li>
+          <li>Spark Open on Baseten</li>
+          <li>Muse Voice Transcribe</li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-legal">
+      <span>© 2026 SnapClaim team</span>
+      <a href="https://github.com/Parithosh-Varma/snapclaim/blob/main/LICENSE">Apache-2.0</a>
+      <span>Documentation, not advice. No coverage or legal decisions.</span>
+    </div>
+  </footer>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
