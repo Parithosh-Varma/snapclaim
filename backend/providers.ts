@@ -1,4 +1,3 @@
-import { MockFindingsProvider, MockVisionProvider } from "../src/adapters/mock.ts";
 import type { FindingsProvider, FindingsRequest, VisionProvider, VisionRequest, VisionResult } from "../src/adapters/types.ts";
 import { BudgetExceededError, estimateCostUsd, type SpendGuard } from "../src/config/spend-guard.ts";
 import { loadConfig, type AppConfig } from "../src/config/config.ts";
@@ -20,19 +19,14 @@ export function configFromEnv(env: Env): AppConfig {
   return loadConfig(env);
 }
 
-/** Live routes fail closed: no key, no call. Measure/report-mock never reach here. */
+/** Live routes fail closed: no key, no call. Measure and observe never reach here. */
 export function requireLiveKeys(env: Env, config: AppConfig): { metaKey: string; basetenKey?: string } {
-  if (config.mockMode) return { metaKey: "" };
   const metaKey = env.META_API_KEY?.trim();
-  if (!metaKey) throw new HttpError(503, "META_API_KEY required when MOCK_MODE=0");
+  if (!metaKey) throw new HttpError(503, "META_API_KEY required: set it in .env or as a Worker secret");
   return { metaKey, basetenKey: env.BASETEN_API_KEY?.trim() || undefined };
 }
 
-export function visionProvider(env: Env, config: AppConfig, fixture?: VisionResult): VisionProvider {
-  if (config.mockMode) {
-    if (!fixture) throw new HttpError(400, "mock segment requires body.fixture {component, masks} — backend invents no masks");
-    return new MockVisionProvider(fixture);
-  }
+export function visionProvider(env: Env, config: AppConfig): VisionProvider {
   requireLiveKeys(env, config);
   return {
     // SAM 3.1 request shape is not yet verified against the live API. Fail loudly, never fake a mask.
@@ -48,7 +42,6 @@ export function findingsProvider(
   fetchFn: FetchFn = fetch,
   spend?: SpendGuard,
 ): FindingsProvider {
-  if (config.mockMode) return new MockFindingsProvider();
   const { metaKey } = requireLiveKeys(env, config);
   return new MetaFindingsProvider({
     apiKey: metaKey,
@@ -71,9 +64,8 @@ export function skepticProvider(
   fetchFn: FetchFn = fetch,
   spend?: SpendGuard,
 ): FindingsProvider {
-  if (config.mockMode) return new MockFindingsProvider();
   const basetenKey = env.BASETEN_API_KEY?.trim();
-  if (!basetenKey) throw new HttpError(503, "BASETEN_API_KEY required when MOCK_MODE=0");
+  if (!basetenKey) throw new HttpError(503, "BASETEN_API_KEY required: set it in .env or as a Worker secret");
   return new BasetenSkepticProvider({
     apiKey: basetenKey,
     base: config.endpoints.baseten,

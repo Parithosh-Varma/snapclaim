@@ -34,18 +34,17 @@ test("token cost estimate is deterministic", () => {
   assert.equal(cost, 0.00125);
 });
 
-test("config defaults to mock mode and the exact open-weights model id", () => {
+test("config defaults to the exact open-weights model id", () => {
   const config = loadConfig({});
-  assert.equal(config.mockMode, true);
+  assert.ok(!("mockMode" in config));
   assert.equal(config.spendLimitUsd, 5);
   assert.equal(config.models.sparkOpen, "meta-models/muse-spark-open");
   assert.equal(config.models.spark, "muse-spark-1.3");
   assert.equal(config.minReferenceConfidence, DEFAULT_CONFIG.minReferenceConfidence);
 });
 
-test("live mode is opt-in and spend limits are validated", () => {
-  const config = loadConfig({ MOCK_MODE: "0", SPEND_GUARD_USD: "2.5", MIN_REFERENCE_CONFIDENCE: "0.8" });
-  assert.equal(config.mockMode, false);
+test("spend limits are validated", () => {
+  const config = loadConfig({ SPEND_GUARD_USD: "2.5", MIN_REFERENCE_CONFIDENCE: "0.8" });
   assert.equal(config.spendLimitUsd, 2.5);
   assert.equal(config.minReferenceConfidence, 0.8);
 

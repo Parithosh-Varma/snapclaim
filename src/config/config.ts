@@ -11,7 +11,6 @@ export interface EndpointConfig {
 }
 
 export interface AppConfig {
-  mockMode: boolean;
   spendLimitUsd: number;
   endpoints: EndpointConfig;
   models: ModelConfig;
@@ -19,7 +18,6 @@ export interface AppConfig {
 }
 
 export const DEFAULT_CONFIG: AppConfig = Object.freeze({
-  mockMode: true,
   spendLimitUsd: 5,
   endpoints: Object.freeze({
     meta: "https://api.meta.ai/v1",
@@ -46,7 +44,6 @@ function parseNonNegative(raw: string | undefined, fallback: number, name: strin
 }
 
 /**
- * Mock mode is the default: live calls require MOCK_MODE=0 explicitly.
  * The Worker passes its environment bindings here; tests pass a plain object.
  */
 export function loadConfig(env: Record<string, string | undefined>): AppConfig {
@@ -60,7 +57,6 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
   }
 
   return {
-    mockMode: env.MOCK_MODE !== "0",
     spendLimitUsd: parseNonNegative(env.SPEND_GUARD_USD, DEFAULT_CONFIG.spendLimitUsd, "SPEND_GUARD_USD"),
     endpoints: {
       meta: env.META_API_BASE ?? DEFAULT_CONFIG.endpoints.meta,

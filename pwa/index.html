@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>SnapClaim — capture (mock)</title>
+<title>SnapClaim — capture</title>
 <style>
 body { font-family: system-ui, sans-serif; max-width: 860px; margin: 24px auto; padding: 0 16px; }
 textarea { width: 100%; font-family: monospace; }
@@ -16,25 +16,43 @@ svg.schematic { border: 1px solid #ccc; width: 100%; height: auto; }
 </style>
 </head>
 <body>
-<h1>SnapClaim capture (mock, $0)</h1>
-<p>Photo + one line in, measured report out. Mock mode invents no masks — paste fixture or edited masks JSON.</p>
+<h1>SnapClaim capture</h1>
+<p>Photo + one line in, measured report out. Outlining runs on this phone; the photo never leaves it.</p>
 
-<div class="row">
 <div>
 <label>Backend <input id="base" value="https://snapclaim-backend.parithosh.workers.dev" size="38" /></label>
 <button id="health">health</button> <span id="healthOut"></span>
 </div>
-<div>
-<label>Photo (preview only in mock) <input id="photo" type="file" accept="image/*" /></label>
-<div><img id="preview" alt="" style="max-width:100%;display:none" /></div>
-</div>
-</div>
 
-<h2>1. Masks JSON (fixture shape)</h2>
-<textarea id="payload" rows="16"></textarea><br/>
-<button id="fixture">load fixture</button>
+<h2>1. Photo and outlines</h2>
+<input id="photo" type="file" accept="image/*" capture="environment" />
+<div id="steps" style="display:none">
+<p>Tap the photo to add points to the active step.</p>
+<div class="row">
+<div>
+<button id="stepDamage">Mark the damage</button>
+<select id="damageLabel"><option>crack</option><option>stain</option><option>peel</option><option>dent</option></select>
+<button id="undoDamage">Undo point</button> <button id="clearDamage">Clear</button>
+</div>
+<div>
+<button id="stepCoin">Mark the coin</button>
+<select id="coinKind">
+<option value="24.26">US quarter 24.26 mm</option>
+<option value="23.88">Canadian quarter 23.88 mm</option>
+<option value="24.5">UK 10p 24.5 mm</option>
+<option value="23.25">1 euro 23.25 mm</option>
+</select>
+<button id="undoCoin">Undo point</button> <button id="clearCoin">Clear</button>
+</div>
+</div>
+</div>
+<canvas id="canvas" style="width:100%;height:auto;display:none;touch-action:manipulation;margin-top:8px"></canvas>
+<div><button id="measure" disabled>Measure</button> <span id="status"></span></div>
+<div id="measured"></div>
+
+<h2>Measured payload (read-only)</h2>
+<textarea id="payload" rows="10" readonly></textarea><br/>
 <button id="send">send to /v1/report</button>
-<span id="status"></span>
 
 <h2>2. Transcript (one line)</h2>
 <input id="transcript" value="wall crack near the window, coin for scale" size="60" />
@@ -57,6 +75,6 @@ svg.schematic { border: 1px solid #ccc; width: 100%; height: auto; }
 <h2>6. Raw report</h2>
 <pre id="raw">{}</pre>
 
-<script src="./app.js"></script>
+<script type="module" src="./app.js"></script>
 </body>
 </html>

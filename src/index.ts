@@ -21,5 +21,17 @@ export type { FindingDraft, GateResult } from "./findings/evidence-gate.ts";
 export { DEFAULT_CONFIG, loadConfig } from "./config/config.ts";
 export type { AppConfig } from "./config/config.ts";
 export { BudgetExceededError, SpendGuard, estimateCostUsd } from "./config/spend-guard.ts";
-export { MockFindingsProvider, MockVisionProvider } from "./adapters/mock.ts";
 export type { FindingsProvider, FindingsRequest, VisionProvider, VisionRequest, VisionResult } from "./adapters/types.ts";
+export {
+  connectedRegions,
+  createMask,
+  decodeRle,
+  intersectMasks,
+  maskArea,
+  maskFromRows,
+  skeletonLengthPx,
+  skeletonize,
+} from "./vision/mask.ts";
+export type { BinaryMask, CocoRle, Region } from "./vision/mask.ts";
+export { circularReference, observeMask } from "./vision/observe.ts";
+export type { CircularReferenceOptions, ObserveMaskOptions, ReferenceDiagnostics } from "./vision/observe.ts";
