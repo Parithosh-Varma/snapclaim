@@ -11,8 +11,21 @@ const MODEL_ID = "Xenova/slimsam-77-uniform";
 // that still scores MIN_FINE_SCORE. Coins are compact, so they keep the best score.
 const MIN_FINE_SCORE = 0.5;
 
-let tf = null, model = null, processor = null;
+let tf = null, model = null, processor = null, device = null;
 let rawImage = null, embeddings = null, currentPhoto = -1;
+let forcedCpu = false; // set after a GPU run fails, for the rest of the session
+
+// WebGPU first (full-precision weights, which every adapter can run), else the
+// 8-bit CPU build. ?device=wasm or ?device=webgpu on the worker URL forces one.
+const forced = new URL(self.location.href).searchParams.get("device");
+
+async function hasWebGpu() {
+  try {
+    return !!(await navigator.gpu?.requestAdapter());
+  } catch {
+    return false;
+  }
+}
 
 async function loadModel() {
   if (model) return;
@@ -20,8 +33,27 @@ async function loadModel() {
   const progress_callback = (p) => {
     if (p.status === "progress") postMessage({ type: "progress", percent: Math.round(p.progress) });
   };
+  processor ??= await tf.AutoProcessor.from_pretrained(MODEL_ID, { progress_callback });
+  if (!forcedCpu && forced !== "wasm" && (forced === "webgpu" || (await hasWebGpu()))) {
+    try {
+      model = await tf.SamModel.from_pretrained(MODEL_ID, { device: "webgpu", dtype: "fp32", progress_callback });
+      device = "webgpu";
+      return;
+    } catch (e) {
+      if (forced === "webgpu") throw e;
+    }
+  }
   model = await tf.SamModel.from_pretrained(MODEL_ID, { progress_callback });
-  processor = await tf.AutoProcessor.from_pretrained(MODEL_ID, { progress_callback });
+  device = "wasm";
+}
+
+/** Drop a GPU model that failed mid-run, so the next load takes the CPU path. */
+function fallBackToCpu() {
+  if (device !== "webgpu" || forced === "webgpu") return false;
+  model = null;
+  device = null;
+  forcedCpu = true;
+  return true;
 }
 
 async function embed({ photoId, image }) {
@@ -32,11 +64,19 @@ async function embed({ photoId, image }) {
     const raw = new tf.RawImage(image.data, image.width, image.height, 4).rgb();
     // image embeddings are computed once per photo; point prompts reuse them
     const inputs = await processor(raw);
-    const result = await model.get_image_embeddings(inputs);
+    const started = performance.now();
+    let result;
+    try {
+      result = await model.get_image_embeddings(inputs);
+    } catch (e) {
+      if (!fallBackToCpu()) throw e;
+      await loadModel();
+      result = await model.get_image_embeddings(inputs);
+    }
     if (photoId !== currentPhoto) return; // a newer photo arrived meanwhile
     rawImage = raw;
     embeddings = result;
-    postMessage({ type: "ready", photoId });
+    postMessage({ type: "ready", photoId, device, embedMs: Math.round(performance.now() - started) });
   } catch (e) {
     if (photoId === currentPhoto) postMessage({ type: "error", photoId, message: String(e?.message ?? e) });
   }
