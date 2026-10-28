@@ -2,6 +2,11 @@ const $ = (id) => document.getElementById(id);
 
 import { checkPhoto } from "./photo-check.js";
 
+/** Light the ✓ on a step section when its job is done. */
+function markStep(n) {
+  $(`step${n}`)?.classList.add("done");
+}
+
 function base() { return $("base").value.replace(/\/$/, ""); }
 
 $("health").onclick = async () => {
@@ -50,7 +55,7 @@ document.querySelectorAll("[data-line]").forEach((b) => {
 async function handlePhotoFile(f) {
   if (!f) return;
   $("photoName").textContent = f.name || "Pasted image";
-  $("pillPhoto")?.classList.add("done");
+  markStep(1);
   $("measure").disabled = true;
   embeddings = null;
   for (const k of Object.keys(steps)) steps[k] = emptyStep();
@@ -132,7 +137,6 @@ function redraw() {
     }
   }
   $("measure").disabled = !steps.damage.mask;
-  $("pillMark")?.classList.toggle("done", !!steps.damage.mask);
 }
 
 // One SAM decoder run per tap, then union. Prompting all taps at once makes SAM
@@ -314,15 +318,22 @@ $("measure").onclick = async () => {
 
 function measuredRows(findings) {
   return findings.map((f) => {
+    const label = String(f.label);
+    const cap = label.charAt(0).toUpperCase() + label.slice(1);
     const mm = f.crackLengthMm === null ? "—" : `${escapeHtml(String(f.crackLengthMm))} mm`;
     const area = f.areaCm2 === null || f.areaCm2 === undefined ? "" : ` · ${escapeHtml(String(f.areaCm2))} cm²`;
     const width = f.crackWidthMm === null || f.crackWidthMm === undefined ? "" : ` · w ${escapeHtml(String(f.crackWidthMm))} mm`;
-    return `<li><b>${escapeHtml(String(f.label))}</b> ${escapeHtml(String(f.percent))}%${area} · ${mm}${width} · <span class="badge ok">${escapeHtml(String(f.severity))}</span>${f.statement ? `<br/><small>${escapeHtml(String(f.statement))}</small>` : ""}</li>`;
+    const regions = `${escapeHtml(String(f.regionCount ?? 1))} region${(f.regionCount ?? 1) === 1 ? "" : "s"}`;
+    return `<li><p class="found">${escapeHtml(cap)} found</p>` +
+      `<b>${escapeHtml(String(f.percent))}%</b> <small>of the wall</small> · ` +
+      `<b>${mm}</b> <small>length</small>${area} · ${regions} · ` +
+      `<span class="badge ok">${escapeHtml(String(f.severity))}</span>${width}` +
+      `${f.statement ? `<br/><small>${escapeHtml(String(f.statement))}</small>` : ""}</li>`;
   }).join("");
 }
 
 function showMeasured(result) {
-  $("pillReport")?.classList.add("done");
+  markStep(3);
   const mode = result.mode === "absolute" ? "" : " (no coin: percent only)";
   $("measured").innerHTML = `<span class="badge ok">MEASURED${mode}</span><ul>${measuredRows(result.findings)}</ul>`;
   drawScheme(result.findings);
@@ -375,6 +386,7 @@ async function runReport(keepMeasured = false) {
     return;
   }
   $("status").textContent = `ok ${j.requestId} ${j.durationMs}ms`;
+  markStep(2);
   lastMeasurement = j.result.measurement ?? null;
   $("skepStatus").textContent = lastMeasurement ? "ready for skeptic" : "";
   const rows = measuredRows(j.result.findings);
@@ -441,6 +453,7 @@ $("skeptic").onclick = async () => {
     return;
   }
   $("skepStatus").textContent = `skeptic ok ${j.requestId}`;
+  markStep(4);
   const rows = j.result.findings.map((f) => {
     const disputed = /disputed/i.test(f.statement);
     const badge = disputed ? `<span class="badge fail">DISPUTED</span>` : `<span class="badge ok">AGREED</span>`;
@@ -678,6 +691,7 @@ $("xcheck").onclick = async () => {
     chip.className = `badge ${badge}`;
     chip.textContent = `${escapeHtml(String(verdict))} · IoU ${escapeHtml(String(iou))}`;
     $("xcheckStatus").appendChild(chip);
+    markStep(4);
   } catch (e) {
     $("xcheckStatus").textContent = `Cross-check failed (${e.message ?? e}). Mock mode has no SAM; go live or ignore.`;
   }
@@ -697,6 +711,7 @@ $("render").onclick = async () => {  let body;
   });
   const j = await res.json();
   if (!res.ok || !j.ok) return;
+  markStep(5);
   $("annex").innerHTML = j.result.svg;
   const blob = new Blob([j.result.svg], { type: "image/svg+xml" });
   const dl = $("dl");

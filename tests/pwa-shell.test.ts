@@ -28,6 +28,9 @@ test("PWA shell is installable and honest", () => {
   assert.ok(html.includes('id="noScale"'), "no-scale percent-only toggle exists");
   assert.ok(html.includes('id="xcheck"'), "SAM cross-check button exists");
   assert.ok(html.includes('id="xcheckStatus"'), "cross-check status exists");
+  for (const headline of ["Snap it.", "Say what happened.", "Get the numbers.", "Checked twice.", "Send the report."]) {
+    assert.ok(html.includes(headline), `step headline "${headline}" exists`);
+  }
 });
 
 test("service worker caches the shell, never the API", () => {
