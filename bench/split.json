@@ -1,7 +1,7 @@
 {
   "version": 1,
   "note": "Held-out split for the eval. heldOut is frozen before any prompt or threshold tuning; once frozenAt is set, cases only get added, never moved. The first four held-out cases are public photos without a scale reference: they test that the pipeline refuses to invent millimetres. Measured-accuracy cases (coin or ruler in frame) are still missing. Photo files stay local in fixtures/photos/ (gitignored); source and license are recorded here.",
-  "frozenAt": "2026-10-28T16:50:00+03:00",
+  "frozenAt": "2026-10-28T18:05:00+03:00",
   "dev": [
     {
       "id": "fixture-wall-crack-01",
