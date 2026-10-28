@@ -48,4 +48,4 @@ export function modelFetch(drafts: FindingDraft[]): typeof fetch {
   }) as typeof fetch;
 }
 
-export const LIVE_ENV = { META_API_KEY: "test", BASETEN_API_KEY: "test" };
+export const LIVE_ENV = { MOCK_MODE: "0", META_API_KEY: "test", BASETEN_API_KEY: "test" };

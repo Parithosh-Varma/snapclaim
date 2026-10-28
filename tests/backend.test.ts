@@ -13,16 +13,19 @@ const payload = () => {
   };
 };
 
-test("backend health reports live mode only when keys are set", async () => {
+test("backend health distinguishes mock, live and missing keys", async () => {
   const res = await handleRequest({ method: "GET", path: "/v1/health", env: {} });
   assert.equal(res.status, 200);
   const body = res.body as { ok: boolean; version: string; mode: string };
   assert.equal(body.ok, true);
-  assert.equal(body.mode, "config-error");
+  assert.equal(body.mode, "mock");
   assert.ok(body.version.length > 0);
 
   const live = await handleRequest({ method: "GET", path: "/v1/health", env: LIVE_ENV });
   assert.equal((live.body as { mode: string }).mode, "live");
+
+  const noKeys = await handleRequest({ method: "GET", path: "/v1/health", env: { MOCK_MODE: "0" } });
+  assert.equal((noKeys.body as { mode: string }).mode, "config-error");
 });
 
 test("backend measure is enveloped and ignores extra fields", async () => {
@@ -78,9 +81,22 @@ test("live findings without a key fails closed with 503", async () => {
     method: "POST",
     path: "/v1/findings",
     body: { transcript: "x", findings: result.findings, receipts: result.receipts },
-    env: {},
+    env: { MOCK_MODE: "0" },
   });
   assert.equal(res.status, 503);
+});
+
+test("mock findings fall back without keys and still pass the gate", async () => {
+  const p = payload();
+  const measured = await handleRequest({ method: "POST", path: "/v1/measure", body: p, env: {} });
+  const result = (measured.body as { result: { findings: unknown[]; receipts: unknown[] } }).result;
+  const res = await handleRequest({
+    method: "POST",
+    path: "/v1/findings",
+    body: { ...p, transcript: "x", findings: result.findings, receipts: result.receipts },
+    env: {},
+  });
+  assert.equal(res.status, 200);
 });
 
 test("findings with masks cross-checks receipts and rejects tampered ones", async () => {
@@ -110,13 +126,32 @@ test("findings with masks cross-checks receipts and rejects tampered ones", asyn
   assert.equal(bad.status, 422);
 });
 
-test("segment never invents masks: no fixture path, no key means 503", async () => {
+test("segment in mock mode requires a fixture and invents no masks", async () => {
+  const missing = await handleRequest({
+    method: "POST",
+    path: "/v1/segment",
+    body: { imageId: "img-1", labels: ["crack"] },
+    env: {},
+  });
+  assert.equal(missing.status, 400);
+
+  const f = loadWallFixture();
+  const ok = await handleRequest({
+    method: "POST",
+    path: "/v1/segment",
+    body: { imageId: f.imageId, labels: ["crack"], fixture: { component: f.component, masks: f.masks } },
+    env: {},
+  });
+  assert.equal(ok.status, 200);
+});
+
+test("segment in live mode without a key fails closed with 503", async () => {
   const f = loadWallFixture();
   const res = await handleRequest({
     method: "POST",
     path: "/v1/segment",
     body: { imageId: f.imageId, labels: ["crack"], fixture: { component: f.component, masks: f.masks } },
-    env: {},
+    env: { MOCK_MODE: "0" },
   });
   assert.equal(res.status, 503);
 });

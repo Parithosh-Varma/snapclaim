@@ -61,11 +61,11 @@ export function toMeasureInput(body: unknown): MeasureSessionInput {
   return input;
 }
 
-export function healthBody(env: Env = {}): { ok: true; version: string; time: string; mode: "live" | "config-error" } {
-  let mode: "live" | "config-error" = "live";
+export function healthBody(env: Env = {}): { ok: true; version: string; time: string; mode: "mock" | "live" | "config-error" } {
+  let mode: "mock" | "live" | "config-error" = "mock";
   try {
-    configFromEnv(env);
-    if (!env.META_API_KEY?.trim()) mode = "config-error";
+    const config = configFromEnv(env);
+    if (!config.mockMode) mode = env.META_API_KEY?.trim() ? "live" : "config-error";
   } catch {
     mode = "config-error";
   }
@@ -202,7 +202,7 @@ export async function reportBody(body: unknown, env: Env, requestId = newRequest
 export async function segmentBody(body: unknown, env: Env, requestId = newRequestId()): Promise<EnvelopedResult> {
   const started = Date.now();
   if (!isRecord(body)) throw new Error("body must be a JSON object");
-  const provider = visionProvider(env, configFromEnv(env));
+  const provider = visionProvider(env, configFromEnv(env), body.fixture as never);
   const result = await provider.segment({
     imageId: typeof body.imageId === "string" ? body.imageId : "unknown",
     labels: Array.isArray(body.labels) ? (body.labels as never) : [],

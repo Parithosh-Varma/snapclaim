@@ -28,14 +28,15 @@ async function main() {
     body: JSON.stringify({ ...payload, transcript: "crack near window" }),
   });
   const live = health.mode === "live";
-  if (live) {
+  const mock = health.mode === "mock";
+  if (live || mock) {
     const body = await reported.json();
     if (!body?.ok || body?.result?.gate?.ok !== true) throw new Error("report failed: " + JSON.stringify(body));
-    console.log("report ok", JSON.stringify({ findings: body.result.findings.length, gate: body.result.gate.ok }));
+    console.log(`report ok (${health.mode})`, JSON.stringify({ findings: body.result.findings.length, gate: body.result.gate.ok }));
   } else {
-    // No keys: the backend must refuse, never fake findings.
+    // MOCK_MODE=0 with no keys: the backend must refuse, never fake findings.
     if (reported.status !== 503) throw new Error("report without keys should 503, got " + reported.status);
-    console.log("report fails closed 503 (no META_API_KEY)");
+    console.log("report fails closed 503 (MOCK_MODE=0, no META_API_KEY)");
   }
 
   const gated = await fetch(`${base}/v1/report`, {
