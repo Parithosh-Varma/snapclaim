@@ -308,6 +308,62 @@ export function skeletonLengthPx(skeleton: BinaryMask): number {
   return length;
 }
 
+/**
+ * Undoes the foreshortening of a tilted surface: lengths along `angle`
+ * (radians from +x, y pointing down) are multiplied by `factor`, lengths
+ * across it are kept. From a coin's ellipse, `angle` is its minor axis and
+ * `factor` is 1 / aspect.
+ */
+export interface PlaneStretch {
+  angle: number;
+  factor: number;
+}
+
+/**
+ * The mask as it would look shot straight on: resampled onto
+ * a grid stretched by `factor` along `angle`, bilinear and thresholded at one half. Measuring the resampled mask
+ * keeps the skeleton and its link weights exact; stretching each link of the
+ * original skeleton instead overstates stair-stepped lines by up to 13%.
+ */
+export function rectifyMask(mask: BinaryMask, stretch: PlaneStretch): BinaryMask {
+  assertMask(mask);
+  const nx = Math.cos(stretch.angle);
+  const ny = Math.sin(stretch.angle);
+  const forward = (x: number, y: number): [number, number] => {
+    const along = (stretch.factor - 1) * (x * nx + y * ny);
+    return [x + along * nx, y + along * ny];
+  };
+  const corners = [forward(0, 0), forward(mask.width, 0), forward(0, mask.height), forward(mask.width, mask.height)];
+  const minX = Math.min(...corners.map((c) => c[0]));
+  const minY = Math.min(...corners.map((c) => c[1]));
+  const width = Math.ceil(Math.max(...corners.map((c) => c[0])) - minX);
+  const height = Math.ceil(Math.max(...corners.map((c) => c[1])) - minY);
+  const out = createMask(width, height);
+  const back = 1 / stretch.factor - 1;
+  const at = (x: number, y: number): number =>
+    x >= 0 && y >= 0 && x < mask.width && y < mask.height && mask.data[y * mask.width + x] !== 0 ? 1 : 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      // Output pixel centre → original image, then the pixel that contains it.
+      const ox = x + 0.5 + minX;
+      const oy = y + 0.5 + minY;
+      const along = back * (ox * nx + oy * ny);
+      // Bilinear between pixel centres, kept at ≥ 0.5: nearest-pixel sampling
+      // leaves stair steps on oblique edges that sprout skeleton spurs.
+      const fx = ox + along * nx - 0.5;
+      const fy = oy + along * ny - 0.5;
+      const x0 = Math.floor(fx);
+      const y0 = Math.floor(fy);
+      const tx = fx - x0;
+      const ty = fy - y0;
+      const value =
+        (1 - tx) * (1 - ty) * at(x0, y0) + tx * (1 - ty) * at(x0 + 1, y0) + (1 - tx) * ty * at(x0, y0 + 1) + tx * ty * at(x0 + 1, y0 + 1);
+      if (value >= 0.5) out.data[y * width + x] = 1;
+    }
+  }
+  return out;
+}
+
 /** Copy of one region, cropped to its bounding box plus a one-pixel empty border. */
 export function cropRegion(width: number, region: Region): BinaryMask {
   let minX = Infinity;

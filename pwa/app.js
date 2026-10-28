@@ -315,7 +315,12 @@ $("measure").onclick = async () => {
 function shapeWarnings(result) {
   const out = [];
   const coin = result.referenceCheck;
-  if (coin?.rejected) out.push(`Coin not used: ${coin.rejected}. Undo the coin taps and tap its centre again.`);
+  if (coin?.rejected) {
+    const fix = /tilted/.test(coin.rejected) ? "Retake the photo from more directly in front." : "Undo the coin taps and tap its centre again.";
+    out.push(`Coin not used: ${coin.rejected}. ${fix}`);
+  } else if (coin?.tiltDeg >= 12) {
+    out.push(`The wall is seen at a ${Math.round(coin.tiltDeg)}° angle (from the coin's shape); crack lengths are corrected for it.`);
+  }
   for (const m of result.masks) {
     if (!m.blockyAreaPx) continue;
     const share = Math.round((100 * m.blockyAreaPx) / m.areaPx);
