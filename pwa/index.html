@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
 <meta name="theme-color" content="#000000" />
 <meta name="description" content="SnapClaim — photo + one line in, measured damage report out." />
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; connect-src 'self' https:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; worker-src 'self' blob:; media-src blob: data:" />
@@ -170,6 +170,7 @@
 <span class="corner bl" aria-hidden="true"></span><span class="corner br" aria-hidden="true"></span>
 <div class="coinring" id="coinRing" aria-hidden="true" style="display:none"></div>
 <div id="coinHint">Add a coin for scale</div>
+<button id="enableCam" type="button" style="display:none;position:absolute;z-index:4;left:50%;top:55%;transform:translateX(-50%);border:2px solid #fff;background:rgba(5,10,25,.55);backdrop-filter:blur(6px);color:#fff;font:inherit;font-weight:800;font-size:17px;padding:14px 26px;border-radius:999px;cursor:pointer">Enable camera</button>
 <div id="count" aria-hidden="true"></div>
 <button id="shutter" type="button" aria-label="Capture"></button>
 <div class="flash" id="flash"></div>

@@ -76,17 +76,47 @@ function stopCamera() {
   feed.srcObject = null;
 }
 function acquireCamera() {
-  if (!navigator.mediaDevices?.getUserMedia) { setLocked(false); return; }
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: "environment" } }, audio: false })
-    .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false }))
+  if (!navigator.mediaDevices?.getUserMedia) { explainCam({ name: "unsupported" }); return; }
+  const backCam = { video: { facingMode: { exact: "environment" } }, audio: false };
+  const anyCam = { video: { facingMode: "environment" }, audio: false };
+  navigator.mediaDevices.getUserMedia(backCam)
+    .catch(() => navigator.mediaDevices.getUserMedia(anyCam))
     .then((stream) => {
       camStream = stream;
+      stream.oninactive = () => {
+        coinSeen = false; smooth = null; history.length = 0; cancelCapture();
+        setLocked(true, "Add a coin for scale");
+        explainCam({ name: "stopped" });
+      };
       feed.srcObject = stream;
-      return feed.play().catch(() => {});
+      return feed.play().then(() => {
+        $("enableCam").style.display = "none";
+        scan();
+      });
     })
-    .then(() => scan())
-    .catch(() => { hint.textContent = "Camera blocked — demo mode, shutter open"; setLocked(false); });
+    .catch(explainCam);
 }
+function explainCam(err) {
+  const name = (err && err.name) || "unknown";
+  const btn = $("enableCam");
+  if (btn) btn.style.display = "block";
+  if (name === "NotAllowedError" || name === "SecurityError") {
+    hint.textContent = "Camera permission is off — tap Enable camera";
+  } else if (name === "NotFoundError" || name === "OverconstrainedError") {
+    hint.textContent = "No back camera found — tap Enable camera to retry";
+  } else if (name === "NotReadableError") {
+    hint.textContent = "Camera busy in another app — close it, then tap Enable camera";
+  } else if (name === "stopped") {
+    hint.textContent = "Camera stopped — tap Enable camera";
+  } else {
+    hint.textContent = `Camera unavailable (${name}) — tap Enable camera`;
+  }
+  setLocked(false);
+}
+$("enableCam").addEventListener("click", () => {
+  $("enableCam").style.display = "none";
+  acquireCamera();
+});
 function placeRing(det, fw, fh) {
   const vw = window.innerWidth, vh = window.innerHeight;
   const scale = Math.max(vw / fw, vh / fh);
