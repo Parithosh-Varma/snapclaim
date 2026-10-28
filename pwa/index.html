@@ -121,10 +121,12 @@
     margin-top:8px;text-align:center;min-height:1.2em}
   #status:empty::before{content:"Ready when you are."}
 
-  #measured:empty, #findings:empty, #skepticOut:empty, #annex:empty{display:none}
+  #measured:empty, #findings:empty, #skepticOut:empty, #annex:empty, #photoCheck:empty{display:none}
   #measured, #findings, #skepticOut{margin-top:14px}
+  #photoCheck{margin:14px 0 0;padding:0;list-style:none}
   #measured ul, #findings ul, #skepticOut ul{margin:10px 0 0;padding:0;list-style:none}
   #measured li, #findings li, #skepticOut li{padding:11px 12px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;background:#fff;font-size:15px}
+  #photoCheck li{padding:11px 12px;border:1px solid var(--line);border-left:4px solid var(--tape);border-radius:12px;margin-bottom:8px;background:#fff8e1;font-size:14px}
   #measured li small, #findings li small, #skepticOut li small{color:var(--muted)}
   svg.schematic{border:1px solid var(--line);border-radius:12px;width:100%;height:auto;background:#fff;margin-top:12px}
   #annex svg{max-width:100%;height:auto}
@@ -218,6 +220,7 @@
       <button id="measure" class="btn-primary" type="button" disabled>Measure damage</button>
       <span id="status" role="status"></span>
     </div>
+    <ul id="photoCheck"></ul>
     <div id="measured"></div>
   </section>
 

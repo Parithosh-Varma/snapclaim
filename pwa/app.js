@@ -1,3 +1,5 @@
+import { checkPhoto, coinPrecision } from "./photo-check.js";
+
 const $ = (id) => document.getElementById(id);
 
 function base() { return $("base").value.replace(/\/$/, ""); }
@@ -29,6 +31,17 @@ let active = "damage";
 // per step: tap points in photo pixels, one SAM mask per tap, and their union (row-major 0/1)
 const emptyStep = () => ({ points: [], pointMasks: [], mask: null, iou: 0 });
 const steps = { damage: emptyStep(), coin: emptyStep() };
+// Blur/exposure warnings for this photo; the coin-size note is added once the coin is outlined.
+let photoWarnings = [];
+
+function showPhotoNotes() {
+  const el = $("photoCheck");
+  if (!el) return;
+  const notes = [...photoWarnings];
+  const coin = steps.coin.mask && coinPrecision(steps.coin.mask);
+  if (coin?.warning) notes.push(coin.warning);
+  el.innerHTML = notes.map((n) => `<li>${n}</li>`).join("");
+}
 
 async function loadModel() {
   if (model) return;
@@ -51,6 +64,7 @@ async function handlePhotoFile(f) {
   $("pillPhoto")?.classList.add("done");
   $("measure").disabled = true;
   embeddings = null;
+  photoWarnings = [];
   for (const k of Object.keys(steps)) steps[k] = emptyStep();
   let bmp;
   try {
@@ -69,6 +83,14 @@ async function handlePhotoFile(f) {
   $("canvas").style.display = "block";
   $("steps").style.display = "block";
   document.body.classList.add("has-photo");
+  // Blur/exposure check on the downscaled pixels, before the model runs.
+  try {
+    const image = photo.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, photo.width, photo.height);
+    photoWarnings = checkPhoto(image).warnings;
+  } catch (e) {
+    photoWarnings = [];
+    console.warn("[photo] checks failed", e);
+  }
   redraw();
   try {
     $("status").textContent = "Preparing the photo…";
@@ -124,6 +146,7 @@ function redraw() {
   }
   $("measure").disabled = !steps.damage.mask;
   $("pillMark")?.classList.toggle("done", !!steps.damage.mask);
+  showPhotoNotes();
 }
 
 // One SAM decoder run per tap, then union. Prompting all taps at once makes SAM
