@@ -2,7 +2,7 @@
 // Version the cache; network-first for /v1 (never cache measurements),
 // cache-first for the shell. No photo bytes are cached.
 const CACHE = "snapclaim-shell-v1";
-const SHELL = ["./", "./index.html", "./app.js", "./manifest.webmanifest"];
+const SHELL = ["./", "./index.html", "./app.js", "./coin-model.js", "./photo-check.js", "./manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

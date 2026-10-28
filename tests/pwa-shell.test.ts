@@ -20,17 +20,17 @@ test("PWA shell is installable and honest", () => {
   const html = read("pwa/index.html");
   assert.ok(html.includes('rel="manifest"'), "index links the manifest");
   assert.ok(html.includes("Content-Security-Policy"), "index sets a CSP");
-  assert.ok(html.includes('id="record"'), "voice capture button exists");
-  assert.ok(html.includes('id="voiceStatus"'), "voice status element exists");
-  assert.ok(html.includes('id="sample"'), "one-tap sample measurement exists");
+  assert.ok(html.includes('id="micBtn"'), "voice capture button exists");
+  assert.ok(html.includes('id="wave"'), "waveform exists");
+  assert.ok(html.includes('id="shutter"'), "camera shutter exists");
+  assert.ok(html.includes('id="coinRing"'), "coin ring exists");
+  assert.ok(html.includes('id="sReview"'), "review screen exists");
+  assert.ok(html.includes('id="usePhoto"') && html.includes('id="retake"'), "review actions exist");
+  assert.ok(html.includes('id="markCanvas"'), "mark screen exists");
+  assert.ok(html.includes('id="noCoin"'), "no-coin percent-only path exists");
+  assert.ok(html.includes('id="xcheckBtn"') || html.includes("Cross-check"), "cross-check exists");
+  assert.ok(html.includes('id="coinKind"'), "coin options exist");
   assert.ok(html.includes("India"), "Indian coin options exist");
-  assert.ok(html.includes('id="photoNotes"'), "photo quality notes element exists");
-  assert.ok(html.includes('id="noScale"'), "no-scale percent-only toggle exists");
-  assert.ok(html.includes('id="xcheck"'), "SAM cross-check button exists");
-  assert.ok(html.includes('id="xcheckStatus"'), "cross-check status exists");
-  for (const headline of ["Snap it.", "Say what happened.", "Get the numbers.", "Checked twice.", "Send the report."]) {
-    assert.ok(html.includes(headline), `step headline "${headline}" exists`);
-  }
 });
 
 test("service worker caches the shell, never the API", () => {
@@ -38,12 +38,13 @@ test("service worker caches the shell, never the API", () => {
   assert.ok(sw.includes("snapclaim-shell-v1"), "versioned cache");
   assert.ok(sw.includes("/v1/"), "API bypass is explicit");
   assert.ok(sw.includes("skipWaiting"), "updates activate");
+  assert.ok(sw.includes("coin-model.js"), "coin model cached for offline gating");
 
   const app = read("pwa/app.js");
   assert.ok(app.includes("serviceWorker"), "PWA registers the service worker");
   assert.ok(app.includes("/v1/transcribe"), "voice posts to the transcribe proxy");
-  assert.ok(app.includes("photo-check.js"), "photo quality shares one module with tests");
-  assert.ok(app.includes("/v1/crosscheck"), "PWA can cross-check on-device masks against SAM");
   assert.ok(app.includes("OfflineAudioContext"), "clip is resampled on-device");
+  assert.ok(app.includes("/v1/crosscheck"), "PWA can cross-check on-device masks against SAM");
+  assert.ok(app.includes("CoinModel.detectCoins"), "coin gate uses the real detector");
   assert.ok(!app.includes("$(\"raw\").innerHTML"), "no raw HTML injection of backend output");
 });

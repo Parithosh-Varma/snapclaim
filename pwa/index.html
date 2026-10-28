@@ -2,314 +2,270 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#f4f1ea" />
-<meta name="description" content="SnapClaim — photo + one line in, measured damage report out. Outlining runs on-device; you choose what leaves this phone." />
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; connect-src 'self' https:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; worker-src 'self' blob:;" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#000000" />
+<meta name="description" content="SnapClaim — photo + one line in, measured damage report out." />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; connect-src 'self' https:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; worker-src 'self' blob:; media-src blob: data:" />
 <link rel="manifest" href="./manifest.webmanifest" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b1e46'/%3E%3Ccircle cx='16' cy='16' r='7' fill='none' stroke='%230e8a4d' stroke-width='2.5'/%3E%3Cpath d='M16 3v6M16 23v6M3 16h6M23 16h6' stroke='%230e8a4d' stroke-width='2.5'/%3E%3C/svg%3E" />
-<title>SnapClaim — capture</title>
+<title>SnapClaim</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <style>
-  :root{
-    --paper:#f4f1ea; --card:#fffdf8; --ink:#0b1e46; --ink-2:#46557a; --muted:#8a8fa0;
-    --line:#e2ddd0; --damage:#c81e2b; --damage-soft:#fdecec; --coin:#0e8a4d; --coin-soft:#e4f3ea;
-    --tape:#0e8a4d; --info:#0b1e46; --radius:20px;
-  }
-  *{box-sizing:border-box}
-  html{-webkit-text-size-adjust:100%}
-  body{margin:0;background:var(--paper);color:var(--ink);
-    font-family:"Archivo",system-ui,-apple-system,sans-serif;line-height:1.45}
-  .app{max-width:720px;margin:0 auto;padding:0 18px calc(24px + env(safe-area-inset-bottom))}
+  :root{ --ink:#0b1e46; --coin:#0e8a4d; --paper:#f4f1ea; --damage:#c81e2b; }
+  *{box-sizing:border-box;margin:0}
+  html,body{height:100%}
+  body{font-family:"Archivo",system-ui,sans-serif;color:#fff;background:#000;overflow:hidden;
+    touch-action:pan-y;overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
+  button{font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  button:focus{outline:none}
 
-  /* ---------- top bar ---------- */
-  .topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:10px;
-    padding:14px 2px;background:color-mix(in srgb,var(--paper) 90%,transparent);backdrop-filter:blur(10px)}
-  .brand{display:flex;align-items:center;gap:10px;min-width:0}
-  .mark{width:38px;height:38px;flex:0 0 auto;border-radius:10px;background:var(--ink);display:grid;place-items:center}
-  .brand b{font-size:19px;letter-spacing:-.02em;line-height:1;font-weight:800}
-  .brand b i{font-style:normal;color:var(--coin)}
-  .brand small{display:block;color:var(--muted);font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;margin-top:3px}
-  .health{display:flex;align-items:center;gap:8px}
-  #healthOut{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted)}
-  #healthOut.is-ok{color:var(--coin)} #healthOut.is-bad{color:var(--damage)}
-  .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:0 0 auto}
-  #healthOut.is-ok ~ .dot, .health:has(#healthOut.is-ok) .dot{background:var(--coin);box-shadow:0 0 0 4px var(--coin-soft)}
+  /* ---------- camera ---------- */
+  #cam{position:fixed;inset:0;background:#111}
+  #cam video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .corner{position:absolute;width:34px;height:34px;border:4px solid #fff;z-index:2;pointer-events:none}
+  .corner.tl{top:96px;left:26px;border-right:0;border-bottom:0;border-radius:10px 0 0 0}
+  .corner.tr{top:96px;right:26px;border-left:0;border-bottom:0;border-radius:0 10px 0 0}
+  .corner.bl{bottom:150px;left:26px;border-right:0;border-top:0;border-radius:0 0 0 10px}
+  .corner.br{bottom:150px;right:26px;border-left:0;border-top:0;border-radius:0 0 10px 0}
+  #coinHint{position:absolute;z-index:3;left:50%;transform:translateX(-50%);
+    top:calc(100px + env(safe-area-inset-top));
+    font-weight:700;font-size:15px;white-space:nowrap;
+    color:#fff;background:rgba(11,30,70,.88);padding:10px 18px;border-radius:999px}
+  .coinring{position:absolute;z-index:2;border:4px solid var(--coin);border-radius:50%;
+    box-shadow:0 0 0 2px rgba(255,255,255,.7),0 0 24px rgba(14,138,77,.8);
+    display:none;pointer-events:none;
+    transition:left .15s linear,top .15s linear,width .15s linear,height .15s linear}
+  #count{position:absolute;z-index:4;left:50%;top:38%;transform:translate(-50%,-50%);
+    font-size:120px;font-weight:800;color:#fff;letter-spacing:-.04em;display:none;
+    text-shadow:0 4px 30px rgba(0,0,0,.5);pointer-events:none}
+  #count.pop{animation:pop .3s ease}
+  @keyframes pop{from{transform:translate(-50%,-50%) scale(1.35)}to{transform:translate(-50%,-50%) scale(1)}}
+  #shutter{position:absolute;z-index:3;left:50%;transform:translateX(-50%);
+    bottom:calc(34px + env(safe-area-inset-bottom));
+    width:78px;height:78px;border-radius:50%;border:5px solid #fff;
+    background:transparent;box-shadow:0 8px 28px rgba(0,0,0,.45);padding:0}
+  #shutter::after{content:"";display:block;width:100%;height:100%;border-radius:50%;background:#fff}
+  #shutter:active{transform:translateX(-50%) scale(.94)}
+  #shutter.locked{opacity:.35} #shutter.locked::after{background:#cfd4dc}
+  #shutter.hide{opacity:0;pointer-events:none}
+  #shutter{transition:opacity .18s ease, transform .12s ease}
+  .flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .3s ease;z-index:9}
+  .flash.go{opacity:1;transition:none}
+  #altEntry{position:absolute;z-index:3;left:50%;transform:translateX(-50%);
+    bottom:calc(158px + env(safe-area-inset-bottom));border:0;background:none;
+    color:rgba(255,255,255,.85);font-size:13px;font-weight:600;text-decoration:underline;padding:8px;white-space:nowrap}
+  #noCoin{position:absolute;z-index:3;left:50%;transform:translateX(-50%);
+    bottom:calc(126px + env(safe-area-inset-bottom));border:0;background:none;
+    color:rgba(255,255,255,.85);font-size:13px;font-weight:600;text-decoration:underline;padding:8px;white-space:nowrap}
+  body.reviewing #altEntry,body.reviewing #noCoin,
+  body.step2 #altEntry,body.step2 #noCoin{display:none}
 
-  /* ---------- steps ---------- */
-  .step{padding:26px 2px 8px}
-  .eyebrow{font-weight:700;font-size:13px;letter-spacing:.06em;color:var(--coin);display:flex;align-items:center;gap:10px}
-  .eyebrow .dashes{display:inline-flex;gap:6px;margin-left:2px}
-  .eyebrow .dashes i{display:block;width:34px;height:4px;border-radius:2px;background:var(--line)}
-  .eyebrow .dashes i.on{background:var(--coin)}
-  .eyebrow .tick{display:none;color:var(--coin);font-weight:800}
-  .step.done .eyebrow .tick{display:inline}
-  .step h2{font-size:clamp(38px,10vw,56px);line-height:1.02;letter-spacing:-.03em;margin:12px 0 8px;font-weight:800}
-  .step .sub{color:var(--ink-2);margin:0 0 16px;font-size:16px;max-width:52ch}
+  /* ---------- screens ---------- */
+  .screen{position:fixed;inset:0;z-index:5;background:var(--paper);color:var(--ink);
+    transform:translateX(100%);visibility:hidden;overflow-y:auto;
+    transition:transform .32s cubic-bezier(.32,.72,.28,1), visibility 0s linear .32s}
+  .screen.on{transform:translateX(0);visibility:visible;
+    transition:transform .32s cubic-bezier(.32,.72,.28,1)}
+  .wrap{max-width:560px;margin:0 auto;padding:calc(20px + env(safe-area-inset-top)) 20px calc(28px + env(safe-area-inset-bottom))}
+  .navrow{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .navrow button{border:0;background:none;color:var(--ink);font-weight:700;font-size:16px;padding:10px 6px}
+  .step-tag{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--coin);font-weight:500}
+  h1{font-size:clamp(38px,10vw,52px);letter-spacing:-.03em;line-height:1.02;margin:0 0 6px}
+  .sub{color:#5b6b8c;margin:0 0 16px;font-size:15px}
+  .card{background:#fffdf8;border:1px solid #e2ddd0;border-radius:18px;padding:16px;margin-bottom:12px}
 
-  /* ---------- cards ---------- */
-  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
-    padding:18px 16px;margin:0 0 6px;box-shadow:0 1px 0 rgba(11,30,70,.05)}
+  /* mark */
+  #markCanvas{width:100%;height:auto;display:block;border-radius:14px;touch-action:none;background:#000}
+  .seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+  .seg button{min-height:48px;border-radius:12px;border:2px solid #e2ddd0;background:#fff;font-weight:700;font-size:15px}
+  .seg button.on{background:var(--damage);border-color:var(--damage);color:#fff}
+  .btn-primary{width:100%;min-height:56px;border:0;border-radius:16px;background:var(--coin);color:#fff;font-weight:800;font-size:17px}
+  .btn-dark{width:100%;min-height:54px;border:0;border-radius:16px;background:var(--ink);color:#fff;font-weight:700;font-size:16px}
+  .btn-ghostline{width:100%;min-height:50px;border-radius:16px;border:1px solid #e2ddd0;background:transparent;color:var(--ink);font-weight:700}
+  .rowbtns{display:flex;gap:8px;margin-top:10px}.rowbtns button{flex:1}
+  label.field{display:block;font-size:13px;font-weight:600;margin:0 0 10px;color:var(--ink)}
+  select{min-height:46px;border:1px solid #e2ddd0;border-radius:12px;background:#fff;width:100%;font:inherit;padding:0 10px;margin-top:6px}
+  #status,#xStatus,#skStatus{display:block;font-family:"IBM Plex Mono",monospace;font-size:12px;color:#5b6b8c;margin-top:8px;min-height:1.2em}
 
-  /* ---------- buttons & inputs ---------- */
-  button, select, input[type="text"], textarea{font:inherit}
-  button{min-height:46px;padding:10px 16px;border-radius:14px;border:1px solid var(--line);
-    background:#fff;color:var(--ink);font-weight:600;cursor:pointer}
-  button:active{transform:translateY(1px)}
-  button:disabled{opacity:.45;cursor:not-allowed;transform:none}
-  button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible{
-    outline:3px solid var(--coin);outline-offset:2px}
-  .btn-primary{background:var(--coin);border-color:var(--coin);color:#fff;width:100%;font-size:17px;min-height:56px;border-radius:16px;font-weight:700}
-  .btn-tape{background:var(--ink);border-color:var(--ink);color:#fff;width:100%;font-size:16px;min-height:54px;border-radius:16px}
-  .btn-ghost{background:transparent}
-  select, input[type="text"]{min-height:46px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;width:100%}
-  label.field{display:block;font-size:13px;font-weight:600;margin:0 0 12px}
-  label.field select, label.field input{margin-top:6px;font-weight:400}
-  textarea{width:100%;font-family:"IBM Plex Mono",monospace;font-size:12px;padding:12px;border:1px solid var(--line);border-radius:12px;background:#f8f6f0}
-  pre{background:var(--ink);color:#d7e5da;padding:14px;border-radius:12px;overflow:auto;font-family:"IBM Plex Mono",monospace;font-size:12px}
+  /* mic */
+  .voicemock{display:flex;flex-direction:column;align-items:center;gap:12px;padding:8px 0}
+  .micwrap{position:relative;width:210px;height:210px;display:grid;place-items:center}
+  .pring{position:absolute;border-radius:50%;border:3px solid rgba(14,138,77,.35);pointer-events:none}
+  .pring.p1{inset:14px}.pring.p2{inset:0}
+  .micwrap.live .pring{animation:ringpulse 1.8s ease-out infinite}
+  .micwrap.live .p2{animation-delay:.9s}
+  @keyframes ringpulse{from{transform:scale(.82);opacity:.9}to{transform:scale(1.08);opacity:0}}
+  #micBtn{width:124px;height:124px;border-radius:50%;border:0;background:var(--coin);color:#fff;display:grid;place-items:center;box-shadow:0 10px 30px rgba(14,138,77,.35)}
+  #micBtn svg{width:52px;height:52px}
+  #micState{font-size:15px;color:#5b6b8c}
+  .wave{display:flex;align-items:center;gap:5px;height:52px}
+  .wave i{display:block;width:5px;border-radius:3px;background:var(--coin);height:6px;transition:height .09s linear}
+  #heard{font-size:20px;font-weight:800;letter-spacing:-.01em;max-width:22ch;text-align:center;min-height:2.6em}
+  #transcriptBox{width:100%;font:inherit;font-size:15px;padding:12px;border:1px solid #e2ddd0;border-radius:12px;background:#fff}
+  #voiceErr{color:#c81e2b;font-size:13px;min-height:1.2em}
+
+  /* results */
+  #measured:empty,#findings:empty,#skOut:empty,#annex:empty{display:none}
+  #measured ul,#skOut ul{margin:10px 0 0;padding:0;list-style:none}
+  #measured li,#skOut li{padding:12px;border:1px solid #e2ddd0;border-radius:14px;margin-bottom:8px;background:#fff;font-size:15px}
+  #measured li small{color:#5b6b8c}
+  .found{font-size:22px;font-weight:800;margin:0 0 8px}
   .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;
     font-family:"IBM Plex Mono",monospace;letter-spacing:.06em;text-transform:uppercase}
-  .ok{background:var(--coin-soft);color:var(--coin)} .fail{background:var(--damage-soft);color:var(--damage)}
-
-  /* ---------- photo / viewfinder ---------- */
-  .upload{display:flex;align-items:center;gap:12px;border:1.5px dashed var(--muted);border-radius:14px;
-    padding:16px;background:#fff;cursor:pointer;margin-bottom:14px}
-  .upload:active{background:var(--coin-soft)}
-  .upload .ico{width:44px;height:44px;flex:0 0 auto;border-radius:12px;background:var(--ink);color:#fff;
-    display:grid;place-items:center;font-size:22px}
-  .upload b{display:block;font-size:16px} .upload small{color:var(--muted)}
-  #photo{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}
-  .viewfinder{position:relative;border-radius:16px;overflow:hidden;background:#fff;border:1px solid var(--line);margin-top:12px}
-  #canvas{width:100%;height:auto;display:none;touch-action:manipulation;vertical-align:top}
-  .corner{position:absolute;width:26px;height:26px;border:3px solid var(--coin);pointer-events:none;opacity:.9}
-  .corner.tl{top:10px;left:10px;border-right:0;border-bottom:0;border-radius:8px 0 0 0}
-  .corner.tr{top:10px;right:10px;border-left:0;border-bottom:0;border-radius:0 8px 0 0}
-  .corner.bl{bottom:10px;left:10px;border-right:0;border-top:0;border-radius:0 0 0 8px}
-  .corner.br{bottom:10px;right:10px;border-left:0;border-top:0;border-radius:0 0 8px 0}
-  .vf-empty{padding:38px 18px 30px;text-align:center;color:var(--muted);font-size:14px}
-  .vf-empty b{display:block;color:var(--ink);font-size:17px;margin-bottom:4px}
-  body.has-photo .vf-empty{display:none}
-
-  /* segmented damage / coin control */
-  .seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0 12px}
-  .seg button{min-height:54px;font-size:16px;border-width:2px;background:#fff}
-  #stepDamage{border-color:color-mix(in srgb,var(--damage) 45%,var(--line))}
-  #stepCoin{border-color:color-mix(in srgb,var(--coin) 45%,var(--line))}
-  #stepDamage.is-active{background:var(--damage);border-color:var(--damage);color:#fff}
-  #stepCoin.is-active{background:var(--coin);border-color:var(--coin);color:#fff}
-  .toolgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-  @media (max-width:560px){.toolgrid{grid-template-columns:1fr}}
-  .minirow{display:flex;gap:8px} .minirow button{flex:1;min-height:44px;font-size:14px;padding:8px}
-  .hint{font-size:13px;color:var(--muted);margin:0 0 4px}
-  .hint b{color:var(--ink)}
-
-  .actionbar{position:sticky;bottom:calc(10px + env(safe-area-inset-bottom));z-index:15;margin-top:14px;
-    background:color-mix(in srgb,var(--card) 94%,transparent);backdrop-filter:blur(10px);
-    border:1px solid var(--line);border-radius:16px;padding:10px;box-shadow:0 10px 30px rgba(11,30,70,.12)}
-  #status{display:block;font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--muted);
-    margin-top:8px;text-align:center;min-height:1.2em}
-  #status:empty::before{content:"Ready when you are."}
-
-  /* ---------- mic ---------- */
-  .microw{display:flex;align-items:center;gap:14px;margin:6px 0 12px}
-  #record{width:84px;height:84px;flex:0 0 auto;border-radius:50%;background:var(--coin);border:4px solid var(--coin-soft);
-    color:#fff;font-size:15px;font-weight:700;line-height:1.1;padding:6px;box-shadow:0 6px 20px rgba(14,138,77,.3)}
-  #record:active{transform:scale(.96)}
-  .miccopy b{display:block;font-size:16px}
-  .miccopy span{font-size:13px;color:var(--muted)}
-  #voiceStatus{font-size:13px;color:var(--muted);margin:0 0 4px;display:block;min-height:1.2em}
-  .transcript-quote{font-size:20px;font-weight:700;letter-spacing:-.01em;border-left:4px solid var(--coin);padding-left:12px;margin:12px 0}
-
-  /* ---------- results ---------- */
-  #measured:empty, #findings:empty, #skepticOut:empty, #annex:empty{display:none}
-  #measured, #findings, #skepticOut{margin-top:14px}
-  #measured ul, #findings ul, #skepticOut ul{margin:10px 0 0;padding:0;list-style:none}
-  #measured li, #findings li, #skepticOut li{padding:12px;border:1px solid var(--line);border-radius:14px;margin-bottom:8px;background:#fff;font-size:15px}
-  #measured li small, #findings li small, #skepticOut li small{color:var(--muted)}
-  .found{font-size:22px;font-weight:800;letter-spacing:-.02em;margin:0 0 8px}
-  svg.schematic{border:1px solid var(--line);border-radius:12px;width:100%;height:auto;background:#fff;margin-top:12px}
+  .ok{background:#e4f3ea;color:#0e8a4d}.fail{background:#fdecec;color:#c81e2b}
+  svg.schematic{border:1px solid #e2ddd0;border-radius:12px;width:100%;height:auto;background:#fff;margin-top:12px}
   #annex svg{max-width:100%;height:auto}
-  .chips{display:flex;gap:8px;flex-wrap:wrap;margin:-4px 0 12px}
-  .chips button{min-height:38px;padding:6px 12px;border-radius:999px;font-size:13px;font-weight:500;background:#fff}
-  .rowbtns{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-  .rowbtns button{flex:1}
-  details.dev{border:1px solid var(--line);border-radius:var(--radius);background:var(--card);padding:14px 16px;margin:14px 0}
-  details.dev summary{cursor:pointer;font-weight:700;font-size:15px}
-  details.dev .inner{margin-top:14px}
-  a#dl{font-weight:700;color:var(--info)}
-  .foot{color:var(--muted);font-size:12px;text-align:center;font-family:"IBM Plex Mono",monospace;padding:8px 0 4px}
-  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+  pre{background:var(--ink);color:#d7e5da;padding:14px;border-radius:12px;overflow:auto;font-family:"IBM Plex Mono",monospace;font-size:12px}
+  details.dev{border:1px solid #e2ddd0;border-radius:16px;background:#fffdf8;padding:14px;margin-top:12px}
+  details.dev summary{cursor:pointer;font-weight:700}
+  a#dl{font-weight:700;color:var(--ink)}
 </style>
 </head>
 <body>
-<div class="app">
 
-  <header class="topbar">
-    <div class="brand">
-      <span class="mark" aria-hidden="true">
-        <svg width="22" height="22" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="7" stroke="#fff" stroke-width="2.5"/><path d="M16 3v6M16 23v6M3 16h6M23 16h6" stroke="#0e8a4d" stroke-width="2.5"/></svg>
-      </span>
-      <span><b>Snap<i>Claim</i></b><small>Field capture</small></span>
-    </div>
-    <div class="health">
-      <span id="healthOut"></span><span class="dot" aria-hidden="true"></span>
-      <button id="health" type="button">Check backend</button>
-    </div>
-  </header>
+<!-- 01 · camera -->
+<div id="cam" role="img" aria-label="Live camera feed"><video id="feed" playsinline muted autoplay></video></div>
+<span class="corner tl" aria-hidden="true"></span><span class="corner tr" aria-hidden="true"></span>
+<span class="corner bl" aria-hidden="true"></span><span class="corner br" aria-hidden="true"></span>
+<div class="coinring" id="coinRing" aria-hidden="true" style="display:none"></div>
+<div id="coinHint">Add a coin for scale</div>
+<div id="count" aria-hidden="true"></div>
+<button id="shutter" type="button" aria-label="Capture"></button>
+<div class="flash" id="flash"></div>
+<button id="altEntry" type="button">no camera? use a sample</button>
+<button id="noCoin" type="button">no coin? continue without scale</button>
 
-  <!-- 01 · Snap it -->
-  <section class="step" id="step1" aria-labelledby="h-snap">
-    <div class="eyebrow">01 / 05 <span class="dashes" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><i></i></span> <span class="tick">✓</span></div>
-    <h2 id="h-snap">Snap it.</h2>
-    <p class="sub">Put a coin in the shot for scale.</p>
+<!-- 02 · review -->
+<section class="screen" id="sReview" aria-label="Review photo">
+  <img id="shotFull" alt="Captured photo" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000" />
+  <div style="position:absolute;left:0;right:0;bottom:0;display:flex;gap:10px;padding:14px 18px calc(26px + env(safe-area-inset-bottom));background:linear-gradient(transparent,rgba(0,0,0,.65))">
+    <button id="retake" type="button" style="flex:1;min-height:56px;border-radius:16px;border:2px solid rgba(255,255,255,.85);background:transparent;color:#fff;font-weight:800;font-size:17px">Retake</button>
+    <button id="usePhoto" type="button" style="flex:1;min-height:56px;border-radius:16px;border:0;background:var(--coin);color:#fff;font-weight:800;font-size:17px">Use photo</button>
+  </div>
+</section>
 
+<!-- 03 · mark damage -->
+<section class="screen" id="sMark" aria-labelledby="h-mark">
+  <div class="wrap">
+    <div class="navrow"><button id="backCam" type="button">‹ Camera</button><span class="step-tag">mark</span></div>
+    <h1 id="h-mark">Tap the damage.</h1>
+    <p class="sub">One tap on the crack. The coin is already outlined from the gate.</p>
     <div class="card">
-      <label class="upload" for="photo">
-        <span class="ico" aria-hidden="true">◎</span>
-        <span><b id="photoName">Take, choose, or paste a photo</b><small>Camera on mobile · Cmd+V works here · JPG / PNG</small></span>
+      <canvas id="markCanvas"></canvas>
+      <div class="seg" role="group" aria-label="Damage type">
+        <button id="chipCrack" type="button" class="on">Crack</button>
+        <button id="chipStain" type="button">Stain</button>
+      </div>
+      <div class="seg" role="group" aria-label="More types">
+        <button id="chipPeel" type="button">Peel</button>
+        <button id="chipDent" type="button">Dent</button>
+      </div>
+      <label class="field">Coin (auto-detected — confirm)
+        <select id="coinKind">
+          <option value="27">India ₹10 · 27 mm</option>
+          <option value="25">India ₹5 · 25 mm</option>
+          <option value="23">India ₹2 · 23 mm</option>
+          <option value="22">India ₹1 · 22 mm</option>
+          <option value="24.26">US quarter · 24.26 mm</option>
+          <option value="23.88">Canadian quarter · 23.88 mm</option>
+          <option value="24.5">UK 10p · 24.5 mm</option>
+          <option value="23.25">1 euro · 23.25 mm</option>
+        </select>
       </label>
-      <input id="photo" type="file" accept="image/*" capture="environment" />
-
-      <div class="viewfinder">
-        <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
-        <div class="vf-empty"><b>No photo yet</b>Your photo appears here. Then you tap on it to outline.</div>
-        <canvas id="canvas"></canvas>
-      </div>
-
-      <div id="steps" style="display:none">
-        <div class="seg" role="group" aria-label="What are you marking">
-          <button id="stepDamage" type="button" aria-pressed="true">● Mark damage</button>
-          <button id="stepCoin" type="button" aria-pressed="false">● Mark coin</button>
-        </div>
-        <p class="hint">Tap the photo to add points to the selected outline. <b>Damage first, coin second.</b> Add more taps to extend it.</p>
-        <div class="toolgrid">
-          <div>
-            <label class="field">Damage type
-              <select id="damageLabel"><option>crack</option><option>stain</option><option>peel</option><option>dent</option></select>
-            </label>
-            <div class="minirow">
-              <button id="undoDamage" type="button">Undo point</button>
-              <button id="clearDamage" type="button">Clear</button>
-            </div>
-          </div>
-          <div>
-            <label class="field">Coin (for scale)
-              <select id="coinKind">
-                <option value="27">India ₹10 · 27 mm</option>
-                <option value="25">India ₹5 · 25 mm</option>
-                <option value="23">India ₹2 · 23 mm</option>
-                <option value="22">India ₹1 · 22 mm</option>
-                <option value="24.26">US quarter · 24.26 mm</option>
-                <option value="23.88">Canadian quarter · 23.88 mm</option>
-                <option value="24.5">UK 10p · 24.5 mm</option>
-                <option value="23.25">1 euro · 23.25 mm</option>
-              </select>
-            </label>
-            <div class="minirow">
-              <button id="undoCoin" type="button">Undo point</button>
-              <button id="clearCoin" type="button">Clear</button>
-            </div>
-          </div>
-        </div>
-        <label class="field" style="margin-top:12px"><input id="noScale" type="checkbox" style="min-height:20px;width:auto;margin-right:8px" />No coin — report percentages only</label>
-      </div>
-
-      <div class="actionbar">
-        <button id="measure" class="btn-primary" type="button" disabled>Measure damage</button>
-        <div class="rowbtns" style="margin-top:8px">
-          <button id="sample" class="btn-ghost" type="button">Use sample measurement</button>
-        </div>
-        <div id="photoNotes" class="hint" style="margin-top:8px"></div>
-        <span id="status" role="status"></span>
-      </div>
+      <div id="photoNotes" class="hint" style="font-size:13px;color:#5b6b8c"></div>
+      <div id="tfState" style="font-size:12px;color:#5b6b8c;font-family:'IBM Plex Mono',monospace"></div>
+      <button id="measureBtn" class="btn-primary" type="button" disabled>Measure damage</button>
+      <span id="status"></span>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- 02 · Say what happened -->
-  <section class="step" id="step2" aria-labelledby="h-say">
-    <div class="eyebrow">02 / 05 <span class="dashes" aria-hidden="true"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></span> <span class="tick">✓</span></div>
-    <h2 id="h-say">Say what happened.</h2>
-    <p class="sub">No typing. Just talk.</p>
-
-    <div class="card">
-      <div class="microw">
-        <button id="record" type="button">Hold to speak</button>
-        <div class="miccopy"><b>Hold the button and describe it</b><span>Transcribed on-device; only the text is sent.</span></div>
+<!-- 04 · say it -->
+<section class="screen" id="sSay" aria-labelledby="h-say">
+  <div class="wrap" style="display:flex;flex-direction:column;align-items:center;text-align:center">
+    <div class="navrow" style="align-self:stretch"><button id="backMark" type="button">‹ Mark</button><span class="step-tag">say</span></div>
+    <h1 id="h-say">Say what happened.</h1>
+    <p class="sub">It listens on its own. Tap the mic to finish early.</p>
+    <div class="voicemock">
+      <div class="micwrap" id="micwrap">
+        <span class="pring p1"></span><span class="pring p2"></span>
+        <button id="micBtn" type="button" aria-label="Stop listening"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="2.5" width="6" height="11" rx="3" fill="#fff"/><path d="M6 11.5a6 6 0 0 0 12 0" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M12 17.5V21M8.5 21h7" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg></button>
       </div>
-      <span id="voiceStatus" role="status"></span>
-      <label class="field">Your description
-        <input id="transcript" type="text" value="wall crack near the window, coin for scale" />
-      </label>
-      <div class="chips">
-        <button type="button" data-line="wall crack near the window, coin for scale">Wall crack</button>
-        <button type="button" data-line="water stain on the ceiling, coin for scale">Ceiling stain</button>
-        <button type="button" data-line="paint peeling beside the door, coin for scale">Paint peel</button>
-        <button type="button" data-line="dent in the panel, coin for scale">Dent</button>
-      </div>
-      <button id="send" class="btn-tape" type="button">Send to report</button>
+      <p id="micState">Listening</p>
+      <div class="wave" id="wave" aria-hidden="true"></div>
+      <p id="heard"></p>
+      <input id="transcriptBox" type="text" placeholder="Or type the line…" value="" />
+      <p id="voiceErr"></p>
     </div>
-  </section>
+    <button id="sendBtn" class="btn-dark" type="button" style="width:100%">Send to report</button>
+  </div>
+</section>
 
-  <!-- 03 · Get the numbers -->
-  <section class="step" id="step3" aria-labelledby="h-numbers">
-    <div class="eyebrow">03 / 05 <span class="dashes" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span> <span class="tick">✓</span></div>
-    <h2 id="h-numbers">Get the numbers.</h2>
+<!-- 05 · numbers -->
+<section class="screen" id="sNum" aria-labelledby="h-num">
+  <div class="wrap">
+    <div class="navrow"><button id="backSay" type="button">‹ Say</button><span class="step-tag">measured</span></div>
+    <h1 id="h-num">Get the numbers.</h1>
     <p class="sub">Outlined and measured, not guessed.</p>
     <div id="measured"></div>
     <svg id="scheme" class="schematic" viewBox="0 0 400 140" role="img" aria-label="Schematic damage bars"></svg>
     <div id="findings"></div>
-  </section>
+    <button id="toCheck" class="btn-dark" type="button" style="width:100%;margin-top:12px">Check it twice →</button>
+  </div>
+</section>
 
-  <!-- 04 · Checked twice -->
-  <section class="step" id="step4" aria-labelledby="h-checked">
-    <div class="eyebrow">04 / 05 <span class="dashes" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span> <span class="tick">✓</span></div>
-    <h2 id="h-checked">Checked twice.</h2>
+<!-- 06 · checked -->
+<section class="screen" id="sCheck" aria-labelledby="h-check">
+  <div class="wrap">
+    <div class="navrow"><button id="backNum" type="button">‹ Numbers</button><span class="step-tag">checked</span></div>
+    <h1 id="h-check">Checked twice.</h1>
     <p class="sub">A second check has to agree. Disagreements print red, never hidden.</p>
     <div class="card">
       <div class="rowbtns">
-        <button id="skeptic" type="button">Ask skeptic</button>
-        <button id="xcheck" type="button" title="Sends the photo to the backend for one SAM 3.1 check">Cross-check masks</button>
+        <button id="skepticBtn" type="button">Ask skeptic</button>
+        <button id="xcheckBtn" type="button">Cross-check masks</button>
       </div>
-      <span id="skepStatus" role="status" class="hint"></span>
-      <div id="skepticOut"></div>
-      <span id="xcheckStatus" role="status" class="hint"></span>
+      <span id="skStatus"></span>
+      <div id="skOut"></div>
+      <span id="xStatus" style="font-size:13px;color:#5b6b8c"></span>
     </div>
-  </section>
+    <button id="toReport" class="btn-dark" type="button" style="width:100%;margin-top:12px">Make the report →</button>
+  </div>
+</section>
 
-  <!-- 05 · Send the report -->
-  <section class="step" id="step5" aria-labelledby="h-send">
-    <div class="eyebrow">05 / 05 <span class="dashes" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></span> <span class="tick">✓</span></div>
-    <h2 id="h-send">Send the report.</h2>
+<!-- 07 · report -->
+<section class="screen" id="sReport" aria-labelledby="h-send">
+  <div class="wrap">
+    <div class="navrow"><button id="backCheck" type="button">‹ Checked</button><span class="step-tag">report</span></div>
+    <h1 id="h-send">Send the report.</h1>
     <p class="sub">To your landlord or insurer, in one tap.</p>
     <div class="card">
-      <div class="rowbtns">
-        <button id="render" class="btn-primary" type="button">Send report</button>
-        <a id="dl" style="display:none">download svg</a>
-      </div>
-      <div id="annex"></div>
+      <button id="renderBtn" class="btn-primary" type="button">Send report</button>
+      <div style="margin-top:10px"><a id="dl" style="display:none">download svg</a></div>
+      <div id="annex" style="margin-top:12px"></div>
     </div>
     <details class="dev">
       <summary>Developer — backend, payload &amp; raw output</summary>
-      <div class="inner">
+      <div style="margin-top:12px">
         <label class="field">Backend URL
-          <input id="base" type="text" value="https://snapclaim-backend.parithosh.workers.dev" />
+          <input id="baseUrl" type="text" value="https://snapclaim-backend.parithosh.workers.dev" style="min-height:46px;border:1px solid #e2ddd0;border-radius:12px;width:100%;font:inherit;padding:0 10px" />
         </label>
-        <label class="field">Measured payload (read-only)
-          <textarea id="payload" rows="10" readonly></textarea>
-        </label>
-        <h3>Raw report</h3>
+        <button id="healthBtn" type="button">Check backend</button>
+        <span id="healthOut" style="font-family:IBM Plex Mono,monospace;font-size:12px"></span>
+        <h3 style="margin:12px 0 6px">Raw report</h3>
         <pre id="raw">{}</pre>
       </div>
     </details>
-  </section>
+  </div>
+</section>
 
-  <p class="foot">SNAPCLAIM · MEASURED, NOT GUESSED · YOU CHOOSE WHAT LEAVES THIS PHONE</p>
-</div>
+<script src="./coin-model.js"></script>
+<script src="./photo-check.js"></script>
 <script type="module" src="./app.js"></script>
 </body>
 </html>

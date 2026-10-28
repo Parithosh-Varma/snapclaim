@@ -1,400 +1,398 @@
 const $ = (id) => document.getElementById(id);
+function base() { return $("baseUrl").value.replace(/\/$/, ""); }
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 
-import { checkPhoto } from "./photo-check.js";
-
-/** Light the ✓ on a step section when its job is done. */
-function markStep(n) {
-  $(`step${n}`)?.classList.add("done");
+/* ---------- navigation ---------- */
+const SCREENS = ["sCam", "sReview", "sMark", "sSay", "sNum", "sCheck", "sReport"];
+function show(id) {
+  for (const s of ["sReview", "sMark", "sSay", "sNum", "sCheck", "sReport"]) {
+    document.getElementById(s)?.classList.toggle("on", s === id);
+  }
+  document.body.classList.toggle("reviewing", id === "sReview");
+  document.body.classList.toggle("step2", id === "sSay");
+}
+function backToCam() {
+  for (const s of ["sReview", "sMark", "sSay", "sNum", "sCheck", "sReport"]) document.getElementById(s)?.classList.remove("on");
+  document.body.classList.remove("reviewing", "step2");
 }
 
-function base() { return $("base").value.replace(/\/$/, ""); }
-
-$("health").onclick = async () => {
+/* ---------- backend ---------- */
+$("healthBtn").onclick = async () => {
   try {
     const r = await fetch(base() + "/v1/health");
     const j = await r.json();
     $("healthOut").textContent = `ok v${j.version} mode:${j.mode}`;
-    $("healthOut").className = "is-ok";
-  } catch (e) {
-    $("healthOut").textContent = "unreachable — run npm run backend:start";
-    $("healthOut").className = "is-bad";
+  } catch {
+    $("healthOut").textContent = "unreachable";
   }
 };
 
-// ---- photo intake + on-device segmentation (transformers.js, SlimSAM) ----
-const TF_URL = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2";
-const MODEL_ID = "Xenova/slimsam-77-uniform";
-// 512 keeps Worker CPU alive: skeletonize is O(pixels × passes), 1024² trips the free-tier limit
-// and the edge returns a no-CORS error page the browser reports as a CORS failure.
-const MAX_SIDE = 512;
-const COLORS = { damage: [196, 31, 41], coin: [15, 122, 54] };
+/* ---------- camera + coin gate ---------- */
+const feed = $("feed");
+const ring = $("coinRing");
+const hint = $("coinHint");
+const fab = $("shutter");
+const SW = 256;
+const work = document.createElement("canvas");
+const wctx = work.getContext("2d", { willReadFrequently: true });
+const full = document.createElement("canvas");
+const fctx = full.getContext("2d", { willReadFrequently: true });
+const history = [];
+let coinSeen = false, smooth = null, camStream = null, noScaleMode = false;
+let captureTimer = null, countdownTimer = null;
+const countEl = $("count");
+const clf = new CoinModel.Classifier();
+const COUNTRIES = ["INR", "USA", "EUR", "GBP"];
+let coinLabel = "";
+let gateCoin = null; // {cx, cy, rr} in capture-still pixels + still size
+let photo = null;    // downscaled capture canvas for marking
+let stillDataUrl = "";
 
-let tf = null, model = null, processor = null;
-let rawImage = null, embeddings = null;
-let photo = null; // offscreen canvas holding the downscaled photo
-let active = "damage";
-// per step: tap points in photo pixels, one SAM mask per tap, and their union (row-major 0/1)
-const emptyStep = () => ({ points: [], pointMasks: [], mask: null, iou: 0 });
-const steps = { damage: emptyStep(), coin: emptyStep() };
-
-async function loadModel() {
-  if (model) return;
-  // dynamic import so a CDN failure only disables outlining, not the rest of the page
-  tf = await import(TF_URL);
-  const progress_callback = (p) => {
-    if (p.status === "progress") $("status").textContent = `Downloading model… ${Math.round(p.progress)}%`;
-  };
-  model = await tf.SamModel.from_pretrained(MODEL_ID, { progress_callback });
-  processor = await tf.AutoProcessor.from_pretrained(MODEL_ID, { progress_callback });
+function setLocked(locked, label) {
+  fab.classList.toggle("locked", locked);
+  if (label) hint.textContent = label;
+  ring.style.display = locked ? "none" : "block";
 }
-
-document.querySelectorAll("[data-line]").forEach((b) => {
-  b.onclick = () => { $("transcript").value = b.dataset.line; };
-});
-
-async function handlePhotoFile(f) {
-  if (!f) return;
-  $("photoName").textContent = f.name || "Pasted image";
-  markStep(1);
-  $("measure").disabled = true;
-  embeddings = null;
-  for (const k of Object.keys(steps)) steps[k] = emptyStep();
-  let bmp;
+function armCapture() {
+  cancelCapture();
+  let n = 3;
+  hint.textContent = "Hold steady…";
+  countEl.textContent = "3";
+  countEl.style.display = "block";
+  countdownTimer = setInterval(() => {
+    n--;
+    if (n > 0) { countEl.textContent = String(n); countEl.classList.remove("pop"); void countEl.offsetWidth; countEl.classList.add("pop"); }
+  }, 1000);
+  captureTimer = setTimeout(() => { cancelCapture(); if (coinSeen && !document.querySelector(".screen.on")) fab.click(); }, 3000);
+}
+function cancelCapture() {
+  if (captureTimer) { clearTimeout(captureTimer); captureTimer = null; }
+  if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+  countEl.style.display = "none";
+}
+function stopCamera() {
+  if (camStream) { camStream.getTracks().forEach((t) => t.stop()); camStream = null; }
+  feed.srcObject = null;
+}
+function acquireCamera() {
+  if (!navigator.mediaDevices?.getUserMedia) { setLocked(false); return; }
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: "environment" } }, audio: false })
+    .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false }))
+    .then((stream) => {
+      camStream = stream;
+      feed.srcObject = stream;
+      return feed.play().catch(() => {});
+    })
+    .then(() => scan())
+    .catch(() => { hint.textContent = "Camera blocked — demo mode, shutter open"; setLocked(false); });
+}
+function placeRing(det, fw, fh) {
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const scale = Math.max(vw / fw, vh / fh);
+  const dw = fw * scale, dh = fh * scale;
+  const ox = (vw - dw) / 2, oy = (vh - dh) / 2;
+  const cx = ox + (det.cx / fw) * dw, cy = oy + (det.cy / fh) * dh;
+  const r = Math.min(Math.max((det.rr / fw) * dw, 28), Math.min(vw, vh) * 0.4);
+  ring.style.left = cx - r + "px"; ring.style.top = cy - r + "px";
+  ring.style.width = r * 2 + "px"; ring.style.height = r * 2 + "px";
+}
+function identifyCoin(det, fw, fh) {
   try {
-    bmp = await createImageBitmap(f);
-  } catch {
-    $("status").textContent = "Could not read that photo. Try another one.";
+    const vw = feed.videoWidth, vh = feed.videoHeight;
+    if (!vw) return;
+    const k = Math.min(1, 640 / Math.max(vw, vh));
+    full.width = Math.round(vw * k); full.height = Math.round(vh * k);
+    fctx.drawImage(feed, 0, 0, full.width, full.height);
+    const img = fctx.getImageData(0, 0, full.width, full.height);
+    const kx = (full.width / fw) * det.cx, ky = (full.height / fh) * det.cy, kr = (full.width / fw) * det.rr;
+    const fv = CoinModel.extractFeatures(img.data, full.width, full.height, { x: kx, y: ky, r: kr });
+    const best = clf.predict(fv, { countries: COUNTRIES })[0];
+    if (best && best.label !== "unknown") {
+      const def = CoinModel.DB.find((d) => d.id === best.label);
+      coinLabel = def ? `${def.label} · Ø${def.diam} mm` : best.label;
+      hint.textContent = `${coinLabel} (${Math.round(best.confidence * 100)}%) — hold steady…`;
+    } else { coinLabel = ""; hint.textContent = "Coin found — hold steady…"; }
+  } catch { /* ID is advisory; the gate stands on geometry */ }
+}
+function scan() {
+  if (!feed.videoWidth) { setTimeout(scan, 500); return; }
+  const fw = SW, fh = Math.round((SW * feed.videoHeight) / feed.videoWidth);
+  work.width = fw; work.height = fh;
+  try { wctx.drawImage(feed, 0, 0, fw, fh); } catch { setTimeout(scan, 500); return; }
+  const img = wctx.getImageData(0, 0, fw, fh);
+  const found = CoinModel.detectCoins(img.data, fw, fh, { maxCoins: 3 })[0] || null;
+  const tooClose = !!found && found.r > fw * 0.32;
+  const det = found && !tooClose ? { cx: found.x, cy: found.y, rr: found.r, score: found.score } : null;
+  if (tooClose) {
+    history.push(null);
+    if (history.length > 10) history.shift();
+    cancelCapture();
+    if (coinSeen) hint.textContent = "A bit too close — move back a little";
+    setTimeout(scan, 200);
     return;
   }
-  const scale = Math.min(1, MAX_SIDE / Math.max(bmp.width, bmp.height));
-  photo = document.createElement("canvas");
-  photo.width = Math.round(bmp.width * scale);
-  photo.height = Math.round(bmp.height * scale);
-  photo.getContext("2d", { willReadFrequently: true }).drawImage(bmp, 0, 0, photo.width, photo.height);
-  $("canvas").width = photo.width;
-  $("canvas").height = photo.height;
-  $("canvas").style.display = "block";
-  $("steps").style.display = "block";
-  document.body.classList.add("has-photo");
-  redraw();
-  try {
-    const px = photo.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, photo.width, photo.height);
-    const notes = checkPhoto({ width: px.width, height: px.height, data: px.data }, Math.max(bmp.width, bmp.height));
-    $("photoNotes").textContent = notes.join(" ");
-  } catch {
-    // Notes are advisory; a failure here must never block intake.
+  history.push(det);
+  if (history.length > 10) history.shift();
+  const recent = history.filter(Boolean);
+  let steady = false;
+  if (recent.length >= 6) {
+    const xs = recent.map((d) => d.cx).sort((a, b) => a - b);
+    const ys = recent.map((d) => d.cy).sort((a, b) => a - b);
+    const med = { cx: xs[recent.length >> 1], cy: ys[recent.length >> 1] };
+    steady = recent.every((d) => Math.hypot(d.cx - med.cx, d.cy - med.cy) < 25);
   }
-  try {
-    $("status").textContent = "Preparing the photo…";
-    await loadModel();
-    const blob = await new Promise((r) => photo.toBlob(r, "image/png"));
-    rawImage = await tf.RawImage.read(URL.createObjectURL(blob));
-    // image embeddings are computed once per photo; point prompts reuse them
-    const inputs = await processor(rawImage);
-    embeddings = await model.get_image_embeddings(inputs);
-    $("status").textContent = "Ready. Mark the damage, then the coin.";
-  } catch (e) {
-    $("status").textContent = `The outlining model failed to load (${e.message ?? e}). Check your connection and retry.`;
+  if (steady) {
+    const d = recent[recent.length - 1];
+    smooth = smooth ? {
+      cx: smooth.cx + (d.cx - smooth.cx) * 0.35, cy: smooth.cy + (d.cy - smooth.cy) * 0.35,
+      rr: smooth.rr + (d.rr - smooth.rr) * 0.35, score: d.score,
+    } : { ...d };
+    placeRing(smooth, fw, fh);
+    if (!coinSeen) { coinSeen = true; identifyCoin(smooth, fw, fh); setLocked(false); armCapture(); }
+  } else if (coinSeen && recent.length < 3) {
+    cancelCapture();
+    coinSeen = false; smooth = null; coinLabel = "";
+    setLocked(true, "Add a coin for scale");
   }
+  setTimeout(scan, 200);
 }
+setLocked(true, "Add a coin for scale");
+acquireCamera();
 
-$("photo").onchange = () => handlePhotoFile($("photo").files?.[0]);
-
-// Cmd/Ctrl+V anywhere: grab the first image in the clipboard.
-document.addEventListener("paste", (e) => {
-  const item = [...(e.clipboardData?.items ?? [])].find((i) => i.type.startsWith("image/"));
-  const f = item?.getAsFile();
-  if (f) {
-    e.preventDefault();
-    handlePhotoFile(f);
-  }
-});
-
-function redraw() {
-  const c = $("canvas"), ctx = c.getContext("2d", { willReadFrequently: true });
-  ctx.drawImage(photo, 0, 0);
-  for (const [name, st] of Object.entries(steps)) {
-    const [r, g, b] = COLORS[name];
-    if (st.mask) {
-      const img = ctx.getImageData(0, 0, c.width, c.height);
-      for (let i = 0; i < st.mask.length; i++) {
-        if (!st.mask[i]) continue;
-        const o = i * 4;
-        img.data[o] = img.data[o] * 0.55 + r * 0.45;
-        img.data[o + 1] = img.data[o + 1] * 0.55 + g * 0.45;
-        img.data[o + 2] = img.data[o + 2] * 0.55 + b * 0.45;
+fab.addEventListener("pointerdown", () => fab.classList.add("hide"));
+for (const ev of ["pointerup", "pointercancel", "pointerleave"]) fab.addEventListener(ev, () => fab.classList.remove("hide"));
+fab.addEventListener("click", () => {
+  if (fab.classList.contains("locked")) { hint.textContent = "Hold a coin in front of the camera"; return; }
+  cancelCapture();
+  try {
+    const vw = feed.videoWidth, vh = feed.videoHeight;
+    if (vw) {
+      const cap = document.createElement("canvas");
+      const side = Math.max(vw, vh) > 1024 ? 1024 / Math.max(vw, vh) : 1;
+      cap.width = Math.round(vw * side); cap.height = Math.round(vh * side);
+      cap.getContext("2d").drawImage(feed, 0, 0, cap.width, cap.height);
+      stillDataUrl = cap.toDataURL("image/jpeg", 0.85);
+      document.getElementById("shotFull").src = stillDataUrl;
+      // coin circle in still pixels for the scale reference later
+      if (smooth) {
+        const sx = cap.width / vw, sy = cap.height / vh;
+        gateCoin = { cx: smooth.cx, cy: smooth.cy, rr: smooth.rr, fw: SW, fh: Math.round((SW * vh) / vw), sw: cap.width, sh: cap.height, sx, sy };
       }
-      ctx.putImageData(img, 0, 0);
     }
-    ctx.fillStyle = `rgb(${r},${g},${b})`;
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 2;
-    for (const [x, y] of st.points) {
-      ctx.beginPath();
-      ctx.arc(x, y, Math.max(5, c.width / 120), 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-    }
-  }
-  $("measure").disabled = !steps.damage.mask;
-}
+  } catch { /* stills are best-effort */ }
+  stopCamera();
+  const flash = $("flash");
+  flash.classList.add("go");
+  setTimeout(() => { show("sReview"); flash.classList.remove("go"); }, 160);
+});
+$("retake").onclick = () => {
+  backToCam();
+  coinSeen = false; smooth = null; coinLabel = ""; gateCoin = null; stillDataUrl = ""; noScaleMode = false;
+  history.length = 0;
+  setLocked(true, "Add a coin for scale");
+  acquireCamera();
+};
+$("usePhoto").onclick = () => { show("sMark"); setupMarkPhoto(); };
+$("backCam").onclick = () => { $("retake").onclick(); };
+$("altEntry").onclick = () => { loadSample(); };
+$("noCoin").onclick = () => {
+  noScaleMode = true;
+  gateCoin = null;
+  setLocked(false, "Percent-only — no scale. Tap to snap.");
+  cancelCapture();
+};
 
-// One SAM decoder run per tap, then union. Prompting all taps at once makes SAM
-// outline the object a thin crack runs through instead of the crack itself.
-// Cracks are thin: SAM's highest-scoring candidate is often the wall the crack runs
-// through (71% of the photo on a real facade), so damage takes the smallest candidate
-// that still scores MIN_FINE_SCORE. Coins are compact, so they keep the best score.
+/* ---------- mark damage (photo canvas + SlimSAM taps) ---------- */
+const TF_URL = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2";
+const MODEL_ID = "Xenova/slimsam-77-uniform";
+const MAX_SIDE = 512;
 const MIN_FINE_SCORE = 0.5;
+let tf = null, model = null, processor = null, embeddings = null;
+let dmg = { points: [], pointMasks: [], mask: null, iou: 0 };
+let dmgLabel = "crack";
 
-async function decodePoint(point, preferSmallest) {
-  // input_points shape: [image][prompt][point][x,y], in original image pixels
-  const inputs = await processor(rawImage, { input_points: [[point]] });
-  const outputs = await model({ ...embeddings, input_points: inputs.input_points, input_labels: inputs.input_labels });
-  // masks[0] has dims [1, 3, H, W]: three candidate masks at original size
-  const masks = await processor.post_process_masks(outputs.pred_masks, inputs.original_sizes, inputs.reshaped_input_sizes);
-  const scores = outputs.iou_scores.data; // 3 scores, one per candidate
-  const [, , h, w] = masks[0].dims;
-  const areaOf = (k) => {
-    let n = 0;
-    for (const v of masks[0].data.subarray(k * h * w, (k + 1) * h * w)) if (v) n++;
-    return n;
+function encodeRle(mask, w, h) {
+  const counts = [];
+  let cur = 0, run = 0;
+  for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) {
+    const v = mask[y * w + x] ? 1 : 0;
+    if (v === cur) run++; else { counts.push(run); cur = v; run = 1; }
+  }
+  counts.push(run);
+  return { size: [h, w], counts };
+}
+function circleRle(cx, cy, r, w, h) {
+  const mask = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const dx = x + 0.5 - cx, dy = y + 0.5 - cy;
+    if (dx * dx + dy * dy <= r * r) mask[y * w + x] = 1;
+  }
+  return encodeRle(mask, w, h);
+}
+async function loadModel() {
+  if (model) return;
+  tf = await import(TF_URL);
+  model = await tf.SamModel.from_pretrained(MODEL_ID);
+  processor = await tf.AutoProcessor.from_pretrained(MODEL_ID);
+}
+function setupMarkPhoto() {
+  const img = new Image();
+  img.onload = () => {
+    const scale = Math.min(1, MAX_SIDE / Math.max(img.width, img.height));
+    photo = document.createElement("canvas");
+    photo.width = Math.round(img.width * scale);
+    photo.height = Math.round(img.height * scale);
+    photo.getContext("2d", { willReadFrequently: true }).drawImage(img, 0, 0, photo.width, photo.height);
+    dmg = { points: [], pointMasks: [], mask: null, iou: 0 };
+    drawMark();
+    $("measureBtn").disabled = true;
+    $("status").textContent = "Tap the crack, then Measure.";
+    loadModel().then(prepareEmbeddings).catch(() => { $("status").textContent = "Outlining unavailable — measuring the whole-frame fallback is off. Retry."; });
   };
+  img.src = stillDataUrl;
+}
+async function prepareEmbeddings() {
+  const blob = await new Promise((r) => photo.toBlob(r, "image/png"));
+  const rawImage = await tf.RawImage.read(URL.createObjectURL(blob));
+  const inputs = await processor(rawImage);
+  embeddings = await model.get_image_embeddings(inputs);
+  $("tfState").textContent = "";
+}
+async function decodePoint(point) {
+  const inputs = await processor(await tf.RawImage.read(URL.createObjectURL(await new Promise((r) => photo.toBlob(r, "image/png")))), { input_points: [[point]] });
+  const outputs = await model({ ...embeddings, input_points: inputs.input_points, input_labels: inputs.input_labels });
+  const masks = await processor.post_process_masks(outputs.pred_masks, inputs.original_sizes, inputs.reshaped_input_sizes);
+  const scores = outputs.iou_scores.data;
+  const [, , h, w] = masks[0].dims;
+  const areaOf = (k) => { let n = 0; for (const v of masks[0].data.subarray(k * h * w, (k + 1) * h * w)) if (v) n++; return n; };
   let best = 0;
   for (let i = 1; i < scores.length; i++) if (scores[i] > scores[best]) best = i;
-  if (preferSmallest) {
-    let fine = -1, fineArea = Infinity;
-    for (let i = 0; i < scores.length; i++) {
-      const a = areaOf(i);
-      if (scores[i] >= MIN_FINE_SCORE && a > 0 && a < fineArea) { fine = i; fineArea = a; }
-    }
-    if (fine >= 0) best = fine;
+  let fine = -1, fineArea = Infinity;
+  for (let i = 0; i < scores.length; i++) {
+    const a = areaOf(i);
+    if (scores[i] >= MIN_FINE_SCORE && a > 0 && a < fineArea) { fine = i; fineArea = a; }
   }
+  if (fine >= 0) best = fine;
   const m = masks[0].data.subarray(best * h * w, (best + 1) * h * w);
   const out = new Uint8Array(h * w);
   let area = 0;
   for (let i = 0; i < out.length; i++) if (m[i]) { out[i] = 1; area++; }
   return area ? { mask: out, iou: scores[best] } : null;
 }
-
-async function segment(name) {
-  const st = steps[name];
-  st.pointMasks.length = Math.min(st.pointMasks.length, st.points.length);
-  if (!st.points.length) {
-    st.mask = null;
-    redraw();
-    return;
-  }
-  if (!embeddings) {
-    $("status").textContent = "The photo is still being prepared. Wait a moment.";
-    return;
-  }
-  $("status").textContent = "Outlining…";
-  try {
-    while (st.pointMasks.length < st.points.length) {
-      st.pointMasks.push(await decodePoint(st.points[st.pointMasks.length], name === "damage"));
+function drawMark() {
+  const c = $("markCanvas");
+  c.width = photo.width; c.height = photo.height;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(photo, 0, 0);
+  if (dmg.mask) {
+    const img = ctx.getImageData(0, 0, c.width, c.height);
+    for (let i = 0; i < dmg.mask.length; i++) {
+      if (!dmg.mask[i]) continue;
+      const o = i * 4;
+      img.data[o] = img.data[o] * 0.55 + 196 * 0.45;
+      img.data[o + 1] = img.data[o + 1] * 0.55 + 31 * 0.45;
+      img.data[o + 2] = img.data[o + 2] * 0.55 + 41 * 0.45;
     }
-    const found = st.pointMasks.filter(Boolean);
-    if (!found.length) {
-      st.mask = null;
-      $("status").textContent = "No mask found there. Tap closer to the middle of it.";
-    } else {
-      const union = new Uint8Array(found[0].mask.length);
-      for (const { mask } of found) for (let i = 0; i < union.length; i++) union[i] |= mask[i];
-      st.mask = union;
-      // the union is only as trustworthy as its weakest piece
-      st.iou = Math.min(...found.map((f) => f.iou));
-      const missed = st.pointMasks.length - found.length;
-      $("status").textContent = `Outlined (${Math.round(st.iou * 100)}% sure)` +
-        (missed ? `; ${missed} tap${missed > 1 ? "s" : ""} found nothing.` : ".");
-    }
-  } catch (e) {
-    st.mask = null;
-    $("status").textContent = `Outlining failed (${e.message ?? e}).`;
+    ctx.putImageData(img, 0, 0);
   }
-  redraw();
+  // auto coin outline from the gate (green ring)
+  if (gateCoin) {
+    const kx = photo.width / gateCoin.sw, ky = photo.height / gateCoin.sh;
+    const cx = (gateCoin.cx / gateCoin.fw) * gateCoin.sw * kx;
+    const cy = (gateCoin.cy / gateCoin.fh) * gateCoin.sh * ky;
+    const r = (gateCoin.rr / gateCoin.fw) * gateCoin.sw * kx;
+    ctx.strokeStyle = "#0e8a4d"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.fillStyle = "#c81e2b"; ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
+  for (const [x, y] of dmg.points) {
+    ctx.beginPath(); ctx.arc(x, y, Math.max(5, c.width / 120), 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  }
+  $("measureBtn").disabled = !dmg.mask;
 }
-
-// Tap or click: scale from displayed size to canvas pixels, add a point to the active step.
-$("canvas").onpointerdown = (ev) => {
-  if (!photo) return;
-  const c = $("canvas"), r = c.getBoundingClientRect();
+$("markCanvas").addEventListener("pointerdown", async (ev) => {
+  if (!photo || !embeddings) { $("status").textContent = "Outlining model still loading…"; return; }
+  const c = $("markCanvas"), r = c.getBoundingClientRect();
   const x = Math.round((ev.clientX - r.left) * (c.width / r.width));
   const y = Math.round((ev.clientY - r.top) * (c.height / r.height));
-  steps[active].points.push([x, y]);
-  segment(active);
-};
-
-function setActive(name) {
-  active = name;
-  for (const [key, id] of [["damage", "stepDamage"], ["coin", "stepCoin"]]) {
-    $(id).classList.toggle("is-active", name === key);
-    $(id).setAttribute("aria-pressed", String(name === key));
-  }
-}
-$("stepDamage").onclick = () => setActive("damage");
-$("stepCoin").onclick = () => setActive("coin");
-$("undoDamage").onclick = () => { steps.damage.points.pop(); segment("damage"); };
-$("undoCoin").onclick = () => { steps.coin.points.pop(); segment("coin"); };
-$("clearDamage").onclick = () => { steps.damage = emptyStep(); redraw(); };
-$("clearCoin").onclick = () => { steps.coin = emptyStep(); redraw(); };
-setActive("damage");
-
-// COCO RLE as src/vision/mask.ts decodeRle reads it: column-major pixel order
-// (index i -> x = floor(i/h), y = i%h), first run counts zeros (may be 0).
-function encodeRle(mask, w, h) {
-  const counts = [];
-  let cur = 0, run = 0;
-  for (let x = 0; x < w; x++) {
-    for (let y = 0; y < h; y++) {
-      const v = mask[y * w + x] ? 1 : 0;
-      if (v === cur) run++;
-      else { counts.push(run); cur = v; run = 1; }
-    }
-  }
-  counts.push(run);
-  return { size: [h, w], counts };
-}
-
-$("measure").onclick = async () => {
-  const d = steps.damage, k = steps.coin;
-  if (!d.mask) {
-    $("status").textContent = "Mark the damage first.";
-    return;
-  }
-  const w = photo.width, h = photo.height;
-  const body = {
-    masks: [{
-      id: "damage-1",
-      label: $("damageLabel").value,
-      rle: encodeRle(d.mask, w, h),
-      confidence: d.iou
-    }]
+  dmg.points.push([x, y]);
+  $("status").textContent = "Outlining…";
+  try {
+    while (dmg.pointMasks.length < dmg.points.length) dmg.pointMasks.push(await decodePoint(dmg.points[dmg.pointMasks.length]));
+    const found = dmg.pointMasks.filter(Boolean);
+    if (found.length) {
+      const union = new Uint8Array(found[0].mask.length);
+      for (const { mask } of found) for (let i = 0; i < union.length; i++) union[i] |= mask[i];
+      dmg.mask = union;
+      dmg.iou = Math.min(...found.map((f) => f.iou));
+      $("status").textContent = `Outlined (${Math.round(dmg.iou * 100)}% sure).`;
+    } else { dmg.mask = null; $("status").textContent = "No mask there. Tap the middle of it."; }
+  } catch { dmg.mask = null; $("status").textContent = "Outlining failed."; }
+  drawMark();
+});
+for (const [id, label] of [["chipCrack", "crack"], ["chipStain", "stain"], ["chipPeel", "peel"], ["chipDent", "dent"]]) {
+  $(id).onclick = () => {
+    dmgLabel = label;
+    for (const [o] of [["chipCrack"], ["chipStain"], ["chipPeel"], ["chipDent"]]) $(o).classList.remove("on");
+    $(id).classList.add("on");
   };
-  if (k.mask) {
-    body.reference = {
-      id: "coin",
-      rle: encodeRle(k.mask, w, h),
-      knownMm: Number($("coinKind").value),
-      confidence: k.iou
-    };
-  } else if ($("noScale")?.checked) {
-    body.note = "no scale reference: percent-only report requested";
-  }
-  $("status").textContent = "Measuring…";
-  let res, j;
-  try {
-    res = await fetch(base() + "/v1/observe", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body)
-    });
-    j = await res.json();
-  } catch {
-    $("status").textContent = "Backend didn't answer (Worker CPU cap on big photos?) — try local: npm run backend:start, set Backend to http://127.0.0.1:8787";
-    return;
-  }
-  if (!res.ok || !j.ok) {
-    $("status").textContent = `Backend error: ${j.error ?? res.status}`;
-    return;
-  }
-  $("payload").value = JSON.stringify(j.result, null, 2);
-  // Measuring is pure math and needs no key; show it before asking for AI findings.
-  let measured;
-  try {
-    const mres = await fetch(base() + "/v1/measure", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(j.result)
-    });
-    measured = await mres.json();
-    if (!mres.ok || !measured.ok) throw new Error(measured.error ?? mres.status);
-  } catch (e) {
-    $("status").textContent = `Measuring failed (${e.message ?? e}).`;
-    return;
-  }
-  showMeasured(measured.result);
-  await runReport(true);
-};
+}
 
+/* ---------- measure + report ---------- */
+function checkPhotoNotes() {
+  try {
+    const px = photo.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, photo.width, photo.height);
+    const notes = checkPhoto({ width: px.width, height: px.height, data: px.data }, Math.max(photo.width, photo.height));
+    $("photoNotes").textContent = notes.join(" ");
+  } catch { /* advisory only */ }
+}
+let payloadObj = null;
+let lastMeasurement = null;
+$("measureBtn").onclick = async () => {
+  if (!dmg.mask) return;
+  checkPhotoNotes();
+  const w = photo.width, h = photo.height;
+  const body = { masks: [{ id: "damage-1", label: dmgLabel, rle: encodeRle(dmg.mask, w, h), confidence: dmg.iou || 0.8 }] };
+  if (gateCoin) {
+    const kx = w / gateCoin.sw, ky = h / gateCoin.sh;
+    const cx = (gateCoin.cx / gateCoin.fw) * gateCoin.sw * kx;
+    const cy = (gateCoin.cy / gateCoin.fh) * gateCoin.sh * ky;
+    const r = Math.max(3, (gateCoin.rr / gateCoin.fw) * gateCoin.sw * kx);
+    body.reference = { id: "coin", rle: circleRle(cx, cy, r, w, h), knownMm: Number($("coinKind").value), confidence: 0.85 };
+  } else if (noScaleMode) body.note = "percent-only requested";
+  $("status").textContent = "Measuring…";
+  try {
+    const res = await fetch(base() + "/v1/observe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    const j = await res.json();
+    if (!res.ok || !j.ok) throw new Error(j.error ?? res.status);
+    const mres = await fetch(base() + "/v1/measure", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(j.result) });
+    const measured = await mres.json();
+    if (!mres.ok || !measured.ok) throw new Error(measured.error ?? mres.status);
+    payloadObj = j.result;
+    showMeasured(measured.result);
+    show("sSay");
+    startListening();
+  } catch (e) { $("status").textContent = `Measuring failed (${e.message ?? e}).`; }
+};
 function measuredRows(findings) {
   return findings.map((f) => {
-    const label = String(f.label);
-    const cap = label.charAt(0).toUpperCase() + label.slice(1);
-    const mm = f.crackLengthMm === null ? "—" : `${escapeHtml(String(f.crackLengthMm))} mm`;
-    const area = f.areaCm2 === null || f.areaCm2 === undefined ? "" : ` · ${escapeHtml(String(f.areaCm2))} cm²`;
-    const width = f.crackWidthMm === null || f.crackWidthMm === undefined ? "" : ` · w ${escapeHtml(String(f.crackWidthMm))} mm`;
-    const regions = `${escapeHtml(String(f.regionCount ?? 1))} region${(f.regionCount ?? 1) === 1 ? "" : "s"}`;
-    return `<li><p class="found">${escapeHtml(cap)} found</p>` +
-      `<b>${escapeHtml(String(f.percent))}%</b> <small>of the wall</small> · ` +
-      `<b>${mm}</b> <small>length</small>${area} · ${regions} · ` +
-      `<span class="badge ok">${escapeHtml(String(f.severity))}</span>${width}` +
-      `${f.statement ? `<br/><small>${escapeHtml(String(f.statement))}</small>` : ""}</li>`;
+    const mm = f.crackLengthMm === null ? "—" : `${esc(String(f.crackLengthMm))} mm`;
+    const area = f.areaCm2 == null ? "" : ` · ${esc(String(f.areaCm2))} cm²`;
+    const width = f.crackWidthMm == null ? "" : ` · w ${esc(String(f.crackWidthMm))} mm`;
+    const cap = String(f.label);
+    return `<li><p class="found">${esc(cap.charAt(0).toUpperCase() + cap.slice(1))} found</p>` +
+      `<b>${esc(String(f.percent))}%</b> <small>of the wall</small> · <b>${mm}</b> <small>length</small>${area} · ` +
+      `${esc(String(f.regionCount ?? 1))} region${(f.regionCount ?? 1) === 1 ? "" : "s"} · ` +
+      `<span class="badge ok">${esc(String(f.severity))}</span>${width}` +
+      `${f.statement ? `<br/><small>${esc(String(f.statement))}</small>` : ""}</li>`;
   }).join("");
 }
-
 function showMeasured(result) {
-  markStep(3);
   const mode = result.mode === "absolute" ? "" : " (no coin: percent only)";
   $("measured").innerHTML = `<span class="badge ok">MEASURED${mode}</span><ul>${measuredRows(result.findings)}</ul>`;
   drawScheme(result.findings);
+  show("sNum");
 }
-
-let lastMeasurement = null;
-
-$("send").onclick = () => runReport();
-
-// keepMeasured: called right after a real measurement, so a missing key must not hide it.
-async function runReport(keepMeasured = false) {
-  $("status").textContent = "sending…";
-  $("findings").innerHTML = "";
-  let body;
-  try {
-    body = JSON.parse($("payload").value || "{}");
-  } catch {
-    $("status").textContent = "bad JSON in masks box";
-    return;
-  }
-  if (!Array.isArray(body.masks) || body.masks.length === 0) {
-    $("status").textContent = "Measure first — no measured payload yet.";
-    return;
-  }
-  body.transcript = $("transcript").value;
-  let res, j;
-  try {
-    res = await fetch(base() + "/v1/report", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body)
-    });
-    j = await res.json();
-  } catch {
-    $("status").textContent = "backend unreachable — run npm run backend:start";
-    return;
-  }
-  $("raw").textContent = JSON.stringify(j, null, 2);
-  if (res.status === 503) {
-    $("status").textContent = "Measured. AI findings are off: the backend has no API key.";
-    $("findings").innerHTML = `<span class="badge fail">AI FINDINGS UNAVAILABLE</span><pre>${escapeHtml(String(j.error ?? "API key missing"))}</pre>`;
-    if (!keepMeasured) drawScheme([]);
-    return;
-  }
-  if (!res.ok || !j.ok) {
-    $("status").textContent = `gate ${res.status}`;
-    const fails = j.details ?? j.failures ?? [j.error];
-    $("findings").innerHTML = `<span class="badge fail">GATED</span><pre>${escapeHtml(String(JSON.stringify(fails, null, 2)))}</pre>`;
-    if (!keepMeasured) drawScheme([]);
-    return;
-  }
-  $("status").textContent = `ok ${j.requestId} ${j.durationMs}ms`;
-  markStep(2);
-  lastMeasurement = j.result.measurement ?? null;
-  $("skepStatus").textContent = lastMeasurement ? "ready for skeptic" : "";
-  const rows = measuredRows(j.result.findings);
-  const gate = j.result.gate?.ok ? `<span class="badge ok">GATE PASS</span>` : `<span class="badge fail">GATE FAIL</span>`;
-  $("findings").innerHTML = `${gate}<ul>${rows}</ul>`;
-  drawScheme(j.result.measurement?.findings ?? j.result.findings ?? []);
-}
-
 function drawScheme(findings) {
   const svg = $("scheme");
   svg.innerHTML = "";
@@ -414,304 +412,220 @@ function drawScheme(findings) {
     t.textContent = `${f.label} ${f.percent}%`;
     svg.appendChild(t);
   });
-  if (!findings.length) {
-    const t = document.createElementNS(NS, "text");
-    t.setAttribute("x", "8"); t.setAttribute("y", "24");
-    t.setAttribute("font-size", "12");
-    t.textContent = "no findings — gated or empty";
-    svg.appendChild(t);
-  }
 }
 
-$("skeptic").onclick = async () => {
-  if (!lastMeasurement) {
-    $("skepStatus").textContent = "run report first";
-    return;
+/* ---------- mic + transcribe ---------- */
+const mic = $("micBtn"), micState = $("micState"), heard = $("heard"), wave = $("wave");
+const NBARS = 28, barEls = [];
+for (let i = 0; i < NBARS; i++) { const b = document.createElement("i"); wave.appendChild(b); barEls.push(b); }
+let micTimer = null, micStream = null, micReady = false, listening = false, analyser = null, analyserData = null;
+function paintWave() {
+  if (analyser) {
+    analyser.getByteFrequencyData(analyserData);
+    for (let i = 0; i < NBARS; i++) {
+      const v = analyserData[Math.floor((i / NBARS) * analyserData.length)] / 255;
+      barEls[i].style.height = Math.max(6, Math.round(v * 52)) + "px";
+    }
+  } else {
+    const t = Date.now() / 180;
+    for (let i = 0; i < NBARS; i++) {
+      const v = listening ? 0.35 + 0.3 * Math.sin(t + i * 0.7) + 0.25 * Math.sin(t * 0.37 + i * 1.7) : 0.12;
+      barEls[i].style.height = Math.max(6, Math.round(Math.abs(v) * 52)) + "px";
+    }
   }
-  $("skepStatus").textContent = "asking…";
-  $("skepticOut").innerHTML = "";
-  let res, j;
+}
+setInterval(() => { if ($("sSay").classList.contains("on")) paintWave(); }, 90);
+async function ensureMic() {
+  if (micReady) return true;
+  if (!navigator.mediaDevices?.getUserMedia) { heard.textContent = "No microphone on this device."; return false; }
   try {
-    res = await fetch(base() + "/v1/skeptic", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        transcript: $("transcript").value,
-        findings: lastMeasurement.findings,
-        receipts: lastMeasurement.receipts
-      })
-    });
-    j = await res.json();
-  } catch {
-    $("skepStatus").textContent = "backend unreachable";
-    return;
-  }
-  if (!res.ok || !j.ok) {
-    const msg = j.error ?? "skeptic failed";
-    $("skepStatus").textContent = `skeptic ${res.status}: ${msg}`;
-    if (res.status === 503) $("skepticOut").innerHTML = "<small>live skeptic needs BASETEN_API_KEY; live keys missing on the server.</small>";
-    return;
-  }
-  $("skepStatus").textContent = `skeptic ok ${j.requestId}`;
-  markStep(4);
-  const rows = j.result.findings.map((f) => {
-    const disputed = /disputed/i.test(f.statement);
-    const badge = disputed ? `<span class="badge fail">DISPUTED</span>` : `<span class="badge ok">AGREED</span>`;
-    const cites = (f.citations ?? []).join(", ");
-    return `<li>${badge} ${escapeHtml(f.statement)}<br/><small>cites: ${escapeHtml(cites)}</small></li>`;
-  }).join("");
-  $("skepticOut").innerHTML = `<ul>${rows}</ul>`;
-};
-
-function escapeHtml(s) {
-  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    micReady = true;
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      const actx = new Ctx();
+      const src = actx.createMediaStreamSource(micStream);
+      analyser = actx.createAnalyser(); analyser.fftSize = 64;
+      analyserData = new Uint8Array(analyser.frequencyBinCount);
+      src.connect(analyser);
+    } catch { /* levels stay simulated */ }
+    return true;
+  } catch { heard.textContent = "Mic blocked — allow access or type below."; return false; }
 }
-
-// The app shell works offline; measurements always hit the network (see sw.js).
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
-  });
+function stopListening(landed, text) {
+  clearTimeout(micTimer); micTimer = null; listening = false;
+  document.getElementById("micwrap").classList.remove("live");
+  micState.textContent = landed ? "Heard" : "Listening";
+  heard.textContent = landed ? (text ?? "") : "";
 }
-
-// ---- voice line via Muse Voice Transcribe (POST /v1/transcribe) ----
-// Hold the button to talk; letting go stops (10 s cap). The PWA encodes the
-// clip to mono 16 kHz WAV on-device and sends only the audio bytes to the
-// backend, which proxies them to Muse Voice Transcribe. Text lands in the box.
-const MAX_VOICE_MS = 10000;
-let recorder = null, voiceChunks = [], voiceStream = null, voiceTimer = null;
-
-function blobToBase64(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result).split(",").pop() ?? "");
-    reader.onerror = () => reject(new Error("could not read the recording"));
-    reader.readAsDataURL(blob);
-  });
+async function startListening() {
+  if (listening) return;
+  heard.textContent = "Asking for the mic…";
+  if (!(await ensureMic())) return;
+  listening = true;
+  document.getElementById("micwrap").classList.add("live");
+  micState.textContent = "Listening";
+  heard.textContent = "";
+  recorderStart();
+  micTimer = setTimeout(() => finishListening(true), 8000);
 }
-
-function encodeWav(samples, sampleRate) {
+let recChunks = [], recorder = null, recStream = null;
+async function recorderStart() {
+  try {
+    recStream = micStream ?? await navigator.mediaDevices.getUserMedia({ audio: true });
+    recChunks = [];
+    recorder = new MediaRecorder(recStream);
+    recorder.ondataavailable = (e) => { if (e.data.size) recChunks.push(e.data); };
+    recorder.start();
+  } catch { recorder = null; }
+}
+function encodeWav(samples, rate) {
   const buffer = new ArrayBuffer(44 + samples.length * 2);
   const view = new DataView(buffer);
-  const writeAscii = (offset, text) => {
-    for (let i = 0; i < text.length; i++) view.setUint8(offset + i, text.charCodeAt(i));
-  };
-  writeAscii(0, "RIFF");
-  view.setUint32(4, 36 + samples.length * 2, true);
-  writeAscii(8, "WAVE");
-  writeAscii(12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
-  writeAscii(36, "data");
-  view.setUint32(40, samples.length * 2, true);
+  const ascii = (o, t) => { for (let i = 0; i < t.length; i++) view.setUint8(o + i, t.charCodeAt(i)); };
+  ascii(0, "RIFF"); view.setUint32(4, 36 + samples.length * 2, true); ascii(8, "WAVE");
+  ascii(12, "fmt "); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+  view.setUint32(24, rate, true); view.setUint32(28, rate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+  ascii(36, "data"); view.setUint32(40, samples.length * 2, true);
   for (let i = 0; i < samples.length; i++) {
     const s = Math.max(-1, Math.min(1, samples[i]));
     view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
   }
   return new Blob([buffer], { type: "audio/wav" });
 }
-
-/** Recorded clip → mono 16 kHz samples, the rate Muse Voice Transcribe expects. */
-async function toVoiceWav(blob) {
-  const Ctx = window.AudioContext || window.webkitAudioContext;
-  if (!Ctx) throw new Error("audio not supported in this browser");
-  const ctx = new Ctx();
+async function finishListening(landed) {
+  stopListening(false);
+  if (!landed || !recorder || recorder.state === "recording") {
+    try { if (recorder?.state === "recording") recorder.stop(); } catch { /* noop */ }
+  }
+  await new Promise((r) => setTimeout(r, 300));
+  const clip = new Blob(recChunks, { type: recorder?.mimeType || "audio/webm" });
+  if (!landed || clip.size === 0) { if (landed) heard.textContent = "Didn't catch anything — type the line."; return; }
+  micState.textContent = "Transcribing…";
   try {
-    const decoded = await ctx.decodeAudioData(await blob.arrayBuffer());
-    const targetRate = 16000;
-    const seconds = Math.min(decoded.duration, MAX_VOICE_MS / 1000);
-    const offline = new OfflineAudioContext(1, Math.max(1, Math.ceil(seconds * targetRate)), targetRate);
-    const src = offline.createBufferSource();
-    src.buffer = decoded;
-    src.connect(offline.destination);
-    src.start(0, 0, seconds);
-    const rendered = await offline.startRendering();
-    return encodeWav(rendered.getChannelData(0), targetRate);
-  } finally {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new Ctx();
+    const decoded = await ctx.decodeAudioData(await clip.arrayBuffer());
+    const off = new OfflineAudioContext(1, Math.ceil(Math.min(decoded.duration, 10) * 16000), 16000);
+    const src = off.createBufferSource(); src.buffer = decoded; src.connect(off.destination); src.start(0, 0, Math.min(decoded.duration, 10));
+    const rendered = await off.startRendering();
     ctx.close().catch(() => {});
-  }
-}
-
-async function startRecording() {
-  if (recorder) return;
-  if (!navigator.mediaDevices?.getUserMedia) {
-    $("voiceStatus").textContent = "No microphone access. Type the line instead.";
-    return;
-  }
-  try {
-    voiceStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  } catch {
-    $("voiceStatus").textContent = "No microphone access. Type the line instead.";
-    return;
-  }
-  voiceChunks = [];
-  recorder = new MediaRecorder(voiceStream);
-  recorder.ondataavailable = (e) => {
-    if (e.data.size > 0) voiceChunks.push(e.data);
-  };
-  recorder.onstop = async () => {
-    const rec = recorder;
-    recorder = null;
-    clearTimeout(voiceTimer);
-    voiceStream?.getTracks().forEach((t) => t.stop());
-    voiceStream = null;
-    $("record").textContent = "Hold to speak";
-    const clip = new Blob(voiceChunks, { type: rec.mimeType || "audio/webm" });
-    if (clip.size === 0) {
-      $("voiceStatus").textContent = "Didn't catch anything. Hold the button and try again.";
-      return;
-    }
-    $("voiceStatus").textContent = "Transcribing…";
-    try {
-      const wav = await toVoiceWav(clip);
-      const audioBase64 = await blobToBase64(wav);
-      const res = await fetch(base() + "/v1/transcribe", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ audioBase64 }),
-      });
-      const j = await res.json().catch(() => ({}));
-      if (res.status === 503) {
-        $("voiceStatus").textContent = "Voice needs the backend API key. Type the line instead.";
-        return;
-      }
-      if (!res.ok || !j.ok) throw new Error(j.error ?? res.status);
-      const text = String(j.result?.transcript ?? "").trim();
-      if (!text) {
-        $("voiceStatus").textContent = "Didn't catch anything. Hold the button and try again.";
-        return;
-      }
-      $("transcript").value = text;
-      $("voiceStatus").textContent = "Done. Fix any words in the box before sending.";
-    } catch (e) {
-      $("voiceStatus").textContent = `Transcription failed (${e.message ?? e}). Type the line instead.`;
-    }
-  };
-  recorder.start();
-  $("record").textContent = "Release to stop";
-  $("voiceStatus").textContent = "Listening… release when done.";
-  voiceTimer = setTimeout(() => stopRecording(), MAX_VOICE_MS);
-}
-
-function stopRecording() {
-  if (recorder?.state === "recording") recorder.stop();
-}
-
-$("record")?.addEventListener("pointerdown", (e) => {
-  e.preventDefault();
-  try {
-    $("record").setPointerCapture?.(e.pointerId);
-  } catch {
-    // Older browsers keep the default capture behavior.
-  }
-  startRecording();
-});
-$("record")?.addEventListener("pointerup", () => stopRecording());
-$("record")?.addEventListener("pointercancel", () => stopRecording());
-
-// Sample measurement so a judge can try the full loop with one tap.
-// Same numbers as fixtures/masks/wall-crack.json; photo outline step skipped.
-$("sample")?.addEventListener("click", async () => {
-  const sample = {
-    component: { id: "wall-panel-north", areaPx: 480000, confidence: 0.93 },
-    masks: [
-      { id: "crack-1", label: "crack", areaPx: 24800, skeletonPx: 913, regionCount: 1, confidence: 0.88 },
-      { id: "stain-1", label: "stain", areaPx: 6200, regionCount: 2, confidence: 0.71 }
-    ],
-    scaleReference: { id: "coin-10inr", knownMm: 27, lengthPx: 287, confidence: 0.88 }
-  };
-  $("payload").value = JSON.stringify(sample, null, 2);
-  $("status").textContent = "Sample loaded. Measuring…";
-  try {
-    const mres = await fetch(base() + "/v1/measure", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(sample)
+    const wav = encodeWav(rendered.getChannelData(0), 16000);
+    const b64 = await new Promise((res, rej) => {
+      const fr = new FileReader();
+      fr.onload = () => res(String(fr.result).split(",").pop());
+      fr.onerror = () => rej(new Error("read failed"));
+      fr.readAsDataURL(wav);
     });
-    const measured = await mres.json();
-    if (!mres.ok || !measured.ok) throw new Error(measured.error ?? mres.status);
-    showMeasured(measured.result);
-    await runReport(true);
-  } catch (e) {
-    $("status").textContent = `Sample failed (${e.message ?? e}). Is the backend reachable?`;
-  }
-});
+    const res = await fetch(base() + "/v1/transcribe", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ audioBase64: b64 }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (res.status === 503) { $("voiceErr").textContent = "Voice needs the backend API key — type the line."; $("transcriptBox").value = ""; return; }
+    if (!res.ok || !j.ok) throw new Error(j.error ?? res.status);
+    const text = String(j.result?.transcript ?? "").trim();
+    if (!text) { heard.textContent = "Didn't catch anything — type the line."; return; }
+    $("transcriptBox").value = text;
+    heard.textContent = `“${text}”`;
+    micState.textContent = "Heard";
+  } catch (e) { $("voiceErr").textContent = `Transcription failed — type the line. (${e.message ?? e})`; }
+}
+mic.onclick = () => { if (listening) finishListening(true); else startListening(); };
+$("sendBtn").onclick = () => runReport();
+$("backMark").onclick = () => show("sReview");
+$("backSay").onclick = () => show("sMark");
 
-// ---- independent mask cross-check: on-device mask vs SAM 3.1 ----
-// Explicit and disclosed: this sends the photo to the backend once, which
-// forwards it to SAM 3.1. Everything else in the app measures without
-// the photo ever leaving the phone.
-$("xcheck").onclick = async () => {
-  const d = steps.damage;
-  if (!d.mask || !photo) {
-    $("xcheckStatus").textContent = "Mark the damage first.";
+/* ---------- report / skeptic / render ---------- */
+async function runReport() {
+  if (!payloadObj) return;
+  $("findings").innerHTML = "";
+  const body = JSON.parse(JSON.stringify(payloadObj));
+  body.transcript = $("transcriptBox").value;
+  let res, j;
+  try {
+    res = await fetch(base() + "/v1/report", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    j = await res.json();
+  } catch { j = { ok: false, error: "backend unreachable" }; res = { status: 0 }; }
+  $("raw").textContent = JSON.stringify(j, null, 2);
+  if (res.status === 503) {
+    $("findings").innerHTML = `<span class="badge fail">AI FINDINGS UNAVAILABLE</span><pre>${esc(j.error ?? "API key missing")}</pre>`;
     return;
   }
-  if (!d.points.length) {
-    $("xcheckStatus").textContent = "Tap the damage so SAM has a point prompt.";
+  if (!res.ok || !j.ok) {
+    const fails = j.details ?? j.failures ?? [j.error];
+    $("findings").innerHTML = `<span class="badge fail">GATED</span><pre>${esc(JSON.stringify(fails, null, 2))}</pre>`;
     return;
   }
-  $("xcheckStatus").textContent = "Asking SAM 3.1…";
+  lastMeasurement = j.result.measurement ?? null;
+  $("findings").innerHTML = `<span class="badge ok">GATE PASS</span><ul>${measuredRows(j.result.findings)}</ul>`;
+  drawScheme(j.result.measurement?.findings ?? []);
+  show("sNum");
+}
+$("toCheck").onclick = () => show("sCheck");
+$("toReport").onclick = () => show("sReport");
+$("backSay").onclick = () => show("sMark");
+$("backNum").onclick = () => show("sSay");
+$("backCheck").onclick = () => show("sCheck");
+$("skepticBtn").onclick = async () => {
+  if (!lastMeasurement) { $("skStatus").textContent = "run report first"; return; }
+  $("skStatus").textContent = "asking…";
+  $("skOut").innerHTML = "";
+  let res, j;
+  try {
+    res = await fetch(base() + "/v1/skeptic", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ transcript: $("transcriptBox").value, findings: lastMeasurement.findings, receipts: lastMeasurement.receipts }),
+    });
+    j = await res.json();
+  } catch { $("skStatus").textContent = "backend unreachable"; return; }
+  if (!res.ok || !j.ok) {
+    $("skStatus").textContent = `skeptic ${res.status}: ${j.error ?? "failed"}`;
+    return;
+  }
+  $("skStatus").textContent = `skeptic ok ${j.requestId}`;
+  $("skOut").innerHTML = `<ul>${j.result.findings.map((f) => {
+    const disputed = /disputed/i.test(f.statement);
+    return `<li><span class="badge ${disputed ? "fail" : "ok"}">${disputed ? "DISPUTED" : "AGREED"}</span> ${esc(f.statement)}<br/><small>cites: ${esc((f.citations ?? []).join(", "))}</small></li>`;
+  }).join("")}</ul>`;
+};
+$("xcheckBtn").onclick = async () => {
+  if (!dmg.mask || !photo) { $("xStatus").textContent = "Mark the damage first."; return; }
+  $("xStatus").textContent = "Asking SAM 3.1…";
   try {
     const segRes = await fetch(base() + "/v1/segment", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
+      method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({
         imageUrl: photo.toDataURL("image/jpeg", 0.85),
-        width: photo.width,
-        height: photo.height,
-        points: d.points.map(([x, y]) => ({ x, y }))
-      })
+        width: photo.width, height: photo.height,
+        points: dmg.points.map(([x, y]) => ({ x, y })),
+      }),
     });
     const seg = await segRes.json();
     if (!segRes.ok || !seg.ok) throw new Error(seg.error ?? "SAM segment failed");
     const record = seg.result?.records?.[0];
-    if (!record) {
-      $("xcheckStatus").textContent = "SAM found nothing there. Try another tap.";
-      return;
-    }
-    const mine = encodeRle(d.mask, photo.width, photo.height);
+    if (!record) { $("xStatus").textContent = "SAM found nothing there."; return; }
     const ccRes = await fetch(base() + "/v1/crosscheck", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ a: mine, b: record.rle, threshold: 0.5 })
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ a: encodeRle(dmg.mask, photo.width, photo.height), b: record.rle, threshold: 0.5 }),
     });
     const cc = await ccRes.json();
     if (!ccRes.ok || !cc.ok) throw new Error(cc.error ?? "cross-check failed");
-    const verdict = cc.result?.verdict ?? "UNKNOWN";
-    const iou = cc.result?.iou ?? "?";
-    const badge = verdict === "AGREED" ? "ok" : "fail";
-    $("xcheckStatus").innerHTML = "";
+    const badge = cc.result.verdict === "AGREED" ? "ok" : "fail";
+    $("xStatus").innerHTML = "";
     const chip = document.createElement("span");
     chip.className = `badge ${badge}`;
-    chip.textContent = `${escapeHtml(String(verdict))} · IoU ${escapeHtml(String(iou))}`;
-    $("xcheckStatus").appendChild(chip);
-    markStep(4);
-  } catch (e) {
-    $("xcheckStatus").textContent = `Cross-check failed (${e.message ?? e}). Mock mode has no SAM; go live or ignore.`;
-  }
+    chip.textContent = `${cc.result.verdict} · IoU ${cc.result.iou}`;
+    $("xStatus").appendChild(chip);
+  } catch (e) { $("xStatus").textContent = `Cross-check failed (${e.message ?? e}). Mock mode has no SAM.`; }
 };
-
-$("render").onclick = async () => {  let body;
-  try {
-    body = JSON.parse($("payload").value || "{}");
-  } catch {
-    return;
-  }
-  body.transcript = $("transcript").value;
-  const res = await fetch(base() + "/v1/render", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body)
-  });
+$("renderBtn").onclick = async () => {
+  if (!payloadObj) return;
+  const body = JSON.parse(JSON.stringify(payloadObj));
+  body.transcript = $("transcriptBox").value;
+  const res = await fetch(base() + "/v1/render", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   const j = await res.json();
   if (!res.ok || !j.ok) return;
-  markStep(5);
   $("annex").innerHTML = j.result.svg;
   const blob = new Blob([j.result.svg], { type: "image/svg+xml" });
   const dl = $("dl");
@@ -721,3 +635,26 @@ $("render").onclick = async () => {  let body;
   dl.textContent = "download svg";
 };
 
+/* ---------- sample (no camera) ---------- */
+async function loadSample() {
+  const sample = {
+    component: { id: "wall-panel-north", areaPx: 480000, confidence: 0.93 },
+    masks: [
+      { id: "crack-1", label: "crack", areaPx: 24800, skeletonPx: 913, regionCount: 1, confidence: 0.88 },
+      { id: "stain-1", label: "stain", areaPx: 6200, regionCount: 2, confidence: 0.71 },
+    ],
+    scaleReference: { id: "coin-10inr", knownMm: 27, lengthPx: 287, confidence: 0.88 },
+  };
+  try {
+    const mres = await fetch(base() + "/v1/measure", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(sample) });
+    const measured = await mres.json();
+    if (!mres.ok || !measured.ok) throw new Error(measured.error ?? mres.status);
+    payloadObj = sample;
+    showMeasured(measured.result);
+    show("sSay");
+    startListening();
+  } catch (e) { hint.textContent = `Sample failed (${e.message ?? e}). Is the backend reachable?`; }
+}
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+}
