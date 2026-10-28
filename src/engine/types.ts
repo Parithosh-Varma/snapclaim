@@ -17,6 +17,12 @@ export interface MaskObservation {
    */
   blockyRegionCount?: number;
   blockyAreaPx?: number;
+  /**
+   * Crack regions with one dead-straight edge, usually a ledge, frame or other
+   * built edge the tap caught. Flagged like blocky regions; a region can be both.
+   */
+  straightRegionCount?: number;
+  straightAreaPx?: number;
   confidence: number;
 }
 

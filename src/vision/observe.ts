@@ -10,10 +10,13 @@ import {
   maxInscribedRadiusPx,
   skeletonLengthPx,
   skeletonize,
+  straightestEdgeRmsPx,
 } from "./mask.ts";
 
 /** A crack region shorter than this many times its thickest point is blocky, not a crack. */
 export const MIN_CRACK_ELONGATION = 4;
+/** A crack region with an edge this close to a straight line (RMS, px) is likely built, not a crack. */
+export const MAX_STRAIGHT_EDGE_RMS_PX = 1;
 /** Regions smaller than this are too few pixels to judge their shape. */
 const MIN_SHAPE_AREA_PX = 50;
 
@@ -57,6 +60,8 @@ export function observeMask(mask: BinaryMask, options: ObserveMaskOptions): Mask
 
     let blockyRegionCount = 0;
     let blockyAreaPx = 0;
+    let straightRegionCount = 0;
+    let straightAreaPx = 0;
     for (const region of regions) {
       if (region.areaPx < MIN_SHAPE_AREA_PX) continue;
       const piece = cropRegion(clipped.width, region);
@@ -65,10 +70,19 @@ export function observeMask(mask: BinaryMask, options: ObserveMaskOptions): Mask
         blockyRegionCount++;
         blockyAreaPx += region.areaPx;
       }
+      const edge = straightestEdgeRmsPx(clipped.width, region);
+      if (edge !== null && edge <= MAX_STRAIGHT_EDGE_RMS_PX) {
+        straightRegionCount++;
+        straightAreaPx += region.areaPx;
+      }
     }
     if (blockyRegionCount > 0) {
       observation.blockyRegionCount = blockyRegionCount;
       observation.blockyAreaPx = blockyAreaPx;
+    }
+    if (straightRegionCount > 0) {
+      observation.straightRegionCount = straightRegionCount;
+      observation.straightAreaPx = straightAreaPx;
     }
   }
 

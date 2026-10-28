@@ -21,15 +21,19 @@ test("real facade masks reproduce the bench statistics", () => {
   assert.deepEqual(observe("crack-taps"), bench.masks[0]);
 });
 
-test("real facade: the stone-frame tap is flagged as blocky", () => {
+test("real facade: built pieces are flagged, the crack itself is not", () => {
   const block = observe("block-tap");
   assert.equal(block.blockyRegionCount, 1);
   assert.ok(block.blockyAreaPx! > 0.99 * block.areaPx, "the whole tap is the frame block");
+  assert.equal(block.straightRegionCount, 1, "the frame block's edges are ruler-straight");
 
-  // Four taps along the crack: the frame block is caught (plus a 63 px crack fragment at the
-  // photo edge). The pediment-ledge strip is long and thin, so the shape check passes it:
-  // 1,239 px of architecture still counted. A straightness check is the planned fix.
+  // Four taps along the crack. Blocky: the frame block (2,115 px) plus a 63 px crack
+  // fragment at the photo edge. Straight-edged: the frame block and the pediment-ledge
+  // strip (1,239 px), which is long and thin and so passes the blocky check. The two
+  // real crack segments (829 and 244 px) are in neither.
   const taps = observe("crack-taps");
   assert.equal(taps.blockyRegionCount, 2);
   assert.equal(taps.blockyAreaPx, 2115 + 63);
+  assert.equal(taps.straightRegionCount, 2);
+  assert.equal(taps.straightAreaPx, 2115 + 1239);
 });

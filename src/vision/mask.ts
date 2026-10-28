@@ -366,3 +366,71 @@ export function maxInscribedRadiusPx(mask: BinaryMask): number {
   }
   return best / 3;
 }
+
+function lineFitRmsPx(us: number[], vs: number[]): number {
+  const n = us.length;
+  const mu = us.reduce((a, b) => a + b, 0) / n;
+  const mv = vs.reduce((a, b) => a + b, 0) / n;
+  let suv = 0;
+  let suu = 0;
+  for (let k = 0; k < n; k++) {
+    suv += ((us[k] as number) - mu) * ((vs[k] as number) - mv);
+    suu += ((us[k] as number) - mu) ** 2;
+  }
+  const slope = suu === 0 ? 0 : suv / suu;
+  let sum = 0;
+  for (let k = 0; k < n; k++) sum += ((vs[k] as number) - mv - slope * ((us[k] as number) - mu)) ** 2;
+  return Math.sqrt(sum / n);
+}
+
+/**
+ * How close a region's straighter long edge is to a line: RMS distance in pixels
+ * of that edge from its best-fit line, over the middle 80% of the region's
+ * length (the ends are rounded on any shape). Built things such as ledges, frames
+ * and joints have at least one edge near 0.5 px; a crack's edges are
+ * both ragged. Null when the region is shorter than `minLengthPx` along its axis.
+ */
+export function straightestEdgeRmsPx(width: number, region: Region, minLengthPx = 30): number | null {
+  const n = region.areaPx;
+  let sumX = 0;
+  let sumY = 0;
+  for (const i of region.pixels) {
+    sumX += i % width;
+    sumY += Math.floor(i / width);
+  }
+  const cx = sumX / n;
+  const cy = sumY / n;
+  let xx = 0;
+  let yy = 0;
+  let xy = 0;
+  for (const i of region.pixels) {
+    const dx = (i % width) - cx;
+    const dy = Math.floor(i / width) - cy;
+    xx += dx * dx;
+    yy += dy * dy;
+    xy += dx * dy;
+  }
+  const theta = 0.5 * Math.atan2(2 * xy, xx - yy);
+  const cos = Math.cos(theta);
+  const sin = Math.sin(theta);
+
+  // Per 1 px step along the main axis, the extreme offsets across it: the two edges.
+  const low = new Map<number, number>();
+  const high = new Map<number, number>();
+  for (const i of region.pixels) {
+    const dx = (i % width) - cx;
+    const dy = Math.floor(i / width) - cy;
+    const u = Math.round(dx * cos + dy * sin);
+    const v = -dx * sin + dy * cos;
+    if (!(v >= (low.get(u) ?? Infinity))) low.set(u, v);
+    if (!(v <= (high.get(u) ?? -Infinity))) high.set(u, v);
+  }
+  const steps = [...low.keys()].sort((a, b) => a - b);
+  if (steps.length < minLengthPx) return null;
+  const cut = Math.floor(steps.length * 0.1);
+  const us = steps.slice(cut, steps.length - cut);
+  return Math.min(
+    lineFitRmsPx(us, us.map((u) => low.get(u) as number)),
+    lineFitRmsPx(us, us.map((u) => high.get(u) as number)),
+  );
+}
