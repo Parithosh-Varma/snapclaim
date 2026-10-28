@@ -1,4 +1,5 @@
 import { checkPhoto, coinPrecision } from "./photo-check.js";
+import { findCoins } from "./coin-detect.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -24,6 +25,8 @@ const COLORS = { damage: [196, 31, 41], coin: [15, 122, 54] };
 
 let photo = null; // offscreen canvas holding the downscaled photo
 let photoId = 0, ready = false;
+// The coin found on this photo, tapped for the user once SAM is ready (they can undo it).
+let foundCoin = null;
 let active = "damage";
 // per step: tap points in photo pixels, one SAM mask per tap, and their union (row-major 0/1)
 const emptyStep = () => ({ points: [], pointMasks: [], mask: null, iou: 0 });
@@ -65,6 +68,12 @@ function samWorker() {
     else if (data.type === "ready") {
       ready = true;
       $("status").textContent = "Ready. Mark the damage, then the coin.";
+      if (foundCoin && !steps.coin.points.length) {
+        steps.coin.points.push([foundCoin.x, foundCoin.y]);
+        segment("coin").then(() => {
+          if (steps.coin.mask) $("status").textContent = "Found the coin (green). If that's wrong, Undo it under the coin step. Now mark the damage.";
+        });
+      }
       console.info(`[sam] embedded on ${data.device} in ${data.embedMs} ms`);
     } else if (data.type === "error") {
       $("status").textContent = `The outlining model failed to load (${data.message}). Check your connection and retry.`;
@@ -125,6 +134,13 @@ async function handlePhotoFile(f) {
   redraw();
   $("status").textContent = "Preparing the photo… (you can look around; the page stays usable)";
   const image = photo.getContext("2d").getImageData(0, 0, photo.width, photo.height);
+  // Before the pixels are handed to the worker (the transfer empties this buffer).
+  try {
+    foundCoin = findCoins(image)[0] ?? null;
+  } catch (e) {
+    foundCoin = null;
+    console.warn("[coin] detection failed", e);
+  }
   samWorker().postMessage({ type: "embed", photoId, image: { data: image.data, width: image.width, height: image.height } }, [image.data.buffer]);
 }
 
