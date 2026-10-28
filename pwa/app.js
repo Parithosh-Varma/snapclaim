@@ -14,31 +14,56 @@ $("health").onclick = async () => {
   }
 };
 
-// ---- photo intake + on-device segmentation (transformers.js, SlimSAM) ----
-const TF_URL = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2";
-const MODEL_ID = "Xenova/slimsam-77-uniform";
+// ---- photo intake + on-device segmentation (transformers.js SlimSAM, in sam-worker.js) ----
 // 512 keeps Worker CPU alive: skeletonize is O(pixels × passes), 1024² trips the free-tier limit
 // and the edge returns a no-CORS error page the browser reports as a CORS failure.
 const MAX_SIDE = 512;
 const COLORS = { damage: [196, 31, 41], coin: [15, 122, 54] };
 
-let tf = null, model = null, processor = null;
-let rawImage = null, embeddings = null;
 let photo = null; // offscreen canvas holding the downscaled photo
+let photoId = 0, ready = false;
 let active = "damage";
 // per step: tap points in photo pixels, one SAM mask per tap, and their union (row-major 0/1)
 const emptyStep = () => ({ points: [], pointMasks: [], mask: null, iou: 0 });
 const steps = { damage: emptyStep(), coin: emptyStep() };
 
-async function loadModel() {
-  if (model) return;
-  // dynamic import so a CDN failure only disables outlining, not the rest of the page
-  tf = await import(TF_URL);
-  const progress_callback = (p) => {
-    if (p.status === "progress") $("status").textContent = `Downloading model… ${Math.round(p.progress)}%`;
+// The model runs in a worker so the ~30 s embedding never freezes the page.
+// A worker that fails to start only disables outlining, not the rest of the page.
+let worker = null;
+const pending = new Map();
+let nextId = 0;
+function samWorker() {
+  if (worker) return worker;
+  worker = new Worker(new URL("./sam-worker.js", import.meta.url), { type: "module" });
+  worker.onmessage = ({ data }) => {
+    if (data.type === "decoded") {
+      const p = pending.get(data.id);
+      pending.delete(data.id);
+      if (data.error) p?.reject(new Error(data.error));
+      else p?.resolve(data.result);
+      return;
+    }
+    if (data.photoId !== undefined && data.photoId !== photoId) return; // stale photo
+    if (data.type === "progress") $("status").textContent = `Downloading model… ${data.percent}%`;
+    else if (data.type === "ready") {
+      ready = true;
+      $("status").textContent = "Ready. Mark the damage, then the coin.";
+    } else if (data.type === "error") {
+      $("status").textContent = `The outlining model failed to load (${data.message}). Check your connection and retry.`;
+    }
   };
-  model = await tf.SamModel.from_pretrained(MODEL_ID, { progress_callback });
-  processor = await tf.AutoProcessor.from_pretrained(MODEL_ID, { progress_callback });
+  worker.onerror = (e) => {
+    $("status").textContent = `The outlining model failed to start (${e.message ?? "worker error"}).`;
+  };
+  return worker;
+}
+
+function decodePoint(point, preferSmallest) {
+  const id = nextId++;
+  return new Promise((resolve, reject) => {
+    pending.set(id, { resolve, reject });
+    samWorker().postMessage({ type: "decode", id, photoId, point, preferSmallest });
+  });
 }
 
 document.querySelectorAll("[data-line]").forEach((b) => {
@@ -50,7 +75,8 @@ async function handlePhotoFile(f) {
   $("photoName").textContent = f.name || "Pasted image";
   $("pillPhoto")?.classList.add("done");
   $("measure").disabled = true;
-  embeddings = null;
+  ready = false;
+  photoId++;
   for (const k of Object.keys(steps)) steps[k] = emptyStep();
   let bmp;
   try {
@@ -70,18 +96,9 @@ async function handlePhotoFile(f) {
   $("steps").style.display = "block";
   document.body.classList.add("has-photo");
   redraw();
-  try {
-    $("status").textContent = "Preparing the photo…";
-    await loadModel();
-    const blob = await new Promise((r) => photo.toBlob(r, "image/png"));
-    rawImage = await tf.RawImage.read(URL.createObjectURL(blob));
-    // image embeddings are computed once per photo; point prompts reuse them
-    const inputs = await processor(rawImage);
-    embeddings = await model.get_image_embeddings(inputs);
-    $("status").textContent = "Ready. Mark the damage, then the coin.";
-  } catch (e) {
-    $("status").textContent = `The outlining model failed to load (${e.message ?? e}). Check your connection and retry.`;
-  }
+  $("status").textContent = "Preparing the photo… (you can look around; the page stays usable)";
+  const image = photo.getContext("2d").getImageData(0, 0, photo.width, photo.height);
+  samWorker().postMessage({ type: "embed", photoId, image: { data: image.data, width: image.width, height: image.height } }, [image.data.buffer]);
 }
 
 $("photo").onchange = () => handlePhotoFile($("photo").files?.[0]);
@@ -126,43 +143,6 @@ function redraw() {
   $("pillMark")?.classList.toggle("done", !!steps.damage.mask);
 }
 
-// One SAM decoder run per tap, then union. Prompting all taps at once makes SAM
-// outline the object a thin crack runs through instead of the crack itself.
-// Cracks are thin: SAM's highest-scoring candidate is often the wall the crack runs
-// through (71% of the photo on a real facade), so damage takes the smallest candidate
-// that still scores MIN_FINE_SCORE. Coins are compact, so they keep the best score.
-const MIN_FINE_SCORE = 0.5;
-
-async function decodePoint(point, preferSmallest) {
-  // input_points shape: [image][prompt][point][x,y], in original image pixels
-  const inputs = await processor(rawImage, { input_points: [[point]] });
-  const outputs = await model({ ...embeddings, input_points: inputs.input_points, input_labels: inputs.input_labels });
-  // masks[0] has dims [1, 3, H, W]: three candidate masks at original size
-  const masks = await processor.post_process_masks(outputs.pred_masks, inputs.original_sizes, inputs.reshaped_input_sizes);
-  const scores = outputs.iou_scores.data; // 3 scores, one per candidate
-  const [, , h, w] = masks[0].dims;
-  const areaOf = (k) => {
-    let n = 0;
-    for (const v of masks[0].data.subarray(k * h * w, (k + 1) * h * w)) if (v) n++;
-    return n;
-  };
-  let best = 0;
-  for (let i = 1; i < scores.length; i++) if (scores[i] > scores[best]) best = i;
-  if (preferSmallest) {
-    let fine = -1, fineArea = Infinity;
-    for (let i = 0; i < scores.length; i++) {
-      const a = areaOf(i);
-      if (scores[i] >= MIN_FINE_SCORE && a > 0 && a < fineArea) { fine = i; fineArea = a; }
-    }
-    if (fine >= 0) best = fine;
-  }
-  const m = masks[0].data.subarray(best * h * w, (best + 1) * h * w);
-  const out = new Uint8Array(h * w);
-  let area = 0;
-  for (let i = 0; i < out.length; i++) if (m[i]) { out[i] = 1; area++; }
-  return area ? { mask: out, iou: scores[best] } : null;
-}
-
 async function segment(name) {
   const st = steps[name];
   st.pointMasks.length = Math.min(st.pointMasks.length, st.points.length);
@@ -171,7 +151,7 @@ async function segment(name) {
     redraw();
     return;
   }
-  if (!embeddings) {
+  if (!ready) {
     $("status").textContent = "The photo is still being prepared. Wait a moment.";
     return;
   }
