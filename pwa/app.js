@@ -488,3 +488,88 @@ $("render").onclick = async () => {
   dl.textContent = "download svg";
 };
 
+// ---- voice line: record, then transcribe on the device (Whisper, in voice-worker.js) ----
+// Hold the button to talk; letting go stops. The text lands in the transcript
+// box, where the user can still fix it before the report is drafted.
+const MAX_VOICE_MS = 30000;
+let voiceWorker = null, recorder = null, voiceTimer = null, nextVoiceId = 0;
+let held = false; // the button is down; a quick tap may let go before the mic opens
+
+function transcribe(audio) {
+  voiceWorker ??= new Worker(new URL("./voice-worker.js", import.meta.url), { type: "module" });
+  const id = nextVoiceId++;
+  return new Promise((resolve, reject) => {
+    voiceWorker.onmessage = ({ data }) => {
+      if (data.type === "progress") $("voiceStatus").textContent = `Downloading speech model… ${data.percent}%`;
+      else if (data.type === "transcribed" && data.id === id) data.error ? reject(new Error(data.error)) : resolve(data.text);
+    };
+    voiceWorker.onerror = (e) => reject(new Error(e.message ?? "speech worker failed to start"));
+    voiceWorker.postMessage({ type: "transcribe", id, audio }, [audio.buffer]);
+  });
+}
+
+/** Recorded clip → mono 16 kHz samples, the rate Whisper expects. */
+async function toWhisperAudio(blob) {
+  const ctx = new AudioContext({ sampleRate: 16000 });
+  try {
+    const decoded = await ctx.decodeAudioData(await blob.arrayBuffer());
+    const mono = new Float32Array(decoded.length);
+    for (let c = 0; c < decoded.numberOfChannels; c++) {
+      const ch = decoded.getChannelData(c);
+      for (let i = 0; i < mono.length; i++) mono[i] += ch[i] / decoded.numberOfChannels;
+    }
+    return mono;
+  } finally {
+    ctx.close();
+  }
+}
+
+async function startRecording() {
+  if (recorder) return;
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch {
+    $("voiceStatus").textContent = "No microphone access. Type the line instead.";
+    return;
+  }
+  if (!held) {
+    stream.getTracks().forEach((t) => t.stop());
+    $("voiceStatus").textContent = "Hold the button while you speak.";
+    return;
+  }
+  const chunks = [];
+  recorder = new MediaRecorder(stream);
+  recorder.ondataavailable = (e) => chunks.push(e.data);
+  recorder.onstop = async () => {
+    stream.getTracks().forEach((t) => t.stop());
+    recorder = null;
+    clearTimeout(voiceTimer);
+    $("record").textContent = "Hold to speak";
+    $("voiceStatus").textContent = "Transcribing on this device…";
+    try {
+      const text = await transcribe(await toWhisperAudio(new Blob(chunks, { type: chunks[0]?.type })));
+      if (!text) {
+        $("voiceStatus").textContent = "Didn't catch anything. Hold the button and try again.";
+        return;
+      }
+      $("transcript").value = text;
+      $("voiceStatus").textContent = "Done. Fix any words in the box before drafting.";
+    } catch (e) {
+      $("voiceStatus").textContent = `Transcription failed (${e.message ?? e}). Type the line instead.`;
+    }
+  };
+  recorder.start();
+  $("record").textContent = "Recording… let go to stop";
+  $("voiceStatus").textContent = "";
+  voiceTimer = setTimeout(stopRecording, MAX_VOICE_MS);
+}
+
+function stopRecording() {
+  held = false;
+  if (recorder?.state === "recording") recorder.stop();
+}
+
+$("record").onpointerdown = (e) => { e.preventDefault(); held = true; startRecording(); };
+$("record").onpointerup = stopRecording;
+$("record").onpointerleave = stopRecording;
