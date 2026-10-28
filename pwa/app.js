@@ -1,4 +1,5 @@
 import { findCoins } from "./coin-detect.js";
+import { checkPhoto, coinPrecision } from "./photo-check.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -26,6 +27,15 @@ let photo = null; // offscreen canvas holding the downscaled photo
 let photoId = 0, ready = false;
 // The coin found on this photo, tapped for the user once SAM is ready (they can undo it).
 let foundCoin = null;
+// Blur/exposure warnings for this photo; the coin-size note is added once the coin is outlined.
+let photoWarnings = [];
+
+function showPhotoNotes() {
+  const notes = [...photoWarnings];
+  const coin = steps.coin.mask && coinPrecision(steps.coin.mask);
+  if (coin?.warning) notes.push(coin.warning);
+  $("photoCheck").innerHTML = notes.map((n) => `<li>${n}</li>`).join("");
+}
 let active = "damage";
 // per step: tap points in photo pixels, one SAM mask per tap, and their union (row-major 0/1)
 const emptyStep = () => ({ points: [], pointMasks: [], mask: null, iou: 0 });
@@ -115,6 +125,13 @@ async function handlePhotoFile(f) {
   const image = photo.getContext("2d").getImageData(0, 0, photo.width, photo.height);
   // Before the pixels are handed to the worker (the transfer empties this buffer).
   try {
+    photoWarnings = checkPhoto(image).warnings;
+  } catch (e) {
+    photoWarnings = [];
+    console.warn("[photo] checks failed", e);
+  }
+  showPhotoNotes();
+  try {
     foundCoin = findCoins(image)[0] ?? null;
   } catch (e) {
     foundCoin = null;
@@ -163,6 +180,7 @@ function redraw() {
   }
   $("measure").disabled = !steps.damage.mask;
   $("pillMark")?.classList.toggle("done", !!steps.damage.mask);
+  showPhotoNotes();
 }
 
 async function segment(name) {
