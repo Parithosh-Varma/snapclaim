@@ -1,5 +1,5 @@
 import { measureSession } from "../src/engine/measure.ts";
-import { circularReference, observeMask } from "../src/vision/observe.ts";
+import { type ReferenceDiagnostics, circularReference, observeMask } from "../src/vision/observe.ts";
 import { decodeRle, type BinaryMask, type CocoRle } from "../src/vision/mask.ts";
 import type { MeasureSessionInput } from "../src/engine/types.ts";
 import { validateFindings, type FindingDraft } from "../src/findings/evidence-gate.ts";
@@ -153,7 +153,10 @@ export function observeBody(body: unknown, requestId = newRequestId()): Envelope
     });
   });
 
-  const result: Pick<MeasureSessionInput, "component" | "masks" | "scaleReference"> = {
+  // referenceCheck is extra: /v1/measure ignores it, the PWA shows it.
+  const result: Pick<MeasureSessionInput, "component" | "masks" | "scaleReference"> & {
+    referenceCheck?: ReferenceDiagnostics;
+  } = {
     component: componentObs,
     masks: observed,
   };
@@ -162,11 +165,13 @@ export function observeBody(body: unknown, requestId = newRequestId()): Envelope
     const refMask = parseRle(reference.rle, "reference");
     sameSize(refMask, "reference");
     try {
-      result.scaleReference = circularReference(refMask, {
+      const measured = circularReference(refMask, {
         id: requireId(reference.id, "reference.id"),
         knownMm: requireNumber(reference.knownMm, "reference.knownMm"),
         confidence: requireNumber(reference.confidence, "reference.confidence"),
-      }).reference;
+      });
+      result.scaleReference = measured.reference;
+      result.referenceCheck = measured.diagnostics;
     } catch (error) {
       throw new HttpError(422, `reference: ${error instanceof Error ? error.message : "cannot measure"}`);
     }
