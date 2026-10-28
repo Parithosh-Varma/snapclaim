@@ -170,6 +170,11 @@
   <section class="card" aria-labelledby="h-capture">
     <div class="card-head"><h2 id="h-capture">Capture the damage</h2><span class="step-no">STEP 01</span></div>
     <p class="sub">Frame the whole damaged area plus a coin beside it, flat against the surface.</p>
+    <div id="tiltMeter"></div>
+    <script type="module">
+      import { mountTiltMeter } from "./tilt-meter.js";
+      mountTiltMeter(document.getElementById("tiltMeter"));
+    </script>
 
     <label class="upload" for="photo">
       <span class="ico" aria-hidden="true">◎</span>
