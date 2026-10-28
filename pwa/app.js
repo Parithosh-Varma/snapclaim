@@ -467,6 +467,8 @@ $("render").onclick = async () => {
     return;
   }
   body.transcript = $("transcript").value;
+  // The annexure draws the measured outlines over the photo itself, embedded as a JPEG.
+  if (body.overlay && photo) body.overlay.photoHref = photo.toDataURL("image/jpeg", 0.8);
   const res = await fetch(base() + "/v1/render", {
     method: "POST",
     headers: { "content-type": "application/json" },
