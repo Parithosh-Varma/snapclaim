@@ -16,6 +16,7 @@ npm test                # 40 tests, mock mode, $0 spend
 |---|---|---|
 | `GET /v1/health` | any | `{ok, version, time, mode}` |
 | `POST /v1/measure` | any | Deterministic math only: masks in, findings + receipts out. No model, no keys. |
+| `POST /v1/observe` | any | Pixel masks (COCO RLE) → component/masks/scaleReference that `/v1/report` takes. No model, no keys. |
 | `POST /v1/report` | mock default | measure → findings draft → Evidence Gate. Uncited numbers return `422` with `details[]`. Client may pass `drafts[]` to test the gate. |
 | `POST /v1/segment` | mock | Requires `body.fixture {component, masks}` — the backend invents no masks. Live SAM 3.1 returns `501` until its request shape is verified. |
 | `POST /v1/findings` | mock/live | Drafts findings from measured facts, then gates them. Live path records token usage to the spend ledger. |

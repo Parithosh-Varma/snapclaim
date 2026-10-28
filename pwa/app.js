@@ -7,15 +7,19 @@ $("health").onclick = async () => {
     const r = await fetch(base() + "/v1/health");
     const j = await r.json();
     $("healthOut").textContent = `ok v${j.version} mode:${j.mode}`;
+    $("healthOut").className = "is-ok";
   } catch (e) {
     $("healthOut").textContent = "unreachable — run npm run backend:start";
+    $("healthOut").className = "is-bad";
   }
 };
 
 // ---- photo intake + on-device segmentation (transformers.js, SlimSAM) ----
 const TF_URL = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2";
 const MODEL_ID = "Xenova/slimsam-77-uniform";
-const MAX_SIDE = 1024;
+// 512 keeps Worker CPU alive: skeletonize is O(pixels × passes), 1024² trips the free-tier limit
+// and the edge returns a no-CORS error page the browser reports as a CORS failure.
+const MAX_SIDE = 512;
 const COLORS = { damage: [196, 31, 41], coin: [15, 122, 54] };
 
 let tf = null, model = null, processor = null;
@@ -37,9 +41,14 @@ async function loadModel() {
   processor = await tf.AutoProcessor.from_pretrained(MODEL_ID, { progress_callback });
 }
 
-$("photo").onchange = async () => {
-  const f = $("photo").files?.[0];
+document.querySelectorAll("[data-line]").forEach((b) => {
+  b.onclick = () => { $("transcript").value = b.dataset.line; };
+});
+
+async function handlePhotoFile(f) {
   if (!f) return;
+  $("photoName").textContent = f.name || "Pasted image";
+  $("pillPhoto")?.classList.add("done");
   $("measure").disabled = true;
   embeddings = null;
   for (const k of Object.keys(steps)) steps[k] = emptyStep();
@@ -54,11 +63,12 @@ $("photo").onchange = async () => {
   photo = document.createElement("canvas");
   photo.width = Math.round(bmp.width * scale);
   photo.height = Math.round(bmp.height * scale);
-  photo.getContext("2d").drawImage(bmp, 0, 0, photo.width, photo.height);
+  photo.getContext("2d", { willReadFrequently: true }).drawImage(bmp, 0, 0, photo.width, photo.height);
   $("canvas").width = photo.width;
   $("canvas").height = photo.height;
   $("canvas").style.display = "block";
   $("steps").style.display = "block";
+  document.body.classList.add("has-photo");
   redraw();
   try {
     $("status").textContent = "Preparing the photo…";
@@ -72,10 +82,22 @@ $("photo").onchange = async () => {
   } catch (e) {
     $("status").textContent = `The outlining model failed to load (${e.message ?? e}). Check your connection and retry.`;
   }
-};
+}
+
+$("photo").onchange = () => handlePhotoFile($("photo").files?.[0]);
+
+// Cmd/Ctrl+V anywhere: grab the first image in the clipboard.
+document.addEventListener("paste", (e) => {
+  const item = [...(e.clipboardData?.items ?? [])].find((i) => i.type.startsWith("image/"));
+  const f = item?.getAsFile();
+  if (f) {
+    e.preventDefault();
+    handlePhotoFile(f);
+  }
+});
 
 function redraw() {
-  const c = $("canvas"), ctx = c.getContext("2d");
+  const c = $("canvas"), ctx = c.getContext("2d", { willReadFrequently: true });
   ctx.drawImage(photo, 0, 0);
   for (const [name, st] of Object.entries(steps)) {
     const [r, g, b] = COLORS[name];
@@ -101,6 +123,7 @@ function redraw() {
     }
   }
   $("measure").disabled = !steps.damage.mask;
+  $("pillMark")?.classList.toggle("done", !!steps.damage.mask);
 }
 
 // One SAM decoder run per tap, then union. Prompting all taps at once makes SAM
@@ -190,8 +213,10 @@ $("canvas").onpointerdown = (ev) => {
 
 function setActive(name) {
   active = name;
-  $("stepDamage").style.fontWeight = name === "damage" ? "bold" : "normal";
-  $("stepCoin").style.fontWeight = name === "coin" ? "bold" : "normal";
+  for (const [key, id] of [["damage", "stepDamage"], ["coin", "stepCoin"]]) {
+    $(id).classList.toggle("is-active", name === key);
+    $(id).setAttribute("aria-pressed", String(name === key));
+  }
 }
 $("stepDamage").onclick = () => setActive("damage");
 $("stepCoin").onclick = () => setActive("coin");
@@ -250,7 +275,7 @@ $("measure").onclick = async () => {
     });
     j = await res.json();
   } catch {
-    $("status").textContent = "backend unreachable — run npm run backend:start";
+    $("status").textContent = "Backend didn't answer (Worker CPU cap on big photos?) — try local: npm run backend:start, set Backend to http://127.0.0.1:8787";
     return;
   }
   if (!res.ok || !j.ok) {
@@ -284,6 +309,7 @@ function measuredRows(findings) {
 }
 
 function showMeasured(result) {
+  $("pillReport")?.classList.add("done");
   const mode = result.mode === "absolute" ? "" : " (no coin: percent only)";
   $("measured").innerHTML = `<span class="badge ok">MEASURED${mode}</span><ul>${measuredRows(result.findings)}</ul>`;
   drawScheme(result.findings);
@@ -302,6 +328,10 @@ async function runReport(keepMeasured = false) {
     body = JSON.parse($("payload").value || "{}");
   } catch {
     $("status").textContent = "bad JSON in masks box";
+    return;
+  }
+  if (!Array.isArray(body.masks) || body.masks.length === 0) {
+    $("status").textContent = "Measure first — no measured payload yet.";
     return;
   }
   body.transcript = $("transcript").value;
