@@ -331,6 +331,14 @@ function measuredRows(findings) {
   }).join("");
 }
 
+// /v1/report returns finding drafts (a statement plus the receipts it cites), not measured rows.
+function draftRows(findings) {
+  return findings.map((f) => {
+    const cites = (f.citations ?? []).join(", ");
+    return `<li>${escapeHtml(f.statement)}${cites ? `<br/><small>cites: ${escapeHtml(cites)}</small>` : ""}</li>`;
+  }).join("");
+}
+
 function showMeasured(result) {
   $("pillReport")?.classList.add("done");
   const mode = result.mode === "absolute" ? "" : " (no coin: percent only)";
@@ -384,10 +392,10 @@ async function runReport(keepMeasured = false) {
     if (!keepMeasured) drawScheme([]);
     return;
   }
-  $("status").textContent = `ok ${j.requestId} ${j.durationMs}ms`;
+  $("status").textContent = "Measured. Findings below.";
   lastMeasurement = j.result.measurement ?? null;
   $("skepStatus").textContent = lastMeasurement ? "ready for skeptic" : "";
-  const rows = measuredRows(j.result.findings);
+  const rows = draftRows(j.result.findings);
   const gate = j.result.gate?.ok ? `<span class="badge ok">GATE PASS</span>` : `<span class="badge fail">GATE FAIL</span>`;
   $("findings").innerHTML = `${gate}<ul>${rows}</ul>`;
   drawScheme(j.result.measurement?.findings ?? j.result.findings ?? []);
