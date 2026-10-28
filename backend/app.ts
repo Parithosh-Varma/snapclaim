@@ -433,6 +433,27 @@ export function corsHeaders(): Record<string, string> {
   };
 }
 
+/**
+ * Origin-restricted CORS for the public demo. Set ALLOWED_ORIGINS to a
+ * comma-separated list (e.g. your Pages URL) and browsers outside it can no
+ * longer spend your SPEND_GUARD_USD from a web page. Unset means "*" (dev).
+ * curl and other non-browser clients are unaffected by design — the spend
+ * guard and per-call metering are the backstop there.
+ */
+export function corsHeadersFor(origin: string | null, env: Env = {}): Record<string, string> {
+  const base = corsHeaders();
+  const raw = env.ALLOWED_ORIGINS ?? "";
+  const allowed = raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== "");
+  if (allowed.length === 0) return base;
+  if (origin !== null && allowed.includes(origin)) {
+    return { ...base, "access-control-allow-origin": origin };
+  }
+  return { ...base, "access-control-allow-origin": allowed[0] as string };
+}
+
 export interface HandledResponse {
   status: number;
   body: unknown;

@@ -21,6 +21,7 @@ npm run replay -- request.json measurement.json
 | `POST /v1/observe` | any | Pixel masks (COCO RLE) → component/masks/scaleReference that `/v1/report` takes. No model, no keys. |
 | `POST /v1/report` | mock default | measure → findings draft → Evidence Gate. Uncited numbers return `422` with `details[]`. Client may pass `drafts[]` to test the gate. |
 | `POST /v1/segment` | mock/live | Mock requires `body.fixture {component, masks}` — the backend invents no masks. Live calls SAM 3.1 point prompts (`imageUrl` + `width/height` + `points[1..16]`), parses the Responses output text and decodes masks with `@meta-sam/parser`; returns `{records: [{objectId, box, confidence, rle}]}`. Empty output throws, never fakes. |
+| `POST /v1/crosscheck` | any | `{a, b}` COCO RLE masks of one frame, `threshold?` — IoU + Dice agreement with AGREED/DISPUTED verdict. Keyless, deterministic. |
 | `POST /v1/transcribe` | mock/live | Spoken line to text via Muse Voice Transcribe (`/asr/transcribe`, multipart, `PUSH_TO_TALK`, Hindi/Telugu/English bias + claim keywords). Mock requires `body.fixtureTranscript`. Audio priced at $0.18/hr on the ledger. |
 | `POST /v1/findings` | mock/live | Drafts findings from measured facts, then gates them. Live path records token usage to the spend ledger. |
 | `POST /v1/skeptic` | mock/live | Independent re-check via Spark Open on Baseten, gated. Real per-token pricing charged to the ledger. `503` without `BASETEN_API_KEY`. |

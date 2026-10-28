@@ -158,3 +158,14 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 - 115 tests green, `tsc` clean, eval 5 pass.
 
 **Spend:** $0.00.
+
+## 2026-10-28 — Self-improvement batch 3 (prod hardening)
+
+**Shipped**
+
+- CORS allowlist: `ALLOWED_ORIGINS` (comma-separated) echoed per origin; unset keeps `*` for dev. Both Node and Worker apply it to every response including errors and preflight, so a foreign site can't burn the spend cap from a browser. Spend guard + metering remain the backstop for non-browser clients.
+- CI: `.github/workflows/ci.yml` runs `npm ci`, tests, typecheck, eval and the mock smoke on every push/PR (Node 22).
+- Input hardening tests: garbage RLE and out-of-range thresholds on `/v1/crosscheck`; Worker preflight/oversize/404 paths.
+- 119 tests green, `tsc` clean, eval 5 pass.
+
+**Spend:** $0.00.
