@@ -1,4 +1,8 @@
+import { checkPhoto } from "./photo-check.js";
+
 const $ = (id) => document.getElementById(id);
+let payloadObj = null;
+let lastMeasurement = null;
 function base() { return $("baseUrl").value.replace(/\/$/, ""); }
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 
@@ -488,8 +492,6 @@ function checkPhotoNotes() {
     $("photoNotes").textContent = notes.join(" ");
   } catch { /* advisory only */ }
 }
-  payloadObj = null;
-  lastMeasurement = null;
   let checkState = { skeptic: "idle", xcheck: "idle" }; // idle|loading|ok|error per check
 
 $("measureBtn").onclick = async () => {

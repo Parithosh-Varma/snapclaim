@@ -55,3 +55,32 @@ test("service worker caches the shell, never the API", () => {
   assert.ok(app.includes("findRing"), "coin gate uses edge + radial-uniformity detection");
   assert.ok(!app.includes("$(\"raw\").innerHTML"), "no raw HTML injection of backend output");
 });
+
+test("PWA scripts load as the right module type", () => {
+  const html = read("pwa/index.html");
+  // ESM sources must never be pulled in with a classic <script src>:
+  // the browser throws "Uncaught SyntaxError: Unexpected token 'export'"
+  // and everything after it breaks.
+  const classicSrcs = [...html.matchAll(/<script\s+src="([^"]+)"\s*><\/script>/g)].map((m) => m[1]);
+  const app = read("pwa/app.js");
+  const esmSources = ["./photo-check.js"];
+  for (const src of esmSources) {
+    assert.ok(!classicSrcs.includes(src), `${src} must not load as a classic script`);
+    assert.ok(app.includes(`from "${src}"`), `app.js imports ${src} as a module`);
+  }
+  // coin-model.js is a globalThis (non-module) script: classic tag is correct.
+  assert.ok(classicSrcs.includes("./coin-model.js"), "coin-model.js loads as a classic global script");
+});
+
+test("PWA module top-level state is declared before use", () => {
+  const app = read("pwa/app.js");
+  // Regression test for "ReferenceError: payloadObj is not defined":
+  // app.js runs as a strict-mode module, so every top-level assignment target
+  // must have a let/const/var declaration somewhere in the module.
+  for (const name of ["payloadObj", "lastMeasurement", "checkState"]) {
+    assert.ok(
+      new RegExp(`\\b(?:let|const|var)\\s+${name}\\b`).test(app),
+      `${name} is declared at module scope`,
+    );
+  }
+});
