@@ -162,7 +162,7 @@
   </header>
 
   <section class="hero">
-    <div class="eyebrow">On-device outlining · Photo never leaves this phone</div>
+    <div class="eyebrow">On-device outlining · You choose what leaves this phone</div>
     <h1>Photo in.<br/><em>Measured claim</em> out.</h1>
     <p>Take one photo, tap the damage, tap a coin for scale. You get <b>numbers an insurer can check</b> — not a guess.</p>
     <div class="progress" aria-hidden="true">
@@ -264,6 +264,10 @@
       <button id="render" type="button">Render annexure</button>
       <a id="dl" style="display:none">download svg</a>
     </div>
+    <div class="rowbtns" style="margin-top:8px">
+      <button id="xcheck" type="button" title="Sends the photo to the backend for one SAM 3.1 check">Cross-check masks (sends photo)</button>
+    </div>
+    <span id="xcheckStatus" role="status" class="hint"></span>
     <span id="skepStatus" role="status"></span>
     <div id="skepticOut"></div>
     <div id="annex"></div>

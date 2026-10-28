@@ -142,7 +142,7 @@ Hard limits: 50 masks per call (chunk above), 1–16 point prompts per segment c
 
 ## Privacy and security
 
-- The photo stays on the phone: only COCO RLE masks travel to `/v1/observe`. The annexure photo is attached only when you press Render, and only `data:`/`https:` URLs are accepted.
+- The photo stays on the phone: only COCO RLE masks travel to `/v1/observe`. Two explicit exceptions, both your tap: **Cross-check masks** sends the photo once to SAM 3.1 via the backend, and **Render** attaches it to the annexure. Only `data:`/`https:` URLs are accepted.
 - Keys live in server env / Worker secrets, never in the PWA. Fail-closed 503 without them.
 - All model output rendered in the PWA is HTML-escaped; the page ships a Content-Security-Policy.
 - EXIF/XMP metadata is stripped from photos on intake.

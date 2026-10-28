@@ -26,6 +26,8 @@ test("PWA shell is installable and honest", () => {
   assert.ok(html.includes("India"), "Indian coin options exist");
   assert.ok(html.includes('id="photoNotes"'), "photo quality notes element exists");
   assert.ok(html.includes('id="noScale"'), "no-scale percent-only toggle exists");
+  assert.ok(html.includes('id="xcheck"'), "SAM cross-check button exists");
+  assert.ok(html.includes('id="xcheckStatus"'), "cross-check status exists");
 });
 
 test("service worker caches the shell, never the API", () => {
@@ -38,6 +40,7 @@ test("service worker caches the shell, never the API", () => {
   assert.ok(app.includes("serviceWorker"), "PWA registers the service worker");
   assert.ok(app.includes("/v1/transcribe"), "voice posts to the transcribe proxy");
   assert.ok(app.includes("photo-check.js"), "photo quality shares one module with tests");
+  assert.ok(app.includes("/v1/crosscheck"), "PWA can cross-check on-device masks against SAM");
   assert.ok(app.includes("OfflineAudioContext"), "clip is resampled on-device");
   assert.ok(!app.includes("$(\"raw\").innerHTML"), "no raw HTML injection of backend output");
 });

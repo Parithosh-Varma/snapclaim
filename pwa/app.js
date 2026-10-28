@@ -629,8 +629,61 @@ $("sample")?.addEventListener("click", async () => {
   }
 });
 
-$("render").onclick = async () => {
-  let body;
+// ---- independent mask cross-check: on-device mask vs SAM 3.1 ----
+// Explicit and disclosed: this sends the photo to the backend once, which
+// forwards it to SAM 3.1. Everything else in the app measures without
+// the photo ever leaving the phone.
+$("xcheck").onclick = async () => {
+  const d = steps.damage;
+  if (!d.mask || !photo) {
+    $("xcheckStatus").textContent = "Mark the damage first.";
+    return;
+  }
+  if (!d.points.length) {
+    $("xcheckStatus").textContent = "Tap the damage so SAM has a point prompt.";
+    return;
+  }
+  $("xcheckStatus").textContent = "Asking SAM 3.1…";
+  try {
+    const segRes = await fetch(base() + "/v1/segment", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        imageUrl: photo.toDataURL("image/jpeg", 0.85),
+        width: photo.width,
+        height: photo.height,
+        points: d.points.map(([x, y]) => ({ x, y }))
+      })
+    });
+    const seg = await segRes.json();
+    if (!segRes.ok || !seg.ok) throw new Error(seg.error ?? "SAM segment failed");
+    const record = seg.result?.records?.[0];
+    if (!record) {
+      $("xcheckStatus").textContent = "SAM found nothing there. Try another tap.";
+      return;
+    }
+    const mine = encodeRle(d.mask, photo.width, photo.height);
+    const ccRes = await fetch(base() + "/v1/crosscheck", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ a: mine, b: record.rle, threshold: 0.5 })
+    });
+    const cc = await ccRes.json();
+    if (!ccRes.ok || !cc.ok) throw new Error(cc.error ?? "cross-check failed");
+    const verdict = cc.result?.verdict ?? "UNKNOWN";
+    const iou = cc.result?.iou ?? "?";
+    const badge = verdict === "AGREED" ? "ok" : "fail";
+    $("xcheckStatus").innerHTML = "";
+    const chip = document.createElement("span");
+    chip.className = `badge ${badge}`;
+    chip.textContent = `${escapeHtml(String(verdict))} · IoU ${escapeHtml(String(iou))}`;
+    $("xcheckStatus").appendChild(chip);
+  } catch (e) {
+    $("xcheckStatus").textContent = `Cross-check failed (${e.message ?? e}). Mock mode has no SAM; go live or ignore.`;
+  }
+};
+
+$("render").onclick = async () => {  let body;
   try {
     body = JSON.parse($("payload").value || "{}");
   } catch {
