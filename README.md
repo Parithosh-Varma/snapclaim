@@ -2,7 +2,7 @@
 
 > **Point your phone at damage, speak one line about it — get a claim-ready report where every number is measured, cited, and checked by an independent model before it ships. Computed, not generated.**
 
-Built during the **Meta Global AI Developer Hackathon** (Oct 26 – Nov 4, 2026) · Indie track · solo build · public by default.
+Built during the **Meta Global AI Developer Hackathon** (Oct 26 – Nov 4, 2026) · Indie track · 3-person student team · public by default.
 
 **Status: mock by default, live behind `MOCK_MODE=0`. Photo intake segments on-device (SlimSAM); measure and observe are pure math; findings/skeptic/segment use deterministic mocks at $0 with no keys, live Meta/Baseten when `MOCK_MODE=0` with keys (503 without them). 56/56 tests green, typecheck clean.** Progress lives in `DEV-LOG.md`.
 
