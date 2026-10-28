@@ -41,7 +41,7 @@ test("PWA shell is installable and honest", () => {
 
 test("service worker caches the shell, never the API", () => {
   const sw = read("pwa/sw.js");
-  assert.ok(sw.includes("snapclaim-shell-v1"), "versioned cache");
+  assert.ok(/snapclaim-shell-v\d+/.test(sw), "versioned cache");
   assert.ok(sw.includes("/v1/"), "API bypass is explicit");
   assert.ok(sw.includes("skipWaiting"), "updates activate");
   assert.ok(sw.includes("coin-model.js"), "coin model cached for offline gating");
