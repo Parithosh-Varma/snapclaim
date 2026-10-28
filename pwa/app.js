@@ -458,12 +458,21 @@ function checkPhotoNotes() {
     $("photoNotes").textContent = notes.join(" ");
   } catch { /* advisory only */ }
 }
-let payloadObj = null;
-let lastMeasurement = null;
+  payloadObj = null;
+  lastMeasurement = null;
+  let checkState = { skeptic: "idle", xcheck: "idle" }; // idle|loading|ok|error per check
+
 $("measureBtn").onclick = async () => {
   if (!dmg.mask) return;
   checkPhotoNotes();
   const w = photo.width, h = photo.height;
+  show("sNum");
+  fillPhotoCard();
+  setNumLoading(true);
+  $("numError").hidden = true;
+  $("measured").innerHTML = "";
+  $("findings").innerHTML = "";
+  drawScheme([]);
   const body = { masks: [{ id: "damage-1", label: dmgLabel, rle: encodeRle(dmg.mask, w, h), confidence: dmg.iou || 0.8 }] };
   if (gateCoin) {
     const kx = w / gateCoin.sw, ky = h / gateCoin.sh;
@@ -472,7 +481,7 @@ $("measureBtn").onclick = async () => {
     const r = Math.max(3, (gateCoin.rr / gateCoin.fw) * gateCoin.sw * kx);
     body.reference = { id: "coin", rle: circleRle(cx, cy, r, w, h), knownMm: Number($("coinKind").value), confidence: 0.85 };
   } else if (noScaleMode) body.note = "percent-only requested";
-  $("status").textContent = "Measuring…";
+  $("status").textContent = "";
   try {
     const res = await fetch(base() + "/v1/observe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     const j = await res.json();
@@ -481,29 +490,82 @@ $("measureBtn").onclick = async () => {
     const measured = await mres.json();
     if (!mres.ok || !measured.ok) throw new Error(measured.error ?? mres.status);
     payloadObj = j.result;
-    showMeasured(measured.result);
+    lastMeasurement = measured.result;
+    showMeasured(lastMeasurement);
     show("sSay");
     startListening();
-  } catch (e) { $("status").textContent = `Measuring failed (${e.message ?? e}).`; }
+  } catch (e) {
+    setNumLoading(false);
+    $("status").textContent = `Measuring failed (${e.message ?? e}).`;
+    showNumError("Measurement failed", String(e.message ?? e), () => $("measureBtn").click());
+  }
 };
-function measuredRows(findings) {
+function metricCards(f) {
+  const mm = f.crackLengthMm == null ? "—" : `${esc(String(f.crackLengthMm))} mm`;
+  const area = f.areaCm2 == null ? "" : `<div class="metric"><b>${esc(String(f.areaCm2))} cm²</b><span>Area</span></div>`;
+  const width = f.crackWidthMm == null ? "" : `<div class="metric"><b>${esc(String(f.crackWidthMm))} mm</b><span>Width</span></div>`;
+  const label = String(f.label);
+  const cap = label.charAt(0).toUpperCase() + label.slice(1);
+  return `<p class="found">${esc(cap)} found</p>
+    <div class="metrics">
+      <div class="metric"><b>${esc(String(f.percent))}%</b><span>Of the wall</span></div>
+      <div class="metric"><b>${mm}</b><span>Length</span></div>
+      <div class="metric"><b>${esc(String(f.regionCount ?? 1))}</b><span>Region${(f.regionCount ?? 1) === 1 ? "" : "s"}</span></div>
+      ${area}${width}
+    </div>
+    <div class="sevbar sev-${esc(String(f.severity))}"><span>${esc(String(f.severity)).toUpperCase()}</span><small>severity band</small></div>`;
+}
+
+function receiptChips(receipts) {
+  return (receipts || []).slice(0, 12).map((r) => `<code>${esc(r.id)} · ${esc(String(r.output?.value ?? ""))} ${esc(r.output?.unit ?? "")}</code>`).join("");
+}
+
+function measuredRows(findings, receipts) {
   return findings.map((f) => {
     const mm = f.crackLengthMm === null ? "—" : `${esc(String(f.crackLengthMm))} mm`;
-    const area = f.areaCm2 == null ? "" : ` · ${esc(String(f.areaCm2))} cm²`;
-    const width = f.crackWidthMm == null ? "" : ` · w ${esc(String(f.crackWidthMm))} mm`;
-    const cap = String(f.label);
-    return `<li><p class="found">${esc(cap.charAt(0).toUpperCase() + cap.slice(1))} found</p>` +
-      `<b>${esc(String(f.percent))}%</b> <small>of the wall</small> · <b>${mm}</b> <small>length</small>${area} · ` +
+    const label = String(f.label);
+    const cap = label.charAt(0).toUpperCase() + label.slice(1);
+    return `<li><p class="found">${esc(cap)} found</p>` +
+      `<b>${esc(String(f.percent))}%</b> <small>of the wall</small> · <b>${mm}</b> <small>length</small> · ` +
       `${esc(String(f.regionCount ?? 1))} region${(f.regionCount ?? 1) === 1 ? "" : "s"} · ` +
-      `<span class="badge ok">${esc(String(f.severity))}</span>${width}` +
+      `<span class="badge ok">${esc(String(f.severity))}</span>` +
       `${f.statement ? `<br/><small>${esc(String(f.statement))}</small>` : ""}</li>`;
   }).join("");
 }
+
+function fillPhotoCard() {
+  const card = $("numPhotoCard");
+  if (!card || !stillDataUrl) return;
+  card.hidden = false;
+  $("numPhoto").src = stillDataUrl;
+  $("numChip").textContent = coinLabel ? `${coinLabel} · measured` : (noScaleMode ? "Percent only · no coin" : "Measured");
+}
+function setNumLoading(on) {
+  const bar = $("numLoading");
+  if (bar) bar.hidden = !on;
+}
+function showNumError(title, detail, retry) {
+  $("measured").innerHTML =
+    `<div class="statecard err" role="alert"><b>${esc(title)}</b>` +
+    `<p style="margin:8px 0 12px;color:#5b6b8c">${esc(detail)}</p>` +
+    `<button class="btn-dark" type="button" id="numRetry" style="width:100%">Try again</button></div>`;
+  const btn = document.getElementById("numRetry");
+  if (btn) btn.onclick = retry;
+}
 function showMeasured(result) {
-  const mode = result.mode === "absolute" ? "" : " (no coin: percent only)";
-  $("measured").innerHTML = `<span class="badge ok">MEASURED${mode}</span><ul>${measuredRows(result.findings)}</ul>`;
+  setNumLoading(false);
+  $("numError").hidden = true;
+  fillPhotoCard();
+  const first = result.findings[0];
+  const mode = result.mode === "absolute" ? "" : " · percent only (no coin)";
+  $("measured").innerHTML =
+    `<span class="badge ok">MEASURED${esc(mode)}</span>` +
+    (first ? metricCards(first) : "") +
+    (result.findings.length > 1
+      ? `<ul>${measuredRows(result.findings.slice(1), result.receipts)}</ul>`
+      : "") +
+    `<div class="receipts" aria-label="Receipts">${receiptChips(result.receipts)}</div>`;
   drawScheme(result.findings);
-  show("sNum");
 }
 function drawScheme(findings) {
   const svg = $("scheme");
@@ -660,50 +722,109 @@ async function runReport() {
     j = await res.json();
   } catch { j = { ok: false, error: "backend unreachable" }; res = { status: 0 }; }
   $("raw").textContent = JSON.stringify(j, null, 2);
-  if (res.status === 503) {
-    $("findings").innerHTML = `<span class="badge fail">AI FINDINGS UNAVAILABLE</span><pre>${esc(j.error ?? "API key missing")}</pre>`;
-    return;
-  }
-  if (!res.ok || !j.ok) {
-    const fails = j.details ?? j.failures ?? [j.error];
-    $("findings").innerHTML = `<span class="badge fail">GATED</span><pre>${esc(JSON.stringify(fails, null, 2))}</pre>`;
+  if (res.status === 503 || !res.ok || !j.ok) {
+    const fails = res.status === 503 ? [j.error ?? "API key missing"] : (j.details ?? j.failures ?? [j.error]);
+    $("findings").innerHTML = `<span class="badge fail">${res.status === 503 ? "AI FINDINGS UNAVAILABLE" : "GATED"}</span><pre>${esc(JSON.stringify(fails, null, 2))}</pre>`;
     return;
   }
   lastMeasurement = j.result.measurement ?? null;
-  $("findings").innerHTML = `<span class="badge ok">GATE PASS</span><ul>${measuredRows(j.result.findings)}</ul>`;
-  drawScheme(j.result.measurement?.findings ?? []);
+  resetCheckState();
+  const f0 = (j.result.findings ?? [])[0];
+  const summary = f0 && typeof f0.statement === "string" ? f0.statement : null;
+  $("findings").innerHTML =
+    `<span class="badge ok">GATE PASS</span>` +
+    (summary ? `<p style="margin:10px 0 0;font-weight:600">${esc(summary)}</p>` : "") +
+    `<div class="receipts" aria-label="Receipts">${receiptChips(lastMeasurement?.receipts)}</div>`;
+  drawScheme(lastMeasurement?.findings ?? []);
   show("sNum");
+  runChecksAuto();
 }
-$("toCheck").onclick = () => show("sCheck");
-$("toReport").onclick = () => show("sReport");
+$("toCheck").onclick = () => { resetCheckState(); show("sCheck"); runChecksAuto(); };
+$("toReport").onclick = () => { if (canProceedToReport()) show("sReport"); };
 $("backSay").onclick = () => show("sMark");
 $("backNum").onclick = () => show("sSay");
 $("backCheck").onclick = () => show("sCheck");
-$("skepticBtn").onclick = async () => {
-  if (!lastMeasurement) { $("skStatus").textContent = "run report first"; return; }
-  $("skStatus").textContent = "asking…";
-  $("skOut").innerHTML = "";
-  let res, j;
+function resetCheckState() {
+  checkState = { skeptic: "idle", xcheck: "idle" };
+  renderCheckCard();
+  updateReportGate();
+}
+function setCheck(which, state, html) {
+  checkState[which] = state;
+  renderCheckCard();
+  updateReportGate();
+  void html;
+}
+function verdictBadge(verdict) {
+  if (verdict === "AGREED") return `<span class="badge ok">AGREED</span>`;
+  if (verdict === "DISPUTED") return `<span class="badge fail">DISPUTED</span>`;
+  return `<span class="badge wait">PENDING</span>`;
+}
+function checkStates() {
+  return [
+    { key: "skeptic", title: "Independent skeptic", el: $("skStatus"), out: $("skOut") },
+    { key: "xcheck", title: "Mask cross-check", el: $("xStatus"), out: null },
+  ];
+}
+function renderCheckCard() {
+  const s = $("skStatus");
+  if (!s) return;
+  // skeptic card body
+  if (checkState.skeptic === "loading") s.textContent = "Asking the skeptic model…";
+  // xcheck line
+  const x = $("xStatus");
+  if (x && checkState.xcheck === "loading") x.textContent = "Asking SAM 3.1…";
+}
+function updateReportGate() {
+  const btn = $("toReport");
+  if (!btn) return;
+  const done = checkState.skeptic === "ok" || checkState.skeptic === "error";
+  const doneX = checkState.xcheck === "ok" || checkState.xcheck === "error";
+  btn.disabled = !(done && doneX);
+  btn.textContent = done && doneX ? "Make the report →" : "Run both checks to continue";
+}
+function canProceedToReport() {
+  const done = (checkState.skeptic === "ok" || checkState.skeptic === "error") &&
+    (checkState.xcheck === "ok" || checkState.xcheck === "error");
+  if (!done) {
+    $("skStatus").textContent = "Run both checks to continue — retry any failed one.";
+    show("sCheck");
+  }
+  return done;
+}
+async function runSkeptic(auto) {
+  if (checkState.skeptic === "loading") return;
+  if (!lastMeasurement) { if (!auto) $("skStatus").textContent = "run report first"; return; }
+  checkState.skeptic = "loading";
+  renderCheckCard(); updateReportGate();
+  $("skOut").innerHTML = `<div class="skel" role="status" aria-label="Skeptic is checking"></div>`;
   try {
-    res = await fetch(base() + "/v1/skeptic", {
+    const res = await fetch(base() + "/v1/skeptic", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ transcript: $("transcriptBox").value, findings: lastMeasurement.findings, receipts: lastMeasurement.receipts }),
     });
-    j = await res.json();
-  } catch { $("skStatus").textContent = "backend unreachable"; return; }
-  if (!res.ok || !j.ok) {
-    $("skStatus").textContent = `skeptic ${res.status}: ${j.error ?? "failed"}`;
-    return;
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok || !j.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
+    const rows = (j.result.findings ?? []).map((f) => {
+      const disputed = /disputed/i.test(f.statement || "");
+      return `<li>${verdictBadge(disputed ? "DISPUTED" : "AGREED")} ${esc(f.statement ?? "")}<br/><small>cites: ${esc((f.citations ?? []).join(", "))}</small></li>`;
+    }).join("");
+    $("skOut").innerHTML = `<ul>${rows}</ul>`;
+    $("skStatus").textContent = `skeptic ok ${j.requestId ?? ""}`.trim();
+    setCheck("skeptic", "ok");
+  } catch (e) {
+    $("skOut").innerHTML = `<div class="statecard err" role="alert"><b>Skeptic check failed.</b><p style="margin:8px 0 12px;color:#5b6b8c">${esc(e instanceof Error ? e.message : String(e))}</p><button class="btn-dark" type="button" id="skRetry" style="width:100%">Retry skeptic</button></div>`;
+    const b = document.getElementById("skRetry");
+    if (b) b.onclick = () => { checkState.skeptic = "idle"; runSkeptic(false); };
+    $("skStatus").textContent = "";
+    setCheck("skeptic", "error");
   }
-  $("skStatus").textContent = `skeptic ok ${j.requestId}`;
-  $("skOut").innerHTML = `<ul>${j.result.findings.map((f) => {
-    const disputed = /disputed/i.test(f.statement);
-    return `<li><span class="badge ${disputed ? "fail" : "ok"}">${disputed ? "DISPUTED" : "AGREED"}</span> ${esc(f.statement)}<br/><small>cites: ${esc((f.citations ?? []).join(", "))}</small></li>`;
-  }).join("")}</ul>`;
-};
-$("xcheckBtn").onclick = async () => {
-  if (!dmg.mask || !photo) { $("xStatus").textContent = "Mark the damage first."; return; }
-  $("xStatus").textContent = "Asking SAM 3.1…";
+}
+async function runXcheck(auto) {
+  if (checkState.xcheck === "loading") return;
+  if (!dmg.mask || !photo) { if (!auto) $("xStatus").textContent = "Mark the damage first."; return; }
+  checkState.xcheck = "loading";
+  renderCheckCard(); updateReportGate();
   try {
     const segRes = await fetch(base() + "/v1/segment", {
       method: "POST", headers: { "content-type": "application/json" },
@@ -713,38 +834,163 @@ $("xcheckBtn").onclick = async () => {
         points: dmg.points.map(([x, y]) => ({ x, y })),
       }),
     });
-    const seg = await segRes.json();
+    const seg = await segRes.json().catch(() => ({}));
     if (!segRes.ok || !seg.ok) throw new Error(seg.error ?? "SAM segment failed");
     const record = seg.result?.records?.[0];
-    if (!record) { $("xStatus").textContent = "SAM found nothing there."; return; }
+    if (!record) throw new Error("SAM found nothing there — tap the middle of the damage and retry.");
     const ccRes = await fetch(base() + "/v1/crosscheck", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ a: encodeRle(dmg.mask, photo.width, photo.height), b: record.rle, threshold: 0.5 }),
     });
-    const cc = await ccRes.json();
+    const cc = await ccRes.json().catch(() => ({}));
     if (!ccRes.ok || !cc.ok) throw new Error(cc.error ?? "cross-check failed");
-    const badge = cc.result.verdict === "AGREED" ? "ok" : "fail";
-    $("xStatus").innerHTML = "";
+    const x = $("xStatus");
+    x.innerHTML = "";
     const chip = document.createElement("span");
-    chip.className = `badge ${badge}`;
+    chip.className = `badge ${cc.result.verdict === "AGREED" ? "ok" : "fail"}`;
     chip.textContent = `${cc.result.verdict} · IoU ${cc.result.iou}`;
-    $("xStatus").appendChild(chip);
-  } catch (e) { $("xStatus").textContent = `Cross-check failed (${e.message ?? e}). Mock mode has no SAM.`; }
+    x.appendChild(chip);
+    setCheck("xcheck", "ok");
+  } catch (e) {
+    const x = $("xStatus");
+    x.innerHTML = `<div class="statecard err" role="alert"><b>Cross-check failed.</b><p style="margin:8px 0 12px;color:#5b6b8c">${esc(e instanceof Error ? e.message : String(e))}</p><button class="btn-ghostline" type="button" id="xRetry" style="width:100%">Retry cross-check</button></div>`;
+    const b = document.getElementById("xRetry");
+    if (b) b.onclick = () => { checkState.xcheck = "idle"; runXcheck(false); };
+    setCheck("xcheck", "error");
+  }
+}
+function runChecksAuto() {
+  resetCheckState();
+  runSkeptic(true);
+  runXcheck(true);
+}
+$("skepticBtn").onclick = () => { checkState.skeptic = "idle"; runSkeptic(false); };
+$("xcheckBtn").onclick = () => { checkState.xcheck = "idle"; runXcheck(false); };
+let deferredInstallPrompt = null;
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  const b = $("installBtn");
+  if (b) b.hidden = false;
+});
+$("installBtn").onclick = async () => {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice.catch(() => {});
+  deferredInstallPrompt = null;
+  $("installBtn").hidden = true;
+};
+function reportSummaryText() {
+  const f = (lastMeasurement?.findings ?? [])[0];
+  if (!f) return "";
+  const bits = [`${f.label} covers ${f.percent}% of the wall`];
+  if (f.crackLengthMm != null) bits.push(`measures ${f.crackLengthMm} mm`);
+  if (f.areaCm2 != null) bits.push(`covers ${f.areaCm2} cm²`);
+  bits.push(`classified ${f.severity}`);
+  return `SnapClaim: ${bits.join("; ")}. Every number cited by receipt.`;
+}
+function fillReportDoc(ok) {
+  const gate = $("docGate");
+  if (ok) { gate.textContent = "Gate pass"; gate.className = "badge ok"; }
+  else { gate.textContent = "Pending"; gate.className = "badge wait"; }
+  if (stillDataUrl) { const p = $("docPhoto"); p.src = stillDataUrl; p.style.display = "block"; }
+  const t = $("transcriptBox").value.trim();
+  const q = $("docQuote");
+  if (t) { q.hidden = false; q.textContent = `“${t}”`; } else q.hidden = true;
+  const d = new Date();
+  $("docMeta").textContent = `Generated ${d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} · ${lastMeasurement ? lastMeasurement.findings.length : 0} finding${lastMeasurement?.findings?.length === 1 ? "" : "s"}`;
+  const f = (lastMeasurement?.findings ?? [])[0];
+  if (f) {
+    $("docRows").innerHTML =
+      (f.crackLengthMm != null ? `<tr><th scope="row">Crack length</th><td>${esc(String(f.crackLengthMm))} mm</td><td><span class="badge ok">Confirmed</span></td></tr>` : "") +
+      `<tr><th scope="row">Surface affected</th><td>${esc(String(f.percent))} %</td><td><span class="badge ok">Confirmed</span></td></tr>` +
+      (f.areaCm2 != null ? `<tr><th scope="row">Area</th><td>${esc(String(f.areaCm2))} cm²</td><td><span class="badge ok">Confirmed</span></td></tr>` : "") +
+      `<tr><th scope="row">Severity</th><td>${esc(String(f.severity))}</td><td><span class="badge ok">Confirmed</span></td></tr>`;
+  }
+}
+function setShareCopyEnabled(on) {
+  $("shareBtn").disabled = !on;
+  $("copyBtn").disabled = !on;
+}
+$("shareBtn").onclick = async () => {
+  const text = reportSummaryText();
+  if (!text) return;
+  try {
+    if (navigator.share) await navigator.share({ title: "SnapClaim damage report", text });
+    else throw new Error("no native share sheet");
+  } catch {
+    try { await navigator.clipboard.writeText(text); $("reportState").textContent = "Copied — no share sheet on this device."; }
+    catch { $("reportState").textContent = "Sharing unavailable here — use Download SVG."; }
+  }
+};
+$("copyBtn").onclick = async () => {
+  const text = reportSummaryText();
+  if (!text) return;
+  try { await navigator.clipboard.writeText(text); $("reportState").textContent = "Summary copied to clipboard."; }
+  catch { $("reportState").textContent = "Copy failed in this browser — select the summary manually."; }
+};
+$("newClaimBtn").onclick = () => {
+  payloadObj = null; lastMeasurement = null;
+  dmg = { points: [], pointMasks: [], mask: null, iou: 0 };
+  gateCoin = null; stillDataUrl = ""; noScaleMode = false; coinLabel = "";
+  history.length = 0; smooth = null; coinSeen = false;
+  $("transcriptBox").value = ""; $("heard").textContent = "";
+  $("voiceErr").textContent = ""; $("raw").textContent = "{}";
+  $("measured").innerHTML = ""; $("findings").innerHTML = ""; drawScheme([]);
+  $("skOut").innerHTML = ""; $("skStatus").textContent = ""; $("xStatus").textContent = "";
+  const card = $("numPhotoCard"); if (card) card.hidden = true;
+  $("annexWrap").innerHTML = `<img id="annexImg" alt="Generated report annexure" hidden />`;
+  $("dl").style.display = "none"; $("dl").removeAttribute("href");
+  $("docGate").textContent = "Pending"; $("docGate").className = "badge wait";
+  $("docMeta").textContent = "Not generated yet";
+  $("docPhoto").style.display = "none";
+  $("docQuote").hidden = true;
+  $("docRows").innerHTML = `<tr><th>Measurement</th><td>Generate the report to fill this in.</td></tr>`;
+  $("reportState").textContent = "";
+  setShareCopyEnabled(false);
+  resetCheckState();
+  backToCam();
+  setLocked(true, "Add a coin for scale");
+  acquireCamera();
 };
 $("renderBtn").onclick = async () => {
   if (!payloadObj) return;
+  const state = $("reportState");
+  state.textContent = "Generating report…";
+  $("annexWrap").innerHTML = `<img id="annexImg" alt="Generated report annexure" hidden /><div class="skel" role="status" aria-label="Generating report"></div>`;
+  setShareCopyEnabled(false);
   const body = JSON.parse(JSON.stringify(payloadObj));
   body.transcript = $("transcriptBox").value;
-  const res = await fetch(base() + "/v1/render", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-  const j = await res.json();
-  if (!res.ok || !j.ok) return;
-  $("annex").innerHTML = j.result.svg;
-  const blob = new Blob([j.result.svg], { type: "image/svg+xml" });
-  const dl = $("dl");
-  dl.href = URL.createObjectURL(blob);
-  dl.download = "snapclaim-annexure.svg";
-  dl.style.display = "inline";
-  dl.textContent = "download svg";
+  try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 30000);
+    let res, j;
+    try {
+      res = await fetch(base() + "/v1/render", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: ctl.signal });
+      j = await res.json();
+    } finally { clearTimeout(timer); }
+    if (!res.ok || !j.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
+    const blob = new Blob([j.result.svg], { type: "image/svg+xml" });
+    const url = URL.createObjectURL(blob);
+    const img = document.getElementById("annexImg");
+    await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = () => reject(new Error("preview failed to render")); img.src = url; img.hidden = false; });
+    document.querySelector("#annexWrap .skel")?.remove();
+    const dl = $("dl");
+    dl.href = url;
+    dl.download = "snapclaim-annexure.svg";
+    dl.style.display = "block";
+    dl.textContent = "Download SVG annexure";
+    fillReportDoc(true);
+    setShareCopyEnabled(true);
+    state.textContent = "";
+  } catch (e) {
+    const name = e instanceof Error ? e.name : "";
+    const what = name === "AbortError" ? "timed out after 30 s" : (e instanceof Error ? e.message : String(e));
+    $("annexWrap").innerHTML = `<img id="annexImg" alt="Generated report annexure" hidden />
+      <div class="statecard err" role="alert"><b>Report failed.</b><p style="margin:8px 0 12px;color:#5b6b8c">${esc(what)}</p><button class="btn-dark" type="button" id="renderRetry" style="width:100%">Retry</button></div>`;
+    document.getElementById("renderRetry").onclick = () => $("renderBtn").click();
+    state.textContent = "";
+  }
 };
 
 /* ---------- sample (no camera) ---------- */
@@ -762,6 +1008,7 @@ async function loadSample() {
     const measured = await mres.json();
     if (!mres.ok || !measured.ok) throw new Error(measured.error ?? mres.status);
     payloadObj = sample;
+    fillPhotoCard();
     showMeasured(measured.result);
     show("sSay");
     startListening();

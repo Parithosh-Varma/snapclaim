@@ -28,6 +28,12 @@ test("PWA shell is installable and honest", () => {
   assert.ok(html.includes('id="usePhoto"') && html.includes('id="retake"'), "review actions exist");
   assert.ok(html.includes('id="markCanvas"'), "mark screen exists");
   assert.ok(html.includes('id="noCoin"'), "no-coin percent-only path exists");
+  for (const step of ["01 / 05","02 / 05","03 / 05","04 / 05","05 / 05"]) {
+    assert.ok(html.includes(step), `eyebrow ${step} exists`);
+  }
+  for (const id of ["numPhotoCard","numPhoto","numChip","numLoading","numError","reportDoc","docGate","docMeta","docPhoto","docQuote","docRows","annexImg","shareBtn","copyBtn","newClaimBtn","installBtn","offlineBar","toReport","renderBtn"]) {
+    assert.ok(html.includes(`id="${id}"`), `report/check element ${id} exists`);
+  }
   assert.ok(html.includes('id="xcheckBtn"') || html.includes("Cross-check"), "cross-check exists");
   assert.ok(html.includes('id="coinKind"'), "coin options exist");
   assert.ok(html.includes("India"), "Indian coin options exist");
