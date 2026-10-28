@@ -32,8 +32,35 @@ export interface DisputeScore {
 
 /**
  * Scores the skeptic's DISPUTED calls against hand labels, matched on caseId + maskId.
- * Draft: signature only, the counting lands with the first held-out cases.
+ * A label with no prediction goes to `missing` and counts as a miss on the label's side:
+ * an expected DISPUTED becomes a false negative, an expected CONFIRMED is left out of the counts.
  */
-export function scoreDisputes(_labels: DisputeLabel[], _predictions: DisputePrediction[]): DisputeScore {
-  throw new Error("scoreDisputes is not implemented yet");
+export function scoreDisputes(labels: DisputeLabel[], predictions: DisputePrediction[]): DisputeScore {
+  const key = (caseId: string, maskId: string) => `${caseId}\u0000${maskId}`;
+  const predicted = new Map(predictions.map((p) => [key(p.caseId, p.maskId), p.verdict]));
+  const score: DisputeScore = {
+    truePositives: 0,
+    falsePositives: 0,
+    falseNegatives: 0,
+    trueNegatives: 0,
+    precision: null,
+    recall: null,
+    missing: [],
+  };
+  for (const label of labels) {
+    const verdict = predicted.get(key(label.caseId, label.maskId));
+    if (verdict === undefined) {
+      score.missing.push(`${label.caseId}/${label.maskId}`);
+      if (label.expected === "DISPUTED") score.falseNegatives++;
+    } else if (label.expected === "DISPUTED") {
+      if (verdict === "DISPUTED") score.truePositives++;
+      else score.falseNegatives++;
+    } else if (verdict === "DISPUTED") score.falsePositives++;
+    else score.trueNegatives++;
+  }
+  const flagged = score.truePositives + score.falsePositives;
+  const actual = score.truePositives + score.falseNegatives;
+  if (flagged > 0) score.precision = score.truePositives / flagged;
+  if (actual > 0) score.recall = score.truePositives / actual;
+  return score;
 }
