@@ -10,6 +10,13 @@ export interface MaskObservation {
   skeletonPx?: number;
   /** Disconnected regions of damage; defaults to 1 when the segmenter does not report it. */
   regionCount?: number;
+  /**
+   * Crack regions that are thick rather than long and thin, usually a tap that
+   * caught a stone block or a patch of wall. Their area is still counted; the
+   * flag lets the user undo the tap before it inflates the report.
+   */
+  blockyRegionCount?: number;
+  blockyAreaPx?: number;
   confidence: number;
 }
 

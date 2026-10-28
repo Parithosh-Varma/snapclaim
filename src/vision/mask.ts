@@ -307,3 +307,62 @@ export function skeletonLengthPx(skeleton: BinaryMask): number {
   }
   return length;
 }
+
+/** Copy of one region, cropped to its bounding box plus a one-pixel empty border. */
+export function cropRegion(width: number, region: Region): BinaryMask {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const i of region.pixels) {
+    const x = i % width;
+    const y = Math.floor(i / width);
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  const out = createMask(maxX - minX + 3, maxY - minY + 3);
+  for (const i of region.pixels) {
+    out.data[(Math.floor(i / width) - minY + 1) * out.width + (i % width) - minX + 1] = 1;
+  }
+  return out;
+}
+
+/**
+ * Largest distance from a mask pixel to the background, in pixels, from a
+ * two-pass 3-4 chamfer transform (within 8% of Euclidean). Twice this is the
+ * thickest point of the shape.
+ */
+export function maxInscribedRadiusPx(mask: BinaryMask): number {
+  assertMask(mask);
+  const { width, height } = mask;
+  const dist = new Int32Array(width * height);
+  const far = 1 << 28;
+  const get = (x: number, y: number): number =>
+    x < 0 || y < 0 || x >= width || y >= height ? 0 : (dist[y * width + x] as number);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = y * width + x;
+      if (mask.data[i] === 0) continue;
+      dist[i] = Math.min(far, get(x - 1, y) + 3, get(x, y - 1) + 3, get(x - 1, y - 1) + 4, get(x + 1, y - 1) + 4);
+    }
+  }
+  let best = 0;
+  for (let y = height - 1; y >= 0; y--) {
+    for (let x = width - 1; x >= 0; x--) {
+      const i = y * width + x;
+      if (mask.data[i] === 0) continue;
+      const d = Math.min(
+        dist[i] as number,
+        get(x + 1, y) + 3,
+        get(x, y + 1) + 3,
+        get(x + 1, y + 1) + 4,
+        get(x - 1, y + 1) + 4,
+      );
+      dist[i] = d;
+      if (d > best) best = d;
+    }
+  }
+  return best / 3;
+}

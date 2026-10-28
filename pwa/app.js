@@ -306,6 +306,7 @@ $("measure").onclick = async () => {
     return;
   }
   $("payload").value = JSON.stringify(j.result, null, 2);
+  const warnings = shapeWarnings(j.result);
   // Measuring is pure math and needs no key; show it before asking for AI findings.
   let measured;
   try {
@@ -321,8 +322,22 @@ $("measure").onclick = async () => {
     return;
   }
   showMeasured(measured.result);
+  if (warnings.length) $("measured").insertAdjacentHTML("beforeend", warnings.map((w) => `<p><span class="badge">CHECK</span> ${w}</p>`).join(""));
   await runReport(true);
 };
+
+// The coin and crack shape checks from /v1/observe, in words the user can act on.
+function shapeWarnings(result) {
+  const out = [];
+  const coin = result.referenceCheck;
+  if (coin?.rejected) out.push(`Coin not used: ${coin.rejected}. Undo the coin taps and tap its centre again.`);
+  for (const m of result.masks) {
+    if (!m.blockyAreaPx) continue;
+    const share = Math.round((100 * m.blockyAreaPx) / m.areaPx);
+    out.push(`${m.blockyRegionCount} piece(s) of the ${m.label} mask look blocky, not crack-shaped (${share}% of its area). Undo the tap that grabbed them.`);
+  }
+  return out;
+}
 
 function measuredRows(findings) {
   return findings.map((f) => {
