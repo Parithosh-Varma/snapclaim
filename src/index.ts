@@ -58,4 +58,6 @@ export type {
 } from "./vision/sam.ts";
 export type { BinaryMask, CocoRle, Region } from "./vision/mask.ts";
 export { circularReference, observeMask } from "./vision/observe.ts";
+export { maskAgreement, agreementVerdict } from "./vision/agreement.ts";
+export type { Agreement } from "./vision/agreement.ts";
 export type { CircularReferenceOptions, ObserveMaskOptions, ReferenceDiagnostics } from "./vision/observe.ts";

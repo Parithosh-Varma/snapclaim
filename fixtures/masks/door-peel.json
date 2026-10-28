@@ -1,0 +1,18 @@
+{
+  "imageId": "fixture-door-peel-01",
+  "note": "Synthetic mask statistics for engine tests: paint peel, no scale reference. Tests percent-only refusal.",
+  "component": {
+    "id": "door-panel-east",
+    "areaPx": 300000,
+    "confidence": 0.91
+  },
+  "masks": [
+    {
+      "id": "peel-1",
+      "label": "peel",
+      "areaPx": 9000,
+      "regionCount": 2,
+      "confidence": 0.83
+    }
+  ]
+}

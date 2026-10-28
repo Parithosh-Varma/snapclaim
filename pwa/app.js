@@ -1,5 +1,7 @@
 const $ = (id) => document.getElementById(id);
 
+import { checkPhoto } from "./photo-check.js";
+
 function base() { return $("base").value.replace(/\/$/, ""); }
 
 $("health").onclick = async () => {
@@ -70,6 +72,13 @@ async function handlePhotoFile(f) {
   $("steps").style.display = "block";
   document.body.classList.add("has-photo");
   redraw();
+  try {
+    const px = photo.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, photo.width, photo.height);
+    const notes = checkPhoto({ width: px.width, height: px.height, data: px.data }, Math.max(bmp.width, bmp.height));
+    $("photoNotes").textContent = notes.join(" ");
+  } catch {
+    // Notes are advisory; a failure here must never block intake.
+  }
   try {
     $("status").textContent = "Preparing the photo…";
     await loadModel();

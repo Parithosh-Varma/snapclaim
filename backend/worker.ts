@@ -9,6 +9,13 @@ export default {
     const headers = { "content-type": "application/json", ...corsHeaders() };
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
     const url = new URL(request.url);
+    const declared = Number(request.headers.get("content-length") ?? 0);
+    if (Number.isFinite(declared) && declared > 1_000_000) {
+      return Response.json(
+        { ok: false, error: "body too large (1MB cap)", code: 400, requestId: "unknown" },
+        { status: 400, headers },
+      );
+    }
     let body: unknown;
     if (request.method === "POST") {
       body = await request.json().catch(() => {

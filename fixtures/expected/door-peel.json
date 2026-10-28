@@ -1,0 +1,4 @@
+{
+  "cases": [{ "maskId": "peel-1", "percent": 3, "crackLengthMm": null, "severity": "moderate" }],
+  "tolerance": { "percent": 0.01, "crackLengthMm": 0.05 }
+}
