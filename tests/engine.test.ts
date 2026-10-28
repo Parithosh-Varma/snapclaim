@@ -68,18 +68,26 @@ test("a full session emits one receipt per measured claim", () => {
 
   assert.equal(session.mode, "absolute");
   assert.equal(session.findings.length, 2);
-  assert.equal(session.receipts.length, 8);
+  assert.equal(session.receipts.length, 11);
 
   const crack = session.findings[0];
   assert.ok(crack);
   assert.equal(crack.percent, 5.17);
   assert.equal(crack.crackLengthMm, 85.9);
   assert.equal(crack.severity, "significant");
+  // 24800 px × (27/287 mm/px)² / 100 = 2.19 cm²; mean width 24800/913 × scale = 2.6 mm.
+  assert.equal(crack.areaCm2, 2.19);
+  assert.equal(crack.crackWidthMm, 2.6);
+  assert.ok(crack.receiptIds.area !== null);
+  assert.ok(crack.receiptIds.width !== null);
 
   const stain = session.findings[1];
   assert.ok(stain);
   assert.equal(stain.percent, 1.29);
   assert.equal(stain.crackLengthMm, null);
+  assert.equal(stain.crackWidthMm, null);
+  // 6200 px at the same scale = 0.55 cm².
+  assert.equal(stain.areaCm2, 0.55);
   assert.equal(stain.severity, "moderate");
 
   const ids = new Set(session.receipts.map((receipt) => receipt.id));
@@ -101,7 +109,10 @@ test("without a scale reference the session stays percent-only and says so", () 
 
   assert.equal(session.mode, "percent-only");
   assert.ok(session.findings.every((finding) => finding.crackLengthMm === null));
+  assert.ok(session.findings.every((finding) => finding.areaCm2 === null));
+  assert.ok(session.findings.every((finding) => finding.crackWidthMm === null));
   assert.ok(session.receipts.every((receipt) => receipt.output.unit !== "mm"));
+  assert.ok(session.receipts.every((receipt) => receipt.output.unit !== "cm2"));
 });
 
 test("a low-confidence reference is rejected with a receipt, not silently used", () => {
@@ -115,4 +126,5 @@ test("a low-confidence reference is rejected with a receipt, not silently used",
   assert.equal(session.mode, "percent-only");
   assert.ok(session.receipts.some((receipt) => receipt.method === "scale_rejected"));
   assert.ok(session.receipts.every((receipt) => receipt.output.unit !== "mm"));
+  assert.ok(session.receipts.every((receipt) => receipt.output.unit !== "cm2"));
 });

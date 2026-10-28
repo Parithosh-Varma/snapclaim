@@ -128,3 +128,20 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 - PWA backend field now defaults to `https://snapclaim-backend.parithosh.workers.dev` (localhost still typeable). Shareable demo on any phone.
 - `npm run eval` — deterministic guessed-vs-measured bench. Wall-crack locked as regression baseline (2 pass). Missing expected file = SKIP. README in `eval/` for Constantine.
 - 40 tests green, `tsc` clean, eval 2 pass. $0.
+
+## 2026-10-28 — Benchmark hardening (9s push)
+
+**Shipped**
+
+- Evidence gate hardened: every finding must cite a measured number (qualitative-only sentences fail); dates/times stripped before number extraction (`2026-10-28` no longer reads as -10/-28); per-unit backing (% ↔ percent receipt, mm ↔ calibrated-length receipt); one-mask-per-finding rule; severity words must match the cited severity receipt (contradictions fail). 4 new gate tests.
+- Measurement grown up: calibrated area (cm², `areaPx × mmPerPx² / 100`) and mean crack width (mm, `areaPx / skeletonPx × mmPerPx`) with `calibrated_area` / `calibrated_width` receipts; wall-crack now reports 5.17% / 85.9 mm / 2.6 mm wide / 2.19 cm² (11 receipts, was 8).
+- SAM 3.1 live path real: `src/vision/sam.ts` — point/box prompt builder, full output-text parser (frames, sparse ids, confidence, both encodings), mask decode via official `@meta-sam/parser`, frame pasting + COCO RLE encode. Payloads in tests are real official-encoder outputs. `POST /v1/segment` live takes `{imageUrl, width, height, points}` and returns `{records: [{objectId, box, confidence, rle}]}`; empty output throws, never fakes. The one deliberate dependency; everything else stays zero-dep.
+- Voice intake real: `POST /v1/transcribe` proxies to `{META_API_BASE}/asr/transcribe` (multipart, PUSH_TO_TALK, Hindi/Telugu/English bias + claim keywords), $0.18/hr ledgered; mock needs `fixtureTranscript`. PWA hold-to-speak records, resamples to mono 16 kHz WAV on-device (OfflineAudioContext), posts base64, fills the transcript box. Mock shows a fixture hint; 503 shows a key hint.
+- PWA trust fixes: `escapeHtml` on all finding/gate rendering (XSS closed); CSP meta; Indian coins (₹10/5/2/1 first); **Use sample** one-tap measurement (wall-crack fixture, no photo needed); service worker (shell offline, `/v1` never cached); installable manifest.
+- Proof artifacts: `npm run replay` reproduces findings + receipts + mode (MATCH/DRIFT, exit codes); `docs/eval-report.md` filled with bench table, frozen split, baselines protocol and stated gaps; `bench/split.json` frozen 2026-10-28.
+- README now carries a works/mocked/blocked truth table, corrected pipeline (no PDF, no `snapclaim` binary, skeptic text-only until Baseten access), live eval table and an honest photo-privacy note.
+- 105 tests green, `tsc` clean, eval 2 pass, replay MATCH + DRIFT verified.
+
+**Spend:** $0.00 (all live paths stubbed in CI; no keys in repo).
+
+**Next:** set Worker secrets + demo token and flip the badge to live; capture 12–20 ruler-measured photos; one live SAM photo; one live Hindi/Telugu clip; record the video.

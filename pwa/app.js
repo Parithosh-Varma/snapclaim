@@ -303,8 +303,10 @@ $("measure").onclick = async () => {
 
 function measuredRows(findings) {
   return findings.map((f) => {
-    const mm = f.crackLengthMm === null ? "—" : `${f.crackLengthMm} mm`;
-    return `<li><b>${f.label}</b> ${f.percent}% · ${mm} · <span class="badge ok">${f.severity}</span>${f.statement ? `<br/><small>${f.statement}</small>` : ""}</li>`;
+    const mm = f.crackLengthMm === null ? "—" : `${escapeHtml(String(f.crackLengthMm))} mm`;
+    const area = f.areaCm2 === null || f.areaCm2 === undefined ? "" : ` · ${escapeHtml(String(f.areaCm2))} cm²`;
+    const width = f.crackWidthMm === null || f.crackWidthMm === undefined ? "" : ` · w ${escapeHtml(String(f.crackWidthMm))} mm`;
+    return `<li><b>${escapeHtml(String(f.label))}</b> ${escapeHtml(String(f.percent))}%${area} · ${mm}${width} · <span class="badge ok">${escapeHtml(String(f.severity))}</span>${f.statement ? `<br/><small>${escapeHtml(String(f.statement))}</small>` : ""}</li>`;
   }).join("");
 }
 
@@ -350,14 +352,14 @@ async function runReport(keepMeasured = false) {
   $("raw").textContent = JSON.stringify(j, null, 2);
   if (res.status === 503) {
     $("status").textContent = "Measured. AI findings are off: the backend has no API key.";
-    $("findings").innerHTML = `<span class="badge fail">AI FINDINGS UNAVAILABLE</span><pre>${j.error ?? "API key missing"}</pre>`;
+    $("findings").innerHTML = `<span class="badge fail">AI FINDINGS UNAVAILABLE</span><pre>${escapeHtml(String(j.error ?? "API key missing"))}</pre>`;
     if (!keepMeasured) drawScheme([]);
     return;
   }
   if (!res.ok || !j.ok) {
     $("status").textContent = `gate ${res.status}`;
     const fails = j.details ?? j.failures ?? [j.error];
-    $("findings").innerHTML = `<span class="badge fail">GATED</span><pre>${String(JSON.stringify(fails, null, 2))}</pre>`;
+    $("findings").innerHTML = `<span class="badge fail">GATED</span><pre>${escapeHtml(String(JSON.stringify(fails, null, 2)))}</pre>`;
     if (!keepMeasured) drawScheme([]);
     return;
   }
@@ -440,6 +442,181 @@ $("skeptic").onclick = async () => {
 function escapeHtml(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
+
+// The app shell works offline; measurements always hit the network (see sw.js).
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  });
+}
+
+// ---- voice line via Muse Voice Transcribe (POST /v1/transcribe) ----
+// Hold the button to talk; letting go stops (10 s cap). The PWA encodes the
+// clip to mono 16 kHz WAV on-device and sends only the audio bytes to the
+// backend, which proxies them to Muse Voice Transcribe. Text lands in the box.
+const MAX_VOICE_MS = 10000;
+let recorder = null, voiceChunks = [], voiceStream = null, voiceTimer = null;
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",").pop() ?? "");
+    reader.onerror = () => reject(new Error("could not read the recording"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+function encodeWav(samples, sampleRate) {
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+  const writeAscii = (offset, text) => {
+    for (let i = 0; i < text.length; i++) view.setUint8(offset + i, text.charCodeAt(i));
+  };
+  writeAscii(0, "RIFF");
+  view.setUint32(4, 36 + samples.length * 2, true);
+  writeAscii(8, "WAVE");
+  writeAscii(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeAscii(36, "data");
+  view.setUint32(40, samples.length * 2, true);
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+  }
+  return new Blob([buffer], { type: "audio/wav" });
+}
+
+/** Recorded clip → mono 16 kHz samples, the rate Muse Voice Transcribe expects. */
+async function toVoiceWav(blob) {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) throw new Error("audio not supported in this browser");
+  const ctx = new Ctx();
+  try {
+    const decoded = await ctx.decodeAudioData(await blob.arrayBuffer());
+    const targetRate = 16000;
+    const seconds = Math.min(decoded.duration, MAX_VOICE_MS / 1000);
+    const offline = new OfflineAudioContext(1, Math.max(1, Math.ceil(seconds * targetRate)), targetRate);
+    const src = offline.createBufferSource();
+    src.buffer = decoded;
+    src.connect(offline.destination);
+    src.start(0, 0, seconds);
+    const rendered = await offline.startRendering();
+    return encodeWav(rendered.getChannelData(0), targetRate);
+  } finally {
+    ctx.close().catch(() => {});
+  }
+}
+
+async function startRecording() {
+  if (recorder) return;
+  if (!navigator.mediaDevices?.getUserMedia) {
+    $("voiceStatus").textContent = "No microphone access. Type the line instead.";
+    return;
+  }
+  try {
+    voiceStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch {
+    $("voiceStatus").textContent = "No microphone access. Type the line instead.";
+    return;
+  }
+  voiceChunks = [];
+  recorder = new MediaRecorder(voiceStream);
+  recorder.ondataavailable = (e) => {
+    if (e.data.size > 0) voiceChunks.push(e.data);
+  };
+  recorder.onstop = async () => {
+    const rec = recorder;
+    recorder = null;
+    clearTimeout(voiceTimer);
+    voiceStream?.getTracks().forEach((t) => t.stop());
+    voiceStream = null;
+    $("record").textContent = "Hold to speak";
+    const clip = new Blob(voiceChunks, { type: rec.mimeType || "audio/webm" });
+    if (clip.size === 0) {
+      $("voiceStatus").textContent = "Didn't catch anything. Hold the button and try again.";
+      return;
+    }
+    $("voiceStatus").textContent = "Transcribing…";
+    try {
+      const wav = await toVoiceWav(clip);
+      const audioBase64 = await blobToBase64(wav);
+      const res = await fetch(base() + "/v1/transcribe", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ audioBase64 }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (res.status === 503) {
+        $("voiceStatus").textContent = "Voice needs the backend API key. Type the line instead.";
+        return;
+      }
+      if (!res.ok || !j.ok) throw new Error(j.error ?? res.status);
+      const text = String(j.result?.transcript ?? "").trim();
+      if (!text) {
+        $("voiceStatus").textContent = "Didn't catch anything. Hold the button and try again.";
+        return;
+      }
+      $("transcript").value = text;
+      $("voiceStatus").textContent = "Done. Fix any words in the box before sending.";
+    } catch (e) {
+      $("voiceStatus").textContent = `Transcription failed (${e.message ?? e}). Type the line instead.`;
+    }
+  };
+  recorder.start();
+  $("record").textContent = "Release to stop";
+  $("voiceStatus").textContent = "Listening… release when done.";
+  voiceTimer = setTimeout(() => stopRecording(), MAX_VOICE_MS);
+}
+
+function stopRecording() {
+  if (recorder?.state === "recording") recorder.stop();
+}
+
+$("record")?.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  try {
+    $("record").setPointerCapture?.(e.pointerId);
+  } catch {
+    // Older browsers keep the default capture behavior.
+  }
+  startRecording();
+});
+$("record")?.addEventListener("pointerup", () => stopRecording());
+$("record")?.addEventListener("pointercancel", () => stopRecording());
+
+// Sample measurement so a judge can try the full loop with one tap.
+// Same numbers as fixtures/masks/wall-crack.json; photo outline step skipped.
+$("sample")?.addEventListener("click", async () => {
+  const sample = {
+    component: { id: "wall-panel-north", areaPx: 480000, confidence: 0.93 },
+    masks: [
+      { id: "crack-1", label: "crack", areaPx: 24800, skeletonPx: 913, regionCount: 1, confidence: 0.88 },
+      { id: "stain-1", label: "stain", areaPx: 6200, regionCount: 2, confidence: 0.71 }
+    ],
+    scaleReference: { id: "coin-10inr", knownMm: 27, lengthPx: 287, confidence: 0.88 }
+  };
+  $("payload").value = JSON.stringify(sample, null, 2);
+  $("status").textContent = "Sample loaded. Measuring…";
+  try {
+    const mres = await fetch(base() + "/v1/measure", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(sample)
+    });
+    const measured = await mres.json();
+    if (!mres.ok || !measured.ok) throw new Error(measured.error ?? mres.status);
+    showMeasured(measured.result);
+    await runReport(true);
+  } catch (e) {
+    $("status").textContent = `Sample failed (${e.message ?? e}). Is the backend reachable?`;
+  }
+});
 
 $("render").onclick = async () => {
   let body;

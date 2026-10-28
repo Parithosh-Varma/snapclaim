@@ -14,10 +14,14 @@
     "backend:start": "node --experimental-strip-types --no-warnings backend/server.ts",
     "backend:live": "node --experimental-strip-types --no-warnings --env-file=.env backend/server.ts",
     "backend:smoke": "node backend/smoke.mjs",
-    "eval": "node --experimental-strip-types --no-warnings eval/bench.ts"
+    "eval": "node --experimental-strip-types --no-warnings eval/bench.ts",
+    "replay": "node --experimental-strip-types --no-warnings eval/replay.ts"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "@meta-sam/parser": "^0.1.0"
   }
 }

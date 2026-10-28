@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#131b16" />
 <meta name="description" content="SnapClaim — photo + one line in, measured damage report out. Outlining runs on-device; the photo never leaves it." />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; connect-src 'self' https:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; worker-src 'self' blob:;" />
+<link rel="manifest" href="./manifest.webmanifest" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23131b16'/%3E%3Ccircle cx='16' cy='16' r='7' fill='none' stroke='%23f2c230' stroke-width='2.5'/%3E%3Cpath d='M16 3v6M16 23v6M3 16h6M23 16h6' stroke='%23f2c230' stroke-width='2.5'/%3E%3C/svg%3E" />
 <title>SnapClaim — capture</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -200,6 +205,10 @@
         <div>
           <label class="field">Coin (for scale)
             <select id="coinKind">
+              <option value="27">India ₹10 · 27 mm</option>
+              <option value="25">India ₹5 · 25 mm</option>
+              <option value="23">India ₹2 · 23 mm</option>
+              <option value="22">India ₹1 · 22 mm</option>
               <option value="24.26">US quarter · 24.26 mm</option>
               <option value="23.88">Canadian quarter · 23.88 mm</option>
               <option value="24.5">UK 10p · 24.5 mm</option>
@@ -216,6 +225,9 @@
 
     <div class="actionbar">
       <button id="measure" class="btn-primary" type="button" disabled>Measure damage</button>
+      <div class="rowbtns" style="margin-top:8px">
+        <button id="sample" class="btn-ghost" type="button">Use sample measurement</button>
+      </div>
       <span id="status" role="status"></span>
     </div>
     <div id="measured"></div>
@@ -223,10 +235,14 @@
 
   <section class="card" aria-labelledby="h-describe">
     <div class="card-head"><h2 id="h-describe">Describe it in one line</h2><span class="step-no">STEP 02</span></div>
-    <p class="sub">Where is it, and what happened? Measuring runs automatically after Step 01 — send only if you need to re-run.</p>
+    <p class="sub">Where is it, and what happened? Speak or type — the line goes to the report with your measurement.</p>
     <label class="field">Your description
       <input id="transcript" type="text" value="wall crack near the window, coin for scale" />
     </label>
+    <div class="rowbtns" style="margin-bottom:12px">
+      <button id="record" type="button">Hold to speak</button>
+    </div>
+    <span id="voiceStatus" role="status" class="hint"></span>
     <div class="chips">
       <button type="button" data-line="wall crack near the window, coin for scale">Wall crack</button>
       <button type="button" data-line="water stain on the ceiling, coin for scale">Ceiling stain</button>

@@ -7,9 +7,19 @@ import type { MeasuredFinding } from "../src/engine/types.ts";
 import type { Receipt } from "../src/receipts/types.ts";
 import { renderAnnexureSvg } from "../src/render/svg.ts";
 import { guardFor, spendStatus } from "./spend.ts";
-import { configFromEnv, findingsProvider, skepticProvider, visionProvider, HttpError, type Env, type FetchFn } from "./providers.ts";
+import { BudgetExceededError } from "../src/config/spend-guard.ts";
+import { configFromEnv, findingsProvider, requireLiveKeys, skepticProvider, visionProvider, HttpError, SAM_IMAGE_USD, type Env, type FetchFn } from "./providers.ts";
+import {
+  DEFAULT_KEYWORDS,
+  DEFAULT_LANGUAGE_BIAS,
+  estimateAudioUsd,
+  transcribeWithMuse,
+  type TranscribeResult,
+} from "./transcribe.ts";
+import { encodeRle as encodeMaskRle } from "../src/vision/mask.ts";
+import { segmentWithSam, type SamPoint } from "../src/vision/sam.ts";
 
-export const VERSION = "0.2.0";
+export const VERSION = "0.3.0";
 export const MAX_MASKS = 50;
 
 export interface EnvelopedResult {
@@ -199,13 +209,108 @@ export async function reportBody(body: unknown, env: Env, requestId = newRequest
   return envelope(requestId, started, { measurement, findings: drafts, gate });
 }
 
-export async function segmentBody(body: unknown, env: Env, requestId = newRequestId()): Promise<EnvelopedResult> {
+export async function segmentBody(body: unknown, env: Env, requestId = newRequestId(), fetchFn?: FetchFn): Promise<EnvelopedResult> {
   const started = Date.now();
   if (!isRecord(body)) throw new Error("body must be a JSON object");
-  const provider = visionProvider(env, configFromEnv(env), body.fixture as never);
-  const result = await provider.segment({
-    imageId: typeof body.imageId === "string" ? body.imageId : "unknown",
-    labels: Array.isArray(body.labels) ? (body.labels as never) : [],
+  const config = configFromEnv(env);
+  if (config.mockMode) {
+    const provider = visionProvider(env, config, body.fixture as never);
+    const result = await provider.segment({
+      imageId: typeof body.imageId === "string" ? body.imageId : "unknown",
+      labels: Array.isArray(body.labels) ? (body.labels as never) : [],
+    });
+    return envelope(requestId, started, result);
+  }
+  // Live: SAM 3.1 point prompts over the Responses API. The backend decodes
+  // masks with the official parser — it never invents them.
+  const { metaKey } = requireLiveKeys(env, config);
+  const imageUrl = typeof body.imageUrl === "string" ? body.imageUrl : "";
+  if (!imageUrl.startsWith("data:image/") && !imageUrl.startsWith("https://")) {
+    throw new HttpError(400, "live /v1/segment needs body.imageUrl (https:// or data:image/)");
+  }
+  const width = requireNumber(body.width, "width");
+  const height = requireNumber(body.height, "height");
+  const rawPoints = Array.isArray(body.points) ? body.points : [];
+  if (rawPoints.length === 0 || rawPoints.length > 16) throw new HttpError(400, "live /v1/segment needs 1–16 body.points [{x, y}]");
+  const points: SamPoint[] = rawPoints.map((point, i) => {
+    if (!isRecord(point)) throw new HttpError(400, `points[${i}] must be an object`);
+    return { x: requireNumber(point.x, `points[${i}].x`), y: requireNumber(point.y, `points[${i}].y`) };
+  });
+  const spend = guardFor(env);
+  if (spend.remainingUsd <= 0) throw new HttpError(429, `spend guard: $0 remaining of $${spend.limitUsd} limit`);
+  const sam = await segmentWithSam({
+    fetchFn,
+    base: config.endpoints.meta,
+    apiKey: metaKey,
+    model: config.models.sam,
+    request: { imageUrl, size: { width: Math.round(width), height: Math.round(height) }, points },
+  });
+  try {
+    spend.charge(`sam segment ${sam.records.length} objects`, SAM_IMAGE_USD);
+  } catch (error) {
+    if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
+    throw error;
+  }
+  return envelope(requestId, started, {
+    records: sam.records.map((record) => ({
+      objectId: record.objectId,
+      box: record.box,
+      confidence: record.box.confidence ?? null,
+      rle: encodeMaskRle(record.frameMask),
+    })),
+  });
+}
+
+function base64ToBytes(value: unknown): Uint8Array {
+  if (typeof value !== "string" || value.length === 0) throw new HttpError(400, "body.audioBase64 must be a non-empty string");
+  const clean = value.includes(",") ? (value.split(",").pop() as string) : value;
+  try {
+    const binary = atob(clean);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  } catch {
+    throw new HttpError(400, "body.audioBase64 is not valid base64");
+  }
+}
+
+/**
+ * POST /v1/transcribe — spoken line to text via Muse Voice Transcribe.
+ * Mock mode returns the supplied fixture transcript (the backend invents none).
+ * Live mode proxies to {META_API_BASE}/v1/asr/transcribe as multipart.
+ */
+export async function transcribeBody(body: unknown, env: Env, requestId = newRequestId(), fetchFn?: FetchFn): Promise<EnvelopedResult> {
+  const started = Date.now();
+  if (!isRecord(body)) throw new Error("body must be a JSON object");
+  const config = configFromEnv(env);
+  if (config.mockMode) {
+    if (typeof body.fixtureTranscript !== "string") {
+      throw new HttpError(400, "mock transcribe requires body.fixtureTranscript — backend invents no transcripts");
+    }
+    const result: TranscribeResult = { transcript: body.fixtureTranscript, audioDurationMs: 0, turns: [] };
+    return envelope(requestId, started, result);
+  }
+  const { metaKey } = requireLiveKeys(env, config);
+  const audio = base64ToBytes(body.audioBase64);
+  if (audio.length > 4_000_000) throw new HttpError(400, "audio over 4 MB; send a clip of 10 seconds or less");
+  const languageBias = Array.isArray(body.languageBias) ? body.languageBias.map(String) : DEFAULT_LANGUAGE_BIAS;
+  const keywords = Array.isArray(body.keywords) ? body.keywords.map(String) : DEFAULT_KEYWORDS;
+  const spend = guardFor(env);
+  if (spend.remainingUsd <= 0) throw new HttpError(429, `spend guard: $0 remaining of $${spend.limitUsd} limit`);
+  const result = await transcribeWithMuse({
+    fetchFn,
+    base: config.endpoints.meta,
+    apiKey: metaKey,
+    model: config.models.transcribe,
+    audio: { audio, languageBias, keywords },
+    charge: (label, usd) => {
+      try {
+        spend.charge(label, usd);
+      } catch (error) {
+        if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
+        throw error;
+      }
+    },
   });
   return envelope(requestId, started, result);
 }
@@ -326,7 +431,8 @@ export async function handleRequest(input: {
     if (input.method === "POST" && input.path === "/v1/measure") return { status: 200, body: measureBody(input.body, requestId) };
     if (input.method === "POST" && input.path === "/v1/observe") return { status: 200, body: observeBody(input.body, requestId) };
     if (input.method === "POST" && input.path === "/v1/report") return { status: 200, body: await reportBody(input.body, env, requestId, input.fetchFn) };
-    if (input.method === "POST" && input.path === "/v1/segment") return { status: 200, body: await segmentBody(input.body, env, requestId) };
+    if (input.method === "POST" && input.path === "/v1/segment") return { status: 200, body: await segmentBody(input.body, env, requestId, input.fetchFn) };
+    if (input.method === "POST" && input.path === "/v1/transcribe") return { status: 200, body: await transcribeBody(input.body, env, requestId, input.fetchFn) };
     if (input.method === "POST" && input.path === "/v1/findings") return { status: 200, body: await findingsBody(input.body, env, requestId, input.fetchFn) };
     if (input.method === "POST" && input.path === "/v1/skeptic") return { status: 200, body: await skepticBody(input.body, env, requestId, input.fetchFn) };
     if (input.method === "POST" && input.path === "/v1/render") return { status: 200, body: await renderBody(input.body, env, requestId, input.fetchFn) };

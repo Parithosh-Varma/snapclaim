@@ -1,0 +1,18 @@
+{
+  "name": "SnapClaim — measured damage reports",
+  "short_name": "SnapClaim",
+  "description": "Photo + one line in, measured damage report out. Computed, not generated.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#131b16",
+  "theme_color": "#131b16",
+  "icons": [
+    {
+      "src": "../assets/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

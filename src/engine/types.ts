@@ -45,10 +45,16 @@ export interface MeasuredFinding {
   ratio: number;
   percent: number;
   crackLengthMm: number | null;
+  /** Calibrated damage area. Null in percent-only mode (no scale reference). */
+  areaCm2: number | null;
+  /** Mean crack width. Null for non-crack labels or without calibration. */
+  crackWidthMm: number | null;
   severity: SeverityBand;
   receiptIds: {
     ratio: string;
     length: string | null;
+    area: string | null;
+    width: string | null;
     severity: string;
     regions: string;
   };
