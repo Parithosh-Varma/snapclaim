@@ -125,18 +125,85 @@ function scan() {
   setTimeout(scan, 200);
 }
 
+function grayEdges(img, w, h) {
+  const g = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    const o = i * 4;
+    g[i] = 0.299 * img[o] + 0.587 * img[o + 1] + 0.114 * img[o + 2];
+  }
+  const edge = new Uint8Array(w * h);
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      const gx = -g[i - w - 1] - 2 * g[i - 1] - g[i + w - 1] + g[i - w + 1] + 2 * g[i + 1] + g[i + w + 1];
+      const gy = -g[i - w - 1] - 2 * g[i - w] - g[i - w + 1] + g[i + w - 1] + 2 * g[i + w] + g[i + w + 1];
+      if (gx * gx + gy * gy > 9000) edge[i] = 1;
+    }
+  }
+  return edge;
+}
+
+/** Biggest ring-like edge blob: centroid + radial uniformity score. */
+function findRing(edge, w, h) {
+  const seen = new Uint8Array(w * h);
+  let best = null;
+  const stack = [];
+  for (let s = 0; s < w * h; s++) {
+    if (!edge[s] || seen[s]) continue;
+    let sx = 0, sy = 0, n = 0;
+    const pts = [];
+    stack.push(s);
+    seen[s] = 1;
+    while (stack.length && pts.length < 4000) {
+      const i = stack.pop();
+      const x = i % w, y = (i / w) | 0;
+      pts.push(i); sx += x; sy += y; n++;
+      if (x > 0 && !seen[i - 1] && edge[i - 1]) { seen[i - 1] = 1; stack.push(i - 1); }
+      if (x < w - 1 && !seen[i + 1] && edge[i + 1]) { seen[i + 1] = 1; stack.push(i + 1); }
+      if (y > 0 && !seen[i - w] && edge[i - w]) { seen[i - w] = 1; stack.push(i - w); }
+      if (y < h - 1 && !seen[i + w] && edge[i + w]) { seen[i + w] = 1; stack.push(i + w); }
+    }
+    if (n < 25 || n > 4000) continue;
+    const cx = sx / n, cy = sy / n;
+    let rr = 0;
+    for (const i of pts) {
+      const dx = (i % w) - cx, dy = ((i / w) | 0) - cy;
+      rr += Math.sqrt(dx * dx + dy * dy);
+    }
+    rr /= n;
+    if (rr < w * 0.02 || rr > w * 0.35) continue;
+    let inband = 0;
+    const tol = Math.max(1.5, rr * 0.18);
+    for (const i of pts) {
+      const dx = (i % w) - cx, dy = ((i / w) | 0) - cy;
+      if (Math.abs(Math.sqrt(dx * dx + dy * dy) - rr) <= tol) inband++;
+    }
+    const score = inband / n;
+    if (score > 0.6 && (!best || score > best.score)) best = { cx, cy, rr, score };
+  }
+  return best;
+}
+
 function scanFrame() {
   const fw = SW, fh = Math.round((SW * feed.videoHeight) / feed.videoWidth);
   work.width = fw; work.height = fh;
   wctx.drawImage(feed, 0, 0, fw, fh);
   const img = wctx.getImageData(0, 0, fw, fh);
-  const all = CoinModel.detectCoins(img.data, fw, fh, { maxCoins: 5 });
-  // Tap-to-assist: a tap narrows the search to its neighbourhood and
-  // relaxes steadiness. The ring still has to be there — a tap alone
-  // never unlocks the shutter.
-  let pool = all;
-  if (assistPt) pool = all.filter((c) => Math.hypot(c.x - assistPt.x, c.y - assistPt.y) < fw * 0.25);
-  const found = pool[0] || null;
+  // Tap-to-assist narrows the search window; without it, whole frame.
+  const edge = grayEdges(img.data, fw, fh);
+  let found = null;
+  if (assistPt) {
+    const r = Math.round(fw * 0.25);
+    const x0 = Math.max(0, Math.round(assistPt.x - r)), x1 = Math.min(fw, Math.round(assistPt.x + r));
+    const y0 = Math.max(0, Math.round(assistPt.y - r)), y1 = Math.min(fh, Math.round(assistPt.y + r));
+    const sub = new Uint8Array((x1 - x0) * (y1 - y0));
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) sub[(y - y0) * (x1 - x0) + (x - x0)] = edge[y * fw + x];
+    const sub0 = findRing(sub, x1 - x0, y1 - y0);
+    if (sub0) found = { cx: sub0.cx + x0, cy: sub0.cy + y0, rr: sub0.rr, score: sub0.score };
+  } else {
+    const f0 = findRing(edge, fw, fh);
+    if (f0) found = { cx: f0.cx, cy: f0.cy, rr: f0.rr, score: f0.score };
+  }
   const tooClose = !!found && found.r > fw * 0.32;
   const det = found && !tooClose ? { cx: found.x, cy: found.y, rr: found.r, score: found.score } : null;
   if (tooClose) {
