@@ -47,7 +47,11 @@ const pending = new Map();
 let nextId = 0;
 function samWorker() {
   if (worker) return worker;
-  worker = new Worker(new URL("./sam-worker.js", import.meta.url), { type: "module" });
+  // ?device=wasm|webgpu on the page URL forces the worker's backend, for comparisons.
+  const url = new URL("./sam-worker.js", import.meta.url);
+  const device = new URLSearchParams(location.search).get("device");
+  if (device) url.searchParams.set("device", device);
+  worker = new Worker(url, { type: "module" });
   worker.onmessage = ({ data }) => {
     if (data.type === "decoded") {
       const p = pending.get(data.id);
@@ -61,6 +65,7 @@ function samWorker() {
     else if (data.type === "ready") {
       ready = true;
       $("status").textContent = "Ready. Mark the damage, then the coin.";
+      console.info(`[sam] embedded on ${data.device} in ${data.embedMs} ms`);
     } else if (data.type === "error") {
       $("status").textContent = `The outlining model failed to load (${data.message}). Check your connection and retry.`;
     }
