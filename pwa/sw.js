@@ -1,7 +1,7 @@
 // SnapClaim service worker: the app shell opens on a bad connection.
 // Version the cache; network-first for /v1 (never cache measurements),
 // cache-first for the shell. No photo bytes are cached.
-const CACHE = "snapclaim-shell-v2";
+const CACHE = "snapclaim-shell-v3";
 const SHELL = ["./", "./index.html", "./app.js", "./coin-model.js", "./photo-check.js", "./manifest.webmanifest",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/maskable-512.png", "./icons/apple-touch-icon.png"];
 
