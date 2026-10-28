@@ -145,3 +145,16 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 **Spend:** $0.00 (all live paths stubbed in CI; no keys in repo).
 
 **Next:** set Worker secrets + demo token and flip the badge to live; capture 12–20 ruler-measured photos; one live SAM photo; one live Hindi/Telugu clip; record the video.
+
+## 2026-10-28 — Self-improvement batch 2 (prod push)
+
+**Shipped**
+
+- `POST /v1/crosscheck` — IoU + Dice agreement between two same-frame RLE masks with AGREED/DISPUTED verdict at a caller threshold (default 0.5). Keyless, deterministic. The planned SlimSAM-vs-SAM 3.1 skeptic check now has a live route, not just a utility.
+- Eval 2 → 5 pass: `door-peel` (no-scale) and `wall-crack-noscale` fixtures pin the percent-only refusal in CI.
+- Worker body-size guard (1 MB, same as Node) + Worker routing tests.
+- PWA photo quality notes (dark/blown-out/blurry/low-res, calibrated Laplacian threshold 150) sharing one tested module with the suite; no-scale percent-only toggle.
+- Node responses gain `x-content-type-options: nosniff`.
+- 115 tests green, `tsc` clean, eval 5 pass.
+
+**Spend:** $0.00.

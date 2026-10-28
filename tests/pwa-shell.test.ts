@@ -25,6 +25,7 @@ test("PWA shell is installable and honest", () => {
   assert.ok(html.includes('id="sample"'), "one-tap sample measurement exists");
   assert.ok(html.includes("India"), "Indian coin options exist");
   assert.ok(html.includes('id="photoNotes"'), "photo quality notes element exists");
+  assert.ok(html.includes('id="noScale"'), "no-scale percent-only toggle exists");
 });
 
 test("service worker caches the shell, never the API", () => {

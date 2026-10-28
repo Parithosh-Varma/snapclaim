@@ -273,6 +273,8 @@ $("measure").onclick = async () => {
       knownMm: Number($("coinKind").value),
       confidence: k.iou
     };
+  } else if ($("noScale")?.checked) {
+    body.note = "no scale reference: percent-only report requested";
   }
   $("status").textContent = "Measuring…";
   let res, j;

@@ -1,6 +1,7 @@
 import { measureSession } from "../src/engine/measure.ts";
 import { circularReference, observeMask } from "../src/vision/observe.ts";
 import { decodeRle, type BinaryMask, type CocoRle } from "../src/vision/mask.ts";
+import { agreementVerdict, maskAgreement } from "../src/vision/agreement.ts";
 import type { MeasureSessionInput } from "../src/engine/types.ts";
 import { validateFindings, type FindingDraft } from "../src/findings/evidence-gate.ts";
 import type { MeasuredFinding } from "../src/engine/types.ts";
@@ -113,6 +114,28 @@ function requireNumber(value: unknown, name: string): number {
 function requireId(value: unknown, name: string): string {
   if (typeof value !== "string" || value === "") throw new HttpError(400, `${name} must be a non-empty string`);
   return value;
+}
+
+/**
+ * POST /v1/crosscheck — independent mask agreement.
+ *
+ * Takes two COCO RLE masks of the same frame (e.g. the on-device SlimSAM
+ * preview and the authoritative SAM 3.1 record) and scores their overlap.
+ * The verdict uses the caller's threshold (default 0.5). Pure set math,
+ * no keys, no models — the planned SlimSAM-vs-SAM skeptic check.
+ */
+export function crosscheckBody(body: unknown, requestId = newRequestId()): EnvelopedResult {
+  const started = Date.now();
+  if (!isRecord(body)) throw new Error("body must be a JSON object");
+  if (!isRecord(body.a) || !isRecord(body.b)) throw new HttpError(400, "body needs {a, b} COCO RLE masks");
+  const threshold = body.threshold === undefined ? 0.5 : requireNumber(body.threshold, "threshold");
+  const a = parseRle(body.a, "a");
+  const b = parseRle(body.b, "b");
+  if (a.width !== b.width || a.height !== b.height) {
+    throw new HttpError(422, `masks differ in size: ${a.width}x${a.height} vs ${b.width}x${b.height}`);
+  }
+  const agreement = maskAgreement(a, b);
+  return envelope(requestId, started, { ...agreement, verdict: agreementVerdict(agreement, threshold), threshold });
 }
 
 /** Deterministic: pixel masks (COCO RLE) to the component/masks/scaleReference that /v1/report takes. No keys, no model. */
@@ -430,6 +453,7 @@ export async function handleRequest(input: {
     if (input.method === "GET" && input.path === "/v1/spend") return { status: 200, body: spendStatus(env) };
     if (input.method === "POST" && input.path === "/v1/measure") return { status: 200, body: measureBody(input.body, requestId) };
     if (input.method === "POST" && input.path === "/v1/observe") return { status: 200, body: observeBody(input.body, requestId) };
+    if (input.method === "POST" && input.path === "/v1/crosscheck") return { status: 200, body: crosscheckBody(input.body, requestId) };
     if (input.method === "POST" && input.path === "/v1/report") return { status: 200, body: await reportBody(input.body, env, requestId, input.fetchFn) };
     if (input.method === "POST" && input.path === "/v1/segment") return { status: 200, body: await segmentBody(input.body, env, requestId, input.fetchFn) };
     if (input.method === "POST" && input.path === "/v1/transcribe") return { status: 200, body: await transcribeBody(input.body, env, requestId, input.fetchFn) };

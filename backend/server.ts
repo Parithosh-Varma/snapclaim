@@ -5,7 +5,7 @@ import { corsHeaders, handleRequest } from "./app.ts";
 const PORT = Number(process.env.PORT ?? 8787);
 
 function sendJson(res: import("node:http").ServerResponse, status: number, value: unknown): void {
-  res.writeHead(status, { "content-type": "application/json", ...corsHeaders() });
+  res.writeHead(status, { "content-type": "application/json", "x-content-type-options": "nosniff", ...corsHeaders() });
   res.end(JSON.stringify(value));
 }
 
