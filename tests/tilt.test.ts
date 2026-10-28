@@ -2,44 +2,10 @@ import { strict as assert } from "node:assert";
 import { test } from "node:test";
 import { observeBody } from "../backend/app.ts";
 import { calibratedLengthMm } from "../src/engine/math.ts";
-import { type BinaryMask, createMask } from "../src/vision/mask.ts";
+import { readFileSync } from "node:fs";
+import type { BinaryMask } from "../src/vision/mask.ts";
 import { MIN_COIN_ASPECT, circularReference, observeMask, tiltStretch } from "../src/vision/observe.ts";
-
-const SIZE = 400;
-
-/**
- * A wall photographed at an angle: points on the wall (in straight-on pixels,
- * centred on the photo) are squashed by `aspect` along the unit vector at `angle`.
- * Each photo pixel is mapped back onto the wall and tested there.
- */
-function photographed(aspect: number, angleDeg: number, onWall: (u: number, v: number) => boolean): BinaryMask {
-  const nx = Math.cos((angleDeg * Math.PI) / 180);
-  const ny = Math.sin((angleDeg * Math.PI) / 180);
-  const mask = createMask(SIZE, SIZE);
-  for (let y = 0; y < SIZE; y++) {
-    for (let x = 0; x < SIZE; x++) {
-      const px = x - SIZE / 2;
-      const py = y - SIZE / 2;
-      const along = (1 / aspect - 1) * (px * nx + py * ny);
-      if (onWall(px + along * nx, py + along * ny)) mask.data[y * SIZE + x] = 1;
-    }
-  }
-  return mask;
-}
-
-/** A 3 px wide straight crack on the wall, `lengthPx` long at `deg` through (u0, v0). */
-function crack(u0: number, v0: number, lengthPx: number, deg: number) {
-  const dx = Math.cos((deg * Math.PI) / 180);
-  const dy = Math.sin((deg * Math.PI) / 180);
-  return (u: number, v: number) => {
-    const t = (u - u0) * dx + (v - v0) * dy;
-    const d = Math.abs(-(u - u0) * dy + (v - v0) * dx);
-    return t >= -lengthPx / 2 && t <= lengthPx / 2 && d <= 1.5;
-  };
-}
-
-const coin = (u: number, v: number) => (u + 110) ** 2 + (v + 110) ** 2 <= 40 * 40;
-const COIN = { id: "coin", knownMm: 24.26, confidence: 0.95 };
+import { COIN, coin, crack, photographed, tiltedWallBench } from "./tilted-scene.ts";
 
 function toRle(mask: BinaryMask): { size: [number, number]; counts: number[] } {
   const counts: number[] = [];
@@ -117,4 +83,11 @@ test("/v1/observe corrects crack length with the coin's tilt", () => {
   assert.ok(corrected.referenceCheck!.tiltDeg > 45);
   assert.ok(Math.abs(corrected.masks[0]!.skeletonPx / 220 - 1) < 0.04, `corrected ${corrected.masks[0]!.skeletonPx}`);
   assert.ok(result(false).masks[0]!.skeletonPx < 0.85 * 220);
+});
+
+test("the tilted-wall bench case is what the vision code measures on the scene", () => {
+  // If the vision code changes these numbers, regenerate fixtures/masks/tilted-wall.json on purpose.
+  const fixture = JSON.parse(readFileSync(new URL("../fixtures/masks/tilted-wall.json", import.meta.url), "utf8"));
+  const { component, masks, scaleReference } = tiltedWallBench();
+  assert.deepEqual({ component: fixture.component, masks: fixture.masks, scaleReference: fixture.scaleReference }, { component, masks, scaleReference });
 });
