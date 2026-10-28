@@ -483,9 +483,3 @@ $("render").onclick = async () => {
   dl.textContent = "download svg";
 };
 
-
-// Installable, and the app opens on a bad connection (see sw.js). Not on
-// localhost, where a cached shell would only get in the way of editing.
-if ("serviceWorker" in navigator && !["localhost", "127.0.0.1"].includes(location.hostname)) {
-  navigator.serviceWorker.register("./sw.js").catch((e) => console.warn("[sw] not registered", e));
-}
