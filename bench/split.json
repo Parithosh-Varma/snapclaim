@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "note": "Held-out split for the eval. heldOut is frozen before any prompt or threshold tuning; once frozenAt is set, cases only get added, never moved.",
+  "note": "Held-out split for the eval. heldOut is frozen before any prompt or threshold tuning; once frozenAt is set, cases only get added, never moved. The first four held-out cases are public photos without a scale reference: they test that the pipeline refuses to invent millimetres. Measured-accuracy cases (coin or ruler in frame) are still missing. Photo files stay local in fixtures/photos/ (gitignored); source and license are recorded here.",
   "frozenAt": null,
   "dev": [
     {
@@ -10,5 +10,50 @@
       "hasScaleReference": true
     }
   ],
-  "heldOut": []
+  "heldOut": [
+    {
+      "id": "public-ruin-wall-crack-01",
+      "file": "fixtures/photos/held-1-wall.jpg",
+      "surface": "wall",
+      "hasScaleReference": false,
+      "expected": "no millimetre claim; report the damage as unmeasured, not as a number",
+      "source": "https://commons.wikimedia.org/wiki/File:Crack_in_the_wall_(44892).jpg",
+      "author": "A.-K. D.",
+      "license": "CC BY-SA 4.0",
+      "note": "Single stone crack seen from below, no scale object in frame."
+    },
+    {
+      "id": "public-stone-wall-crack-02",
+      "file": "fixtures/photos/held-3-wall.jpg",
+      "surface": "wall",
+      "hasScaleReference": false,
+      "expected": "no millimetre claim; report the damage as unmeasured, not as a number",
+      "source": "https://commons.wikimedia.org/wiki/File:Crack_in_the_wall,_Larkbeare_Road,_Exeter_-_geograph.org.uk_-_5058687.jpg",
+      "author": "David Smith",
+      "license": "CC BY-SA 2.0",
+      "note": "Stepped crack in a curved garden wall; the street sign is the only known-size object and is not in the crack's plane."
+    },
+    {
+      "id": "public-interior-wall-cracks-03",
+      "file": "fixtures/photos/held-4-wall.jpg",
+      "surface": "wall",
+      "hasScaleReference": false,
+      "expected": "no millimetre claim; report the damage as unmeasured, not as a number",
+      "source": "https://commons.wikimedia.org/wiki/File:Cracked_Cream_Walls_(Unsplash).jpg",
+      "author": "Nolan Issac",
+      "license": "CC0",
+      "note": "Interior room with several hairline cracks in wallpaper and plaster."
+    },
+    {
+      "id": "public-cracked-tile-04",
+      "file": "fixtures/photos/held-5-tile.jpg",
+      "surface": "tile",
+      "hasScaleReference": false,
+      "expected": "no millimetre claim; report the damage as unmeasured, not as a number",
+      "source": "https://commons.wikimedia.org/wiki/File:Cracked_tile_flooring.jpg",
+      "author": "Mk2010",
+      "license": "CC BY-SA 4.0",
+      "note": "Broken floor tiles, oblique angle, no scale object."
+    }
+  ]
 }
