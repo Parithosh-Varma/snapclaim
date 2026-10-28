@@ -1,5 +1,5 @@
 import { measureSession } from "../src/engine/measure.ts";
-import { type ReferenceDiagnostics, circularReference, observeMask } from "../src/vision/observe.ts";
+import { type ReferenceDiagnostics, circularReference, observeMask, tiltStretch } from "../src/vision/observe.ts";
 import { decodeRle, intersectMasks, type BinaryMask, type CocoRle } from "../src/vision/mask.ts";
 import type { MeasureSessionInput } from "../src/engine/types.ts";
 import { validateFindings, type FindingDraft } from "../src/findings/evidence-gate.ts";
@@ -143,6 +143,25 @@ export function observeBody(body: unknown, requestId = newRequestId()): Envelope
     };
   }
 
+  // The coin first: when it is tilted, its ellipse corrects the crack lengths below.
+  let measuredReference: ReturnType<typeof circularReference> | undefined;
+  let refMask: BinaryMask | undefined;
+  if (reference !== undefined) {
+    if (!isRecord(reference)) throw new HttpError(400, "reference must be an object");
+    refMask = parseRle(reference.rle, "reference");
+    sameSize(refMask, "reference");
+    try {
+      measuredReference = circularReference(refMask, {
+        id: requireId(reference.id, "reference.id"),
+        knownMm: requireNumber(reference.knownMm, "reference.knownMm"),
+        confidence: requireNumber(reference.confidence, "reference.confidence"),
+      });
+    } catch (error) {
+      throw new HttpError(422, `reference: ${error instanceof Error ? error.message : "cannot measure"}`);
+    }
+  }
+  const stretch = measuredReference && tiltStretch(measuredReference.diagnostics);
+
   const observed = decoded.map(({ raw, mask }, i) => {
     const label = raw.label;
     if (typeof label !== "string") throw new HttpError(400, `masks[${i}].label must be a string`);
@@ -151,6 +170,7 @@ export function observeBody(body: unknown, requestId = newRequestId()): Envelope
       label: label as never,
       confidence: requireNumber(raw.confidence, `masks[${i}].confidence`),
       ...(componentMask ? { component: componentMask } : {}),
+      ...(stretch ? { stretch } : {}),
     });
   });
 
@@ -170,22 +190,10 @@ export function observeBody(body: unknown, requestId = newRequestId()): Envelope
       masks: decoded.map(({ mask }, i) => ({ id: observed[i]!.id, label: observed[i]!.label, path: outline(mask) })),
     },
   };
-  if (reference !== undefined) {
-    if (!isRecord(reference)) throw new HttpError(400, "reference must be an object");
-    const refMask = parseRle(reference.rle, "reference");
-    sameSize(refMask, "reference");
-    try {
-      const measured = circularReference(refMask, {
-        id: requireId(reference.id, "reference.id"),
-        knownMm: requireNumber(reference.knownMm, "reference.knownMm"),
-        confidence: requireNumber(reference.confidence, "reference.confidence"),
-      });
-      result.scaleReference = measured.reference;
-      result.referenceCheck = measured.diagnostics;
-      result.overlay.masks.push({ id: measured.reference.id, label: "coin", path: maskOutlinePath(refMask, { tolerance: OUTLINE_TOLERANCE_PX }) });
-    } catch (error) {
-      throw new HttpError(422, `reference: ${error instanceof Error ? error.message : "cannot measure"}`);
-    }
+  if (measuredReference && refMask) {
+    result.scaleReference = measuredReference.reference;
+    result.referenceCheck = measuredReference.diagnostics;
+    result.overlay.masks.push({ id: measuredReference.reference.id, label: "coin", path: maskOutlinePath(refMask, { tolerance: OUTLINE_TOLERANCE_PX }) });
   }
   quietLog("[observe]", { requestId, masks: observed.length });
   return envelope(requestId, started, result);

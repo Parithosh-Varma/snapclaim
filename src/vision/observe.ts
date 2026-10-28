@@ -2,11 +2,13 @@ import type { DamageLabel, MaskObservation, ScaleReference } from "../engine/typ
 import { MeasurementError, round } from "../engine/math.ts";
 import {
   type BinaryMask,
+  type PlaneStretch,
   assertMask,
   connectedRegions,
   cropRegion,
   intersectMasks,
   maskFromRegions,
+  rectifyMask,
   maxInscribedRadiusPx,
   skeletonLengthPx,
   skeletonize,
@@ -29,6 +31,12 @@ export interface ObserveMaskOptions {
   component?: BinaryMask;
   /** Regions smaller than this are treated as segmentation speckle and ignored. */
   minRegionAreaPx?: number;
+  /**
+   * The surface's tilt, from the coin lying on it. Skeleton length is then
+   * measured as if the photo had been taken straight on; area is unchanged,
+   * since the stretch scales damage and wall alike and the ratio holds.
+   */
+  stretch?: PlaneStretch;
 }
 
 /**
@@ -56,7 +64,8 @@ export function observeMask(mask: BinaryMask, options: ObserveMaskOptions): Mask
 
   if (options.label === "crack" && regions.length > 0) {
     const kept = maskFromRegions(clipped.width, clipped.height, regions);
-    observation.skeletonPx = round(skeletonLengthPx(skeletonize(kept)), 1);
+    const flat = options.stretch === undefined ? kept : rectifyMask(kept, options.stretch);
+    observation.skeletonPx = round(skeletonLengthPx(skeletonize(flat)), 1);
 
     let blockyRegionCount = 0;
     let blockyAreaPx = 0;
@@ -104,12 +113,27 @@ export interface ReferenceDiagnostics {
    * share of the radius. Near 0 for a coin; a square or a lumpy outline scores high.
    */
   edgeError: number;
+  /** Angle of the major axis, degrees from +x (image y points down). */
+  axisDeg: number;
+  /**
+   * How far the coin's surface is tilted away from the camera, from its
+   * aspect (cos tilt = minor / major). Crack lengths are corrected for it.
+   */
+  tiltDeg: number;
   /** Why the reference was refused. Its confidence is then 0, so the report stays percent-only. */
   rejected?: string;
 }
 
 /** Outline error allowed before a coin is refused, as a share of its radius. */
 export const MAX_COIN_EDGE_ERROR = 0.08;
+/**
+ * Flattest coin accepted: 0.5 is a 60° tilt. Past that the coin is a thin
+ * sliver, the tilt estimate is unreliable and perspective (one side nearer
+ * the camera) is no longer small, so the report drops to percent-only.
+ */
+export const MIN_COIN_ASPECT = 0.5;
+/** Rounder than this and the coin is treated as seen straight on. */
+const STRAIGHT_ON_ASPECT = 0.98;
 
 export interface CircularReferenceOptions {
   id: string;
@@ -124,11 +148,12 @@ export interface CircularReferenceOptions {
  *
  * The diameter is the major axis of the ellipse with the same second moments
  * as the mask (4·√λ₁), which survives rotation and stays the true diameter
- * when the coin is tilted. Confidence is the segmenter's, discounted by
- * aspect, fill and stray-pixel share, so a tilted or partly covered coin
- * falls below the engine's threshold and the report drops to percent-only.
- * An outline that is not an ellipse at all (a square, a blob, two coins
- * merged) is refused outright with confidence 0 and a reason.
+ * when the coin is tilted. A partly covered coin is not an ellipse, so the
+ * outline check refuses it (confidence 0 plus a reason), as it does a
+ * square, a blob or two coins merged. An outline that is an ellipse is a
+ * tilted coin: `tiltStretch` turns it into the correction for crack lengths,
+ * and confidence is the segmenter's discounted only by fill and stray-pixel
+ * share. A coin flatter than MIN_COIN_ASPECT is refused.
  */
 export function circularReference(
   mask: BinaryMask,
@@ -201,13 +226,15 @@ export function circularReference(
   const edgeError = errors[Math.floor(0.9 * (errors.length - 1))] ?? 1;
   // A small coin's outline is jagged from pixels alone: allow 1.5 px of that.
   const allowed = Math.max(MAX_COIN_EDGE_ERROR, 1.5 / b);
+  const tiltDeg = (Math.acos(Math.min(aspect, 1)) * 180) / Math.PI;
   const rejected =
     edgeError > allowed
       ? `outline is not round (strays ${round(edgeError * 100, 0)}% of the radius, limit ${round(allowed * 100, 0)}%)`
-      : undefined;
+      : aspect < MIN_COIN_ASPECT
+        ? `coin is tilted too far (${round(tiltDeg, 0)}°, limit ${round((Math.acos(MIN_COIN_ASPECT) * 180) / Math.PI, 0)}°); photograph it flatter`
+        : undefined;
 
-  const confidence =
-    rejected === undefined ? options.confidence * aspect * Math.min(fill, 1) * largestShare : 0;
+  const confidence = rejected === undefined ? options.confidence * Math.min(fill, 1) * largestShare : 0;
 
   return {
     reference: {
@@ -223,7 +250,22 @@ export function circularReference(
       fill: round(fill, 3),
       largestShare: round(largestShare, 3),
       edgeError: round(edgeError, 3),
+      axisDeg: round((theta * 180) / Math.PI, 1),
+      tiltDeg: round(tiltDeg, 1),
       ...(rejected === undefined ? {} : { rejected }),
     },
+  };
+}
+
+/**
+ * The correction a coin's ellipse implies for lengths on the surface it lies
+ * on: stretch along the minor axis by 1 / aspect. Undefined when the coin was
+ * refused or is seen straight on.
+ */
+export function tiltStretch(diagnostics: ReferenceDiagnostics): PlaneStretch | undefined {
+  if (diagnostics.rejected !== undefined || diagnostics.aspect >= STRAIGHT_ON_ASPECT) return undefined;
+  return {
+    angle: ((diagnostics.axisDeg + 90) * Math.PI) / 180,
+    factor: diagnostics.majorPx / diagnostics.minorPx,
   };
 }
