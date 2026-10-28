@@ -32,13 +32,14 @@ const feed = $("feed");
 const ring = $("coinRing");
 const hint = $("coinHint");
 const fab = $("shutter");
-const SW = 256;
+const SW = 224; // detection width: cheaper beats sticking to 256
 const work = document.createElement("canvas");
 const wctx = work.getContext("2d", { willReadFrequently: true });
 const full = document.createElement("canvas");
 const fctx = full.getContext("2d", { willReadFrequently: true });
 const history = [];
 let coinSeen = false, smooth = null, camStream = null, noScaleMode = false;
+let assistPt = null, assistAt = 0, scanCount = 0, lastDetAt = 0;
 let captureTimer = null, countdownTimer = null;
 const countEl = $("count");
 const clf = new CoinModel.Classifier();
@@ -116,11 +117,26 @@ function identifyCoin(det, fw, fh) {
 }
 function scan() {
   if (!feed.videoWidth) { setTimeout(scan, 500); return; }
+  try {
+    scanFrame();
+  } catch {
+    /* one bad frame must never kill the loop */
+  }
+  setTimeout(scan, 200);
+}
+
+function scanFrame() {
   const fw = SW, fh = Math.round((SW * feed.videoHeight) / feed.videoWidth);
   work.width = fw; work.height = fh;
-  try { wctx.drawImage(feed, 0, 0, fw, fh); } catch { setTimeout(scan, 500); return; }
+  wctx.drawImage(feed, 0, 0, fw, fh);
   const img = wctx.getImageData(0, 0, fw, fh);
-  const found = CoinModel.detectCoins(img.data, fw, fh, { maxCoins: 3 })[0] || null;
+  const all = CoinModel.detectCoins(img.data, fw, fh, { maxCoins: 5 });
+  // Tap-to-assist: a tap narrows the search to its neighbourhood and
+  // relaxes steadiness. The ring still has to be there — a tap alone
+  // never unlocks the shutter.
+  let pool = all;
+  if (assistPt) pool = all.filter((c) => Math.hypot(c.x - assistPt.x, c.y - assistPt.y) < fw * 0.25);
+  const found = pool[0] || null;
   const tooClose = !!found && found.r > fw * 0.32;
   const det = found && !tooClose ? { cx: found.x, cy: found.y, rr: found.r, score: found.score } : null;
   if (tooClose) {
@@ -128,18 +144,27 @@ function scan() {
     if (history.length > 10) history.shift();
     cancelCapture();
     if (coinSeen) hint.textContent = "A bit too close — move back a little";
-    setTimeout(scan, 200);
     return;
   }
   history.push(det);
   if (history.length > 10) history.shift();
+  scanCount++;
+  if (det) lastDetAt = scanCount;
+  // Nudge: after ~5 s of nothing, invite a tap instead of staying silent.
+  if (!coinSeen && !assistPt && scanCount > 25 && scanCount - lastDetAt > 25) {
+    hint.textContent = "No coin yet — tap it to point";
+  }
   const recent = history.filter(Boolean);
+  // Steady = recent detections agree with each other. With a tap assist
+  // the bar lowers (3 of 5 near the tap); the ring must still be detected.
+  const need = assistPt ? 3 : 6;
+  const tol = assistPt ? 30 : 25;
   let steady = false;
-  if (recent.length >= 6) {
+  if (recent.length >= need) {
     const xs = recent.map((d) => d.cx).sort((a, b) => a - b);
     const ys = recent.map((d) => d.cy).sort((a, b) => a - b);
     const med = { cx: xs[recent.length >> 1], cy: ys[recent.length >> 1] };
-    steady = recent.every((d) => Math.hypot(d.cx - med.cx, d.cy - med.cy) < 25);
+    steady = recent.every((d) => Math.hypot(d.cx - med.cx, d.cy - med.cy) < tol);
   }
   if (steady) {
     const d = recent[recent.length - 1];
@@ -151,13 +176,33 @@ function scan() {
     if (!coinSeen) { coinSeen = true; identifyCoin(smooth, fw, fh); setLocked(false); armCapture(); }
   } else if (coinSeen && recent.length < 3) {
     cancelCapture();
-    coinSeen = false; smooth = null; coinLabel = "";
+    coinSeen = false; smooth = null; coinLabel = ""; assistPt = null;
     setLocked(true, "Add a coin for scale");
   }
-  setTimeout(scan, 200);
 }
-setLocked(true, "Add a coin for scale");
-acquireCamera();
+// Tap-to-assist: tapping the viewfinder narrows the search to that spot.
+// The ring must still be detected there — a tap alone never unlocks.
+document.getElementById("cam").addEventListener("pointerdown", (ev) => {
+  if (coinSeen || !feed.videoWidth) return;
+  const r = feed.getBoundingClientRect();
+  const fx = (ev.clientX - r.left) / r.width, fy = (ev.clientY - r.top) / r.height;
+  const fw = SW, fh = Math.round((SW * feed.videoHeight) / feed.videoWidth);
+  const vw = feed.videoWidth, vh = feed.videoHeight;
+  const scale = Math.max(vw / fw, vh / fh);
+  const ox = (vw - fw * scale) / 2 / scale, oy = (vh - fh * scale) / 2 / scale;
+  assistPt = {
+    x: Math.max(0, Math.min(fw, fx * vw / scale - ox)),
+    y: Math.max(0, Math.min(fh, fy * vh / scale - oy)),
+  };
+  assistAt = scanCount;
+  hint.textContent = "Checking that spot…";
+});
+setInterval(() => {
+  if (assistPt && scanCount - assistAt > 50) { assistPt = null; } // assist expires after ~10 s
+}, 1000);
+
+// Remote diagnosis hook: window.__snapclaim() prints gate internals.
+window.__snapclaim = () => ({ coinSeen, locked: fab.classList.contains("locked"), assist: !!assistPt, scans: scanCount, lastDetAgo: scanCount - lastDetAt, hint: hint.textContent });
 
 fab.addEventListener("pointerdown", () => fab.classList.add("hide"));
 for (const ev of ["pointerup", "pointercancel", "pointerleave"]) fab.addEventListener(ev, () => fab.classList.remove("hide"));
