@@ -8,3 +8,8 @@ coverage/
 *.log
 
 fixtures/photos/
+
+# Marketing lives in the private snapclaim-marketing repo, not here.
+/site/
+/promo/
+/PRODUCT.md
