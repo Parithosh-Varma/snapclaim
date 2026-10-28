@@ -321,6 +321,11 @@ function shapeWarnings(result) {
     const share = Math.round((100 * m.blockyAreaPx) / m.areaPx);
     out.push(`${m.blockyRegionCount} piece(s) of the ${m.label} mask look blocky, not crack-shaped (${share}% of its area). Undo the tap that grabbed them.`);
   }
+  for (const m of result.masks) {
+    if (!m.straightAreaPx) continue;
+    const share = Math.round((100 * m.straightAreaPx) / m.areaPx);
+    out.push(`${m.straightRegionCount} piece(s) of the ${m.label} mask have a ruler-straight edge, like a ledge or frame rather than a crack (${share}% of its area). Undo the tap that grabbed them.`);
+  }
   return out;
 }
 
