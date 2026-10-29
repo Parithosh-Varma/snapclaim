@@ -17,7 +17,8 @@
     "eval": "node --experimental-strip-types --no-warnings eval/bench.ts",
     "replay": "node --experimental-strip-types --no-warnings eval/replay.ts",
     "bench": "node --experimental-strip-types --no-warnings bench/run.ts",
-    "bench:archive": "node --experimental-strip-types --no-warnings bench/archive.ts"
+    "bench:archive": "node --experimental-strip-types --no-warnings bench/archive.ts",
+    "bench:gap": "node --experimental-strip-types --no-warnings bench/gap.ts"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
