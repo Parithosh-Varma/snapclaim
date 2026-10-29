@@ -1,10 +1,10 @@
 # Eval report
 
-Nothing measured yet. Sections fill in as runs land; weak rows stay in.
+Updated 2026-10-28. Weak rows stay in; nothing is buried.
 
 ## Setup
 
-Two scripts, both deterministic and free to run. `npm run eval` measures the dev mask fixtures against hand-checked expected values. `npm run bench` reads one archived live run per held-out case from `bench/runs/` and checks it (see `eval/README.md`). A case with no archived run prints UNRUN and fails the strict command, so a missing run cannot pass as a clean one. Every archived run carries the git SHA, model, prompt version and timestamp it came from.
+Two scripts, both deterministic and free to run. `npm run eval` measures the dev mask fixtures against hand-checked expected values. `npm run bench` reads one archived live run per held-out case from `bench/runs/` and checks it (see `eval/README.md`). A case with no archived run prints UNRUN and fails the strict command, so a missing run cannot pass as a clean one. Every archived run carries the git SHA, model, prompt version and timestamp it came from. `npm run replay -- request.json measurement.json` reproduces findings + receipts + mode byte-for-byte (see `tests/replay.test.ts`).
 
 ## Data and split
 
@@ -25,11 +25,21 @@ Held-out: four public photos, none with a scale reference in the crack's plane, 
 
 ### (a) Model-only qualitative estimate
 
+Muse Spark vision-only: the photo alone, one number in mm, no receipts.
+Not yet run (needs the real-photo set + key). Protocol fixed: same photos,
+same ruler ground truth, median absolute error + % within ±10%.
+
 ### (b) No-measurement photo report
+
+"Looks moderately damaged" with no numbers. Reference point for the claim
+that numbers change decisions; scored qualitatively, not hidden.
 
 ## Metrics
 
 ### Guessed vs measured gap
+
+Median absolute error (mm) and % within ±10% on calibrated cases, dev vs
+held-out separately. The demo table goes in the README when the photos land.
 
 ### Skeptic DISPUTED calls
 
@@ -39,7 +49,16 @@ Scored by `scoreDisputes` in `bench/score.ts`, with DISPUTED as the positive cla
 
 ## Results
 
+| Date | Bench | Disputes | Notes |
+|---|---|---|---|
+| 2026-10-28 | 2 pass, 0 skip, 0 fail | scorer unit-tested, no live runs yet | wall-crack: 5.17% / 85.9 mm / 2.6 mm wide / 2.19 cm² (significant); stain: 1.29% percent-only (moderate) |
+
 ## Failures and misses
+
+- Held-out photos have masks/expected files but no photo bytes in the repo
+  (`fixtures/photos/` gitignored) — they document the protocol, not results.
+- Live SAM 3.1 segment verified on one photo 2026-10-29 (`200`, full-frame RLE, $0.0025).
+- Live skeptic verified 2026-10-29 on the hackathon model `meta-models/muse-spark-open-1026`.
 
 ## Datasets and licenses
 

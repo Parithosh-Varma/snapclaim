@@ -9,7 +9,7 @@ export type {
   SeverityBand,
   SeverityThresholds,
 } from "./engine/types.ts";
-export { areaRatio, calibratedLengthMm, mmPerPx, ratioToPercent, round } from "./engine/math.ts";
+export { areaCm2, areaRatio, calibratedLengthMm, crackWidthMm, mmPerPx, ratioToPercent, round } from "./engine/math.ts";
 export { DEFAULT_SEVERITY_THRESHOLDS, classifySeverity } from "./engine/severity.ts";
 export { measureSession } from "./engine/measure.ts";
 export { renderAnnexureSvg } from "./render/svg.ts";
@@ -29,12 +29,35 @@ export {
   connectedRegions,
   createMask,
   decodeRle,
+  encodeRle,
   intersectMasks,
   maskArea,
   maskFromRows,
+  rleRoundTrip,
   skeletonLengthPx,
   skeletonize,
 } from "./vision/mask.ts";
+export {
+  buildObjectPrompt,
+  frameBox,
+  maskTokenToBinaryMask,
+  parseSamOutputText,
+  pasteRasterToFrame,
+  segmentWithSam,
+} from "./vision/sam.ts";
+export type {
+  SamBox,
+  SamFetchRequest,
+  SamFetchResult,
+  SamFrame,
+  SamMaskToken,
+  SamObjectPrompt,
+  SamPoint,
+  SamRecord,
+  SamSize,
+} from "./vision/sam.ts";
 export type { BinaryMask, CocoRle, Region } from "./vision/mask.ts";
 export { circularReference, observeMask } from "./vision/observe.ts";
+export { maskAgreement, agreementVerdict } from "./vision/agreement.ts";
+export type { Agreement } from "./vision/agreement.ts";
 export type { CircularReferenceOptions, ObserveMaskOptions, ReferenceDiagnostics } from "./vision/observe.ts";

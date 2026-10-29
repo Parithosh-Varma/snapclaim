@@ -132,5 +132,5 @@ test("overlay caption and non-scaling stroke", () => {
 
 test("no-overlay svg is pinned (golden hash)", () => {
   const svg = renderAnnexureSvg({ ...renderBase(), generatedAt: "2026-10-28T00:00:00.000Z" });
-  assert.equal(createHash("sha256").update(svg).digest("hex"), "cff3b0a35c0baab6e6ab77e696c50edf71ac312b37b950e0f175050835cde589");
+  assert.equal(createHash("sha256").update(svg).digest("hex"), "f492a47f3614ac376393bca8cdbab2c37c5dc40688587b15968ed6e28c058ffa");
 });

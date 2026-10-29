@@ -8,8 +8,10 @@ import type {
 import {
   DEFAULT_MIN_REFERENCE_CONFIDENCE,
   MeasurementError,
+  areaCm2,
   areaRatio,
   calibratedLengthMm,
+  crackWidthMm,
   mmPerPx,
   ratioToPercent,
   round,
@@ -118,6 +120,28 @@ function measureMask(
 
   let crackLengthMm: number | null = null;
   let lengthReceiptId: string | null = null;
+  let areaCm2Value: number | null = null;
+  let areaReceiptId: string | null = null;
+  let crackWidthValue: number | null = null;
+  let widthReceiptId: string | null = null;
+
+  if (scale !== null) {
+    areaCm2Value = areaCm2(mask.areaPx, scale.mmPerPx);
+    const areaReceipt = ledger.add({
+      method: "calibrated_area",
+      inputs: {
+        maskId: mask.id,
+        damageAreaPx: mask.areaPx,
+        mmPerPx: round(scale.mmPerPx, 6),
+        scaleReceiptId: scale.receiptId,
+      },
+      output: { value: areaCm2Value, unit: "cm2" },
+      formula: "damageAreaPx * mmPerPx^2 / 100",
+      confidence: round(mask.confidence * scale.reference.confidence, 3),
+      notes: [],
+    });
+    areaReceiptId = areaReceipt.id;
+  }
 
   if (mask.label === "crack" && mask.skeletonPx !== undefined && scale !== null) {
     crackLengthMm = calibratedLengthMm(mask.skeletonPx, scale.reference, minConfidence);
@@ -136,6 +160,26 @@ function measureMask(
         notes: [],
       });
       lengthReceiptId = lengthReceipt.id;
+    }
+    if (mask.skeletonPx > 0) {
+      crackWidthValue = crackWidthMm(mask.areaPx, mask.skeletonPx, scale.mmPerPx);
+      if (crackWidthValue !== null) {
+        const widthReceipt = ledger.add({
+          method: "calibrated_width",
+          inputs: {
+            maskId: mask.id,
+            damageAreaPx: mask.areaPx,
+            skeletonPx: mask.skeletonPx,
+            mmPerPx: round(scale.mmPerPx, 6),
+            scaleReceiptId: scale.receiptId,
+          },
+          output: { value: crackWidthValue, unit: "mm" },
+          formula: "damageAreaPx / skeletonPx * mmPerPx",
+          confidence: round(mask.confidence * scale.reference.confidence, 3),
+          notes: [],
+        });
+        widthReceiptId = widthReceipt.id;
+      }
     }
   }
 
@@ -169,10 +213,14 @@ function measureMask(
     ratio,
     percent,
     crackLengthMm,
+    areaCm2: areaCm2Value,
+    crackWidthMm: crackWidthValue,
     severity,
     receiptIds: {
       ratio: ratioReceipt.id,
       length: lengthReceiptId,
+      area: areaReceiptId,
+      width: widthReceiptId,
       severity: severityReceipt.id,
       regions: regionReceipt.id,
     },
