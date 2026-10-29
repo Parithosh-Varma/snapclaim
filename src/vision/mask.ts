@@ -110,6 +110,33 @@ export function decodeRle(rle: CocoRle): BinaryMask {
   return mask;
 }
 
+/** Row-major binary mask → COCO RLE (column-major, first run counts zeros). */
+export function encodeRle(mask: BinaryMask): CocoRle {
+  assertMask(mask);
+  const counts: number[] = [];
+  let cur = 0;
+  let run = 0;
+  for (let x = 0; x < mask.width; x++) {
+    for (let y = 0; y < mask.height; y++) {
+      const v = mask.data[y * mask.width + x] !== 0 ? 1 : 0;
+      if (v === cur) {
+        run++;
+      } else {
+        counts.push(run);
+        cur = v;
+        run = 1;
+      }
+    }
+  }
+  counts.push(run);
+  return { size: [mask.height, mask.width], counts };
+}
+
+/** Encode then decode; the raster must survive unchanged. Handy for tests. */
+export function rleRoundTrip(mask: BinaryMask): BinaryMask {
+  return decodeRle(encodeRle(mask));
+}
+
 export function maskArea(mask: BinaryMask): number {
   assertMask(mask);
   let area = 0;

@@ -1,4 +1,5 @@
 import { checkPhoto, coinPrecision } from "./photo-check.js";
+import { decodeRle } from "./rle.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -16,7 +17,7 @@ $("health").onclick = async () => {
   }
 };
 
-// ---- photo intake + on-device segmentation (transformers.js SlimSAM, in sam-worker.js) ----
+// ---- photo intake + segmentation: SAM 3.1 API first, on-device SlimSAM fallback (sam-worker.js) ----
 // 512 keeps Worker CPU alive: skeletonize is O(pixels × passes), 1024² trips the free-tier limit
 // and the edge returns a no-CORS error page the browser reports as a CORS failure.
 const MAX_SIDE = 512;
@@ -77,6 +78,27 @@ function decodePoint(point, preferSmallest) {
     pending.set(id, { resolve, reject });
     samWorker().postMessage({ type: "decode", id, photoId, point, preferSmallest });
   });
+}
+
+// SAM 3.1 API via the backend. One call for all taps so far (one billed image),
+// not one per tap. Throws on any failure so the caller falls back to on-device.
+async function segmentViaApi(name) {
+  const st = steps[name];
+  const res = await fetch(base() + "/v1/segment", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      imageUrl: photo.toDataURL("image/jpeg", 0.85),
+      width: photo.width,
+      height: photo.height,
+      points: st.points.map(([x, y]) => ({ x: Math.round(x), y: Math.round(y) })),
+    }),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok || !j.ok) throw new Error(j.error ?? `segment HTTP ${res.status}`);
+  const rec = j.result.records?.[0];
+  if (!rec) throw new Error("API found no object there");
+  return [{ mask: decodeRle(rec.rle), iou: rec.confidence ?? 0 }];
 }
 
 document.querySelectorAll("[data-line]").forEach((b) => {
@@ -180,10 +202,19 @@ async function segment(name) {
   }
   $("status").textContent = "Outlining…";
   try {
-    while (st.pointMasks.length < st.points.length) {
-      st.pointMasks.push(await decodePoint(st.points[st.pointMasks.length], name === "damage"));
+    let found, source;
+    try {
+      found = await segmentViaApi(name);
+      source = "SAM 3.1 API";
+      st.pointMasks = found;
+    } catch {
+      // No live backend (mock mode, no key, offline, API miss): on-device fallback.
+      while (st.pointMasks.length < st.points.length) {
+        st.pointMasks.push(await decodePoint(st.points[st.pointMasks.length], name === "damage"));
+      }
+      found = st.pointMasks.filter(Boolean);
+      source = "on-device";
     }
-    const found = st.pointMasks.filter(Boolean);
     if (!found.length) {
       st.mask = null;
       $("status").textContent = "No mask found there. Tap closer to the middle of it.";
@@ -194,7 +225,7 @@ async function segment(name) {
       // the union is only as trustworthy as its weakest piece
       st.iou = Math.min(...found.map((f) => f.iou));
       const missed = st.pointMasks.length - found.length;
-      $("status").textContent = `Outlined (${Math.round(st.iou * 100)}% sure)` +
+      $("status").textContent = `Outlined (${Math.round(st.iou * 100)}% sure, via ${source})` +
         (missed ? `; ${missed} tap${missed > 1 ? "s" : ""} found nothing.` : ".");
     }
   } catch (e) {

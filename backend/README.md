@@ -18,7 +18,7 @@ npm test                # 40 tests, mock mode, $0 spend
 | `POST /v1/measure` | any | Deterministic math only: masks in, findings + receipts out. No model, no keys. |
 | `POST /v1/observe` | any | Pixel masks (COCO RLE) → component/masks/scaleReference that `/v1/report` takes. No model, no keys. |
 | `POST /v1/report` | mock default | measure → findings draft → Evidence Gate. Uncited numbers return `422` with `details[]`. Client may pass `drafts[]` to test the gate. |
-| `POST /v1/segment` | mock | Requires `body.fixture {component, masks}` — the backend invents no masks. Live SAM 3.1 returns `501` until its request shape is verified. |
+| `POST /v1/segment` | mock/live | Mock requires `body.fixture {component, masks}` — the backend invents no masks. Live takes `{imageUrl, width, height, points[1..16]}` and returns SAM 3.1 records with full-frame RLE, `$0.0025`/image metered. |
 | `POST /v1/findings` | mock/live | Drafts findings from measured facts, then gates them. Live path records token usage to the spend ledger. |
 | `POST /v1/skeptic` | mock/live | Independent re-check via Spark Open on Baseten, gated. Real per-token pricing charged to the ledger. `503` without `BASETEN_API_KEY`. |
 | `POST /v1/render` | mock/live | Gated report → code-drawn SVG annexure `{svg, gate}`. |
@@ -40,7 +40,7 @@ All replies are enveloped `{ok, requestId, durationMs, result}`; errors are verb
 
 ## Not yet (verified live, honestly blocked)
 
-- SAM 3.1 masks: live on `/v1/responses` (`200`, `images_processed:1`) but text channel returns empty — mask output shape unresolved. `/v1/segment` stays `501`.
+- SAM 3.1 masks: live and verified 2026-10-29 (`200`, 1 record + full-frame RLE on a 1024x1024 photo, `$0.0025` ledgered). PWA tries `/v1/segment` first, on-device SlimSAM on any failure. Wire lesson: the official parser wants the mask payload WITH its `!`/`~` marker.
 - Voice transcribe: `muse-voice-transcribe-1.0` listed in `/v1/models` but `model_not_found` on `/chat/completions` and `/v1/responses`. Audio endpoint shape unresolved — text path is primary until then.
 - Skeptic inference: `403` until the Baseten form/access is granted. Code complete with real pricing.
 

@@ -65,6 +65,9 @@ export function findingsProvider(
  */
 export const SPARK_OPEN_PRICE = Object.freeze({ inputUsdPerMTok: 1.25, outputUsdPerMTok: 4.25 });
 
+/** SAM 3.1 image pricing, per dev.meta.ai/models/sam-3-1: $2.50 / 1k images. */
+export const SAM_IMAGE_USD = 0.0025;
+
 export function skepticProvider(
   env: Env,
   config: AppConfig,

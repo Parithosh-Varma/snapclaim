@@ -7,7 +7,10 @@ import type { MeasuredFinding } from "../src/engine/types.ts";
 import type { Receipt } from "../src/receipts/types.ts";
 import { renderAnnexureSvg } from "../src/render/svg.ts";
 import { guardFor, spendStatus } from "./spend.ts";
-import { configFromEnv, findingsProvider, skepticProvider, visionProvider, HttpError, type Env, type FetchFn } from "./providers.ts";
+import { BudgetExceededError } from "../src/config/spend-guard.ts";
+import { configFromEnv, findingsProvider, requireLiveKeys, skepticProvider, visionProvider, HttpError, SAM_IMAGE_USD, type Env, type FetchFn } from "./providers.ts";
+import { encodeRle as encodeMaskRle } from "../src/vision/mask.ts";
+import { segmentWithSam, type SamPoint } from "../src/vision/sam.ts";
 
 export const VERSION = "0.2.0";
 export const MAX_MASKS = 50;
@@ -199,15 +202,56 @@ export async function reportBody(body: unknown, env: Env, requestId = newRequest
   return envelope(requestId, started, { measurement, findings: drafts, gate });
 }
 
-export async function segmentBody(body: unknown, env: Env, requestId = newRequestId()): Promise<EnvelopedResult> {
+export async function segmentBody(body: unknown, env: Env, requestId = newRequestId(), fetchFn?: FetchFn): Promise<EnvelopedResult> {
   const started = Date.now();
   if (!isRecord(body)) throw new Error("body must be a JSON object");
-  const provider = visionProvider(env, configFromEnv(env), body.fixture as never);
-  const result = await provider.segment({
-    imageId: typeof body.imageId === "string" ? body.imageId : "unknown",
-    labels: Array.isArray(body.labels) ? (body.labels as never) : [],
+  const config = configFromEnv(env);
+  if (config.mockMode) {
+    const provider = visionProvider(env, config, body.fixture as never);
+    const result = await provider.segment({
+      imageId: typeof body.imageId === "string" ? body.imageId : "unknown",
+      labels: Array.isArray(body.labels) ? (body.labels as never) : [],
+    });
+    return envelope(requestId, started, result);
+  }
+  // Live: SAM 3.1 point prompts over the Responses API. The backend decodes
+  // masks with the official parser — it never invents them.
+  const { metaKey } = requireLiveKeys(env, config);
+  const imageUrl = typeof body.imageUrl === "string" ? body.imageUrl : "";
+  if (!imageUrl.startsWith("data:image/") && !imageUrl.startsWith("https://")) {
+    throw new HttpError(400, "live /v1/segment needs body.imageUrl (https:// or data:image/)");
+  }
+  const width = requireNumber(body.width, "width");
+  const height = requireNumber(body.height, "height");
+  const rawPoints = Array.isArray(body.points) ? body.points : [];
+  if (rawPoints.length === 0 || rawPoints.length > 16) throw new HttpError(400, "live /v1/segment needs 1–16 body.points [{x, y}]");
+  const points: SamPoint[] = rawPoints.map((point, i) => {
+    if (!isRecord(point)) throw new HttpError(400, `points[${i}] must be an object`);
+    return { x: requireNumber(point.x, `points[${i}].x`), y: requireNumber(point.y, `points[${i}].y`) };
   });
-  return envelope(requestId, started, result);
+  const spend = guardFor(env);
+  if (spend.remainingUsd <= 0) throw new HttpError(429, `spend guard: $0 remaining of $${spend.limitUsd} limit`);
+  const sam = await segmentWithSam({
+    fetchFn,
+    base: config.endpoints.meta,
+    apiKey: metaKey,
+    model: config.models.sam,
+    request: { imageUrl, size: { width: Math.round(width), height: Math.round(height) }, points },
+  });
+  try {
+    spend.charge(`sam segment ${sam.records.length} objects`, SAM_IMAGE_USD);
+  } catch (error) {
+    if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
+    throw error;
+  }
+  return envelope(requestId, started, {
+    records: sam.records.map((record) => ({
+      objectId: record.objectId,
+      box: record.box,
+      confidence: record.box.confidence ?? null,
+      rle: encodeMaskRle(record.frameMask),
+    })),
+  });
 }
 
 export async function findingsBody(body: unknown, env: Env, requestId = newRequestId(), fetchFn?: FetchFn): Promise<EnvelopedResult> {

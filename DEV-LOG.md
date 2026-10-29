@@ -128,3 +128,14 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 - PWA backend field now defaults to `https://snapclaim-backend.parithosh.workers.dev` (localhost still typeable). Shareable demo on any phone.
 - `npm run eval` — deterministic guessed-vs-measured bench. Wall-crack locked as regression baseline (2 pass). Missing expected file = SKIP. README in `eval/` for Constantine.
 - 40 tests green, `tsc` clean, eval 2 pass. $0.
+
+## 2026-10-29 — SAM 3.1 is the primary segmenter (main)
+
+**Shipped**
+
+- Ported the verified live segment path to `main`: `src/vision/sam.ts`, `encodeRle`/`rleRoundTrip` in `src/vision/mask.ts`, `SAM_IMAGE_USD` + live `segmentBody` branch, `@meta-sam/parser` declared in `package.json`, `tests/sam.test.ts`.
+- PWA tries `POST /v1/segment` first (one call for all taps, one billed image), falls back to the on-device worker on any failure; the status line says which one outlined (`via SAM 3.1 API` / `via on-device`). Shared `pwa/rle.js` decodes the backend RLE, covered by `tests/pwa-rle.test.ts`.
+- Live-verified on `main`: `200`, 1 record conf 0.12, RLE 1024x1024, `$0.0025` ledgered ($9.9975 remaining).
+- 121 tests green, `tsc` clean.
+
+**Spend:** $0.0025 (1 live call on main).
