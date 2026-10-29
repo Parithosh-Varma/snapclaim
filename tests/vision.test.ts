@@ -160,3 +160,96 @@ test("stray pixels in a coin mask are ignored and discount confidence", () => {
 
   assert.throws(() => circularReference(createMask(10, 10), { id: "x", knownMm: 27, confidence: 1 }), MeasurementError);
 });
+
+test("a square outline is refused as a coin instead of used as a scale", () => {
+  const round = circularReference(disc(200, 100, 100, 60), { id: "coin", knownMm: 24.26, confidence: 0.95 });
+  assert.ok(round.diagnostics.edgeError < 0.03, `edgeError ${round.diagnostics.edgeError}`);
+  assert.equal(round.diagnostics.rejected, undefined);
+
+  const square = fill(createMask(200, 200), (x, y) => x >= 50 && x < 150 && y >= 50 && y < 150);
+  const { reference, diagnostics } = circularReference(square, { id: "coin", knownMm: 24.26, confidence: 0.95 });
+  // A square passes the moment-based checks: only the outline gives it away.
+  assert.ok(diagnostics.aspect > 0.98 && diagnostics.fill > 0.9);
+  assert.ok(diagnostics.edgeError > 0.1, `edgeError ${diagnostics.edgeError}`);
+  assert.match(diagnostics.rejected ?? "", /not round/);
+  assert.equal(reference.confidence, 0);
+
+  const session = measureSession({
+    component: { id: "wall", areaPx: 40000, confidence: 0.93 },
+    masks: [{ id: "crack-1", label: "crack", areaPx: 400, skeletonPx: 200, regionCount: 1, confidence: 0.9 }],
+    scaleReference: reference,
+  });
+  assert.equal(session.mode, "percent-only");
+});
+
+test("a tilted coin and a small coin still pass the outline check", () => {
+  // 30 degrees of tilt: an ellipse, rotated 25 degrees in the frame.
+  const t = (25 * Math.PI) / 180;
+  const tilted = fill(createMask(240, 240), (x, y) => {
+    const u = (x - 120) * Math.cos(t) + (y - 120) * Math.sin(t);
+    const v = -(x - 120) * Math.sin(t) + (y - 120) * Math.cos(t);
+    return (u / 80) ** 2 + (v / (80 * Math.cos(Math.PI / 6))) ** 2 <= 1;
+  });
+  const leaning = circularReference(tilted, { id: "coin", knownMm: 24.26, confidence: 0.95 });
+  assert.equal(leaning.diagnostics.rejected, undefined);
+  assert.ok(Math.abs(leaning.reference.lengthPx - 161) < 2, `lengthPx ${leaning.reference.lengthPx}`);
+
+  const small = circularReference(disc(60, 30, 30, 9), { id: "coin", knownMm: 24.26, confidence: 0.95 });
+  assert.equal(small.diagnostics.rejected, undefined, `edgeError ${small.diagnostics.edgeError}`);
+  assert.ok(small.reference.confidence > 0.8);
+});
+
+test("a coin mask that swallowed a lump of background is refused", () => {
+  const coin = disc(200, 100, 100, 40);
+  fill(coin, (x, y) => x >= 130 && x < 175 && y >= 90 && y < 110);
+  const { diagnostics } = circularReference(coin, { id: "coin", knownMm: 24.26, confidence: 0.95 });
+  assert.match(diagnostics.rejected ?? "", /not round/);
+});
+
+test("crack pieces that are blocky rather than long and thin are flagged", () => {
+  const thin = fill(createMask(300, 120), (x, y) => x >= 20 && x < 280 && Math.abs(y - (30 + x / 10)) < 2);
+  const clean = observeMask(thin, { id: "crack-1", label: "crack", confidence: 0.9 });
+  assert.equal(clean.blockyRegionCount, undefined);
+
+  // The same crack plus a stone block grabbed by a stray tap.
+  fill(thin, (x, y) => x >= 200 && x < 280 && y >= 70 && y < 115);
+  const mixed = observeMask(thin, { id: "crack-1", label: "crack", confidence: 0.9 });
+  assert.equal(mixed.regionCount, 2);
+  assert.equal(mixed.blockyRegionCount, 1);
+  assert.equal(mixed.blockyAreaPx, 80 * 45);
+
+  const stain = observeMask(thin, { id: "stain-1", label: "stain", confidence: 0.7 });
+  assert.equal(stain.blockyRegionCount, undefined);
+});
+
+test("crack pieces with a ruler-straight edge are flagged; a wandering crack is not", () => {
+  // A crack that wanders: centreline from a fixed pseudo-random walk, width 3 to 5 px.
+  let seed = 7;
+  const rand = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+  const centre: number[] = [];
+  const width: number[] = [];
+  let y = 40;
+  for (let x = 0; x < 300; x++) {
+    y += Math.round((rand() - 0.5) * 3);
+    centre.push(y);
+    width.push(1.5 + rand());
+  }
+  const wander = fill(createMask(300, 100), (x, yy) => x >= 20 && x < 280 && Math.abs(yy - centre[x]!) < width[x]!);
+  const crack = observeMask(wander, { id: "crack-1", label: "crack", confidence: 0.9 });
+  assert.equal(crack.straightRegionCount, undefined);
+
+  // A ledge strip at 3 degrees, 12 px thick, with a ragged lower edge: one straight edge is enough.
+  const t = (3 * Math.PI) / 180;
+  const ledge = fill(createMask(300, 100), (x, yy) => {
+    const u = (x - 150) * Math.cos(t) + (yy - 50) * Math.sin(t);
+    const v = -(x - 150) * Math.sin(t) + (yy - 50) * Math.cos(t);
+    return Math.abs(u) < 100 && v > 0 && v < 10 + 2 * Math.sin(x / 3) + (x % 7) / 3;
+  });
+  const strip = observeMask(ledge, { id: "crack-1", label: "crack", confidence: 0.9 });
+  assert.equal(strip.straightRegionCount, 1);
+  assert.equal(strip.blockyRegionCount, undefined, "long and thin, so only the edge test catches it");
+
+  // Under 30 px along its axis the edge is not judged.
+  const stub = fill(createMask(60, 60), (x, yy) => x >= 10 && x < 35 && yy >= 20 && yy < 24);
+  assert.equal(observeMask(stub, { id: "crack-1", label: "crack", confidence: 0.9 }).straightRegionCount, undefined);
+});

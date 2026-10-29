@@ -1,0 +1,27 @@
+{
+  "imageId": "synthetic-tilted-wall-01",
+  "note": "Synthetic: a quarter and a 220 px crack (truly 66.7 mm) on a wall shot at 49° (aspect 0.65). Statistics from tests/tilted-scene.ts tiltedWallBench(): the coin's ellipse corrects the crack length. tests/tilt.test.ts keeps these numbers in sync.",
+  "component": {
+    "id": "photo",
+    "areaPx": 160000,
+    "confidence": 1
+  },
+  "masks": [
+    {
+      "id": "crack-1",
+      "label": "crack",
+      "areaPx": 426,
+      "regionCount": 1,
+      "confidence": 0.9,
+      "skeletonPx": 219.9,
+      "straightRegionCount": 1,
+      "straightAreaPx": 426
+    }
+  ],
+  "scaleReference": {
+    "id": "coin",
+    "knownMm": 24.26,
+    "lengthPx": 79.9,
+    "confidence": 0.95
+  }
+}
