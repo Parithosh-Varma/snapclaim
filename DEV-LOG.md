@@ -155,3 +155,11 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 - Also confirmed working on the hackathon model: streaming, tool calls, vision (read a generated image correctly), `response_format: json_object`, and prompt caching (128 cached tokens on repeats). Pricing as previously recorded.
 
 **Spend:** ~$0.02 of the $100 hackathon credit on probe calls. Metred guard untouched. 121 tests green, `tsc` clean.
+
+## 2026-10-29 — Worker skeptic live (fetch binding + redeploy)
+
+**Shipped**
+
+- Set `BASETEN_API_KEY` as a Worker secret (encrypted, not a plain variable) and redeployed `main` so the Worker runs the `-1026` model id.
+- Fixed a Workers-only crash: bare global `fetch` passed as `fetchFn` throws illegal-invocation. `worker.ts` and `server.ts` now pass a bound wrapper. Verified on the Worker: `POST /v1/skeptic` → `ok:true`, gate pass, cited drafts.
+- 121 tests green, `tsc` clean.

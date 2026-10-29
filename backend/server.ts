@@ -49,7 +49,8 @@ export const server = createServer(async (req, res) => {
       return;
     }
   }
-  const handled = await handleRequest({ method: req.method ?? "GET", path, body, env: process.env });
+  const fetchFn: typeof fetch = (url, init) => fetch(url, init);
+  const handled = await handleRequest({ method: req.method ?? "GET", path, body, env: process.env, fetchFn });
   sendJson(res, handled.status, handled.body);
 });
 
