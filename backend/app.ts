@@ -1,18 +1,27 @@
 import { measureSession } from "../src/engine/measure.ts";
-import { circularReference, observeMask } from "../src/vision/observe.ts";
-import { decodeRle, type BinaryMask, type CocoRle } from "../src/vision/mask.ts";
+import { type ReferenceDiagnostics, circularReference, observeMask, tiltStretch } from "../src/vision/observe.ts";
+import { decodeRle, intersectMasks, type BinaryMask, type CocoRle } from "../src/vision/mask.ts";
+import { agreementVerdict, maskAgreement } from "../src/vision/agreement.ts";
 import type { MeasureSessionInput } from "../src/engine/types.ts";
 import { validateFindings, type FindingDraft } from "../src/findings/evidence-gate.ts";
 import type { MeasuredFinding } from "../src/engine/types.ts";
 import type { Receipt } from "../src/receipts/types.ts";
-import { renderAnnexureSvg } from "../src/render/svg.ts";
+import { type AnnexureOverlay, renderAnnexureSvg } from "../src/render/svg.ts";
+import { maskOutlinePath } from "../src/vision/contour.ts";
 import { guardFor, spendStatus } from "./spend.ts";
 import { BudgetExceededError } from "../src/config/spend-guard.ts";
 import { configFromEnv, findingsProvider, requireLiveKeys, skepticProvider, visionProvider, HttpError, SAM_IMAGE_USD, type Env, type FetchFn } from "./providers.ts";
+import {
+  DEFAULT_KEYWORDS,
+  DEFAULT_LANGUAGE_BIAS,
+  estimateAudioUsd,
+  transcribeWithMuse,
+  type TranscribeResult,
+} from "./transcribe.ts";
 import { encodeRle as encodeMaskRle } from "../src/vision/mask.ts";
 import { segmentWithSam, type SamPoint } from "../src/vision/sam.ts";
 
-export const VERSION = "0.2.0";
+export const VERSION = "0.3.0";
 export const MAX_MASKS = 50;
 
 export interface EnvelopedResult {
@@ -108,6 +117,28 @@ function requireId(value: unknown, name: string): string {
   return value;
 }
 
+/**
+ * POST /v1/crosscheck — independent mask agreement.
+ *
+ * Takes two COCO RLE masks of the same frame (e.g. the on-device SlimSAM
+ * preview and the authoritative SAM 3.1 record) and scores their overlap.
+ * The verdict uses the caller's threshold (default 0.5). Pure set math,
+ * no keys, no models — the planned SlimSAM-vs-SAM skeptic check.
+ */
+export function crosscheckBody(body: unknown, requestId = newRequestId()): EnvelopedResult {
+  const started = Date.now();
+  if (!isRecord(body)) throw new Error("body must be a JSON object");
+  if (!isRecord(body.a) || !isRecord(body.b)) throw new HttpError(400, "body needs {a, b} COCO RLE masks");
+  const threshold = body.threshold === undefined ? 0.5 : requireNumber(body.threshold, "threshold");
+  const a = parseRle(body.a, "a");
+  const b = parseRle(body.b, "b");
+  if (a.width !== b.width || a.height !== b.height) {
+    throw new HttpError(422, `masks differ in size: ${a.width}x${a.height} vs ${b.width}x${b.height}`);
+  }
+  const agreement = maskAgreement(a, b);
+  return envelope(requestId, started, { ...agreement, verdict: agreementVerdict(agreement, threshold), threshold });
+}
+
 /** Deterministic: pixel masks (COCO RLE) to the component/masks/scaleReference that /v1/report takes. No keys, no model. */
 export function observeBody(body: unknown, requestId = newRequestId()): EnvelopedResult {
   const started = Date.now();
@@ -145,6 +176,25 @@ export function observeBody(body: unknown, requestId = newRequestId()): Envelope
     };
   }
 
+  // The coin first: when it is tilted, its ellipse corrects the crack lengths below.
+  let measuredReference: ReturnType<typeof circularReference> | undefined;
+  let refMask: BinaryMask | undefined;
+  if (reference !== undefined) {
+    if (!isRecord(reference)) throw new HttpError(400, "reference must be an object");
+    refMask = parseRle(reference.rle, "reference");
+    sameSize(refMask, "reference");
+    try {
+      measuredReference = circularReference(refMask, {
+        id: requireId(reference.id, "reference.id"),
+        knownMm: requireNumber(reference.knownMm, "reference.knownMm"),
+        confidence: requireNumber(reference.confidence, "reference.confidence"),
+      });
+    } catch (error) {
+      throw new HttpError(422, `reference: ${error instanceof Error ? error.message : "cannot measure"}`);
+    }
+  }
+  const stretch = measuredReference && tiltStretch(measuredReference.diagnostics);
+
   const observed = decoded.map(({ raw, mask }, i) => {
     const label = raw.label;
     if (typeof label !== "string") throw new HttpError(400, `masks[${i}].label must be a string`);
@@ -153,26 +203,30 @@ export function observeBody(body: unknown, requestId = newRequestId()): Envelope
       label: label as never,
       confidence: requireNumber(raw.confidence, `masks[${i}].confidence`),
       ...(componentMask ? { component: componentMask } : {}),
+      ...(stretch ? { stretch } : {}),
     });
   });
 
-  const result: Pick<MeasureSessionInput, "component" | "masks" | "scaleReference"> = {
+  // referenceCheck and overlay are extra: /v1/measure ignores them. The PWA shows the
+  // check and hands the overlay to /v1/render, outlining exactly the pixels measured.
+  const outline = (mask: BinaryMask) =>
+    maskOutlinePath(componentMask ? intersectMasks(mask, componentMask) : mask, { tolerance: OUTLINE_TOLERANCE_PX });
+  const result: Pick<MeasureSessionInput, "component" | "masks" | "scaleReference"> & {
+    referenceCheck?: ReferenceDiagnostics;
+    overlay: AnnexureOverlay;
+  } = {
     component: componentObs,
     masks: observed,
+    overlay: {
+      width: first.width,
+      height: first.height,
+      masks: decoded.map(({ mask }, i) => ({ id: observed[i]!.id, label: observed[i]!.label, path: outline(mask) })),
+    },
   };
-  if (reference !== undefined) {
-    if (!isRecord(reference)) throw new HttpError(400, "reference must be an object");
-    const refMask = parseRle(reference.rle, "reference");
-    sameSize(refMask, "reference");
-    try {
-      result.scaleReference = circularReference(refMask, {
-        id: requireId(reference.id, "reference.id"),
-        knownMm: requireNumber(reference.knownMm, "reference.knownMm"),
-        confidence: requireNumber(reference.confidence, "reference.confidence"),
-      }).reference;
-    } catch (error) {
-      throw new HttpError(422, `reference: ${error instanceof Error ? error.message : "cannot measure"}`);
-    }
+  if (measuredReference && refMask) {
+    result.scaleReference = measuredReference.reference;
+    result.referenceCheck = measuredReference.diagnostics;
+    result.overlay.masks.push({ id: measuredReference.reference.id, label: "coin", path: maskOutlinePath(refMask, { tolerance: OUTLINE_TOLERANCE_PX }) });
   }
   quietLog("[observe]", { requestId, masks: observed.length });
   return envelope(requestId, started, result);
@@ -254,6 +308,60 @@ export async function segmentBody(body: unknown, env: Env, requestId = newReques
   });
 }
 
+function base64ToBytes(value: unknown): Uint8Array {
+  if (typeof value !== "string" || value.length === 0) throw new HttpError(400, "body.audioBase64 must be a non-empty string");
+  const clean = value.includes(",") ? (value.split(",").pop() as string) : value;
+  try {
+    const binary = atob(clean);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  } catch {
+    throw new HttpError(400, "body.audioBase64 is not valid base64");
+  }
+}
+
+/**
+ * POST /v1/transcribe — spoken line to text via Muse Voice Transcribe.
+ * Mock mode returns the supplied fixture transcript (the backend invents none).
+ * Live mode proxies to {META_API_BASE}/v1/asr/transcribe as multipart.
+ */
+export async function transcribeBody(body: unknown, env: Env, requestId = newRequestId(), fetchFn?: FetchFn): Promise<EnvelopedResult> {
+  const started = Date.now();
+  if (!isRecord(body)) throw new Error("body must be a JSON object");
+  const config = configFromEnv(env);
+  if (config.mockMode) {
+    if (typeof body.fixtureTranscript !== "string") {
+      throw new HttpError(400, "mock transcribe requires body.fixtureTranscript — backend invents no transcripts");
+    }
+    const result: TranscribeResult = { transcript: body.fixtureTranscript, audioDurationMs: 0, turns: [] };
+    return envelope(requestId, started, result);
+  }
+  const { metaKey } = requireLiveKeys(env, config);
+  const audio = base64ToBytes(body.audioBase64);
+  if (audio.length > 4_000_000) throw new HttpError(400, "audio over 4 MB; send a clip of 10 seconds or less");
+  const languageBias = Array.isArray(body.languageBias) ? body.languageBias.map(String) : DEFAULT_LANGUAGE_BIAS;
+  const keywords = Array.isArray(body.keywords) ? body.keywords.map(String) : DEFAULT_KEYWORDS;
+  const spend = guardFor(env);
+  if (spend.remainingUsd <= 0) throw new HttpError(429, `spend guard: $0 remaining of $${spend.limitUsd} limit`);
+  const result = await transcribeWithMuse({
+    fetchFn,
+    base: config.endpoints.meta,
+    apiKey: metaKey,
+    model: config.models.transcribe,
+    audio: { audio, languageBias, keywords },
+    charge: (label, usd) => {
+      try {
+        spend.charge(label, usd);
+      } catch (error) {
+        if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
+        throw error;
+      }
+    },
+  });
+  return envelope(requestId, started, result);
+}
+
 export async function findingsBody(body: unknown, env: Env, requestId = newRequestId(), fetchFn?: FetchFn): Promise<EnvelopedResult> {
   const started = Date.now();
   if (!isRecord(body)) throw new Error("body must be a JSON object");
@@ -298,6 +406,29 @@ export async function skepticBody(body: unknown, env: Env, requestId = newReques
   return envelope(requestId, started, { findings: drafts, gate });
 }
 
+/** Outline simplification, in source pixels: keeps the shape, drops staircase steps. */
+const OUTLINE_TOLERANCE_PX = 1;
+/** An SVG path from contoursToSvgPath: move, line and close commands with plain numbers. */
+const SVG_PATH = /^[MLZ0-9 .-]*$/;
+
+/** The photo panel from /v1/observe, plus the photo the PWA attaches. Shapes are checked here. */
+export function parseOverlay(raw: unknown): AnnexureOverlay {
+  if (!isRecord(raw)) throw new HttpError(400, "overlay must be an object");
+  const width = requireNumber(raw.width, "overlay.width");
+  const height = requireNumber(raw.height, "overlay.height");
+  if (!Array.isArray(raw.masks)) throw new HttpError(400, "overlay.masks must be an array");
+  if (raw.masks.length > MAX_MASKS + 1) throw new HttpError(400, `overlay.masks capped at ${MAX_MASKS + 1}`);
+  const masks = raw.masks.map((m, i) => {
+    if (!isRecord(m) || typeof m.label !== "string" || typeof m.path !== "string" || !SVG_PATH.test(m.path)) {
+      throw new HttpError(400, `overlay.masks[${i}] needs an id, a label and an SVG path`);
+    }
+    return { id: requireId(m.id, `overlay.masks[${i}].id`), label: m.label, path: m.path };
+  });
+  const overlay: AnnexureOverlay = { width, height, masks };
+  if (typeof raw.photoHref === "string") overlay.photoHref = raw.photoHref;
+  return overlay;
+}
+
 export async function renderBody(body: unknown, env: Env, requestId = newRequestId(), fetchFn?: FetchFn): Promise<EnvelopedResult> {
   const started = Date.now();
   const reported = await reportBody(body, env, requestId, fetchFn);
@@ -315,6 +446,7 @@ export async function renderBody(body: unknown, env: Env, requestId = newRequest
     transcript,
     version: VERSION,
     generatedAt: new Date().toISOString(),
+    ...(isRecord(body) && body.overlay !== undefined ? { overlay: parseOverlay(body.overlay) } : {}),
   });
   return envelope(requestId, started, { svg, gate: result.gate, findings: result.findings });
 }
@@ -349,6 +481,27 @@ export function corsHeaders(): Record<string, string> {
   };
 }
 
+/**
+ * Origin-restricted CORS for the public demo. Set ALLOWED_ORIGINS to a
+ * comma-separated list (e.g. your Pages URL) and browsers outside it can no
+ * longer spend your SPEND_GUARD_USD from a web page. Unset means "*" (dev).
+ * curl and other non-browser clients are unaffected by design — the spend
+ * guard and per-call metering are the backstop there.
+ */
+export function corsHeadersFor(origin: string | null, env: Env = {}): Record<string, string> {
+  const base = corsHeaders();
+  const raw = env.ALLOWED_ORIGINS ?? "";
+  const allowed = raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== "");
+  if (allowed.length === 0) return base;
+  if (origin !== null && allowed.includes(origin)) {
+    return { ...base, "access-control-allow-origin": origin };
+  }
+  return { ...base, "access-control-allow-origin": allowed[0] as string };
+}
+
 export interface HandledResponse {
   status: number;
   body: unknown;
@@ -369,8 +522,10 @@ export async function handleRequest(input: {
     if (input.method === "GET" && input.path === "/v1/spend") return { status: 200, body: spendStatus(env) };
     if (input.method === "POST" && input.path === "/v1/measure") return { status: 200, body: measureBody(input.body, requestId) };
     if (input.method === "POST" && input.path === "/v1/observe") return { status: 200, body: observeBody(input.body, requestId) };
+    if (input.method === "POST" && input.path === "/v1/crosscheck") return { status: 200, body: crosscheckBody(input.body, requestId) };
     if (input.method === "POST" && input.path === "/v1/report") return { status: 200, body: await reportBody(input.body, env, requestId, input.fetchFn) };
-    if (input.method === "POST" && input.path === "/v1/segment") return { status: 200, body: await segmentBody(input.body, env, requestId) };
+    if (input.method === "POST" && input.path === "/v1/segment") return { status: 200, body: await segmentBody(input.body, env, requestId, input.fetchFn) };
+    if (input.method === "POST" && input.path === "/v1/transcribe") return { status: 200, body: await transcribeBody(input.body, env, requestId, input.fetchFn) };
     if (input.method === "POST" && input.path === "/v1/findings") return { status: 200, body: await findingsBody(input.body, env, requestId, input.fetchFn) };
     if (input.method === "POST" && input.path === "/v1/skeptic") return { status: 200, body: await skepticBody(input.body, env, requestId, input.fetchFn) };
     if (input.method === "POST" && input.path === "/v1/render") return { status: 200, body: await renderBody(input.body, env, requestId, input.fetchFn) };

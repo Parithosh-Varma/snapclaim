@@ -19,7 +19,7 @@ test("pipeline: masks in, live findings provider out, evidence gate passes", asy
   assert.ok(drafts[0]?.statement.includes("85.9 mm"));
 
   assert.doesNotThrow(() => gateFindings(drafts, session.receipts));
-  assert.equal(session.receipts.length, 8);
+  assert.equal(session.receipts.length, 11);
 });
 
 test("the pipeline can fail: a model that alters numbers is caught before shipping", async () => {

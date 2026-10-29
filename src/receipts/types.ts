@@ -4,9 +4,11 @@ export type ReceiptMethod =
   | "scale_calibration"
   | "scale_rejected"
   | "calibrated_length"
+  | "calibrated_area"
+  | "calibrated_width"
   | "severity_classification";
 
-export type ReceiptUnit = "percent" | "ratio" | "count" | "mm" | "mm_per_px" | "band";
+export type ReceiptUnit = "percent" | "ratio" | "count" | "mm" | "mm_per_px" | "cm2" | "band";
 
 export interface Receipt {
   id: string;

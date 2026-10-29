@@ -1,0 +1,23 @@
+{
+  "imageId": "photo-facade-crack-01",
+  "note": "Real-photo case: /v1/observe statistics of fixtures/rle/facade-crack.json (crack-taps), no coin. Measured as tapped, so the frame block and ledge strip are included (and flagged); tests/vision-real.test.ts keeps these numbers in sync with the masks.",
+  "component": {
+    "id": "photo",
+    "areaPx": 623360,
+    "confidence": 1
+  },
+  "masks": [
+    {
+      "id": "crack-taps",
+      "label": "crack",
+      "areaPx": 4632,
+      "regionCount": 15,
+      "confidence": 0.535,
+      "skeletonPx": 389.2,
+      "blockyRegionCount": 2,
+      "blockyAreaPx": 2178,
+      "straightRegionCount": 2,
+      "straightAreaPx": 3354
+    }
+  ]
+}
