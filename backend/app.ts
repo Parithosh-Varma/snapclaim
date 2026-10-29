@@ -3,7 +3,8 @@ import { circularReference, observeMask } from "../src/vision/observe.ts";
 import { decodeRle, type BinaryMask, type CocoRle } from "../src/vision/mask.ts";
 import { agreementVerdict, maskAgreement } from "../src/vision/agreement.ts";
 import type { MeasureSessionInput } from "../src/engine/types.ts";
-import { validateFindings, type FindingDraft } from "../src/findings/evidence-gate.ts";
+import { validateFindings, type FindingDraft, type GateResult } from "../src/findings/evidence-gate.ts";
+import type { FindingsProvider, FindingsRequest } from "../src/adapters/types.ts";
 import type { MeasuredFinding } from "../src/engine/types.ts";
 import type { Receipt } from "../src/receipts/types.ts";
 import { renderAnnexureSvg } from "../src/render/svg.ts";
@@ -19,6 +20,19 @@ import {
 } from "./transcribe.ts";
 import { encodeRle as encodeMaskRle } from "../src/vision/mask.ts";
 import { segmentWithSam, type SamPoint } from "../src/vision/sam.ts";
+import { executeRemoteD1 } from "./d1-proxy.ts";
+import {
+  decodeBase64ToBytes,
+  encodeBytesToBase64,
+  getRemoteR2,
+  putRemoteR2,
+  r2BucketFromEnv,
+  r2ProxyTarget,
+  splitDataUrl,
+  validateR2ContentType,
+  validateR2DataBase64,
+  validateR2Key,
+} from "./r2-proxy.ts";
 
 export const VERSION = "0.3.0";
 export const MAX_MASKS = 50;
@@ -208,6 +222,33 @@ export function observeBody(body: unknown, requestId = newRequestId()): Envelope
   return envelope(requestId, started, result);
 }
 
+/**
+ * Model drafts fail the evidence gate often (extra findings, uncited numbers).
+ * Retry with the gate failures fed back so the model repairs only what failed,
+ * then fail closed. Explicit caller-supplied drafts never retry — they go
+ * straight to the gate.
+ */
+export const MAX_DRAFT_ATTEMPTS = 3;
+
+export async function draftWithGateRetry(
+  provider: FindingsProvider,
+  request: FindingsRequest,
+  maxAttempts = MAX_DRAFT_ATTEMPTS,
+): Promise<{ drafts: FindingDraft[]; gate: GateResult; attempts: number }> {
+  let failures: string[] = [];
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const drafts = await provider.draftFindings(
+      failures.length ? { ...request, attemptErrors: failures } : request,
+    );
+    const gate = validateFindings(drafts, request.receipts);
+    if (gate.ok) return { drafts, gate, attempts: attempt };
+    failures = gate.failures;
+  }
+  const err = new HttpError(422, "Evidence gate failed");
+  (err as HttpError & { details?: unknown }).details = failures;
+  throw err;
+}
+
 export async function reportBody(body: unknown, env: Env, requestId = newRequestId(), fetchFn?: FetchFn): Promise<EnvelopedResult> {
   const started = Date.now();
   if (!isRecord(body)) throw new Error("body must be a JSON object");
@@ -215,20 +256,24 @@ export async function reportBody(body: unknown, env: Env, requestId = newRequest
   const transcript = typeof body.transcript === "string" ? body.transcript : "";
 
   let drafts: FindingDraft[];
+  let gate: GateResult;
   if (body.drafts !== undefined) {
     if (!Array.isArray(body.drafts)) throw new Error("drafts must be an array");
     drafts = body.drafts as FindingDraft[];
+    gate = validateFindings(drafts, measurement.receipts);
+    if (!gate.ok) {
+      const err = new HttpError(422, "Evidence gate failed");
+      (err as HttpError & { details?: unknown }).details = gate.failures;
+      throw err;
+    }
   } else {
     const provider = findingsProvider(env, configFromEnv(env), fetchFn, guardFor(env));
-    drafts = await provider.draftFindings({ transcript, findings: measurement.findings, receipts: measurement.receipts });
+    ({ drafts, gate } = await draftWithGateRetry(
+      provider,
+      { transcript, findings: measurement.findings, receipts: measurement.receipts },
+    ));
   }
 
-  const gate = validateFindings(drafts, measurement.receipts);
-  if (!gate.ok) {
-    const err = new HttpError(422, "Evidence gate failed");
-    (err as HttpError & { details?: unknown }).details = gate.failures;
-    throw err;
-  }
   return envelope(requestId, started, { measurement, findings: drafts, gate });
 }
 
@@ -346,17 +391,11 @@ export async function findingsBody(body: unknown, env: Env, requestId = newReque
   if (!Array.isArray(findings) || !Array.isArray(receipts)) throw new Error("findings and receipts arrays are required");
   crossCheckMeasurement(body, findings, receipts);
   const provider = findingsProvider(env, configFromEnv(env), fetchFn, guardFor(env));
-  const drafts = await provider.draftFindings({
+  const { drafts, gate } = await draftWithGateRetry(provider, {
     transcript: typeof body.transcript === "string" ? body.transcript : "",
     findings,
     receipts,
   });
-  const gate = validateFindings(drafts, receipts);
-  if (!gate.ok) {
-    const err = new HttpError(422, "Evidence gate failed");
-    (err as HttpError & { details?: unknown }).details = gate.failures;
-    throw err;
-  }
   return envelope(requestId, started, { findings: drafts, gate });
 }
 
@@ -368,17 +407,11 @@ export async function skepticBody(body: unknown, env: Env, requestId = newReques
   if (!Array.isArray(findings) || !Array.isArray(receipts)) throw new Error("findings and receipts arrays are required");
   crossCheckMeasurement(body, findings, receipts);
   const provider = skepticProvider(env, configFromEnv(env), fetchFn, guardFor(env));
-  const drafts = await provider.draftFindings({
+  const { drafts, gate } = await draftWithGateRetry(provider, {
     transcript: typeof body.transcript === "string" ? body.transcript : "",
     findings,
     receipts,
   });
-  const gate = validateFindings(drafts, receipts);
-  if (!gate.ok) {
-    const err = new HttpError(422, "Evidence gate failed");
-    (err as HttpError & { details?: unknown }).details = gate.failures;
-    throw err;
-  }
   return envelope(requestId, started, { findings: drafts, gate });
 }
 
@@ -405,6 +438,193 @@ export async function renderBody(body: unknown, env: Env, requestId = newRequest
 
 export function errorBody(message: string, code: number, requestId: string, details?: unknown): VerboseError {
   return { ok: false, error: message, code, requestId, details };
+}
+
+function proxyTarget(env: Env): { apiToken: string; accountId: string; databaseId: string } | null {
+  const apiToken = typeof env.D1_PROXY_TOKEN === "string" ? env.D1_PROXY_TOKEN : "";
+  const accountId = typeof env.D1_PROXY_ACCOUNT_ID === "string" ? env.D1_PROXY_ACCOUNT_ID : "";
+  const databaseId = typeof env.D1_PROXY_DATABASE_ID === "string" ? env.D1_PROXY_DATABASE_ID : "";
+  if (!apiToken || !accountId || !databaseId) return null;
+  return { apiToken, accountId, databaseId };
+}
+
+/**
+ * POST /v1/collect — tester dataset donation (explicit opt-in only).
+ *
+ * Body: {consent: true, image: "data:image/jpeg;base64,...", label?, coinMm?, transcript?, masksJson?, receiptsJson?, userAgent?}
+ * The canvas dataURL already strips EXIF. Images are capped so the 1MB JSON
+ * body limit is never hit. Writes to the local snapclaim_data D1 binding when
+ * present, else falls back to the cross-account proxy (D1_PROXY_* env) so one
+ * Worker can serve a database that lives in another account.
+ *
+ * R2 spill: when a bucket is bound (same account) or R2_PROXY_* points at the
+ * holder worker in the R2 account (other account), the image bytes go to R2
+ * under donations/{requestId}.ext and D1 stores the pointer "r2:{key}".
+ * Without R2 configured the data: URL is stored inline as before. Readers
+ * must accept both forms.
+ */
+export async function collectBody(body: unknown, env: Env, requestId = newRequestId(), fetchFn?: FetchFn): Promise<EnvelopedResult> {
+  const started = Date.now();
+  if (!isRecord(body)) throw new HttpError(400, "body must be a JSON object");
+  if (body.consent !== true) throw new HttpError(400, "consent must be true — donation is opt-in only");
+  const image = body.image;
+  if (typeof image !== "string" || image.length === 0) throw new HttpError(400, "image must be a data: URL string");
+  if (!/^data:image\/(jpeg|png|webp);base64,/.test(image)) {
+    throw new HttpError(400, "image must be a data:image/jpeg|png|webp base64 URL (canvas strips EXIF)");
+  }
+  if (image.length > 900_000) throw new HttpError(400, "image too large — donate a photo at 768px or smaller");
+  const label = body.label === undefined ? null : String(body.label).slice(0, 32);
+  const coinMm = body.coinMm === undefined || body.coinMm === null ? null : requireNumber(body.coinMm, "coinMm");
+  const transcript = body.transcript === undefined || body.transcript === null ? null : String(body.transcript).slice(0, 500);
+  const masksJson = body.masksJson === undefined || body.masksJson === null ? null : String(body.masksJson).slice(0, 100_000);
+  const receiptsJson = body.receiptsJson === undefined || body.receiptsJson === null ? null : String(body.receiptsJson).slice(0, 100_000);
+  const userAgent = body.userAgent === undefined || body.userAgent === null ? null : String(body.userAgent).slice(0, 200);
+  const createdAt = new Date().toISOString();
+  // D1 target must exist before any R2 write — otherwise a missing store
+  // leaves an orphaned object in the bucket. Fail closed first.
+  const db = (env as { snapclaim_data?: {
+    prepare(query: string): { bind(...values: unknown[]): { run(): Promise<unknown> } };
+  } }).snapclaim_data;
+  const d1proxy = db ? null : proxyTarget(env);
+  if (!db && !d1proxy) {
+    throw new HttpError(503, "dataset store not configured: bind snapclaim_data D1 or set D1_PROXY_* for the cross-account fallback");
+  }
+  // Prefer R2 for the bytes; fall back to inline storage when unconfigured.
+  let storedImage = image;
+  const bucket = r2BucketFromEnv(env as Record<string, unknown>);
+  const r2proxy = r2ProxyTarget(env as Record<string, string | undefined>);
+  if (bucket ?? r2proxy) {
+    const { contentType, dataBase64, extension } = splitDataUrl(image);
+    const r2Key = `donations/${requestId}.${extension}`;
+    if (bucket) {
+      await bucket.put(r2Key, decodeBase64ToBytes(dataBase64), { httpMetadata: { contentType } });
+    } else if (r2proxy) {
+      await putRemoteR2({ fetchFn, baseUrl: r2proxy.baseUrl, proxyKey: r2proxy.proxyKey, key: r2Key, contentType, dataBase64 });
+    }
+    storedImage = `r2:${r2Key}`;
+  }
+  const sql =
+    "INSERT INTO donations (id, created_at, consent, image, label, coin_mm, transcript, masks_json, receipts_json, user_agent) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?)";
+  const args = [requestId, createdAt, storedImage, label, coinMm, transcript, masksJson, receiptsJson, userAgent];
+  if (db) {
+    await db.prepare(sql).bind(...args).run();
+  } else if (d1proxy) {
+    await executeRemoteD1({ fetchFn, ...d1proxy, sql, params: args });
+  }
+  quietLog("[collect]", { requestId, bytes: image.length });
+  return envelope(requestId, started, { id: requestId, createdAt });
+}
+
+export async function collectCountBody(env: Env, requestId = newRequestId(), fetchFn?: FetchFn): Promise<EnvelopedResult> {
+  const started = Date.now();
+  const db = (env as { snapclaim_data?: {
+    prepare(query: string): { bind(...values: unknown[]): { first<T>(col?: string): Promise<T | null> } };
+  } }).snapclaim_data;
+  if (db) {
+    const row = await db.prepare("SELECT COUNT(*) AS n FROM donations").bind().first<{ n: number }>();
+    return envelope(requestId, started, { count: row?.n ?? 0 });
+  }
+  const proxy = proxyTarget(env);
+  if (!proxy) throw new HttpError(503, "dataset store not configured: bind snapclaim_data D1 or set D1_PROXY_* for the cross-account fallback");
+  const rows = await executeRemoteD1({ fetchFn, ...proxy, sql: "SELECT COUNT(*) AS n FROM donations" });
+  const n = (rows[0] as { n?: unknown } | undefined)?.n;
+  return envelope(requestId, started, { count: typeof n === "number" ? n : 0 });
+}
+
+/**
+ * POST /v1/d1/query — key-guarded generic relay to any D1 in any account.
+ * Body: {key, apiToken, accountId, databaseId, sql, params?}. The key must
+ * match the D1_PROXY_KEY worker secret or the call fails closed (403; 503
+ * when the secret is not configured at all). Lets the operator query or
+ * migrate databases without redeploying a bound Worker per account.
+ */
+export async function d1QueryBody(body: unknown, env: Env, requestId = newRequestId(), fetchFn?: FetchFn): Promise<EnvelopedResult> {
+  const started = Date.now();
+  if (!isRecord(body)) throw new HttpError(400, "body must be a JSON object");
+  const configured = typeof env.D1_PROXY_KEY === "string" && env.D1_PROXY_KEY.length > 0;
+  if (!configured) throw new HttpError(503, "D1 proxy not configured: set the D1_PROXY_KEY worker secret");
+  if (typeof body.key !== "string" || body.key !== env.D1_PROXY_KEY) {
+    throw new HttpError(403, "bad proxy key");
+  }
+  if (typeof body.apiToken !== "string" || body.apiToken.length === 0) {
+    throw new HttpError(400, "apiToken must be a non-empty Cloudflare API token");
+  }
+  if (typeof body.sql !== "string") throw new HttpError(400, "sql must be a string");
+  if (typeof body.accountId !== "string" || typeof body.databaseId !== "string") {
+    throw new HttpError(400, "accountId and databaseId are required");
+  }
+  const params = body.params === undefined ? [] : body.params;
+  const rows = await executeRemoteD1({
+    fetchFn,
+    apiToken: body.apiToken,
+    accountId: body.accountId,
+    databaseId: body.databaseId,
+    sql: body.sql,
+    params: Array.isArray(params) ? (params as unknown[]) : [],
+  });
+  return envelope(requestId, started, { rows });
+}
+
+function requireR2OperatorKey(body: Record<string, unknown>, env: Env): void {
+  const configured = typeof env.R2_PROXY_KEY === "string" && env.R2_PROXY_KEY.length > 0;
+  if (!configured) throw new HttpError(503, "R2 proxy not configured: set the R2_PROXY_KEY worker secret");
+  if (typeof body.auth !== "string" || body.auth !== env.R2_PROXY_KEY) {
+    throw new HttpError(403, "bad proxy key");
+  }
+}
+
+/**
+ * POST /v1/r2/put — operator object store via the bound bucket or the
+ * cross-account holder (R2_PROXY_URL + R2_PROXY_KEY). Body:
+ * {auth, key, contentType, dataBase64}. Auth must match R2_PROXY_KEY
+ * (same guard as POST /v1/d1/query). Native binding wins; else forwards
+ * to the holder; else 503. Fail-closed on every validation.
+ */
+export async function r2PutBody(body: unknown, env: Env, requestId = newRequestId(), fetchFn?: FetchFn): Promise<EnvelopedResult> {
+  const started = Date.now();
+  if (!isRecord(body)) throw new HttpError(400, "body must be a JSON object");
+  requireR2OperatorKey(body, env);
+  const key = validateR2Key(body.key);
+  const contentType = validateR2ContentType(body.contentType);
+  const dataBase64 = validateR2DataBase64(body.dataBase64);
+  const bucket = r2BucketFromEnv(env as Record<string, unknown>);
+  if (bucket) {
+    const bytes = decodeBase64ToBytes(dataBase64);
+    await bucket.put(key, bytes, { httpMetadata: { contentType } });
+    return envelope(requestId, started, { key, size: bytes.length });
+  }
+  const proxy = r2ProxyTarget(env as Record<string, string | undefined>);
+  if (!proxy) throw new HttpError(503, "R2 store not configured: bind snapclaim_images or set R2_PROXY_URL for the cross-account holder");
+  const stored = await putRemoteR2({ fetchFn, baseUrl: proxy.baseUrl, proxyKey: proxy.proxyKey, key, contentType, dataBase64 });
+  return envelope(requestId, started, stored);
+}
+
+/**
+ * POST /v1/r2/get — operator object fetch. Body: {auth, key} with the same
+ * key guard as /v1/r2/put. Returns {key, contentType, dataBase64, size}.
+ * Small objects only (holder caps at 900KB base64) so the 1MB JSON cap holds.
+ */
+export async function r2GetBody(body: unknown, env: Env, requestId = newRequestId(), fetchFn?: FetchFn): Promise<EnvelopedResult> {
+  const started = Date.now();
+  if (!isRecord(body)) throw new HttpError(400, "body must be a JSON object");
+  requireR2OperatorKey(body, env);
+  const key = validateR2Key(body.key);
+  const bucket = r2BucketFromEnv(env as Record<string, unknown>);
+  if (bucket) {
+    const obj = await bucket.get(key);
+    if (!obj) throw new HttpError(404, "object not found");
+    const bytes = new Uint8Array(await obj.arrayBuffer());
+    return envelope(requestId, started, {
+      key,
+      contentType: obj.httpMetadata?.contentType ?? "application/octet-stream",
+      dataBase64: encodeBytesToBase64(bytes),
+      size: obj.size,
+    });
+  }
+  const proxy = r2ProxyTarget(env as Record<string, string | undefined>);
+  if (!proxy) throw new HttpError(503, "R2 store not configured: bind snapclaim_images or set R2_PROXY_URL for the cross-account holder");
+  const got = await getRemoteR2({ fetchFn, baseUrl: proxy.baseUrl, proxyKey: proxy.proxyKey, key });
+  return envelope(requestId, started, got);
 }
 
 /**
@@ -481,6 +701,11 @@ export async function handleRequest(input: {
     if (input.method === "POST" && input.path === "/v1/findings") return { status: 200, body: await findingsBody(input.body, env, requestId, input.fetchFn) };
     if (input.method === "POST" && input.path === "/v1/skeptic") return { status: 200, body: await skepticBody(input.body, env, requestId, input.fetchFn) };
     if (input.method === "POST" && input.path === "/v1/render") return { status: 200, body: await renderBody(input.body, env, requestId, input.fetchFn) };
+    if (input.method === "POST" && input.path === "/v1/collect") return { status: 200, body: await collectBody(input.body, env, requestId, input.fetchFn) };
+    if (input.method === "GET" && input.path === "/v1/collect/count") return { status: 200, body: await collectCountBody(env, requestId, input.fetchFn) };
+    if (input.method === "POST" && input.path === "/v1/d1/query") return { status: 200, body: await d1QueryBody(input.body, env, requestId, input.fetchFn) };
+    if (input.method === "POST" && input.path === "/v1/r2/put") return { status: 200, body: await r2PutBody(input.body, env, requestId, input.fetchFn) };
+    if (input.method === "POST" && input.path === "/v1/r2/get") return { status: 200, body: await r2GetBody(input.body, env, requestId, input.fetchFn) };
     return { status: 404, body: errorBody("not found", 404, requestId, { method: input.method, path: input.path }) };
   } catch (error) {
     const status = error instanceof HttpError ? error.status : 400;

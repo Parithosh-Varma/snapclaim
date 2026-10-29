@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "backend:start": "node --experimental-strip-types --no-warnings backend/server.ts",
     "backend:live": "node --experimental-strip-types --no-warnings --env-file=.env backend/server.ts",
+    "r2:local": "node --experimental-strip-types --no-warnings backend/r2-holder-server.ts",
     "backend:smoke": "node backend/smoke.mjs",
     "eval": "node --experimental-strip-types --no-warnings eval/bench.ts",
     "replay": "node --experimental-strip-types --no-warnings eval/replay.ts"

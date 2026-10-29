@@ -1,8 +1,5 @@
 import { corsHeadersFor, handleRequest } from "./app.ts";
-
-export interface Env {
-  [key: string]: string | undefined;
-}
+import type { Env } from "./providers.ts";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {

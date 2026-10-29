@@ -169,3 +169,14 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 - 119 tests green, `tsc` clean, eval 5 pass.
 
 **Spend:** $0.00.
+
+## 2026-10-29 — Live SAM 3.1 wired ($0.0025)
+
+**Shipped**
+
+- `POST /v1/segment` live path verified end to end on `test-crack-coin.png` (1024x1024, point 512,512): `200`, 1 record, box 500,509–535,529 conf 0.12, full-frame RLE 1024x1024. Spend ledger charged `$0.0025` (`sam segment 1 objects`, $9.9975 remaining of $10).
+- Root-caused the 400: our regex stripped the `!`/`~` encoding marker but `@meta-sam/parser`'s `decodeMaskToRaster` wants the payload WITH its marker (it slices one char internally). `maskTokenToBinaryMask` re-attaches it now. Live wire format confirmed against dev.meta.ai/docs/sam/reading-segmentation (H,W height-first, confidence between y and data, box/point prompts always return one_bit).
+- Fixed the same double-marker bug in test fixtures (`tests/sam.test.ts` canned tokens, `tests/transcribe.test.ts` inline token).
+- 141 tests green, `tsc` clean.
+
+**Spend:** $0.0025 ledgered (4 SAM `/v1/responses` calls total; 2 threw before the charge point, 1 bypassed the ledger via direct probe). Meta per-image pricing still taken from `SAM_IMAGE_USD`, not a bill.

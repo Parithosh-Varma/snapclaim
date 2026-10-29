@@ -13,7 +13,7 @@ export class HttpError extends Error {
   }
 }
 
-export type Env = Record<string, string | undefined>;
+export type Env = Record<string, string | undefined> & { snapclaim_data?: any };
 export type FetchFn = typeof fetch;
 
 export function configFromEnv(env: Env): AppConfig {
@@ -114,24 +114,39 @@ export class MetaFindingsProvider implements FindingsProvider {
       receiptIds: f.receiptIds,
     }));
     const receipts = request.receipts.map((r) => ({ id: r.id, output: r.output, formula: r.formula }));
+    const messages = [
+      {
+        role: "system",
+        content:
+          "Write claim findings. Reply with JSON only: an array with EXACTLY one draft per fact, in the same order, " +
+          'each {"statement":"...","citations":["receipt-id"]}. Every number in a statement must appear verbatim ' +
+          "in one of its cited receipts' outputs. Cite at least one receipt id per draft. " +
+          "Never invent numbers, never round from memory, never add extra findings.",
+      },
+      {
+        role: "user",
+        content: JSON.stringify({ transcript: request.transcript, facts, receipts }),
+      },
+    ];
+    if (request.attemptErrors?.length) {
+      messages.push({
+        role: "user",
+        content:
+          "Your previous drafts failed the evidence gate with these failures. Fix ONLY the failing drafts; " +
+          "keep compliant ones byte-identical. Failures:\n- " +
+          request.attemptErrors.join("\n- "),
+      });
+    }
 
-    const res = await this.#opts.fetchFn(`${this.#opts.base}/chat/completions`, {
+    // Unbound call: Workers' fetch throws "Illegal invocation" when invoked as a method.
+    const fetchFn = this.#opts.fetchFn;
+    const res = await fetchFn(`${this.#opts.base}/chat/completions`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${this.#opts.apiKey}` },
       body: JSON.stringify({
         model: this.#opts.model,
-        messages: [
-          {
-            role: "system",
-            content:
-              "Write claim findings. Every number must exactly match a receipt output. Cite receipt ids. " +
-              'Reply with JSON only: [{"statement":"...","citations":["receipt-id"]}]',
-          },
-          {
-            role: "user",
-            content: JSON.stringify({ transcript: request.transcript, facts, receipts }),
-          },
-        ],
+        temperature: 0,
+        messages,
       }),
     });
     if (!res.ok) throw new HttpError(502, `Meta findings failed: HTTP ${res.status}`);
@@ -175,25 +190,39 @@ export class BasetenSkepticProvider implements FindingsProvider {
       receiptIds: f.receiptIds,
     }));
     const receipts = request.receipts.map((r) => ({ id: r.id, output: r.output, formula: r.formula }));
+    const messages = [
+      {
+        role: "system",
+        content:
+          "You are an independent skeptic. Re-derive every number from the receipts only — never invent or round from memory. " +
+          "For each fact, either restate it exactly with its receipt citations, or mark it DISPUTED with the reason. " +
+          "Reply with JSON only: an array with EXACTLY one draft per fact, in the same order, " +
+          'each {"statement":"...","citations":["receipt-id"]}. Every number must appear verbatim in a cited receipt.',
+      },
+      {
+        role: "user",
+        content: JSON.stringify({ transcript: request.transcript, facts, receipts }),
+      },
+    ];
+    if (request.attemptErrors?.length) {
+      messages.push({
+        role: "user",
+        content:
+          "Your previous drafts failed the evidence gate with these failures. Fix ONLY the failing drafts; " +
+          "keep compliant ones byte-identical. Failures:\n- " +
+          request.attemptErrors.join("\n- "),
+      });
+    }
 
-    const res = await this.#opts.fetchFn(`${this.#opts.base}/chat/completions`, {
+    // Unbound call: Workers' fetch throws "Illegal invocation" when invoked as a method.
+    const fetchFn = this.#opts.fetchFn;
+    const res = await fetchFn(`${this.#opts.base}/chat/completions`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${this.#opts.apiKey}` },
       body: JSON.stringify({
         model: this.#opts.model,
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are an independent skeptic. Re-derive every number from the receipts only — never invent or round from memory. " +
-              "For each fact, either restate it exactly with its receipt citations, or mark it DISPUTED with the reason. " +
-              'Reply with JSON only: [{"statement":"...","citations":["receipt-id"]}]',
-          },
-          {
-            role: "user",
-            content: JSON.stringify({ transcript: request.transcript, facts, receipts }),
-          },
-        ],
+        temperature: 0,
+        messages,
       }),
     });
     if (!res.ok) throw new HttpError(502, `Baseten skeptic failed: HTTP ${res.status}`);

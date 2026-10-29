@@ -2,5 +2,29 @@ name = "snapclaim-backend"
 main = "worker.ts"
 compatibility_date = "2026-10-27"
 
+# NOTE: no [[d1_databases]] binding here on purpose — snapclaim-data lives in
+# another account, and bindings are same-account only. Writes go through the
+# D1_PROXY_* cross-account fallback instead (see backend/d1-proxy.ts). If you
+# later create the DB in THIS account, add the binding back and /v1/collect
+# will prefer it automatically.
+
+# Cross-account fallback for /v1/collect when the binding above is absent
+# (e.g. Worker deployed in another account). Secrets stay out of git:
+#   npx wrangler secret put D1_PROXY_TOKEN   (Cloudflare API token with D1 write)
+#   npx wrangler secret put D1_PROXY_KEY     (shared key guarding POST /v1/d1/query)
+#
+# R2 images (other account): the bucket cannot be bound across accounts, so
+# /v1/collect and /v1/r2/put|get spill through a holder worker deployed in
+# the R2 account (backend/r2-holder.ts + backend/r2-holder-wrangler.toml).
+# Local dev stand-in: `npm run r2:local` serves the same protocol from
+# ./.r2-data on http://localhost:8788 — point R2_PROXY_URL there.
+#   npx wrangler secret put R2_PROXY_URL    (holder base URL, https:// or http://localhost for dev)
+#   npx wrangler secret put R2_PROXY_KEY    (shared Bearer secret, also guards POST /v1/r2/put|get via body.auth)
+# Same-account alternative: add [[r2_buckets]] binding = "snapclaim_images"
+# and the backend prefers it over the proxy automatically.
+[vars]
+D1_PROXY_ACCOUNT_ID = "18c0b10f1f40932c837b55bc008e78e1"
+D1_PROXY_DATABASE_ID = "025734a5-ba8b-4e8d-8736-270987c2f181"
+
 [observability]
 enabled = false

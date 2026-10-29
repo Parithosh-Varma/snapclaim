@@ -120,7 +120,7 @@ test("live segment at $0 remaining refuses before any fetch", async () => {
 });
 
 test("live segment decodes a streamed SAM response to frame RLE", async () => {
-  const line = `<0f>1<|box;x1=10;y1=20;x2=15;y2=23;w=100;h=100;c=0.9|><|mask;x=0;y=0;c=0.9;data=4,6,!!!!!!'O3NZWV4|>`;
+  const line = `<0f>1<|box;x1=10;y1=20;x2=15;y2=23;w=100;h=100;c=0.9|><|mask;x=0;y=0;c=0.9;data=4,6,!!!!!'O3NZWV4|>`;
   const sse = [
     `event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":${JSON.stringify(line)}}`,
     `event: response.completed\ndata: {"type":"response.completed"}`,

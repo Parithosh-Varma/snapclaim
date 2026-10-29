@@ -1,0 +1,13 @@
+# Deploy THIS file as wrangler.toml in the account that owns the R2 bucket.
+# The main snapclaim-backend worker (other account) forwards to this holder
+# via R2_PROXY_URL + R2_PROXY_KEY — native bindings are same-account only.
+name = "snapclaim-r2-holder"
+main = "r2-holder.ts"
+compatibility_date = "2026-10-27"
+
+[[r2_buckets]]
+binding = "snapclaim_images"
+bucket_name = "snapclaim-images"
+
+[observability]
+enabled = false

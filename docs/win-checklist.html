@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>SNAPCLAIM — Future Adds Checklist</title>
+<style>
+:root{--bg:#0d1117;--panel:#161b22;--line:#30363d;--txt:#e6edf3;--mut:#8b949e;--acc:#f2c230;--ok:#3fb950;--bad:#f85149}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.5}
+.wrap{max-width:1000px;margin:0 auto;padding:24px 16px 80px}
+pre.ascii{color:var(--acc);font-size:12px;overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+.bar{position:sticky;top:0;background:var(--bg);padding:12px 0;border-bottom:1px solid var(--line);z-index:10}
+.track{height:12px;background:var(--panel);border:1px solid var(--line);border-radius:99px;overflow:hidden}
+#fill{height:100%;width:0;background:var(--acc)}
+h2{margin-top:36px;border-bottom:1px solid var(--line);padding-bottom:8px}
+h2 span{color:var(--acc)}
+label.item{display:flex;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;margin:6px 0;background:var(--panel);cursor:pointer}
+label.item.done{opacity:.6;text-decoration:line-through}
+label.item input{margin-top:4px;transform:scale(1.3)}
+small{color:var(--mut)}
+.cmd{background:#000;padding:2px 6px;border-radius:6px;border:1px solid var(--line)}
+.btn{margin-right:8px;padding:8px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--txt);cursor:pointer}
+@media print{.bar,.btn{display:none}body{background:#fff;color:#000}label.item{background:#fff;color:#000}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<pre class="ascii"> ____  _   _    _    ____   ____ _        _    ___ __  __
+/ ___|| \ | |  / \  |  _ \ / ___| |      / \  |_ _|  \/  |
+\___ \|  \| | / _ \ | |_) | |   | |     / _ \  | || |\/| |
+ ___) | |\  |/ ___ \|  __/| |___| |___ / ___ \ | || |  | |
+|____/|_| \_/_/   \_\_|    \____|_____/_/   \_\___|_|  |_|
+  ____ ___  __  __ ____  _   _ _____ _____ ____  _
+ / ___/ _ \|  \/  |  _ \| | | |_   _| ____|  _ \| |
+| |  | | | | |\/| | |_) | | | | | | |  _| | | | | |
+| |__| |_| | |  | |  __/| |_| | | | | |___| |_| |_|
+ \____\___/|_|  |_|_|    \___/  |_| |_____|____/(_)
+  __        _____ _   _   _____ _   _ _____   _   _    _    ____ _  __
+  \ \      / /_ _| \ | | |_   _| | | | ____| | | | |  / \  |  _ \ |/ /
+   \ \ /\ / / | ||  \| |   | | | |_| |  _|   | |_| | / _ \ | |_) ' /
+    \ V  V /  | || |\  |   | | |  _  | |___  |  _  |/ ___ \|  _ . |
+     \_/\_/  |___|_| \_|   |_| |_| |_|_____| |_| |_/_/   \_\_| \_\</pre>
+
+<div class="bar">
+<div><b id="pct">0%</b> <small id="cnt"></small></div>
+<div class="track"><div id="fill"></div></div>
+<div style="margin-top:8px">
+<button class="btn" onclick="resetAll()">reset</button>
+<button class="btn" onclick="window.print()">print / pdf</button>
+</div>
+</div>
+
+<p><small>Future-only list. Nothing here is done — tick as you add it. Saved in this browser (localStorage).</small></p>
+
+<h2><span>[01]</span> MULTI-PHOTO JOBS — sequential first</h2>
+<div id="c01"></div>
+
+<h2><span>[02]</span> GHOST ALIGN — onion-skin helper</h2>
+<div id="c02"></div>
+
+<h2><span>[03]</span> FEWER TAPS — coin auto + sticky defaults</h2>
+<div id="c03"></div>
+
+<h2><span>[04]</span> DEMO MODE — voice + auto + Wallfixer preview</h2>
+<div id="c04"></div>
+
+<h2><span>[05]</span> PWA POLISH — capture that feels field-ready</h2>
+<div id="c05"></div>
+
+<h2><span>[06]</span> EVAL + METRICS — prove measured beats guessed</h2>
+<div id="c06"></div>
+
+<h2><span>[07]</span> BACKEND + REPLAY — make it reproducible</h2>
+<div id="c07"></div>
+
+<h2><span>[08]</span> VIDEO + SUBMISSION — ship it</h2>
+<div id="c08"></div>
+
+<h2><span>[09]</span> UNBLOCKS — need keys / home / access</h2>
+<div id="c09"></div>
+
+<script>
+const GROUPS={
+c01:[
+"add photos[] queue with thumbnail strip — tap to edit one photo in existing viewfinder",
+"per-photo steps: own damagePts + coinPts + embeddings (lazy, cached)",
+"sticky job defaults: damage label, coin kind, one transcript for whole job",
+"Measure fans out N per-photo observe calls (chunked, local backend :8787)",
+"merge findings as photoId/maskId, receipt IDs namespaced p1-R001…",
+"gate stays per-photo + job-level: every number cites its photo-scoped receipt",
+"annexure SVG: one section per photo (thumbnail schematic + receipts table)",
+"Wallfixer POST shape: {jobId, transcript, photos[{photoId, findings, receipts}], svg}",
+"50-mask cap enforced per-photo, not per-job",
+"percent-only enforced per-photo without coin (no cross-photo scale reuse)",
+],
+c02:[
+"Set as ghost on photo-1: stored 512px canvas, drawn under viewfinder at 20-30%",
+"opacity slider + toggle, on by default off",
+"applies to next uploads (view-only composite, CSS/canvas only)",
+"nudge drag to eyeball-align — never touches measurement pixels",
+"masks + mmPerPx always from original file, never the composited ghost",
+"per-photo coin still required (ghost does not transfer scale)",
+"side-by-side compare for already-uploaded batches with different angles",
+"live-camera ghost deferred: needs getUserMedia view + capture button (day of work)",
+"no warp-to-fit uploads (warp = fake pixels = fake measurement)",
+"ghost toggle + clear ghost, ~30 lines, zero backend change",
+],
+c03:[
+"coin auto-propose: classical ellipse finder proposes coin mask on-device",
+"confirm / reject UI — human tap still required, auto never writes scale alone",
+"reuse circularReference aspect+fill+largestShare check, &lt;0.6 → auto-reject to percent-only",
+"crack stays one-tap confirm: machine proposes 1 point, SAM segments, human accepts",
+"damage label sticky across photos in a job",
+"coin kind sticky across photos in a job",
+"transcript once per job, editable per-photo if needed",
+"auto-run Measure when both masks exist for a photo",
+"target: 5 photos from ~25 taps → ~10 taps",
+"all assists logged — receipts still recompute offline",
+],
+c04:[
+"Demo toggle in PWA, all mocks badged MOCK — real path untouched",
+"voice: browser webkitSpeechRecognition fills transcript box, no fake transcribe call",
+"Demo auto: drops 1 canned damage point + 1 canned coin point per photo, runs real SAM + real measure",
+"Send to Wallfixer (demo): builds preview from lastMeasurement + transcript + receipts + svg",
+"preview modal shows To: demo-wallfixer, findings, citations — explicit DEMO PREVIEW not sent",
+"handoff action = download JSON + copy text, or POST to configurable test webhook only",
+"send enabled only after GATE PASS, never on gated/empty findings",
+"one-take flow target: photo → voice → auto → Wallfixer preview",
+"no real contractor/gov endpoint, no official letterhead",
+"remove or hide Demo toggle for judged submit build if needed",
+],
+c05:[
+"live-camera capture via getUserMedia + ghost overlay + capture-still button",
+"camera permission + HTTPS + iOS Safari fallback handling",
+"photo-check warnings (blur/exposure) shown before Measure is enabled",
+"undo/clear per step already there — add redo for mis-taps",
+"thumbnail strip with per-photo done state (photo/mark/measured)",
+"mobile touch: 46px+ targets, safe-area padding, reduced-motion respect",
+"offline-first: model + page cached, measure queued when backend down",
+"Cm paste: Cmd+V anywhere already works — add drag-drop files too",
+"photo name + size + 512px note visible in dev details",
+"no photo upload to server — on-device SlimSAM note stays in hero",
+],
+c06:[
+"run npm run eval on #18 4 public CC no-coin photos as refusal cases",
+"add guessed-vs-measured gap table: model-only vs no-measurement vs SnapClaim",
+"weak rows stay in docs/eval-report.md with dataset name + license + split",
+"metrics page section: percent error, DISPUTED rate, refusal rate",
+"scoreDisputes kept as DISPUTED = positive class",
+"lock wall-crack fixture as regression baseline",
+"add 3-5 real coin-scale photos when back home (with/away note until then)",
+"print held-out numbers into annexure SVG + demo 2:20 beat",
+"bench split frozen before any tuning — note the commit hash",
+"judge line: same reasoning model gets measured facts only, never raw photo alone",
+],
+c07:[
+"snapclaim replay CLI: receipts JSONL + photo + calibration → same numbers",
+"replay note embedded in annexure SVG footer",
+"receipts table in SVG already there — add formula + confidence columns check",
+"backend: keep single-photo /v1/observe|report, fan out client-side",
+"document Worker CPU limit + 512px rule in backend/README",
+"keep 50-mask / 1MB caps, verbose {ok, requestId, code} errors",
+"GET /v1/spend ledger visible in dev details",
+"D1 stub stays stub until Day 3+ — do not fake persistence",
+"smoke script covers tampered → 422 + spend $0",
+"local :8787 stays demo backend (Worker only for small/health checks)",
+],
+c08:[
+"0:00 hook: real crack, phone in hand, deposit due Friday",
+"0:20 snap → masks bloom red/green, taps visible",
+"one Hinglish line (chips now, voice later) → annexure writes itself",
+"one RED skeptic dispute (occluded scale) → human fix → green co-signed",
+"2:20 receipts + held-out gap + replay rebuild",
+"close: Computed, not generated — a claim is an argument",
+"≤3:00, 1080p, captions, no keys on screen, backend :8787",
+"backup offline recording if venue wifi dies",
+"portal fields: title, problem, 4-model table, arch, video, repo, demo URL, eval, limits, team",
+"submit evening IST Nov 4 + X post",
+],
+c09:[
+"submit Baseten form for meta-models/muse-spark-open (skeptic 403 → live)",
+"verify SAM 3.1 mask shape on /v1/responses (empty text today, /v1/segment stays 501)",
+"voice transcribe probe only after text demo lands (no voice UI yet)",
+"real coin-scale photos when back home — 1 euro / quarter flat, straight-on, diffuse light",
+"keep no-coin public CC photos as refusal cases until then",
+"D1 / PDF stay out per scope — SVG only, stub documented",
+"DEV-LOG every live call with $ + model + result",
+"no force-push, PRs stay reviewable (#17/#18 pattern)",
+"blockers board: Baseten access, SAM shape, real photos, Worker CPU",
+"ask: which future gets built first — coin auto or multi-photo?",
+],
+};
+let total=0,doneSet=new Set(JSON.parse(localStorage.getItem("snapclaim-future")||"[]"));
+function render(){
+ total=0;
+ for(const [gid,items] of Object.entries(GROUPS)){
+  const box=document.getElementById(gid); box.innerHTML="";
+  items.forEach((t,i)=>{
+   const k=gid+":"+i; total++;
+   const lab=document.createElement("label");
+   lab.className="item"+(doneSet.has(k)?" done":"");
+   lab.innerHTML=`<input type="checkbox" ${doneSet.has(k)?"checked":""}/><span>${t}</span>`;
+   lab.querySelector("input").onchange=e=>{
+    e.target.checked?doneSet.add(k):doneSet.delete(k);
+    localStorage.setItem("snapclaim-future",JSON.stringify([...doneSet]));
+    render();
+   };
+   box.appendChild(lab);
+  });
+ }
+ const d=doneSet.size,p=Math.round(d/total*100);
+ document.getElementById("fill").style.width=p+"%";
+ document.getElementById("pct").textContent=p+"% — "+d+"/"+total;
+ document.getElementById("cnt").textContent="tick to save. 100% = all built.";
+}
+function resetAll(){doneSet=new Set();localStorage.removeItem("snapclaim-future");render();}
+render();
+</script>
+</div>
+</body>
+</html>

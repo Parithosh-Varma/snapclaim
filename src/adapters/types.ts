@@ -20,6 +20,8 @@ export interface FindingsRequest {
   transcript: string;
   findings: MeasuredFinding[];
   receipts: Receipt[];
+  /** Gate failures from a previous attempt, fed back to the model on retry. */
+  attemptErrors?: string[];
 }
 
 export interface FindingsProvider {
