@@ -1,0 +1,93 @@
+import { strict as assert } from "node:assert";
+import { test } from "node:test";
+import { observeBody } from "../backend/app.ts";
+import { calibratedLengthMm } from "../src/engine/math.ts";
+import { readFileSync } from "node:fs";
+import type { BinaryMask } from "../src/vision/mask.ts";
+import { MIN_COIN_ASPECT, circularReference, observeMask, tiltStretch } from "../src/vision/observe.ts";
+import { COIN, coin, crack, photographed, tiltedWallBench } from "./tilted-scene.ts";
+
+function toRle(mask: BinaryMask): { size: [number, number]; counts: number[] } {
+  const counts: number[] = [];
+  let run = 0;
+  let on = false;
+  for (let x = 0; x < mask.width; x++) {
+    for (let y = 0; y < mask.height; y++) {
+      if ((mask.data[y * mask.width + x] !== 0) !== on) {
+        counts.push(run);
+        run = 0;
+        on = !on;
+      }
+      run++;
+    }
+  }
+  counts.push(run);
+  return { size: [mask.height, mask.width], counts };
+}
+
+for (const [aspect, angleDeg, crackDeg] of [
+  [0.7, 90, 30],
+  [0.6, 20, 40],
+  [0.8, 135, 120],
+] as const) {
+  test(`a crack on a wall tilted to aspect ${aspect} measures as if shot straight on`, () => {
+    const tiltedMask = photographed(aspect, angleDeg, crack(40, 30, 220, crackDeg));
+
+    const { diagnostics } = circularReference(photographed(aspect, angleDeg, coin), COIN);
+    assert.equal(diagnostics.rejected, undefined);
+    assert.ok(Math.abs(diagnostics.aspect - aspect) < 0.02, `aspect ${diagnostics.aspect}`);
+    const stretch = tiltStretch(diagnostics);
+    assert.ok(stretch !== undefined);
+
+    const naive = observeMask(tiltedMask, { id: "c", label: "crack", confidence: 0.9 });
+    const corrected = observeMask(tiltedMask, { id: "c", label: "crack", confidence: 0.9, stretch });
+    // Against the true 220 px: the skeleton's own angle bias is up to ~5%, so
+    // a straight-on baseline at a different angle would not be a fair target.
+    const err = (o: { skeletonPx?: number }) => Math.abs(o.skeletonPx! / 220 - 1);
+    assert.ok(err(corrected) < 0.04, `corrected ${corrected.skeletonPx} vs true 220`);
+    assert.ok(err(naive) > err(corrected), `naive ${naive.skeletonPx} should be further off`);
+  });
+}
+
+test("a tilted coin keeps its confidence instead of dropping the report to percent-only", () => {
+  const { reference, diagnostics } = circularReference(photographed(0.6, 90, coin), COIN);
+  assert.ok(Math.abs(diagnostics.tiltDeg - 53.1) < 1.5, `tilt ${diagnostics.tiltDeg}`);
+  assert.ok(reference.confidence > 0.9, `confidence ${reference.confidence}`);
+  assert.ok(calibratedLengthMm(100, reference) !== null);
+});
+
+test("a coin tilted past the limit is refused with a reason", () => {
+  const { reference, diagnostics } = circularReference(photographed(MIN_COIN_ASPECT - 0.08, 90, coin), COIN);
+  assert.equal(reference.confidence, 0);
+  assert.match(diagnostics.rejected ?? "", /tilted too far/);
+  assert.equal(tiltStretch(diagnostics), undefined);
+});
+
+test("a coin seen straight on applies no correction", () => {
+  const { diagnostics } = circularReference(photographed(1, 0, coin), COIN);
+  assert.ok(diagnostics.tiltDeg < 12);
+  assert.equal(tiltStretch(diagnostics), undefined);
+});
+
+test("/v1/observe corrects crack length with the coin's tilt", () => {
+  const crackMask = photographed(0.65, 90, crack(40, 30, 220, 60));
+  const coinMask = photographed(0.65, 90, coin);
+  const body = (withCoin: boolean) => ({
+    masks: [{ id: "crack-1", label: "crack", confidence: 0.9, rle: toRle(crackMask) }],
+    ...(withCoin ? { reference: { ...COIN, rle: toRle(coinMask) } } : {}),
+  });
+  const result = (withCoin: boolean) =>
+    (observeBody(body(withCoin)) as unknown as { result: { masks: { skeletonPx: number }[]; referenceCheck?: { tiltDeg: number } } })
+      .result;
+  const corrected = result(true);
+  assert.ok(corrected.referenceCheck!.tiltDeg > 45);
+  assert.ok(Math.abs(corrected.masks[0]!.skeletonPx / 220 - 1) < 0.04, `corrected ${corrected.masks[0]!.skeletonPx}`);
+  assert.ok(result(false).masks[0]!.skeletonPx < 0.85 * 220);
+});
+
+test("the tilted-wall bench case is what the vision code measures on the scene", () => {
+  // If the vision code changes these numbers, regenerate fixtures/masks/tilted-wall.json on purpose.
+  const fixture = JSON.parse(readFileSync(new URL("../fixtures/masks/tilted-wall.json", import.meta.url), "utf8"));
+  const { component, masks, scaleReference } = tiltedWallBench();
+  assert.deepEqual({ component: fixture.component, masks: fixture.masks, scaleReference: fixture.scaleReference }, { component, masks, scaleReference });
+});

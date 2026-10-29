@@ -93,11 +93,82 @@ test("a finding with no citations fails the gate", () => {
   assert.ok(error.failures.some((failure) => failure.includes("no citations")));
 });
 
-test("a qualitative statement backed by the severity receipt passes", () => {
+test("a qualitative statement with no measured number fails the gate", () => {
   const { finding, receipts } = setup();
-  assert.doesNotThrow(() =>
+  const error = expectEvidenceError(() =>
     gateFindings([{ statement: "damage is significant.", citations: [finding.receiptIds.severity] }], receipts),
   );
+  assert.ok(error.failures.some((failure) => failure.includes("no measured number")));
+});
+
+test("a date in the statement is not read as evidence numbers", () => {
+  const { finding, receipts } = setup();
+  // The date contributes no number failures; the cited numbers pass.
+  assert.doesNotThrow(() =>
+    gateFindings(
+      [
+        {
+          statement: `On 2026-10-28 the crack covered 5.17% of the component; classified significant.`,
+          citations: [finding.receiptIds.ratio, finding.receiptIds.severity],
+        },
+      ],
+      receipts,
+    ),
+  );
+  // An uncited number still fails even next to a date.
+  const error = expectEvidenceError(() =>
+    gateFindings(
+      [
+        {
+          statement: `On 2026-10-28 the crack covered 9.99% of the component.`,
+          citations: [finding.receiptIds.ratio],
+        },
+      ],
+      receipts,
+    ),
+  );
+  assert.ok(error.failures.some((f) => f.includes("9.99")));
+  assert.ok(!error.failures.some((f) => f.includes("2026")));
+});
+
+test("citing receipts from two masks in one finding fails", () => {
+  const fixture = loadWallFixture();
+  const session = measureSession({
+    component: fixture.component,
+    masks: fixture.masks,
+    scaleReference: fixture.scaleReference,
+  });
+  const crack = session.findings.find((f) => f.label === "crack");
+  const stain = session.findings.find((f) => f.label === "stain");
+  assert.ok(crack && stain);
+  const error = expectEvidenceError(() =>
+    gateFindings(
+      [
+        {
+          statement: `crack covers 5.17% and stain covers 1.29% of the component.`,
+          citations: [crack.receiptIds.ratio, stain.receiptIds.ratio],
+        },
+      ],
+      session.receipts,
+    ),
+  );
+  assert.ok(error.failures.some((failure) => failure.includes("multiple masks")));
+});
+
+test("a severity word that contradicts the cited receipt fails", () => {
+  const { finding, receipts } = setup();
+  const error = expectEvidenceError(() =>
+    gateFindings(
+      [
+        {
+          statement: `crack covers 5.17% of the component; classified cosmetic.`,
+          citations: [finding.receiptIds.ratio, finding.receiptIds.severity],
+        },
+      ],
+      receipts,
+    ),
+  );
+  assert.ok(error.failures.some((failure) => failure.includes("contradicts")));
 });
 
 test("empty statements fail", () => {
