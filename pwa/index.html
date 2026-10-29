@@ -174,10 +174,6 @@
 <!-- live level: hold the phone square to the wall (the coin's ellipse corrects the rest) -->
 <div id="tiltMeter" style="position:absolute;z-index:4;left:50%;top:max(14px,env(safe-area-inset-top));transform:translateX(-50%);width:min(340px,calc(100% - 28px))"></div>
 <style>#tiltMeter>div,#tiltMeter>button{background:rgba(255,253,248,.92);border-radius:14px;padding:6px 10px}</style>
-<script type="module">
-  import { mountTiltMeter } from "./tilt-meter.js";
-  mountTiltMeter(document.getElementById("tiltMeter"));
-</script>
 <div id="count" aria-hidden="true"></div>
 <button id="shutter" type="button" aria-label="Capture"></button>
 <div class="flash" id="flash"></div>
