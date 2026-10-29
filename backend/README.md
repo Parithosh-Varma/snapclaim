@@ -23,6 +23,9 @@ npm test                # 40 tests, mock mode, $0 spend
 | `POST /v1/skeptic` | mock/live | Independent re-check via Spark Open on Baseten, gated. Real per-token pricing charged to the ledger. `503` without `BASETEN_API_KEY`. |
 | `POST /v1/render` | mock/live | Gated report → code-drawn SVG annexure `{svg, gate}`. |
 | `GET /v1/spend` | any | `{spentUsd, remainingUsd, limitUsd, entries}`. Mock runs stay `$0`. |
+| `POST /v1/sessions` / `GET /v1/sessions` | any | Save `{findings, mode, id?, at?}` (counts only, never photo bytes); list the latest 50, newest first. |
+
+Sessions live in memory unless the Worker has a D1 binding named `DB`. To enable it: `wrangler d1 create snapclaim-sessions`, uncomment the `[[d1_databases]]` block in `wrangler.toml` with the returned id, then `wrangler d1 migrations apply snapclaim-sessions --local` (or `--remote`). The schema is `migrations/0001_sessions.sql`.
 
 All replies are enveloped `{ok, requestId, durationMs, result}`; errors are verbose `{ok:false, error, code, requestId, details}`.
 
