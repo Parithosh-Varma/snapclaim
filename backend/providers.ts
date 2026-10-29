@@ -181,6 +181,9 @@ export class BasetenSkepticProvider implements FindingsProvider {
       headers: { "content-type": "application/json", authorization: `Bearer ${this.#opts.apiKey}` },
       body: JSON.stringify({
         model: this.#opts.model,
+        // Reasoning model: ~95% of completion tokens are reasoning (measured 2026-10-29).
+        // Without a ceiling a spiral is unbounded, so cap it.
+        max_tokens: 8192,
         messages: [
           {
             role: "system",
@@ -198,7 +201,7 @@ export class BasetenSkepticProvider implements FindingsProvider {
     });
     if (!res.ok) throw new HttpError(502, `Baseten skeptic failed: HTTP ${res.status}`);
     const data = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
+      choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
       usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
     if (spend) {
@@ -214,7 +217,10 @@ export class BasetenSkepticProvider implements FindingsProvider {
       }
     }
     const content = data.choices?.[0]?.message?.content;
-    if (!content) throw new HttpError(502, "Baseten skeptic returned no content");
+    if (!content) {
+      const reason = data.choices?.[0]?.finish_reason ?? "unknown";
+      throw new HttpError(502, `Baseten skeptic returned no content (finish_reason: ${reason})`);
+    }
     return parseFindingDrafts(content, "Baseten skeptic");
   }
 }

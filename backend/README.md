@@ -20,7 +20,7 @@ npm run replay -- request.json measurement.json
 | `POST /v1/measure` | any | Deterministic math only: masks in, findings + receipts out. No model, no keys. |
 | `POST /v1/observe` | any | Pixel masks (COCO RLE) → component/masks/scaleReference that `/v1/report` takes. No model, no keys. |
 | `POST /v1/report` | mock default | measure → findings draft → Evidence Gate. Uncited numbers return `422` with `details[]`. Client may pass `drafts[]` to test the gate. |
-| `POST /v1/segment` | mock/live | Mock requires `body.fixture {component, masks}` — the backend invents no masks. Live calls SAM 3.1 point prompts (`imageUrl` + `width/height` + `points[1..16]`), parses the Responses output text and decodes masks with `@meta-sam/parser`; returns `{records: [{objectId, box, confidence, rle}]}`. Empty output throws, never fakes. |
+| `POST /v1/segment` | mock/live | Mock requires `body.fixture {component, masks}` — the backend invents no masks. Live calls SAM 3.1 point prompts (`imageUrl` + `width/height` + `points[1..16]`), parses the Responses output text and decodes masks with `@meta-sam/parser`; returns `{records: [{objectId, box, confidence, rle}]}` with full-frame RLE, `$0.0025`/image metered. Empty output throws, never fakes. |
 | `POST /v1/crosscheck` | any | `{a, b}` COCO RLE masks of one frame, `threshold?` — IoU + Dice agreement with AGREED/DISPUTED verdict. Keyless, deterministic. |
 | `POST /v1/transcribe` | mock/live | Spoken line to text via Muse Voice Transcribe (`/asr/transcribe`, multipart, `PUSH_TO_TALK`, Hindi/Telugu/English bias + claim keywords). Mock requires `body.fixtureTranscript`. Audio priced at $0.18/hr on the ledger. |
 | `POST /v1/findings` | mock/live | Drafts findings from measured facts, then gates them. Live path records token usage to the spend ledger. |
@@ -44,8 +44,8 @@ All replies are enveloped `{ok, requestId, durationMs, result}`; errors are verb
 
 ## Not yet (verified live, honestly blocked)
 
-- SAM 3.1 masks: live path implemented (Responses API + official parser, stubbed-stream tests green). One live photo with a key still needed to confirm end-to-end; until then the PWA's on-device SlimSAM masks are the measured path.
-- Voice transcribe: proxy implemented and stub-tested; first live Hindi/Telugu clip pending a key + mic test.
+- SAM 3.1 masks: live and verified 2026-10-29 (`200`, 1 record + full-frame RLE on a 1024x1024 photo, `$0.0025` ledgered). PWA tries `/v1/segment` first, on-device SlimSAM on any failure. Wire lesson: the official parser wants the mask payload WITH its `!`/`~` marker.
+- Voice transcribe: endpoint verified live 2026-10-29 (`POST /v1/asr/transcribe`, multipart WAV, `200`, ~$0.0001). The `/v1/transcribe` proxy is implemented and stub-tested; the first Hindi/Telugu clip through the proxy is still pending.
 - Skeptic inference: `403` until the Baseten form/access is granted. Code complete with real pricing.
 
 ## Deploy (Worker)

@@ -27,7 +27,7 @@ npm run bench                 # strict
 npm run bench -- --allow-unrun   # local only: unrun cases don't fail the command
 ```
 
-Reads one archived run per case from `bench/runs/<case>.json` (shape and provenance: `CaseRun` in `bench/run.ts`, checked by `validateRun`). `bench/runs/` is not committed yet; the archive writer is still to do.
+Reads one archived run per case from `bench/runs/<case>.json` (shape and provenance: `CaseRun` in `bench/run.ts`, checked by `validateRun`). `bench/runs/` is empty until a live run is archived. `npm run bench:archive -- <caseId> <input.json>` turns a pipeline result (`provenance`, `measurement`, optional `skeptic` drafts from /v1/skeptic) into that file; it refuses to overwrite an existing run. Skeptic verdicts come from the drafts: a draft citing a finding's receipts and saying DISPUTED disputes it, one that only restates it confirms it, a finding never cited gets no verdict.
 
 Exit codes: 0 clean, 1 failed or incomplete (invented millimetres, a run with no findings, an unrun case, an unknown or duplicate caseId), 2 the split has no `frozenAt` or a run file is unreadable. Scaled cases print `SKIP` until accuracy scoring exists.
 

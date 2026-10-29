@@ -4,23 +4,22 @@ Updated 2026-10-28. Weak rows stay in; nothing is buried.
 
 ## Setup
 
-- Deterministic bench: `npm run eval` (CI, $0, no keys). Loads every
-  `fixtures/masks/*.json`, runs `measureSession`, compares against
-  `fixtures/expected/<same>.json` when present (SKIP otherwise, never a pass).
-- Dispute scorer: `bench/score.ts` (`scoreDisputes`), DISPUTED as the positive
-  class, missing labels counted as misses. Covered by `tests/bench-score.test.ts`.
-- Replay: `npm run replay -- request.json measurement.json` reproduces
-  findings + receipts + mode byte-for-byte (see `tests/replay.test.ts`).
+Two scripts, both deterministic and free to run. `npm run eval` measures the dev mask fixtures against hand-checked expected values. `npm run bench` reads one archived live run per held-out case from `bench/runs/` and checks it (see `eval/README.md`). A case with no archived run prints UNRUN and fails the strict command, so a missing run cannot pass as a clean one. Every archived run carries the git SHA, model, prompt version and timestamp it came from. `npm run replay -- request.json measurement.json` reproduces findings + receipts + mode byte-for-byte (see `tests/replay.test.ts`).
 
 ## Data and split
 
-Cases and their split live in `bench/split.json`, frozen 2026-10-28 (see `frozenAt`).
-The dev case (`fixture-wall-crack-01`) is the regression baseline. The four
-held-out cases are public CC photos **without** a scale reference: they test that
-the pipeline refuses to invent millimetres. Photo files stay local in
-`fixtures/photos/` (gitignored); source, author and license are recorded per case.
-Calibrated-accuracy cases (coin + ruler in frame) are still to capture — that is
-the current gap, stated plainly.
+Cases and their split live in `bench/split.json`. The held-out split is frozen before any tuning (`frozenAt` 2026-10-28 18:05 +03:00), and a test hashes every held-out case so editing one after the freeze fails `npm test`.
+
+Dev: one synthetic wall-crack fixture with a coin scale reference.
+
+Held-out: four public photos, none with a scale reference in the crack's plane, so what they test is whether the pipeline refuses to invent millimetres. Scaled accuracy cases (coin or ruler in frame) are still missing; scaled cases print SKIP until accuracy scoring exists.
+
+| Case | Surface | Source license |
+| --- | --- | --- |
+| public-ruin-wall-crack-01 | wall | CC BY-SA 4.0 (Wikimedia Commons, A.-K. D.) |
+| public-stone-wall-crack-02 | wall | CC BY-SA 2.0 (Wikimedia Commons, David Smith) |
+| public-interior-wall-cracks-03 | wall | CC0 (Wikimedia Commons, Nolan Issac) |
+| public-cracked-tile-04 | tile | CC BY-SA 4.0 (Wikimedia Commons, Mk2010) |
 
 ## Baselines
 
@@ -44,6 +43,8 @@ held-out separately. The demo table goes in the README when the photos land.
 
 ### Skeptic DISPUTED calls
 
+The skeptic returns free text, so a finding's verdict is read from it by `bench/archive.ts`: a draft citing the finding's receipts and saying DISPUTED disputes it, a draft that only restates it confirms it, and a finding never cited gets no verdict and counts as missing.
+
 Scored by `scoreDisputes` in `bench/score.ts`, with DISPUTED as the positive class.
 
 ## Results
@@ -56,13 +57,11 @@ Scored by `scoreDisputes` in `bench/score.ts`, with DISPUTED as the positive cla
 
 - Held-out photos have masks/expected files but no photo bytes in the repo
   (`fixtures/photos/` gitignored) — they document the protocol, not results.
-- Live SAM 3.1 decode is tested against real official-encoder payloads and
-  stubbed SSE, not yet against a live photo (needs `META_API_KEY`).
-- Live skeptic inference is `403`-blocked (Baseten access pending); the text-only
-  skeptic path is what ships until then.
+- Live SAM 3.1 segment verified on one photo 2026-10-29 (`200`, full-frame RLE, $0.0025).
+- Live skeptic verified 2026-10-29 on the hackathon model `meta-models/muse-spark-open-1026`.
 
 ## Datasets and licenses
 
-Every public dataset used gets its name, license and exact split listed.
-Current held-out sources (all Wikimedia Commons, see `bench/split.json`):
-CC BY-SA 4.0, CC BY-SA 2.0, CC0 — authors recorded per case.
+The four held-out photos above are the only external data so far. Photo files stay local; source URLs are in `bench/split.json`.
+
+Every public dataset used here gets its name, license and exact split listed.

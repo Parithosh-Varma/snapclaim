@@ -1,4 +1,5 @@
 import { checkPhoto } from "./photo-check.js";
+import { decodeRle } from "./rle.js";
 import { mountTiltMeter } from "./tilt-meter.js";
 
 const $ = (id) => document.getElementById(id);
@@ -353,7 +354,7 @@ $("noCoin").onclick = () => {
 /* ---------- mark damage (photo canvas + SlimSAM taps) ---------- */
 const MAX_SIDE = 512;
 let embeddings = null; // true once the worker has embedded the current photo
-let dmg = { points: [], pointMasks: [], mask: null, iou: 0 };
+let dmg = { points: [], pointMasks: [], mask: null, iou: 0, source: null };
 let dmgLabel = "crack";
 
 function encodeRle(mask, w, h) {
@@ -413,7 +414,7 @@ function setupMarkPhoto() {
     photo.width = Math.round(img.width * scale);
     photo.height = Math.round(img.height * scale);
     photo.getContext("2d", { willReadFrequently: true }).drawImage(img, 0, 0, photo.width, photo.height);
-    dmg = { points: [], pointMasks: [], mask: null, iou: 0 };
+    dmg = { points: [], pointMasks: [], mask: null, iou: 0, source: null };
     drawMark();
     $("measureBtn").disabled = true;
     $("status").textContent = "Tap the crack, then Measure.";
@@ -434,6 +435,32 @@ function samDecode(point, preferSmallest) {
   });
 }
 const decodePoint = (point) => samDecode(point, true);
+// SAM 3.1 via the backend: one call for all taps so far (one billed image), not one per tap.
+// Throws on any failure so the caller falls back to the on-device model.
+async function segmentViaApi(points) {
+  const res = await fetch(base() + "/v1/segment", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      imageUrl: photo.toDataURL("image/jpeg", 0.85),
+      width: photo.width, height: photo.height,
+      points: points.map(([x, y]) => ({ x, y })),
+    }),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok || !j.ok) throw new Error(j.error ?? `segment HTTP ${res.status}`);
+  const rec = j.result?.records?.[0];
+  if (!rec) throw new Error("SAM found nothing there — tap the middle of the damage and retry.");
+  return { mask: decodeRle(rec.rle), iou: rec.confidence ?? 0, rle: rec.rle };
+}
+// On-device union of one SlimSAM mask per tap; null when no tap found anything.
+async function segmentOnDevice() {
+  while (dmg.pointMasks.length < dmg.points.length) dmg.pointMasks.push(await decodePoint(dmg.points[dmg.pointMasks.length]));
+  const found = dmg.pointMasks.filter(Boolean);
+  if (!found.length) return null;
+  const union = new Uint8Array(found[0].mask.length);
+  for (const { mask } of found) for (let i = 0; i < union.length; i++) union[i] |= mask[i];
+  return { mask: union, iou: Math.min(...found.map((f) => f.iou)) };
+}
 const decodeCoinPoint = (point) => samDecode(point, false);
 function drawMark() {
   const c = $("markCanvas");
@@ -467,23 +494,26 @@ function drawMark() {
   $("measureBtn").disabled = !dmg.mask;
 }
 $("markCanvas").addEventListener("pointerdown", async (ev) => {
-  if (!photo || !embeddings) { $("status").textContent = "Outlining model still loading…"; return; }
+  if (!photo) return;
   const c = $("markCanvas"), r = c.getBoundingClientRect();
   const x = Math.round((ev.clientX - r.left) * (c.width / r.width));
   const y = Math.round((ev.clientY - r.top) * (c.height / r.height));
   dmg.points.push([x, y]);
   $("status").textContent = "Outlining…";
+  // SAM 3.1 API first; the on-device model only when the API call fails.
+  let out = null, source = "api";
   try {
-    while (dmg.pointMasks.length < dmg.points.length) dmg.pointMasks.push(await decodePoint(dmg.points[dmg.pointMasks.length]));
-    const found = dmg.pointMasks.filter(Boolean);
-    if (found.length) {
-      const union = new Uint8Array(found[0].mask.length);
-      for (const { mask } of found) for (let i = 0; i < union.length; i++) union[i] |= mask[i];
-      dmg.mask = union;
-      dmg.iou = Math.min(...found.map((f) => f.iou));
-      $("status").textContent = `Outlined (${Math.round(dmg.iou * 100)}% sure).`;
-    } else { dmg.mask = null; $("status").textContent = "No mask there. Tap the middle of it."; }
-  } catch { dmg.mask = null; $("status").textContent = "Outlining failed."; }
+    out = await segmentViaApi(dmg.points);
+  } catch (e) {
+    console.info("[sam] API failed, using on-device", e);
+    source = "device";
+    if (!embeddings) { dmg.points.pop(); $("status").textContent = "Outlining model still loading…"; return; }
+    try { out = await segmentOnDevice(); } catch { out = null; }
+  }
+  if (out) {
+    dmg.mask = out.mask; dmg.iou = out.iou; dmg.source = source;
+    $("status").textContent = `Outlined (${Math.round(dmg.iou * 100)}% sure) via ${source === "api" ? "SAM 3.1 API" : "on-device"}.`;
+  } else { dmg.mask = null; dmg.source = null; $("status").textContent = "No mask there. Tap the middle of it."; }
   drawMark();
 });
 for (const [id, label] of [["chipCrack", "crack"], ["chipStain", "stain"], ["chipPeel", "peel"], ["chipDent", "dent"]]) {
@@ -922,21 +952,19 @@ async function runXcheck(auto) {
   checkState.xcheck = "loading";
   renderCheckCard(); updateReportGate();
   try {
-    const segRes = await fetch(base() + "/v1/segment", {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        imageUrl: photo.toDataURL("image/jpeg", 0.85),
-        width: photo.width, height: photo.height,
-        points: dmg.points.map(([x, y]) => ({ x, y })),
-      }),
-    });
-    const seg = await segRes.json().catch(() => ({}));
-    if (!segRes.ok || !seg.ok) throw new Error(seg.error ?? "SAM segment failed");
-    const record = seg.result?.records?.[0];
-    if (!record) throw new Error("SAM found nothing there — tap the middle of the damage and retry.");
+    // Cross-check against the model that did NOT draw the mask: API mask vs on-device, or the reverse.
+    let other;
+    if (dmg.source === "api") {
+      if (!embeddings) throw new Error("On-device model still loading — retry in a moment.");
+      const dev = await segmentOnDevice();
+      if (!dev) throw new Error("The on-device model found nothing at those taps.");
+      other = encodeRle(dev.mask, photo.width, photo.height);
+    } else {
+      other = (await segmentViaApi(dmg.points)).rle;
+    }
     const ccRes = await fetch(base() + "/v1/crosscheck", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ a: encodeRle(dmg.mask, photo.width, photo.height), b: record.rle, threshold: 0.5 }),
+      body: JSON.stringify({ a: encodeRle(dmg.mask, photo.width, photo.height), b: other, threshold: 0.5 }),
     });
     const cc = await ccRes.json().catch(() => ({}));
     if (!ccRes.ok || !cc.ok) throw new Error(cc.error ?? "cross-check failed");
@@ -1027,7 +1055,7 @@ $("copyBtn").onclick = async () => {
 };
 $("newClaimBtn").onclick = () => {
   payloadObj = null; lastMeasurement = null;
-  dmg = { points: [], pointMasks: [], mask: null, iou: 0 };
+  dmg = { points: [], pointMasks: [], mask: null, iou: 0, source: null };
   gateCoin = null; stillDataUrl = ""; noScaleMode = false; coinLabel = "";
   history.length = 0; smooth = null; coinSeen = false;
   $("transcriptBox").value = ""; $("heard").textContent = "";

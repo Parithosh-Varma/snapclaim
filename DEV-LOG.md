@@ -197,3 +197,57 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 **Spend:** $0.00.
 
 **Next:** real phone test; 3–5 real crack photos with a coin (one at an angle) for the eval; record the video.
+## 2026-10-29 — SAM 3.1 is the primary segmenter (main)
+
+**Shipped**
+
+- Ported the verified live segment path to `main`: `src/vision/sam.ts`, `encodeRle`/`rleRoundTrip` in `src/vision/mask.ts`, `SAM_IMAGE_USD` + live `segmentBody` branch, `@meta-sam/parser` declared in `package.json`, `tests/sam.test.ts`.
+- PWA tries `POST /v1/segment` first (one call for all taps, one billed image), falls back to the on-device worker on any failure; the status line says which one outlined (`via SAM 3.1 API` / `via on-device`). Shared `pwa/rle.js` decodes the backend RLE, covered by `tests/pwa-rle.test.ts`.
+- Live-verified on `main`: `200`, 1 record conf 0.12, RLE 1024x1024, `$0.0025` ledgered ($9.9975 remaining).
+- 121 tests green, `tsc` clean.
+
+**Spend:** $0.0025 (1 live call on main).
+
+## 2026-10-29 — Baseten hackathon key live, skeptic unblocked
+
+**Shipped**
+
+- Swapped `BASETEN_API_KEY` in `.env` (local only, gitignored) for the Meta hackathon key. The previous key was dead — `403 "please check the api-key you provided"` on every model.
+- Corrects the 2026-10-28 entry above: `meta-models/muse-spark-open-1026` **does** exist. It is listed in `/v1/models` as `name: "[HACKATHON] Muse Spark Open"`, `description: "Muse spark open intended for Meta hackathon, not publicly available"`. The plain `meta-models/muse-spark-open` is the public id and returns `403` for a hackathon key, so `config.models.sparkOpen` now points at the `-1026` id.
+- Capped `max_tokens: 8192` on the skeptic call. Muse Spark Open always reasons and the request set no ceiling on a model whose `max_completion_tokens` is 1,048,576.
+
+**Verified live (no guessing)**
+
+- Key valid end-to-end via the real `BasetenSkepticProvider`, not just curl: `200` in 7.2s → 2 drafts, `r1` cited on the reproducible length, percent correctly `DISPUTED` as underivable.
+- Reasoning dominates output: **1,824 reasoning tokens of 1,930 completion tokens** (95%) for a 289-token prompt. Budget-sane (~$0.009/call) but `max_tokens` must stay generous — at `max_tokens: 64` the model returns `content: null` with `finish_reason: "length"`. The no-content error now reports the finish reason instead of hiding it.
+- Also confirmed working on the hackathon model: streaming, tool calls, vision (read a generated image correctly), `response_format: json_object`, and prompt caching (128 cached tokens on repeats). Pricing as previously recorded.
+
+**Spend:** ~$0.02 of the $100 hackathon credit on probe calls. Metred guard untouched. 121 tests green, `tsc` clean.
+
+## 2026-10-29 — Worker skeptic live (fetch binding + redeploy)
+
+**Shipped**
+
+- Set `BASETEN_API_KEY` as a Worker secret (encrypted, not a plain variable) and redeployed `main` so the Worker runs the `-1026` model id.
+- Fixed a Workers-only crash: bare global `fetch` passed as `fetchFn` throws illegal-invocation. `worker.ts` and `server.ts` now pass a bound wrapper. Verified on the Worker: `POST /v1/skeptic` → `ok:true`, gate pass, cited drafts.
+- 121 tests green, `tsc` clean.
+
+## 2026-10-29 — Voice endpoint verified live ($0.0001)
+
+**Shipped**
+
+- The `?` on the README voice row is resolved: Muse Voice Transcribe lives at `POST /v1/asr/transcribe` (multipart file) and `wss://v1/asr/realtime` (live socket) — not chat/completions, not /v1/responses. Model `muse-voice-transcribe-1.0`, WAV mono 16-bit 24kHz, `PUSH_TO_TALK`, `languageBias: [English]`.
+- Probe: 1.5s macOS `say` clip ("wall crack after the rain") → `200`, transcript "wall crack after after the rain." (~$0.0001 at $0.18/hr audio). Hindi/Telugu/code-switch biasing is a documented `languageBias` feature, not yet probed with real speech.
+- README model table corrected. No backend proxy on `main` yet — PWA voice path still unwired; that is the next step if voice makes the demo.
+
+**Spend:** ~$0.0001.
+
+## 2026-10-29 — #30 brought up to date with main
+
+**Shipped**
+
+- Merged `main` into the CV/PWA branch (11 conflicting files). Kept main's live-verified SAM 3.1 wire fix (the decoder gets the payload with its `!`/`~` marker), the bound `fetch` wrapper, the eval archive writer and the frozen-split text. Kept the branch's `/v1/transcribe` proxy (main has none yet), WebGPU worker and CORS allowlist.
+- The merged PWA outlines with the SAM 3.1 API first and falls back to on-device SlimSAM, as on main; taps no longer wait for the on-device embedding. The mask cross-check now compares against whichever model did not draw the mask (API mask vs on-device, or the reverse), so it stays an independent check.
+- 175 tests green, `tsc` clean, eval 7 pass. `npm run bench` still UNRUN until live runs are archived.
+
+**Spend:** $0.00.

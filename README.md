@@ -8,6 +8,8 @@
 
 SnapClaim turns a damage photo plus a one-line description into a replayable evidence package: calibrated measurements (% damaged, crack length/width, area in cm²), each backed by a machine-checkable receipt, with AI-written findings that the server refuses to ship unless every number cites its receipt.
 
+**Global by design:** the measurement engine assumes no currency, locale, or language — a scale reference is any known-size object (coin, ruler, bank card), and the transcript is free text in any language. The demo is shot in India; nothing in the pipeline is India-specific.
+
 ## Contents
 
 - [Quickstart](#quickstart)
@@ -30,7 +32,7 @@ Requirements: Node.js ≥ 22.18. No keys needed — the default mode runs fully 
 
 ```bash
 npm install
-npm test            # 106 tests, zero API spend
+npm test            # full suite, live paths with fetch stubbed, zero API spend
 npm run typecheck
 npm run backend:start   # http://127.0.0.1:8787
 ```
@@ -78,12 +80,23 @@ Three principles run through all of it:
 
 | | Demo (default) | Live (`MOCK_MODE=0` + keys) |
 |---|---|---|
-| Masks | Supplied fixture (`backend invents no masks`) | SAM 3.1 point prompts, decoded with the official parser |
+| Masks | Supplied fixture (`backend invents no masks`) | SAM 3.1 point prompts via `/v1/segment`; the PWA falls back to on-device SlimSAM on any failure |
 | Findings / skeptic | Deterministic mocks ($0) | Muse Spark 1.3 / Spark Open on Baseten |
 | Voice | Supplied `fixtureTranscript` | Muse Voice Transcribe proxy (`/v1/transcribe`) |
 | Measure, observe, gate, render, replay | Real in both modes | Real in both modes |
 
 The health badge reports the mode: `GET /v1/health` → `{mode: "mock" | "live" | "config-error"}`.
+
+### Meta models used
+
+| Role | Model | Where |
+|---|---|---|
+| Perception — damage masks | **SAM 3.1** | `https://api.meta.ai/v1` |
+| Reasoning — evidence-gated findings | **Muse Spark 1.3** | `https://api.meta.ai/v1/chat/completions` |
+| Independent skeptic (open weights) | **Spark Open** | `https://inference.baseten.co/v1` · `meta-models/muse-spark-open-1026` |
+| Voice intake (any language; demoed in Hindi / Telugu / Hinglish) | **Muse Voice Transcribe** | `POST https://api.meta.ai/v1/asr/transcribe` (file) · `wss://api.meta.ai/v1/asr/realtime` (live) |
+
+No image generation anywhere: every visual is drawn in code from the masks and the math. (Muse Image is unavailable in our region under Meta's Geographic Use Policy — the receipts pattern turns that constraint into a design principle, not a product boundary.)
 
 ## API reference
 
@@ -189,6 +202,7 @@ tests/          106 tests, mock by default, live paths with stubbed fetch
 - **Measurement ≠ causation.** The chain proves what was measured, not who broke it.
 - **Staged photos are a known limit.** Receipts make measurement replayable and partly tamper-evident; they do not prove provenance.
 - No medical, health, or insurance-advice functionality. No image generation — every visual is drawn in code. SVG only (no PDF).
+- No geo-circumvention, no VPN. Credits claimed only with each builder's own registration email; no pooling. Build-time tooling disclosed in `DEV-LOG.md`.
 
 ## Provenance and license
 

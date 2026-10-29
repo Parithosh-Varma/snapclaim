@@ -33,7 +33,9 @@ function makeMaskToken(h: number, w: number, fill: (x: number, y: number) => num
   assert.ok(payload, `no canned payload for ${key}`);
   // Sanity: the canned raster really matches `fill` once decoded.
   void fill;
-  return `data=${h},${w},!${payload}`;
+  // Canned payloads already carry their `!` marker (as the encoder emits
+  // them), so no extra marker is added here — same as the live wire format.
+  return `data=${h},${w},${payload}`;
 }
 
 test("point prompts build the documented token grammar", () => {

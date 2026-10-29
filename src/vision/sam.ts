@@ -235,7 +235,10 @@ export function maskTokenToBinaryMask(mask: SamMaskToken): BinaryMask {
   if (mask.h <= 0 || mask.w <= 0) {
     throw new MeasurementError(`mask raster must be positive, got ${mask.h}x${mask.w}`);
   }
-  const raster = decodeMaskToRaster({ encoding: mask.enc, payload: mask.payload, width: mask.w, height: mask.h });
+  // The wire grammar puts the encoding marker before the payload (`!`/`~`);
+  // the official decoder wants the payload WITH its marker, so re-attach it.
+  const marked = `${mask.enc === "one_bit" ? "!" : "~"}${mask.payload}`;
+  const raster = decodeMaskToRaster({ encoding: mask.enc, payload: marked, width: mask.w, height: mask.h });
   if (raster.length !== mask.h * mask.w) {
     throw new MeasurementError(`decoded raster has ${raster.length} bytes, expected ${mask.h * mask.w}`);
   }
