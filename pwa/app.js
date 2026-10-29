@@ -422,14 +422,17 @@ function setupMarkPhoto() {
   };
   img.src = stillDataUrl;
 }
-// Cracks are thin, so the worker takes SAM's smallest confident candidate, not the wall around it.
-function decodePoint(point) {
+// Cracks are thin, so the worker takes SAM's smallest confident candidate, not the wall
+// around it. Coins are compact, so they keep SAM's best-scoring candidate.
+function samDecode(point, preferSmallest) {
   const id = samDecodeId++;
   return new Promise((resolve, reject) => {
     samPending.set(id, { resolve, reject });
-    sam().postMessage({ type: "decode", id, photoId: samPhotoId, point, preferSmallest: true });
+    sam().postMessage({ type: "decode", id, photoId: samPhotoId, point, preferSmallest });
   });
 }
+const decodePoint = (point) => samDecode(point, true);
+const decodeCoinPoint = (point) => samDecode(point, false);
 function drawMark() {
   const c = $("markCanvas");
   c.width = photo.width; c.height = photo.height;
@@ -511,17 +514,30 @@ $("measureBtn").onclick = async () => {
   $("findings").innerHTML = "";
   drawScheme([]);
   const body = { masks: [{ id: "damage-1", label: dmgLabel, rle: encodeRle(dmg.mask, w, h), confidence: dmg.iou || 0.8 }] };
+  let circleRef = null;
   if (gateCoin) {
     const kx = w / gateCoin.sw, ky = h / gateCoin.sh;
     const cx = (gateCoin.cx / gateCoin.fw) * gateCoin.sw * kx;
     const cy = (gateCoin.cy / gateCoin.fh) * gateCoin.sh * ky;
     const r = Math.max(3, (gateCoin.rr / gateCoin.fw) * gateCoin.sw * kx);
-    body.reference = { id: "coin", rle: circleRle(cx, cy, r, w, h), knownMm: Number($("coinKind").value), confidence: 0.85 };
+    circleRef = { id: "coin", rle: circleRle(cx, cy, r, w, h), knownMm: Number($("coinKind").value), confidence: 0.85 };
+    // The coin's real outline, not the gate's circle: a tilted wall shows the coin as an
+    // ellipse, and the backend uses that ellipse to correct the crack lengths.
+    const traced = await traceCoin(cx, cy, r, w, h);
+    body.reference = traced ? { ...circleRef, rle: encodeRle(traced.mask, w, h), confidence: traced.iou } : circleRef;
   } else if (noScaleMode) body.note = "percent-only requested";
   $("status").textContent = "";
   try {
-    const res = await fetch(base() + "/v1/observe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-    const j = await res.json();
+    const observe = (b) => fetch(base() + "/v1/observe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) });
+    let res = await observe(body);
+    let j = await res.json();
+    // a traced outline the backend refuses (not coin-shaped) falls back to the gate's circle
+    if (res.status === 422 && circleRef && body.reference !== circleRef) {
+      console.info(`[coin] traced outline refused (${j.error}); using the detected circle`);
+      body.reference = circleRef;
+      res = await observe(body);
+      j = await res.json();
+    }
     if (!res.ok || !j.ok) throw new Error(j.error ?? res.status);
     const mres = await fetch(base() + "/v1/measure", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(j.result) });
     const measured = await mres.json();
@@ -537,6 +553,21 @@ $("measureBtn").onclick = async () => {
     showNumError("Measurement failed", String(e.message ?? e), () => $("measureBtn").click());
   }
 };
+/** SAM's outline of the coin at the gate's circle, or null when it doesn't look like that coin. */
+async function traceCoin(cx, cy, r, w, h) {
+  if (!embeddings) return null;
+  let out;
+  try { out = await decodeCoinPoint([Math.round(cx), Math.round(cy)]); } catch { return null; }
+  if (!out) return null;
+  let area = 0, sx = 0, sy = 0;
+  for (let i = 0; i < out.mask.length; i++) if (out.mask[i]) { area++; sx += i % w; sy += (i / w) | 0; }
+  // An ellipse seen at up to ~60° keeps half its area; much more means SAM took the wall.
+  const circle = Math.PI * r * r;
+  if (area < circle * 0.4 || area > circle * 1.6) return null;
+  if (Math.hypot(sx / area - cx, sy / area - cy) > r * 0.5) return null;
+  return out;
+}
+
 function metricCards(f) {
   const mm = f.crackLengthMm == null ? "—" : `${esc(String(f.crackLengthMm))} mm`;
   const area = f.areaCm2 == null ? "" : `<div class="metric"><b>${esc(String(f.areaCm2))} cm²</b><span>Area</span></div>`;
