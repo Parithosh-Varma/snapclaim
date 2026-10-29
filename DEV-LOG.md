@@ -163,3 +163,13 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 - Set `BASETEN_API_KEY` as a Worker secret (encrypted, not a plain variable) and redeployed `main` so the Worker runs the `-1026` model id.
 - Fixed a Workers-only crash: bare global `fetch` passed as `fetchFn` throws illegal-invocation. `worker.ts` and `server.ts` now pass a bound wrapper. Verified on the Worker: `POST /v1/skeptic` → `ok:true`, gate pass, cited drafts.
 - 121 tests green, `tsc` clean.
+
+## 2026-10-29 — Voice endpoint verified live ($0.0001)
+
+**Shipped**
+
+- The `?` on the README voice row is resolved: Muse Voice Transcribe lives at `POST /v1/asr/transcribe` (multipart file) and `wss://v1/asr/realtime` (live socket) — not chat/completions, not /v1/responses. Model `muse-voice-transcribe-1.0`, WAV mono 16-bit 24kHz, `PUSH_TO_TALK`, `languageBias: [English]`.
+- Probe: 1.5s macOS `say` clip ("wall crack after the rain") → `200`, transcript "wall crack after after the rain." (~$0.0001 at $0.18/hr audio). Hindi/Telugu/code-switch biasing is a documented `languageBias` feature, not yet probed with real speech.
+- README model table corrected. No backend proxy on `main` yet — PWA voice path still unwired; that is the next step if voice makes the demo.
+
+**Spend:** ~$0.0001.

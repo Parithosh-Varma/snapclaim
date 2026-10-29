@@ -4,13 +4,15 @@
 
 Built during the **Meta Global AI Developer Hackathon** (Oct 26 – Nov 4, 2026) · Indie track · 3-person student team · public by default.
 
-**Status: mock by default, live behind `MOCK_MODE=0`. Photo intake segments on-device (SlimSAM); measure and observe are pure math; findings/skeptic/segment use deterministic mocks at $0 with no keys, live Meta/Baseten when `MOCK_MODE=0` with keys (503 without them). 56/56 tests green, typecheck clean.** Progress lives in `DEV-LOG.md`.
+**Status: mock by default, live behind `MOCK_MODE=0`. Photo intake segments on-device (SlimSAM); measure and observe are pure math; findings/skeptic/segment use deterministic mocks at $0 with no keys, live Meta/Baseten when `MOCK_MODE=0` with keys (503 without them). 121/121 tests green, typecheck clean.** Progress lives in `DEV-LOG.md`.
+
+**Global by design:** the measurement engine assumes no currency, locale, or language — a scale reference is any known-size object (coin, ruler, bank card), and the transcript is free text in any language. The demo is shot in India; nothing in the pipeline is India-specific.
 
 ## Run it
 
 ```bash
 npm install
-npm test         # 56 tests, live paths with fetch stubbed + mock fallback, zero API spend
+npm test         # 121 tests, live paths with fetch stubbed + mock fallback, zero API spend
 npm run typecheck
 ```
 
@@ -55,13 +57,13 @@ A wall cracks after monsoon. A ceiling stains. A bike gets knocked over. A tenan
 | Perception — damage masks | **SAM 3.1** | `https://api.meta.ai/v1` |
 | Reasoning — evidence-gated findings | **Muse Spark 1.3** | `https://api.meta.ai/v1/chat/completions` |
 | Independent skeptic (open weights) | **Spark Open** | `https://inference.baseten.co/v1` · `meta-models/muse-spark-open-1026` |
-| Voice intake (Hindi / Telugu / Hinglish code-switch) | **Muse Voice Transcribe** | `https://api.meta.ai/v1` |
+| Voice intake (any language; demoed in Hindi / Telugu / Hinglish) | **Muse Voice Transcribe** | `POST https://api.meta.ai/v1/asr/transcribe` (file) · `wss://api.meta.ai/v1/asr/realtime` (live) |
 
-No image generation anywhere: every visual is drawn in code from the masks and the math. (Muse Image is unavailable from India under Meta's Geographic Use Policy — the receipts pattern turns that constraint into a design principle.)
+No image generation anywhere: every visual is drawn in code from the masks and the math. (Muse Image is unavailable in our region under Meta's Geographic Use Policy — the receipts pattern turns that constraint into a design principle, not a product boundary.)
 
 ## Measurement rules (deterministic, documented)
 
-- **With scale reference** (coin, ruler, known object): absolute values (mm / cm²) + percentages. Calibration constant is versioned in the report.
+- **With scale reference** (any coin, ruler, bank card, or known object): absolute values (mm / cm²) + percentages. Calibration constant is versioned in the report. No currency or locale assumption — the reference is a physical size in millimetres.
 - **Without scale reference:** percentages and ratios only — labeled as such, never silently upgraded to absolute units.
 - Severity bands are configurable and printed with their thresholds in the report. No hidden numbers.
 - Every measurement is recomputable offline from the original photo + calibration metadata + the receipts file.
@@ -84,7 +86,7 @@ No image generation anywhere: every visual is drawn in code from the masks and t
 ## Demo video (3 minutes)
 
 1. **0:00** A real crack on a real wall, phone in hand. "The surveyor comes next month. The deposit is due Friday."
-2. **0:20** Snap → masks bloom → speak one Hinglish line → the annexure writes itself with green receipts. One finding flips **red**: the skeptic disputes the length estimate (scale marker occluded). Human correction → green. Co-signed.
+2. **0:20** Snap → masks bloom → speak one line (Hinglish in this demo) → the annexure writes itself with green receipts. One finding flips **red**: the skeptic disputes the length estimate (scale marker occluded). Human correction → green. Co-signed.
 3. **2:20** Receipts page: percentages, evidence table, held-out-dataset numbers vs baselines; `snapclaim replay` reconstructs the whole chain from the receipts file. Close: **"Computed, not generated — because a claim is an argument, and arguments need evidence."**
 
 ## Build plan
@@ -110,7 +112,7 @@ TypeScript everywhere · browser PWA (camera + voice capture) · Cloudflare Work
 ## Compliance guardrails
 
 - Non-medical, non-advisory, no coverage/legal decisions.
-- No geo-circumvention; no Muse Image (India geo-block); no VPN.
+- No geo-circumvention; no Muse Image (geo-blocked in our region); no VPN.
 - Credits claimed only with the builder's own registration email; no pooling.
 - Build-time tooling disclosed in `DEV-LOG.md`.
 
