@@ -1,6 +1,8 @@
 import { checkPhoto } from "./photo-check.js";
+import { mountTiltMeter } from "./tilt-meter.js";
 
 const $ = (id) => document.getElementById(id);
+mountTiltMeter($("tiltMeter")); // live level over the camera; hidden without orientation sensors
 let payloadObj = null;
 let lastMeasurement = null;
 function base() { return $("baseUrl").value.replace(/\/$/, ""); }
@@ -238,8 +240,8 @@ function scanFrame() {
     const f0 = findRing(edge, fw, fh);
     if (f0) found = { cx: f0.cx, cy: f0.cy, rr: f0.rr, score: f0.score };
   }
-  const tooClose = !!found && found.r > fw * 0.32;
-  const det = found && !tooClose ? { cx: found.x, cy: found.y, rr: found.r, score: found.score } : null;
+  const tooClose = !!found && found.rr > fw * 0.32;
+  const det = found && !tooClose ? found : null;
   if (tooClose) {
     history.push(null);
     if (history.length > 10) history.shift();
@@ -755,8 +757,10 @@ async function finishListening(landed) {
     // On the device first (Whisper in voice-worker.js): the voice never leaves the phone
     // and it works without the backend key. The server transcriber is the fallback.
     try {
-      const local = await transcribeOnDevice(rendered.getChannelData(0).slice());
-      if (local) { landTranscript(local); return; }
+      // Whisper writes non-speech as tags like [Music] or (wind blowing); those are not words.
+      const local = (await transcribeOnDevice(rendered.getChannelData(0).slice())).replace(/\[[^\]]*\]|\([^)]*\)/g, "").trim();
+      if (local) landTranscript(local); else heard.textContent = "Didn't catch anything — type the line.";
+      return;
     } catch (e) { console.info(`[voice] on-device failed, trying the server: ${e.message ?? e}`); }
     micState.textContent = "Transcribing…";
     const wav = encodeWav(rendered.getChannelData(0), 16000);
@@ -1111,3 +1115,5 @@ async function loadSample() {
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
 }
+// Open the camera on arrival; a refusal or missing camera shows the Enable camera button.
+acquireCamera();
