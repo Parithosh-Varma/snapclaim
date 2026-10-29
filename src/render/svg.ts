@@ -30,6 +30,7 @@ const OVERLAY_COLORS = new Map<string, string>([
   ["stain", "#f39c12"],
   ["peel", "#2980b9"],
   ["dent", "#8e44ad"],
+  ["coin", "#0f7a36"],
 ]);
 
 /** Round to 2 decimals for layout numbers. */

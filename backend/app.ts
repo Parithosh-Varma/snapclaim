@@ -1,12 +1,13 @@
 import { measureSession } from "../src/engine/measure.ts";
-import { circularReference, observeMask } from "../src/vision/observe.ts";
-import { decodeRle, type BinaryMask, type CocoRle } from "../src/vision/mask.ts";
+import { type ReferenceDiagnostics, circularReference, observeMask, tiltStretch } from "../src/vision/observe.ts";
+import { decodeRle, intersectMasks, type BinaryMask, type CocoRle } from "../src/vision/mask.ts";
 import { agreementVerdict, maskAgreement } from "../src/vision/agreement.ts";
 import type { MeasureSessionInput } from "../src/engine/types.ts";
 import { validateFindings, type FindingDraft } from "../src/findings/evidence-gate.ts";
 import type { MeasuredFinding } from "../src/engine/types.ts";
 import type { Receipt } from "../src/receipts/types.ts";
-import { renderAnnexureSvg } from "../src/render/svg.ts";
+import { type AnnexureOverlay, renderAnnexureSvg } from "../src/render/svg.ts";
+import { maskOutlinePath } from "../src/vision/contour.ts";
 import { guardFor, spendStatus } from "./spend.ts";
 import { BudgetExceededError } from "../src/config/spend-guard.ts";
 import { configFromEnv, findingsProvider, requireLiveKeys, skepticProvider, visionProvider, HttpError, SAM_IMAGE_USD, type Env, type FetchFn } from "./providers.ts";
@@ -175,6 +176,25 @@ export function observeBody(body: unknown, requestId = newRequestId()): Envelope
     };
   }
 
+  // The coin first: when it is tilted, its ellipse corrects the crack lengths below.
+  let measuredReference: ReturnType<typeof circularReference> | undefined;
+  let refMask: BinaryMask | undefined;
+  if (reference !== undefined) {
+    if (!isRecord(reference)) throw new HttpError(400, "reference must be an object");
+    refMask = parseRle(reference.rle, "reference");
+    sameSize(refMask, "reference");
+    try {
+      measuredReference = circularReference(refMask, {
+        id: requireId(reference.id, "reference.id"),
+        knownMm: requireNumber(reference.knownMm, "reference.knownMm"),
+        confidence: requireNumber(reference.confidence, "reference.confidence"),
+      });
+    } catch (error) {
+      throw new HttpError(422, `reference: ${error instanceof Error ? error.message : "cannot measure"}`);
+    }
+  }
+  const stretch = measuredReference && tiltStretch(measuredReference.diagnostics);
+
   const observed = decoded.map(({ raw, mask }, i) => {
     const label = raw.label;
     if (typeof label !== "string") throw new HttpError(400, `masks[${i}].label must be a string`);
@@ -183,26 +203,30 @@ export function observeBody(body: unknown, requestId = newRequestId()): Envelope
       label: label as never,
       confidence: requireNumber(raw.confidence, `masks[${i}].confidence`),
       ...(componentMask ? { component: componentMask } : {}),
+      ...(stretch ? { stretch } : {}),
     });
   });
 
-  const result: Pick<MeasureSessionInput, "component" | "masks" | "scaleReference"> = {
+  // referenceCheck and overlay are extra: /v1/measure ignores them. The PWA shows the
+  // check and hands the overlay to /v1/render, outlining exactly the pixels measured.
+  const outline = (mask: BinaryMask) =>
+    maskOutlinePath(componentMask ? intersectMasks(mask, componentMask) : mask, { tolerance: OUTLINE_TOLERANCE_PX });
+  const result: Pick<MeasureSessionInput, "component" | "masks" | "scaleReference"> & {
+    referenceCheck?: ReferenceDiagnostics;
+    overlay: AnnexureOverlay;
+  } = {
     component: componentObs,
     masks: observed,
+    overlay: {
+      width: first.width,
+      height: first.height,
+      masks: decoded.map(({ mask }, i) => ({ id: observed[i]!.id, label: observed[i]!.label, path: outline(mask) })),
+    },
   };
-  if (reference !== undefined) {
-    if (!isRecord(reference)) throw new HttpError(400, "reference must be an object");
-    const refMask = parseRle(reference.rle, "reference");
-    sameSize(refMask, "reference");
-    try {
-      result.scaleReference = circularReference(refMask, {
-        id: requireId(reference.id, "reference.id"),
-        knownMm: requireNumber(reference.knownMm, "reference.knownMm"),
-        confidence: requireNumber(reference.confidence, "reference.confidence"),
-      }).reference;
-    } catch (error) {
-      throw new HttpError(422, `reference: ${error instanceof Error ? error.message : "cannot measure"}`);
-    }
+  if (measuredReference && refMask) {
+    result.scaleReference = measuredReference.reference;
+    result.referenceCheck = measuredReference.diagnostics;
+    result.overlay.masks.push({ id: measuredReference.reference.id, label: "coin", path: maskOutlinePath(refMask, { tolerance: OUTLINE_TOLERANCE_PX }) });
   }
   quietLog("[observe]", { requestId, masks: observed.length });
   return envelope(requestId, started, result);
@@ -382,6 +406,29 @@ export async function skepticBody(body: unknown, env: Env, requestId = newReques
   return envelope(requestId, started, { findings: drafts, gate });
 }
 
+/** Outline simplification, in source pixels: keeps the shape, drops staircase steps. */
+const OUTLINE_TOLERANCE_PX = 1;
+/** An SVG path from contoursToSvgPath: move, line and close commands with plain numbers. */
+const SVG_PATH = /^[MLZ0-9 .-]*$/;
+
+/** The photo panel from /v1/observe, plus the photo the PWA attaches. Shapes are checked here. */
+export function parseOverlay(raw: unknown): AnnexureOverlay {
+  if (!isRecord(raw)) throw new HttpError(400, "overlay must be an object");
+  const width = requireNumber(raw.width, "overlay.width");
+  const height = requireNumber(raw.height, "overlay.height");
+  if (!Array.isArray(raw.masks)) throw new HttpError(400, "overlay.masks must be an array");
+  if (raw.masks.length > MAX_MASKS + 1) throw new HttpError(400, `overlay.masks capped at ${MAX_MASKS + 1}`);
+  const masks = raw.masks.map((m, i) => {
+    if (!isRecord(m) || typeof m.label !== "string" || typeof m.path !== "string" || !SVG_PATH.test(m.path)) {
+      throw new HttpError(400, `overlay.masks[${i}] needs an id, a label and an SVG path`);
+    }
+    return { id: requireId(m.id, `overlay.masks[${i}].id`), label: m.label, path: m.path };
+  });
+  const overlay: AnnexureOverlay = { width, height, masks };
+  if (typeof raw.photoHref === "string") overlay.photoHref = raw.photoHref;
+  return overlay;
+}
+
 export async function renderBody(body: unknown, env: Env, requestId = newRequestId(), fetchFn?: FetchFn): Promise<EnvelopedResult> {
   const started = Date.now();
   const reported = await reportBody(body, env, requestId, fetchFn);
@@ -399,6 +446,7 @@ export async function renderBody(body: unknown, env: Env, requestId = newRequest
     transcript,
     version: VERSION,
     generatedAt: new Date().toISOString(),
+    ...(isRecord(body) && body.overlay !== undefined ? { overlay: parseOverlay(body.overlay) } : {}),
   });
   return envelope(requestId, started, { svg, gate: result.gate, findings: result.findings });
 }

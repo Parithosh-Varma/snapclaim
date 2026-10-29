@@ -334,3 +334,186 @@ export function skeletonLengthPx(skeleton: BinaryMask): number {
   }
   return length;
 }
+
+/**
+ * Undoes the foreshortening of a tilted surface: lengths along `angle`
+ * (radians from +x, y pointing down) are multiplied by `factor`, lengths
+ * across it are kept. From a coin's ellipse, `angle` is its minor axis and
+ * `factor` is 1 / aspect.
+ */
+export interface PlaneStretch {
+  angle: number;
+  factor: number;
+}
+
+/**
+ * The mask as it would look shot straight on: resampled onto
+ * a grid stretched by `factor` along `angle`, bilinear and thresholded at one half. Measuring the resampled mask
+ * keeps the skeleton and its link weights exact; stretching each link of the
+ * original skeleton instead overstates stair-stepped lines by up to 13%.
+ */
+export function rectifyMask(mask: BinaryMask, stretch: PlaneStretch): BinaryMask {
+  assertMask(mask);
+  const nx = Math.cos(stretch.angle);
+  const ny = Math.sin(stretch.angle);
+  const forward = (x: number, y: number): [number, number] => {
+    const along = (stretch.factor - 1) * (x * nx + y * ny);
+    return [x + along * nx, y + along * ny];
+  };
+  const corners = [forward(0, 0), forward(mask.width, 0), forward(0, mask.height), forward(mask.width, mask.height)];
+  const minX = Math.min(...corners.map((c) => c[0]));
+  const minY = Math.min(...corners.map((c) => c[1]));
+  const width = Math.ceil(Math.max(...corners.map((c) => c[0])) - minX);
+  const height = Math.ceil(Math.max(...corners.map((c) => c[1])) - minY);
+  const out = createMask(width, height);
+  const back = 1 / stretch.factor - 1;
+  const at = (x: number, y: number): number =>
+    x >= 0 && y >= 0 && x < mask.width && y < mask.height && mask.data[y * mask.width + x] !== 0 ? 1 : 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      // Output pixel centre → original image, then the pixel that contains it.
+      const ox = x + 0.5 + minX;
+      const oy = y + 0.5 + minY;
+      const along = back * (ox * nx + oy * ny);
+      // Bilinear between pixel centres, kept at ≥ 0.5: nearest-pixel sampling
+      // leaves stair steps on oblique edges that sprout skeleton spurs.
+      const fx = ox + along * nx - 0.5;
+      const fy = oy + along * ny - 0.5;
+      const x0 = Math.floor(fx);
+      const y0 = Math.floor(fy);
+      const tx = fx - x0;
+      const ty = fy - y0;
+      const value =
+        (1 - tx) * (1 - ty) * at(x0, y0) + tx * (1 - ty) * at(x0 + 1, y0) + (1 - tx) * ty * at(x0, y0 + 1) + tx * ty * at(x0 + 1, y0 + 1);
+      if (value >= 0.5) out.data[y * width + x] = 1;
+    }
+  }
+  return out;
+}
+
+/** Copy of one region, cropped to its bounding box plus a one-pixel empty border. */
+export function cropRegion(width: number, region: Region): BinaryMask {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const i of region.pixels) {
+    const x = i % width;
+    const y = Math.floor(i / width);
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  const out = createMask(maxX - minX + 3, maxY - minY + 3);
+  for (const i of region.pixels) {
+    out.data[(Math.floor(i / width) - minY + 1) * out.width + (i % width) - minX + 1] = 1;
+  }
+  return out;
+}
+
+/**
+ * Largest distance from a mask pixel to the background, in pixels, from a
+ * two-pass 3-4 chamfer transform (within 8% of Euclidean). Twice this is the
+ * thickest point of the shape.
+ */
+export function maxInscribedRadiusPx(mask: BinaryMask): number {
+  assertMask(mask);
+  const { width, height } = mask;
+  const dist = new Int32Array(width * height);
+  const far = 1 << 28;
+  const get = (x: number, y: number): number =>
+    x < 0 || y < 0 || x >= width || y >= height ? 0 : (dist[y * width + x] as number);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = y * width + x;
+      if (mask.data[i] === 0) continue;
+      dist[i] = Math.min(far, get(x - 1, y) + 3, get(x, y - 1) + 3, get(x - 1, y - 1) + 4, get(x + 1, y - 1) + 4);
+    }
+  }
+  let best = 0;
+  for (let y = height - 1; y >= 0; y--) {
+    for (let x = width - 1; x >= 0; x--) {
+      const i = y * width + x;
+      if (mask.data[i] === 0) continue;
+      const d = Math.min(
+        dist[i] as number,
+        get(x + 1, y) + 3,
+        get(x, y + 1) + 3,
+        get(x + 1, y + 1) + 4,
+        get(x - 1, y + 1) + 4,
+      );
+      dist[i] = d;
+      if (d > best) best = d;
+    }
+  }
+  return best / 3;
+}
+
+function lineFitRmsPx(us: number[], vs: number[]): number {
+  const n = us.length;
+  const mu = us.reduce((a, b) => a + b, 0) / n;
+  const mv = vs.reduce((a, b) => a + b, 0) / n;
+  let suv = 0;
+  let suu = 0;
+  for (let k = 0; k < n; k++) {
+    suv += ((us[k] as number) - mu) * ((vs[k] as number) - mv);
+    suu += ((us[k] as number) - mu) ** 2;
+  }
+  const slope = suu === 0 ? 0 : suv / suu;
+  let sum = 0;
+  for (let k = 0; k < n; k++) sum += ((vs[k] as number) - mv - slope * ((us[k] as number) - mu)) ** 2;
+  return Math.sqrt(sum / n);
+}
+
+/**
+ * How close a region's straighter long edge is to a line: RMS distance in pixels
+ * of that edge from its best-fit line, over the middle 80% of the region's
+ * length (the ends are rounded on any shape). Built things such as ledges, frames
+ * and joints have at least one edge near 0.5 px; a crack's edges are
+ * both ragged. Null when the region is shorter than `minLengthPx` along its axis.
+ */
+export function straightestEdgeRmsPx(width: number, region: Region, minLengthPx = 30): number | null {
+  const n = region.areaPx;
+  let sumX = 0;
+  let sumY = 0;
+  for (const i of region.pixels) {
+    sumX += i % width;
+    sumY += Math.floor(i / width);
+  }
+  const cx = sumX / n;
+  const cy = sumY / n;
+  let xx = 0;
+  let yy = 0;
+  let xy = 0;
+  for (const i of region.pixels) {
+    const dx = (i % width) - cx;
+    const dy = Math.floor(i / width) - cy;
+    xx += dx * dx;
+    yy += dy * dy;
+    xy += dx * dy;
+  }
+  const theta = 0.5 * Math.atan2(2 * xy, xx - yy);
+  const cos = Math.cos(theta);
+  const sin = Math.sin(theta);
+
+  // Per 1 px step along the main axis, the extreme offsets across it: the two edges.
+  const low = new Map<number, number>();
+  const high = new Map<number, number>();
+  for (const i of region.pixels) {
+    const dx = (i % width) - cx;
+    const dy = Math.floor(i / width) - cy;
+    const u = Math.round(dx * cos + dy * sin);
+    const v = -dx * sin + dy * cos;
+    if (!(v >= (low.get(u) ?? Infinity))) low.set(u, v);
+    if (!(v <= (high.get(u) ?? -Infinity))) high.set(u, v);
+  }
+  const steps = [...low.keys()].sort((a, b) => a - b);
+  if (steps.length < minLengthPx) return null;
+  const cut = Math.floor(steps.length * 0.1);
+  const us = steps.slice(cut, steps.length - cut);
+  return Math.min(
+    lineFitRmsPx(us, us.map((u) => low.get(u) as number)),
+    lineFitRmsPx(us, us.map((u) => high.get(u) as number)),
+  );
+}
