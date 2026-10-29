@@ -169,3 +169,31 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 - 119 tests green, `tsc` clean, eval 5 pass.
 
 **Spend:** $0.00.
+
+## 2026-10-28 — On-device CV: masks to outlines, coin scale, tilt
+
+**Shipped** (PRs #8, #10–12, #14, #21–25, #29, combined in #30)
+
+- SAM masks become engine stats, and a coin becomes the scale reference. Each mask is traced into an SVG outline drawn over the photo in the annexure, outlining exactly the pixels that were measured.
+- Shape checks: coins that aren't round are refused, and blocky crack pieces are flagged. Crack pieces with a ruler-straight edge (ledges, window frames) are flagged too, so they aren't measured as damage.
+- Tilt correction: a coin seen at an angle is an ellipse, and its axes give the wall's tilt. Crack lengths are corrected for it (tilted-wall bench case).
+- SlimSAM runs in a Web Worker, on WebGPU when the device has it and CPU otherwise. The page never freezes during the image embedding.
+- Voice line transcribed on the device with Whisper (`whisper-tiny.en`). The audio never leaves the phone, and it works without a backend key.
+- Live tilt level in the camera view, installable PWA with offline shell, first real-photo bench case (facade crack, percent only).
+
+**Spend:** $0.00.
+
+## 2026-10-29 — Two PWAs merged into one, then driven in a browser
+
+**Shipped**
+
+- Parithosh's PWA (`hardening/benchmark-84`) and the CV stack had diverged into two apps (14 conflicting files). His app is the base, and the CV features were ported in: the SAM worker, on-device voice, the tilt level, and the photo under the outlines. Measuring now sends SAM's traced coin outline instead of the camera gate's perfect circle, so tilt correction can kick in. A traced outline that isn't coin-shaped falls back to the circle.
+- First full run in a real browser (Chrome, fake camera with a synthetic crack and coin): coin gate → capture → SlimSAM on WebGPU (photo embedding 1.2–1.9 s) → tap outline → measure (108.8 mm, w 1.2 mm, 7 receipts) → on-device Whisper → skeptic AGREED (mock) → annexure with photo, crack and coin outlines.
+- That run found four bugs the tests didn't: the coin gate could never lock (the Sobel finder returns `{cx, cy, rr}`, the gate read `.x/.y/.r`); nothing opened the camera on first load; the CSP blocked the tilt meter's inline script; Whisper's `[Music]` tag landed in the transcript as words. All fixed.
+- 166 tests green, `tsc` clean.
+
+**Known gaps:** `/v1/segment` (server SAM cross-check) is unavailable in mock mode, so the cross-check shows an error on the deployed Worker. The paste-to-upload from `main` is gone from the merged app, so the camera is the only photo path. Not yet tested on a real phone.
+
+**Spend:** $0.00.
+
+**Next:** real phone test; 3–5 real crack photos with a coin (one at an angle) for the eval; record the video.
