@@ -161,17 +161,18 @@ test("stray pixels in a coin mask are ignored and discount confidence", () => {
   assert.throws(() => circularReference(createMask(10, 10), { id: "x", knownMm: 27, confidence: 1 }), MeasurementError);
 });
 
-test("a square outline is refused as a coin instead of used as a scale", () => {
-  const round = circularReference(disc(200, 100, 100, 60), { id: "coin", knownMm: 24.26, confidence: 0.95 });
-  assert.ok(round.diagnostics.edgeError < 0.03, `edgeError ${round.diagnostics.edgeError}`);
-  assert.equal(round.diagnostics.rejected, undefined);
+test("a partly covered coin is refused, not read as a tilted one", () => {
+  const whole = circularReference(disc(200, 100, 100, 60), { id: "coin", knownMm: 24.26, confidence: 0.95 });
+  assert.ok(whole.diagnostics.edgeError < 0.03, `edgeError ${whole.diagnostics.edgeError}`);
+  assert.equal(whole.diagnostics.rejected, undefined);
 
-  const square = fill(createMask(200, 200), (x, y) => x >= 50 && x < 150 && y >= 50 && y < 150);
-  const { reference, diagnostics } = circularReference(square, { id: "coin", knownMm: 24.26, confidence: 0.95 });
-  // A square passes the moment-based checks: only the outline gives it away.
-  assert.ok(diagnostics.aspect > 0.98 && diagnostics.fill > 0.9);
-  assert.ok(diagnostics.edgeError > 0.1, `edgeError ${diagnostics.edgeError}`);
-  assert.match(diagnostics.rejected ?? "", /not round/);
+  // A finger over the bottom fifth: the rest looks like a coin tilted ~40°, which
+  // would stretch crack lengths by ~30%. Only the outline gives it away.
+  const covered = disc(200, 100, 100, 60);
+  for (let i = 130 * 200 + 200; i < covered.data.length; i++) covered.data[i] = 0;
+  const { reference, diagnostics } = circularReference(covered, { id: "coin", knownMm: 24.26, confidence: 0.95 });
+  assert.ok(diagnostics.aspect > 0.7 && diagnostics.fill > 0.95);
+  assert.match(diagnostics.rejected ?? "", /covered/);
   assert.equal(reference.confidence, 0);
 
   const session = measureSession({
@@ -203,7 +204,7 @@ test("a coin mask that swallowed a lump of background is refused", () => {
   const coin = disc(200, 100, 100, 40);
   fill(coin, (x, y) => x >= 130 && x < 175 && y >= 90 && y < 110);
   const { diagnostics } = circularReference(coin, { id: "coin", knownMm: 24.26, confidence: 0.95 });
-  assert.match(diagnostics.rejected ?? "", /not round/);
+  assert.match(diagnostics.rejected ?? "", /misshapen/);
 });
 
 test("crack pieces that are blocky rather than long and thin are flagged", () => {

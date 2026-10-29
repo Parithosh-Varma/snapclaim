@@ -110,7 +110,8 @@ export interface ReferenceDiagnostics {
   largestShare: number;
   /**
    * 90th percentile of how far the outline strays from the fitted ellipse, as a
-   * share of the radius. Near 0 for a coin; a square or a lumpy outline scores high.
+   * share of the radius. Near 0 for a whole coin, tilted or not; high when part of
+   * it is covered, cut off by the frame, or the mask bled into the background.
    */
   edgeError: number;
   /** Angle of the major axis, degrees from +x (image y points down). */
@@ -229,7 +230,7 @@ export function circularReference(
   const tiltDeg = (Math.acos(Math.min(aspect, 1)) * 180) / Math.PI;
   const rejected =
     edgeError > allowed
-      ? `outline is not round (strays ${round(edgeError * 100, 0)}% of the radius, limit ${round(allowed * 100, 0)}%)`
+      ? `coin outline is cut off or misshapen, is part of it covered? (strays ${round(edgeError * 100, 0)}% of the radius, limit ${round(allowed * 100, 0)}%)`
       : aspect < MIN_COIN_ASPECT
         ? `coin is tilted too far (${round(tiltDeg, 0)}°, limit ${round((Math.acos(MIN_COIN_ASPECT) * 180) / Math.PI, 0)}°); photograph it flatter`
         : undefined;
