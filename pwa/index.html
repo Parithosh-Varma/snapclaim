@@ -10,6 +10,16 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<script>
+  // Installable, and the app opens on a bad connection (see sw.js). Not on
+  // localhost, where a cached shell would only get in the way of editing.
+  if ("serviceWorker" in navigator && !["localhost", "127.0.0.1"].includes(location.hostname)) {
+    navigator.serviceWorker.register("./sw.js").catch((e) => console.warn("[sw] not registered", e));
+  }
+</script>
 <style>
   :root{
     --paper:#e7ece8; --ink:#131b16; --muted:#5b6b61; --panel:#fbfcfb; --line:#c9d4cc;
