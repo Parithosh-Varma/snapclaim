@@ -29,7 +29,7 @@ export const DEFAULT_CONFIG: AppConfig = Object.freeze({
   models: Object.freeze({
     sam: "sam-3.1",
     spark: "muse-spark-1.3",
-    sparkOpen: "meta-models/muse-spark-open",
+    sparkOpen: "meta-models/muse-spark-open-1026",
     transcribe: "muse-voice-transcribe-1.0",
   }),
   minReferenceConfidence: 0.6,

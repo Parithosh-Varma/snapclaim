@@ -139,3 +139,19 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 - 121 tests green, `tsc` clean.
 
 **Spend:** $0.0025 (1 live call on main).
+
+## 2026-10-29 — Baseten hackathon key live, skeptic unblocked
+
+**Shipped**
+
+- Swapped `BASETEN_API_KEY` in `.env` (local only, gitignored) for the Meta hackathon key. The previous key was dead — `403 "please check the api-key you provided"` on every model.
+- Corrects the 2026-10-28 entry above: `meta-models/muse-spark-open-1026` **does** exist. It is listed in `/v1/models` as `name: "[HACKATHON] Muse Spark Open"`, `description: "Muse spark open intended for Meta hackathon, not publicly available"`. The plain `meta-models/muse-spark-open` is the public id and returns `403` for a hackathon key, so `config.models.sparkOpen` now points at the `-1026` id.
+- Capped `max_tokens: 8192` on the skeptic call. Muse Spark Open always reasons and the request set no ceiling on a model whose `max_completion_tokens` is 1,048,576.
+
+**Verified live (no guessing)**
+
+- Key valid end-to-end via the real `BasetenSkepticProvider`, not just curl: `200` in 7.2s → 2 drafts, `r1` cited on the reproducible length, percent correctly `DISPUTED` as underivable.
+- Reasoning dominates output: **1,824 reasoning tokens of 1,930 completion tokens** (95%) for a 289-token prompt. Budget-sane (~$0.009/call) but `max_tokens` must stay generous — at `max_tokens: 64` the model returns `content: null` with `finish_reason: "length"`. The no-content error now reports the finish reason instead of hiding it.
+- Also confirmed working on the hackathon model: streaming, tool calls, vision (read a generated image correctly), `response_format: json_object`, and prompt caching (128 cached tokens on repeats). Pricing as previously recorded.
+
+**Spend:** ~$0.02 of the $100 hackathon credit on probe calls. Metred guard untouched. 121 tests green, `tsc` clean.

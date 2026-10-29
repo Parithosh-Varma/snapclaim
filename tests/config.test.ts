@@ -40,7 +40,7 @@ test("config defaults to mock mode and the exact open-weights model id", () => {
   assert.equal(loadConfig({ MOCK_MODE: "0" }).mockMode, false);
   assert.equal(loadConfig({ MOCK_MODE: "1" }).mockMode, true);
   assert.equal(config.spendLimitUsd, 5);
-  assert.equal(config.models.sparkOpen, "meta-models/muse-spark-open");
+  assert.equal(config.models.sparkOpen, "meta-models/muse-spark-open-1026");
   assert.equal(config.models.spark, "muse-spark-1.3");
   assert.equal(config.minReferenceConfidence, DEFAULT_CONFIG.minReferenceConfidence);
 });
