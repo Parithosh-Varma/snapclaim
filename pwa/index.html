@@ -1,271 +1,454 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="auto">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-<meta name="theme-color" content="#000000" />
-<meta name="description" content="SnapClaim — photo + one line in, measured damage report out." />
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; connect-src 'self' https:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; worker-src 'self' blob:; media-src blob: data:" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f1ea" />
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#070d1a" />
+<meta name="apple-mobile-web-app-title" content="SnapClaim" />
+<link rel="apple-touch-icon" href="./icon-180.png" />
+<link rel="apple-touch-startup-image" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" href="./splash-1170-2532.png" />
+<link rel="apple-touch-startup-image" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2)" href="./splash-2048-2732.png" />
+<meta name="description" content="SnapClaim — photo + one line in, measured damage report out. Computed, not generated." />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; connect-src 'self' https://snapclaim-backend.parithosh.workers.dev blob: data:; img-src 'self' data: blob:; style-src 'self'; font-src 'self'; worker-src 'self' blob:; media-src blob: data:" />
 <link rel="manifest" href="./manifest.webmanifest" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b1e46'/%3E%3Ccircle cx='16' cy='16' r='7' fill='none' stroke='%230e8a4d' stroke-width='2.5'/%3E%3Cpath d='M16 3v6M16 23v6M3 16h6M23 16h6' stroke='%230e8a4d' stroke-width='2.5'/%3E%3C/svg%3E" />
-<title>SnapClaim</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
-<style>
-  :root{ --ink:#0b1e46; --coin:#0e8a4d; --paper:#f4f1ea; --damage:#c81e2b; }
-  *{box-sizing:border-box;margin:0}
-  html,body{height:100%}
-  body{font-family:"Archivo",system-ui,sans-serif;color:#fff;background:#000;overflow:hidden;
-    touch-action:pan-y;overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
-  button{font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
-  button:focus{outline:none}
-
-  /* ---------- camera ---------- */
-  #cam{position:fixed;inset:0;background:#111}
-  #cam video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-  .corner{position:absolute;width:34px;height:34px;border:4px solid #fff;z-index:2;pointer-events:none}
-  .corner.tl{top:96px;left:26px;border-right:0;border-bottom:0;border-radius:10px 0 0 0}
-  .corner.tr{top:96px;right:26px;border-left:0;border-bottom:0;border-radius:0 10px 0 0}
-  .corner.bl{bottom:150px;left:26px;border-right:0;border-top:0;border-radius:0 0 0 10px}
-  .corner.br{bottom:150px;right:26px;border-left:0;border-top:0;border-radius:0 0 10px 0}
-  #coinHint{position:absolute;z-index:3;left:50%;transform:translateX(-50%);
-    top:calc(100px + env(safe-area-inset-top));
-    font-weight:700;font-size:15px;white-space:nowrap;
-    color:#fff;background:rgba(11,30,70,.88);padding:10px 18px;border-radius:999px}
-  .coinring{position:absolute;z-index:2;border:4px solid var(--coin);border-radius:50%;
-    box-shadow:0 0 0 2px rgba(255,255,255,.7),0 0 24px rgba(14,138,77,.8);
-    display:none;pointer-events:none;
-    transition:left .15s linear,top .15s linear,width .15s linear,height .15s linear}
-  #count{position:absolute;z-index:4;left:50%;top:38%;transform:translate(-50%,-50%);
-    font-size:120px;font-weight:800;color:#fff;letter-spacing:-.04em;display:none;
-    text-shadow:0 4px 30px rgba(0,0,0,.5);pointer-events:none}
-  #count.pop{animation:pop .3s ease}
-  @keyframes pop{from{transform:translate(-50%,-50%) scale(1.35)}to{transform:translate(-50%,-50%) scale(1)}}
-  #shutter{position:absolute;z-index:3;left:50%;transform:translateX(-50%);
-    bottom:calc(34px + env(safe-area-inset-bottom));
-    width:78px;height:78px;border-radius:50%;border:5px solid #fff;
-    background:transparent;box-shadow:0 8px 28px rgba(0,0,0,.45);padding:0}
-  #shutter::after{content:"";display:block;width:100%;height:100%;border-radius:50%;background:#fff}
-  #shutter:active{transform:translateX(-50%) scale(.94)}
-  #shutter.locked{opacity:.35} #shutter.locked::after{background:#cfd4dc}
-  #shutter.hide{opacity:0;pointer-events:none}
-  #shutter{transition:opacity .18s ease, transform .12s ease}
-  .flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .3s ease;z-index:9}
-  .flash.go{opacity:1;transition:none}
-  #altEntry{position:absolute;z-index:3;left:50%;transform:translateX(-50%);
-    bottom:calc(158px + env(safe-area-inset-bottom));border:0;background:none;
-    color:rgba(255,255,255,.85);font-size:13px;font-weight:600;text-decoration:underline;padding:8px;white-space:nowrap}
-  #noCoin{position:absolute;z-index:3;left:50%;transform:translateX(-50%);
-    bottom:calc(126px + env(safe-area-inset-bottom));border:0;background:none;
-    color:rgba(255,255,255,.85);font-size:13px;font-weight:600;text-decoration:underline;padding:8px;white-space:nowrap}
-  body.reviewing #altEntry,body.reviewing #noCoin,
-  body.step2 #altEntry,body.step2 #noCoin{display:none}
-
-  /* ---------- screens ---------- */
-  .screen{position:fixed;inset:0;z-index:5;background:var(--paper);color:var(--ink);
-    transform:translateX(100%);visibility:hidden;overflow-y:auto;
-    transition:transform .32s cubic-bezier(.32,.72,.28,1), visibility 0s linear .32s}
-  .screen.on{transform:translateX(0);visibility:visible;
-    transition:transform .32s cubic-bezier(.32,.72,.28,1)}
-  .wrap{max-width:560px;margin:0 auto;padding:calc(20px + env(safe-area-inset-top)) 20px calc(28px + env(safe-area-inset-bottom))}
-  .navrow{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-  .navrow button{border:0;background:none;color:var(--ink);font-weight:700;font-size:16px;padding:10px 6px}
-  .step-tag{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--coin);font-weight:500}
-  h1{font-size:clamp(38px,10vw,52px);letter-spacing:-.03em;line-height:1.02;margin:0 0 6px}
-  .sub{color:#5b6b8c;margin:0 0 16px;font-size:15px}
-  .card{background:#fffdf8;border:1px solid #e2ddd0;border-radius:18px;padding:16px;margin-bottom:12px}
-
-  /* mark */
-  #markCanvas{width:100%;height:auto;display:block;border-radius:14px;touch-action:none;background:#000}
-  .seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
-  .seg button{min-height:48px;border-radius:12px;border:2px solid #e2ddd0;background:#fff;font-weight:700;font-size:15px}
-  .seg button.on{background:var(--damage);border-color:var(--damage);color:#fff}
-  .btn-primary{width:100%;min-height:56px;border:0;border-radius:16px;background:var(--coin);color:#fff;font-weight:800;font-size:17px}
-  .btn-dark{width:100%;min-height:54px;border:0;border-radius:16px;background:var(--ink);color:#fff;font-weight:700;font-size:16px}
-  .btn-ghostline{width:100%;min-height:50px;border-radius:16px;border:1px solid #e2ddd0;background:transparent;color:var(--ink);font-weight:700}
-  .rowbtns{display:flex;gap:8px;margin-top:10px}.rowbtns button{flex:1}
-  label.field{display:block;font-size:13px;font-weight:600;margin:0 0 10px;color:var(--ink)}
-  select{min-height:46px;border:1px solid #e2ddd0;border-radius:12px;background:#fff;width:100%;font:inherit;padding:0 10px;margin-top:6px}
-  #status,#xStatus,#skStatus{display:block;font-family:"IBM Plex Mono",monospace;font-size:12px;color:#5b6b8c;margin-top:8px;min-height:1.2em}
-
-  /* mic */
-  .voicemock{display:flex;flex-direction:column;align-items:center;gap:12px;padding:8px 0}
-  .micwrap{position:relative;width:210px;height:210px;display:grid;place-items:center}
-  .pring{position:absolute;border-radius:50%;border:3px solid rgba(14,138,77,.35);pointer-events:none}
-  .pring.p1{inset:14px}.pring.p2{inset:0}
-  .micwrap.live .pring{animation:ringpulse 1.8s ease-out infinite}
-  .micwrap.live .p2{animation-delay:.9s}
-  @keyframes ringpulse{from{transform:scale(.82);opacity:.9}to{transform:scale(1.08);opacity:0}}
-  #micBtn{width:124px;height:124px;border-radius:50%;border:0;background:var(--coin);color:#fff;display:grid;place-items:center;box-shadow:0 10px 30px rgba(14,138,77,.35)}
-  #micBtn svg{width:52px;height:52px}
-  #micState{font-size:15px;color:#5b6b8c}
-  .wave{display:flex;align-items:center;gap:5px;height:52px}
-  .wave i{display:block;width:5px;border-radius:3px;background:var(--coin);height:6px;transition:height .09s linear}
-  #heard{font-size:20px;font-weight:800;letter-spacing:-.01em;max-width:22ch;text-align:center;min-height:2.6em}
-  #transcriptBox{width:100%;font:inherit;font-size:15px;padding:12px;border:1px solid #e2ddd0;border-radius:12px;background:#fff}
-  #voiceErr{color:#c81e2b;font-size:13px;min-height:1.2em}
-
-  /* results */
-  #measured:empty,#findings:empty,#skOut:empty,#annex:empty{display:none}
-  #measured ul,#skOut ul{margin:10px 0 0;padding:0;list-style:none}
-  #measured li,#skOut li{padding:12px;border:1px solid #e2ddd0;border-radius:14px;margin-bottom:8px;background:#fff;font-size:15px}
-  #measured li small{color:#5b6b8c}
-  .found{font-size:22px;font-weight:800;margin:0 0 8px}
-  .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;
-    font-family:"IBM Plex Mono",monospace;letter-spacing:.06em;text-transform:uppercase}
-  .ok{background:#e4f3ea;color:#0e8a4d}.fail{background:#fdecec;color:#c81e2b}
-  svg.schematic{border:1px solid #e2ddd0;border-radius:12px;width:100%;height:auto;background:#fff;margin-top:12px}
-  #annex svg{max-width:100%;height:auto}
-  pre{background:var(--ink);color:#d7e5da;padding:14px;border-radius:12px;overflow:auto;font-family:"IBM Plex Mono",monospace;font-size:12px}
-  details.dev{border:1px solid #e2ddd0;border-radius:16px;background:#fffdf8;padding:14px;margin-top:12px}
-  details.dev summary{cursor:pointer;font-weight:700}
-  a#dl{font-weight:700;color:var(--ink)}
-</style>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b1e46'/%3E%3Ccircle cx='16' cy='16' r='7' fill='none' stroke='%238df0b6' stroke-width='2.5'/%3E%3Cpath d='M16 3v6M16 23v6M3 16h6M23 16h6' stroke='%238df0b6' stroke-width='2.5'/%3E%3C/svg%3E" />
+<title>SnapClaim — measured damage reports</title>
+<link rel="stylesheet" href="./styles.css" />
+<script src="./theme.js"></script>
 </head>
 <body>
+<svg width="0" height="0" class="u-hidden-input" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 1-1V9.5"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="14" r="3.5"/></symbol>
+    <symbol id="i-cases" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M4.9 4.9l2.1 2.1m10 10 2.1 2.1m0-14.2-2.1 2.1m-10 10-2.1 2.1"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16m-6-6 6 6-6 6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5.5 5.5L20 7.5"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 10v4m0 3.5v.5"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-8.5v.5"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m-5 5 5-5 5 5"/><path d="M4 20h16"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 3v5h-5"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="m8.2 10.8 7.6-3.6m-7.6 6 7.6 3.6"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12m-5-5 5 5 5-5"/><path d="M4 20h16"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-9 0 1 13h10l1-13"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M6 11.5a6 6 0 0 0 12 0"/><path d="M12 17.5V21M8.5 21h7"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v5c0 5 3.4 8.4 7 10 3.6-1.6 7-5 7-10V6l-7-3z"/><path d="m9.5 12 2 2 3.5-4"/></symbol>
+    <symbol id="i-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="6.5"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></symbol>
+    <symbol id="i-wifi-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2l20 20"/><path d="M5 10a11 11 0 0 1 4.2-2.4M12 6c2.5 0 4.9.9 6.7 2.4M8.5 13.5a6 6 0 0 1 5-1.6M12 18.5v.5"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></symbol>
+    <symbol id="i-inspect" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-coin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4.5"/></symbol>
+    <symbol id="i-photo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="15" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="m5 19 5.5-5.5 3 3L19 11l2 2"/></symbol>
+    <symbol id="i-scale" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16m-4 0h8"/><path d="M12 6 6 8m6-2 6 2"/><path d="M3.5 13a2.5 2.5 0 0 0 5 0L6 18l-2.5-5zM15.5 13a2.5 2.5 0 0 0 5 0L18 18l-2.5-5z"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></symbol>
+    <symbol id="i-crack" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2l3 5-2 4 4 4-2 3 3 4"/></symbol>
+    <symbol id="i-stain" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s5 6 5 10a5 5 0 0 1-10 0c0-4 5-10 5-10z"/></symbol>
+    <symbol id="i-peel" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14c3-1 5-3 6-6l6 6c-1 3-3 5-6 6z"/><path d="M10 8l6 6"/></symbol>
+    <symbol id="i-dent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="13" rx="8" ry="5"/><path d="M8 13c1 2 3 3 4 3s3-1 4-3"/></symbol>
+  </defs>
+</svg>
 
-<!-- 01 · camera -->
+<div id="offlineBanner" hidden><svg class="icon-sm" aria-hidden="true"><use href="#i-wifi-off"/></svg><span>You are offline — browsing cases still works; measuring needs a connection.</span></div>
+<div id="appLive" class="visually-hidden" role="status" aria-live="polite"></div>
+
 <div id="cam" role="img" aria-label="Live camera feed"><video id="feed" playsinline muted autoplay></video></div>
 <span class="corner tl" aria-hidden="true"></span><span class="corner tr" aria-hidden="true"></span>
 <span class="corner bl" aria-hidden="true"></span><span class="corner br" aria-hidden="true"></span>
-<div class="coinring" id="coinRing" aria-hidden="true" style="display:none"></div>
-<div id="coinHint">Add a coin for scale</div>
+<div class="coinring" id="coinRing" data-state="searching" aria-hidden="true"></div>
+<div class="cam-topbar">
+  <button id="camClose" type="button" aria-label="Close camera"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+</div>
+<div id="coinHint" role="status" aria-live="polite">Add a coin for scale</div>
 <div id="count" aria-hidden="true"></div>
-<button id="shutter" type="button" aria-label="Capture"></button>
-<div class="flash" id="flash"></div>
-<button id="altEntry" type="button">no camera? use a sample</button>
-<button id="noCoin" type="button">no coin? continue without scale</button>
-
-<!-- 02 · review -->
-<section class="screen" id="sReview" aria-label="Review photo">
-  <img id="shotFull" alt="Captured photo" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000" />
-  <div style="position:absolute;left:0;right:0;bottom:0;display:flex;gap:10px;padding:14px 18px calc(26px + env(safe-area-inset-bottom));background:linear-gradient(transparent,rgba(0,0,0,.65))">
-    <button id="retake" type="button" style="flex:1;min-height:56px;border-radius:16px;border:2px solid rgba(255,255,255,.85);background:transparent;color:#fff;font-weight:800;font-size:17px">Retake</button>
-    <button id="usePhoto" type="button" style="flex:1;min-height:56px;border-radius:16px;border:0;background:var(--coin);color:#fff;font-weight:800;font-size:17px">Use photo</button>
+<div class="cam-dock">
+  <div class="cam-dock-row">
+    <button id="uploadBtn" type="button" class="cam-side"><svg class="icon-sm" aria-hidden="true"><use href="#i-upload"/></svg><span>Upload</span></button>
+    <button id="shutter" type="button" aria-label="Capture photo. Add a coin for scale to enable."></button>
+    <button id="altEntry" type="button" class="cam-side"><svg class="icon-sm" aria-hidden="true"><use href="#i-photo"/></svg><span>Sample</span></button>
   </div>
-</section>
+  <button id="noCoin" type="button" class="cam-noscale">Continue without a coin (percent only)</button>
+</div>
+<div class="flash" id="flash" aria-hidden="true"></div>
+<div class="cam-fallback u-hidden-input" aria-hidden="true"></div>
+<input id="camFile" type="file" accept="image/*" class="u-hidden-input" tabindex="-1" />
 
-<!-- 03 · mark damage -->
-<section class="screen" id="sMark" aria-labelledby="h-mark">
-  <div class="wrap">
-    <div class="navrow"><button id="backCam" type="button">‹ Camera</button><span class="step-tag">mark</span></div>
-    <h1 id="h-mark">Tap the damage.</h1>
-    <p class="sub">One tap on the crack. The coin is already outlined from the gate.</p>
-    <div class="card">
-      <canvas id="markCanvas"></canvas>
-      <div class="seg" role="group" aria-label="Damage type">
-        <button id="chipCrack" type="button" class="on">Crack</button>
-        <button id="chipStain" type="button">Stain</button>
-      </div>
-      <div class="seg" role="group" aria-label="More types">
-        <button id="chipPeel" type="button">Peel</button>
-        <button id="chipDent" type="button">Dent</button>
-      </div>
-      <label class="field">Coin (auto-detected — confirm)
-        <select id="coinKind">
-          <option value="27">India ₹10 · 27 mm</option>
-          <option value="25">India ₹5 · 25 mm</option>
-          <option value="23">India ₹2 · 23 mm</option>
-          <option value="22">India ₹1 · 22 mm</option>
-          <option value="24.26">US quarter · 24.26 mm</option>
-          <option value="23.88">Canadian quarter · 23.88 mm</option>
-          <option value="24.5">UK 10p · 24.5 mm</option>
-          <option value="23.25">1 euro · 23.25 mm</option>
-        </select>
-      </label>
-      <div id="photoNotes" class="hint" style="font-size:13px;color:#5b6b8c"></div>
-      <div id="tfState" style="font-size:12px;color:#5b6b8c;font-family:'IBM Plex Mono',monospace"></div>
-      <button id="measureBtn" class="btn-primary" type="button" disabled>Measure damage</button>
-      <span id="status"></span>
+<section class="screen" id="sReview" aria-label="Review photo">
+  <div class="review-stage"><img id="shotFull" alt="Captured damage photo, review before continuing" /></div>
+  <div class="review-actions">
+    <ol class="stepper" data-stepper aria-label="Progress: step 1 of 6, Capture"></ol>
+    <label class="donate-row" for="donateCheck"><input id="donateCheck" type="checkbox" /><span>Donate this photo to improve the model</span><a href="#tSettings" id="donateInfo">Info</a></label>
+    <div class="row">
+      <button id="retake" type="button" class="btn btn--on-dark btn-review-retake">Retake</button>
+      <button id="usePhoto" type="button" class="btn btn--primary btn-review-use">Use photo</button>
     </div>
   </div>
 </section>
 
-<!-- 04 · say it -->
+<section class="screen" id="sMark" aria-labelledby="h-mark">
+  <div class="wrap narrow">
+    <div class="navrow"><button id="backCam" type="button" class="btn-quiet"><svg class="icon-sm" aria-hidden="true"><use href="#i-back"/></svg>Camera</button><span class="step-tag">Mark, step 2 of 6</span></div>
+    <h1 id="h-mark" tabindex="-1">Tap the damage.</h1>
+    <p class="sub">One tap on the damage. The coin is already outlined from the camera.</p>
+    <ol class="stepper" data-stepper aria-label="Progress: step 2 of 6, Mark"></ol>
+  </div>
+  <div class="mark-bleed">
+    <div class="canvas-stage">
+      <canvas id="markCanvas"></canvas>
+      <div id="markBadge" class="mask-badge" hidden></div>
+      <div class="canvas-tools" role="toolbar" aria-label="Canvas tools">
+        <button id="sc-inspect" type="button" aria-pressed="false" aria-label="Toggle inspect mode (pan and zoom without marking)"><svg class="icon" aria-hidden="true"><use href="#i-inspect"/></svg></button>
+        <button id="sc-mask-toggle" type="button" aria-pressed="true" aria-label="Toggle mask overlay"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg></button>
+        <button id="sc-zoom-out" type="button" aria-label="Zoom out"><svg class="icon" aria-hidden="true"><use href="#i-minus"/></svg></button>
+        <button id="sc-zoom-in" type="button" aria-label="Zoom in"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg></button>
+      </div>
+    </div>
+  </div>
+  <div class="wrap narrow">
+    <div class="tap-hint coachmark"><svg class="icon-sm" aria-hidden="true"><use href="#i-info"/></svg><span id="sc-zoom-hint">Tap the damage to outline it. Extra taps merge.</span></div>
+    <div class="seg seg--4up" role="group" aria-label="Damage type">
+      <button id="chipCrack" type="button" class="on" data-tint="crack" aria-pressed="true"><svg class="icon" aria-hidden="true"><use href="#i-crack"/></svg>Crack</button>
+      <button id="chipStain" type="button" data-tint="stain" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-stain"/></svg>Stain</button>
+      <button id="chipPeel" type="button" data-tint="peel" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-peel"/></svg>Peel</button>
+      <button id="chipDent" type="button" data-tint="dent" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-dent"/></svg>Dent</button>
+    </div>
+    <div class="coin-row"><svg class="icon-sm" aria-hidden="true"><use href="#i-coin"/></svg><span id="sc-coin-label">Coin auto-detected — confirm below</span><button id="coinChange" type="button">Change</button></div>
+    <label class="field">Scale: coin reference
+      <select id="coinKind" class="select-field" aria-label="Coin reference">
+        <option value="27">India ₹10 · 27 mm</option>
+        <option value="25">India ₹5 · 25 mm</option>
+        <option value="23">India ₹2 · 23 mm</option>
+        <option value="22">India ₹1 · 22 mm</option>
+        <option value="24.26">USA quarter · 24.26 mm</option>
+        <option value="23.88">Canada quarter · 23.88 mm</option>
+        <option value="24.5">UK 10p · 24.5 mm</option>
+        <option value="23.25">Euro 1 · 23.25 mm</option>
+      </select>
+    </label>
+    <div id="photoNotes" class="hint status status--info" role="status"></div>
+    <div id="tfState" aria-hidden="true"></div>
+    <div class="measure-dock">
+      <p class="dock-hint" id="measureHint">Tap the damage to continue</p>
+      <button id="measureBtn" class="btn btn--primary btn-primary" type="button" disabled>Measure damage</button>
+    </div>
+    <span id="status" class="status status--info" role="status" aria-live="polite"></span>
+  </div>
+</section>
+
 <section class="screen" id="sSay" aria-labelledby="h-say">
-  <div class="wrap" style="display:flex;flex-direction:column;align-items:center;text-align:center">
-    <div class="navrow" style="align-self:stretch"><button id="backMark" type="button">‹ Mark</button><span class="step-tag">say</span></div>
-    <h1 id="h-say">Say what happened.</h1>
+  <div class="wrap narrow u-flex-center">
+    <div class="navrow u-stretch"><button id="backMark" type="button" class="btn-quiet"><svg class="icon-sm" aria-hidden="true"><use href="#i-back"/></svg>Mark</button><span class="step-tag">Say, step 3 of 6</span></div>
+    <h1 id="h-say" tabindex="-1">Say what happened.</h1>
     <p class="sub">It listens on its own. Tap the mic to finish early.</p>
+    <ol class="stepper u-stretch" data-stepper aria-label="Progress: step 3 of 6, Say"></ol>
     <div class="voicemock">
       <div class="micwrap" id="micwrap">
-        <span class="pring p1"></span><span class="pring p2"></span>
-        <button id="micBtn" type="button" aria-label="Stop listening"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="2.5" width="6" height="11" rx="3" fill="#fff"/><path d="M6 11.5a6 6 0 0 0 12 0" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M12 17.5V21M8.5 21h7" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg></button>
+        <span class="pring p1" aria-hidden="true"></span><span class="pring p2" aria-hidden="true"></span>
+        <button id="micBtn" type="button" aria-label="Stop listening and transcribe"><svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg></button>
       </div>
-      <p id="micState">Listening</p>
+      <p id="micState" role="status">Listening</p>
       <div class="wave" id="wave" aria-hidden="true"></div>
       <p id="heard"></p>
-      <input id="transcriptBox" type="text" placeholder="Or type the line…" value="" />
-      <p id="voiceErr"></p>
-    </div>
-    <button id="sendBtn" class="btn-dark" type="button" style="width:100%">Send to report</button>
-  </div>
-</section>
-
-<!-- 05 · numbers -->
-<section class="screen" id="sNum" aria-labelledby="h-num">
-  <div class="wrap">
-    <div class="navrow"><button id="backSay" type="button">‹ Say</button><span class="step-tag">measured</span></div>
-    <h1 id="h-num">Get the numbers.</h1>
-    <p class="sub">Outlined and measured, not guessed.</p>
-    <div id="measured"></div>
-    <svg id="scheme" class="schematic" viewBox="0 0 400 140" role="img" aria-label="Schematic damage bars"></svg>
-    <div id="findings"></div>
-    <button id="toCheck" class="btn-dark" type="button" style="width:100%;margin-top:12px">Check it twice →</button>
-  </div>
-</section>
-
-<!-- 06 · checked -->
-<section class="screen" id="sCheck" aria-labelledby="h-check">
-  <div class="wrap">
-    <div class="navrow"><button id="backNum" type="button">‹ Numbers</button><span class="step-tag">checked</span></div>
-    <h1 id="h-check">Checked twice.</h1>
-    <p class="sub">A second check has to agree. Disagreements print red, never hidden.</p>
-    <div class="card">
-      <div class="rowbtns">
-        <button id="skepticBtn" type="button">Ask skeptic</button>
-        <button id="xcheckBtn" type="button">Cross-check masks</button>
+      <div class="transcript-card">
+        <span class="card-label" id="transcriptLabel">Your line (editable)</span>
+        <input id="transcriptBox" class="text-field" type="text" placeholder="Or type the line…" value="" autocomplete="off" aria-labelledby="transcriptLabel" />
       </div>
-      <span id="skStatus"></span>
-      <div id="skOut"></div>
-      <span id="xStatus" style="font-size:13px;color:#5b6b8c"></span>
+      <div class="chip-row" aria-label="Example lines">
+        <button type="button" data-example="Water stain on the ceiling after the leak.">Water stain after leak</button>
+        <button type="button" data-example="Crack in the bedroom wall near the window.">Crack near window</button>
+        <button type="button" data-example="Paint peeling in the bathroom corner.">Peeling paint</button>
+      </div>
+      <p id="voiceErr" class="status status--error" role="alert"></p>
     </div>
-    <button id="toReport" class="btn-dark" type="button" style="width:100%;margin-top:12px">Make the report →</button>
+    <div class="say-dock"><button id="sendBtn" class="btn btn--primary btn-dark u-block" type="button">Send to report<svg class="icon" aria-hidden="true"><use href="#i-arrow"/></svg></button></div>
   </div>
 </section>
 
-<!-- 07 · report -->
-<section class="screen" id="sReport" aria-labelledby="h-send">
-  <div class="wrap">
-    <div class="navrow"><button id="backCheck" type="button">‹ Checked</button><span class="step-tag">report</span></div>
-    <h1 id="h-send">Send the report.</h1>
-    <p class="sub">To your landlord or insurer, in one tap.</p>
+<section class="screen" id="sNum" aria-labelledby="h-num">
+  <div class="wrap narrow">
+    <div class="navrow"><button id="backSay" type="button" class="btn-quiet"><svg class="icon-sm" aria-hidden="true"><use href="#i-back"/></svg>Say</button><span class="step-tag">Measure, step 4 of 6</span></div>
+    <h1 id="h-num" tabindex="-1">The numbers.</h1>
+    <p class="sub">Outlined and measured, not guessed — every figure below is computed from the mask, with its receipt.</p>
+    <ol class="stepper" data-stepper aria-label="Progress: step 4 of 6, Measure"></ol>
+    <figure id="sc-num-figure" hidden>
+      <div class="num-photo-wrap"><canvas id="sc-num-photo" aria-label="Marked damage photo"></canvas>
+      <div id="numBadge" class="mask-badge" hidden></div></div>
+      <figcaption class="hint">Marked photo as measured. The toggle hides the red mask overlay; the coin ring stays for scale.</figcaption>
+    </figure>
+    <div class="rowbtns u-mt-2">
+      <button id="sc-mask-toggle-num" class="btn btn--ghost btn-ghostline" type="button" aria-pressed="true">Hide mask overlay</button>
+    </div>
     <div class="card">
-      <button id="renderBtn" class="btn-primary" type="button">Send report</button>
-      <div style="margin-top:10px"><a id="dl" style="display:none">download svg</a></div>
-      <div id="annex" style="margin-top:12px"></div>
+      <div class="case-title tnum">Measured findings</div>
+      <div id="measured" aria-live="polite"></div>
+      <svg id="scheme" class="schematic schematic--hidden" viewBox="0 0 400 140" role="img" aria-label="Schematic damage bars"></svg>
+      <div class="scale-ref" aria-label="Scale reference">
+        <span class="coin-dot" aria-hidden="true">₹10</span>
+        <div><b>Scale: India ₹10 · 27&nbsp;mm</b><br /><span class="hint">Green ring on the photo is the coin used for millimetres.</span></div>
+      </div>
+      <div class="legend" aria-label="Overlay legend">
+        <div><span class="swatch swatch--damage"></span><span>Red overlay — measured damage area</span></div>
+        <div><span class="swatch swatch--scale"></span><span>Green ring — coin used as the scale reference</span></div>
+      </div>
+    </div>
+    <details class="dev">
+      <summary>How this was computed</summary>
+      <ol class="timeline">
+        <li><span class="n" aria-hidden="true">1</span><span><b>Mask</b> — your tap outlines the damage on-device.</span></li>
+        <li><span class="n" aria-hidden="true">2</span><span><b>Coin scale</b> — the coin ring sets millimetres per pixel.</span></li>
+        <li><span class="n" aria-hidden="true">3</span><span><b>Math</b> — deterministic geometry gives length, width, area and percent, each with a receipt id.</span></li>
+      </ol>
+    </details>
+    <div id="findings"></div>
+    <button id="toCheck" class="btn btn--primary btn-dark u-block u-mt-3" type="button">Check it twice<svg class="icon" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+  </div>
+</section>
+
+<section class="screen" id="sCheck" aria-labelledby="h-check">
+  <div class="wrap narrow">
+    <div class="navrow"><button id="backNum" type="button" class="btn-quiet"><svg class="icon-sm" aria-hidden="true"><use href="#i-back"/></svg>Numbers</button><span class="step-tag">Check, step 5 of 6</span></div>
+    <h1 id="h-check" tabindex="-1">Checked twice.</h1>
+    <p class="sub">A second check has to agree. Disagreements print in red with a label, never hidden and never color-alone.</p>
+    <ol class="stepper" data-stepper aria-label="Progress: step 5 of 6, Check"></ol>
+    <div id="checkVerdict" class="verdict verdict--idle" role="status" aria-live="polite"><svg class="icon" aria-hidden="true"><use href="#i-info"/></svg><span>Not run yet — ask the skeptic or cross-check below.</span></div>
+    <div class="card">
+      <div class="case-title">Primary findings</div>
+      <div id="sc-primary"><div class="skel" aria-hidden="true"></div><p class="sub">Gated findings appear here after the report step.</p></div>
+    </div>
+    <div class="card">
+      <div class="check-action">
+        <div class="rowbtns rowbtns--tight"><button id="skepticBtn" class="btn btn--ghost btn-ghostline" type="button">Ask skeptic</button></div>
+        <p>Skeptic review: an independent pass tries to find holes in the numbers. <span class="leaf-chip"><svg class="icon-sm" aria-hidden="true"><use href="#i-upload"/></svg>Stays on device</span></p>
+      </div>
+      <div class="check-action">
+        <div class="rowbtns rowbtns--tight"><button id="xcheckBtn" class="btn btn--ghost btn-ghostline" type="button">Cross-check masks</button></div>
+        <p>Cross-check masks: a second model re-outlines the damage. Sends this photo once. <span class="leaf-chip"><svg class="icon-sm" aria-hidden="true"><use href="#i-upload"/></svg>Leaves your device</span></p>
+      </div>
+      <span id="skStatus" class="status status--info" role="status" aria-live="polite"></span>
+      <div id="skOut" aria-live="polite"></div>
+      <span id="xStatus" class="status status--info" role="status" aria-live="polite"></span>
+      <div class="agree-meter" aria-hidden="true"><i id="agreeFill"></i></div>
+    </div>
+    <button id="toReport" class="btn btn--primary btn-dark u-block u-mt-3" type="button">Make the report<svg class="icon" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+  </div>
+</section>
+
+<section class="screen" id="sReport" aria-labelledby="h-send">
+  <div class="wrap narrow">
+    <div class="navrow"><button id="backCheck" type="button" class="btn-quiet"><svg class="icon-sm" aria-hidden="true"><use href="#i-back"/></svg>Checked</button><span class="step-tag">Report, step 6 of 6</span></div>
+    <h1 id="h-send" tabindex="-1">Send the report.</h1>
+    <p class="sub">To your landlord or insurer, in one tap.</p>
+    <ol class="stepper" data-stepper aria-label="Progress: step 6 of 6, Report"></ol>
+    <div class="report-doc">
+      <header><span class="brandmark"><svg class="icon" aria-hidden="true"><use href="#i-mark"/></svg></span>
+        <div><div class="case-title">Damage report</div><div class="case-meta">SnapClaim · computed, not generated</div></div>
+      </header>
+      <div class="report-body">
+        <div class="verify-note">Dates shown are your device clock — not verified evidence time. Photos stay on this device unless you share or export.</div>
+        <div class="report-preview" id="reportPreview" aria-live="polite">
+          <div class="report-meta" id="reportMeta">Your measured report will appear here after the checks.</div>
+        </div>
+        <div id="annex" aria-live="polite"></div>
+        <button id="renderBtn" class="btn btn--primary btn-primary" type="button">Share report</button>
+        <div class="rowbtns">
+          <button id="dlPdf" class="btn btn--secondary" type="button"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Download PDF</button>
+          <button id="dlSvgBtn" class="btn btn--secondary" type="button"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Download SVG</button>
+        </div>
+        <button id="doneHome" class="btn btn--text btn-ghostline" type="button">Back to home</button>
+        <div><a id="dl" class="btn btn--ghost" hidden>Download SVG</a></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="screen tab" id="tHome" aria-labelledby="h-home">
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand-lockup"><span class="brandmark"><svg class="icon" aria-hidden="true"><use href="#i-mark"/></svg></span><h1 id="h-home" tabindex="-1">SnapClaim</h1></div>
+      <span class="spacer"></span>
+      <span class="pill" id="netPill">checking…</span>
+    </div>
+    <p class="sub">Measured damage evidence. Photo + one line in, replayable report out.</p>
+    <div class="home-grid">
+      <div class="card hero">
+        <svg class="hero-motif" aria-hidden="true" viewBox="0 0 100 100"><circle cx="50" cy="50" r="30" fill="none" stroke="currentColor" stroke-width="4"/><path d="M50 8v16M50 76v16M8 50h16M76 50h16" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg>
+        <div class="case-title" id="nextTitle">Document new damage</div>
+        <p class="sub" id="nextSub">Capture a photo, tap the damage, say what happened.</p>
+        <button id="ctaNew" class="btn btn--primary btn-primary" type="button">Document damage</button>
+        <button id="ctaSample" class="btn btn--text btn-ghostline" type="button">Try with a sample</button>
+        <div class="trust-strip"><span>On-device</span><span>·</span><span>Computed, not generated</span><span>·</span><span>Browse offline</span></div>
+      </div>
+      <div>
+        <div class="section-head"><h2>Recent cases</h2></div>
+        <ul class="case-list" id="recentList"></ul>
+        <div class="empty" id="recentEmpty"><svg class="icon" aria-hidden="true" viewBox="0 0 64 64"><circle cx="32" cy="32" r="18" fill="none" stroke="currentColor" stroke-width="3"/><path d="M32 10v8M32 46v8M10 32h8M46 32h8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M26 30l4 6-2 6 5 5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>No cases yet. Your first capture will appear here and survive refreshes.</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="screen tab" id="tCases" aria-labelledby="h-cases">
+  <div class="wrap">
+    <div class="topbar"><h1 id="h-cases" tabindex="-1">Cases</h1></div>
+    <p class="sub">Stored on this device only. Nothing uploads unless you export or share.</p>
+    <div class="case-tools">
+      <input id="caseSearch" class="case-search" type="search" placeholder="Search cases…" aria-label="Search cases" autocomplete="off" />
+      <div class="filter-chips" role="group" aria-label="Filter by damage type">
+        <button type="button" data-filter="all" aria-pressed="true">All</button>
+        <button type="button" data-filter="crack" aria-pressed="false">Crack</button>
+        <button type="button" data-filter="stain" aria-pressed="false">Stain</button>
+        <button type="button" data-filter="peel" aria-pressed="false">Peel</button>
+        <button type="button" data-filter="dent" aria-pressed="false">Dent</button>
+      </div>
+      <div class="rowbtns">
+        <select id="caseSort" class="select-field" aria-label="Sort cases">
+          <option value="new">Newest first</option>
+          <option value="old">Oldest first</option>
+          <option value="title">Title A–Z</option>
+        </select>
+        <button id="caseExportSel" class="btn btn--ghost btn-ghostline btn--sm" type="button">Export selected</button>
+      </div>
+    </div>
+    <ul class="case-list" id="caseList"></ul>
+    <div class="empty" id="caseEmpty"><svg class="icon" aria-hidden="true"><use href="#i-cases"/></svg><span>No cases yet. Document damage from Home to start one.</span></div>
+  </div>
+</section>
+
+<section class="screen tab" id="tSettings" aria-labelledby="h-set">
+  <div class="wrap narrow">
+    <div class="topbar"><h1 id="h-set" tabindex="-1">Settings</h1></div>
+    <div class="group">
+      <div class="group-title">Appearance</div>
+      <div class="group-body">
+        <div class="theme-seg" role="group" aria-label="Color theme">
+          <button id="sc-theme-light" type="button" aria-pressed="false">Light</button>
+          <button id="sc-theme-auto" type="button" aria-pressed="true">Auto</button>
+          <button id="sc-theme-dark" type="button" aria-pressed="false">Dark</button>
+        </div>
+      </div>
+    </div>
+    <div class="group">
+      <div class="group-title">Privacy</div>
+      <div class="group-body">
+        <p class="sub">Photos stay on this device. Only mask outlines (not photos) are sent to Measure — except two explicit taps: SAM cross-check sends the photo once, and Render can attach it to the annexure. Dates are your device clock, not verified evidence time. No background uploads, no push, no tracking. Dataset donation below is off by default and sends a downscaled copy only when you tick the box.</p>
+      </div>
+    </div>
+    <div class="group">
+      <div class="group-title">Dataset donation</div>
+      <div class="group-body">
+        <p class="sub">Off by default. When on, each photo you keep is also sent to our dataset store to improve the model. Canvas copies strip location/EXIF. <span class="leaf-chip"><svg class="icon-sm" aria-hidden="true"><use href="#i-upload"/></svg>Leaves your device</span></p>
+        <div class="switch-row">
+          <label for="donateSetting" class="switch-label">Donate photos by default</label>
+          <span class="switch"><input id="donateSetting" type="checkbox" /><span class="track" aria-hidden="true"></span></span>
+        </div>
+      </div>
+    </div>
+    <div class="group">
+      <div class="group-title">Install &amp; offline</div>
+      <div class="group-body">
+        <p class="sub" id="installHint">iPhone: Share → Add to Home Screen. The shell opens offline; measuring needs a connection.</p>
+        <div class="rowbtns"><button id="updateBtn" class="btn btn--ghost btn-ghostline" type="button">Check for updates</button></div>
+      </div>
+    </div>
+    <div class="group">
+      <div class="group-title">Storage</div>
+      <div class="group-body">
+        <p class="sub" id="storeInfo">…</p>
+        <div class="meter" role="img" aria-label="Local storage usage"><i id="sc-store-meter"></i></div>
+        <div class="rowbtns">
+          <button id="exportAllBtn" class="btn btn--ghost btn-ghostline" type="button">Export all cases</button>
+          <button id="wipeBtn" class="btn btn--danger btn-ghostline btn-danger" type="button">Delete all cases</button>
+        </div>
+      </div>
+    </div>
+    <div class="group">
+      <div class="group-title">Connection</div>
+      <div class="group-body">
+        <div class="group-row"><span class="pill" id="connPill">checking…</span></div>
+        <label class="field">Backend URL
+          <input id="baseUrl2" type="url" inputmode="url" value="https://snapclaim-backend.parithosh.workers.dev" />
+        </label>
+        <span id="setHealth" class="mono status status--info" role="status"></span>
+        <div class="rowbtns"><button id="setCheck" class="btn btn--ghost btn-ghostline" type="button">Check backend</button></div>
+      </div>
     </div>
     <details class="dev">
       <summary>Developer — backend, payload &amp; raw output</summary>
-      <div style="margin-top:12px">
+      <div class="u-mt-2">
         <label class="field">Backend URL
-          <input id="baseUrl" type="text" value="https://snapclaim-backend.parithosh.workers.dev" style="min-height:46px;border:1px solid #e2ddd0;border-radius:12px;width:100%;font:inherit;padding:0 10px" />
+          <input id="baseUrl" type="text" value="https://snapclaim-backend.parithosh.workers.dev" />
         </label>
-        <button id="healthBtn" type="button">Check backend</button>
-        <span id="healthOut" style="font-family:IBM Plex Mono,monospace;font-size:12px"></span>
-        <h3 style="margin:12px 0 6px">Raw report</h3>
+        <div class="rowbtns"><button id="healthBtn" class="btn btn--ghost btn-ghostline" type="button">Check backend</button></div>
+        <span id="healthOut" class="mono status status--info" role="status"></span>
+        <h3 class="u-mt-3">Raw report</h3>
         <pre id="raw">{}</pre>
       </div>
     </details>
+    <p class="sub">SnapClaim 0.3.0 · Apache-2.0 · computed, not generated.</p>
   </div>
 </section>
 
+<nav id="tabs" aria-label="Main">
+  <button type="button" data-tab="tHome" aria-selected="true"><svg class="icon" aria-hidden="true"><use href="#i-home"/></svg><span class="tab-label">Home</span></button>
+  <button type="button" data-tab="capture" aria-selected="false"><span class="fab"><svg class="icon" aria-hidden="true"><use href="#i-camera"/></svg></span><span class="tab-label">New</span></button>
+  <button type="button" data-tab="tCases" aria-selected="false"><svg class="icon" aria-hidden="true"><use href="#i-cases"/></svg><span class="tab-label">Cases</span></button>
+  <button type="button" data-tab="tSettings" aria-selected="false"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg><span class="tab-label">Settings</span></button>
+</nav>
+
+<dialog id="caseDlg" aria-labelledby="dlgTitle">
+  <div class="dlg-body">
+    <div class="dlg-head">
+      <h2 id="dlgTitle">Case</h2>
+      <button id="dlgClose" class="dlg-x btn-ghostline" type="button" aria-label="Close case dialog"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+    </div>
+    <p class="sub" id="dlgMeta"></p>
+    <label class="field">Title<input id="dlgName" class="text-field" type="text" maxlength="80" /></label>
+    <label class="field">Property / location<input id="dlgProp" class="text-field" type="text" maxlength="120" /></label>
+    <label class="field">Notes<textarea id="dlgNotes" class="text-field" rows="2" maxlength="500"></textarea></label>
+    <div class="thumb-row" id="dlgPhotos"></div>
+    <div class="rowbtns">
+      <button id="dlgAddPhoto" class="btn btn--ghost btn-ghostline" type="button">Add photo</button>
+      <input id="dlgFile" type="file" accept="image/*" class="u-hidden-input" tabindex="-1" />
+    </div>
+    <div class="rowbtns">
+      <button id="dlgSave" class="btn btn--primary btn-dark" type="button">Save</button>
+      <button id="dlgExport" class="btn btn--ghost btn-ghostline" type="button">Export</button>
+    </div>
+    <div class="rowbtns">
+      <button id="dlgDelete" class="btn btn--danger btn-ghostline" type="button">Delete case</button>
+    </div>
+  </div>
+</dialog>
+<div class="viewer" id="photoViewer" hidden><img id="viewerImg" alt="Case photo enlarged" /><button id="viewerClose" class="dlg-x" type="button" aria-label="Close photo viewer"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></div>
+
+<div class="toast" id="toast" role="status"></div>
+<div id="updateBar"><span>Update available</span><button id="updateGo" type="button">Reload</button></div>
+
+<dialog id="onboard">
+  <div class="onboard-card" role="document">
+    <div class="brand-lockup"><span class="brandmark"><svg class="icon" aria-hidden="true"><use href="#i-mark"/></svg></span><h2 id="sc-ob-title">Measure damage in 3 steps</h2></div>
+    <ol class="onboard-steps">
+      <li><span class="n" aria-hidden="true">1</span><div><b>Coin for scale</b><p>Hold any listed coin next to the damage. The gate locks only on a real ring.</p></div></li>
+      <li><span class="n" aria-hidden="true">2</span><div><b>Tap the damage</b><p>One tap outlines it on-device. Extra taps merge areas.</p></div></li>
+      <li><span class="n" aria-hidden="true">3</span><div><b>Say what happened</b><p>One spoken line becomes gated findings — numbers cite receipts or fail.</p></div></li>
+    </ol>
+    <p class="sub" id="sc-ob-install"></p>
+    <button id="sc-ob-close" class="btn btn--primary btn-primary" type="button">Get started</button>
+  </div>
+</dialog>
+
 <script src="./coin-model.js"></script>
-<script src="./photo-check.js"></script>
+<script src="./store.js"></script>
+<!-- photo-check.js is an ES module: app.js (type=module) imports it directly. No classic tag. -->
 <script type="module" src="./app.js"></script>
+<script src="./ui.js"></script>
 </body>
 </html>

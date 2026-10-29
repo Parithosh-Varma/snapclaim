@@ -1,3 +1,4 @@
+import { checkPhoto } from "./photo-check.js";
 const $ = (id) => document.getElementById(id);
 function base() { return $("baseUrl").value.replace(/\/$/, ""); }
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
@@ -8,6 +9,7 @@ function show(id) {
   for (const s of ["sReview", "sMark", "sSay", "sNum", "sCheck", "sReport"]) {
     document.getElementById(s)?.classList.toggle("on", s === id);
   }
+  try { const c = document.getElementById("donateCheck"); if (c && id === "sReview") c.checked = readDonate(); } catch { /* advisory */ }
   document.body.classList.toggle("reviewing", id === "sReview");
   document.body.classList.toggle("step2", id === "sSay");
 }
@@ -204,8 +206,8 @@ function scanFrame() {
     const f0 = findRing(edge, fw, fh);
     if (f0) found = { cx: f0.cx, cy: f0.cy, rr: f0.rr, score: f0.score };
   }
-  const tooClose = !!found && found.r > fw * 0.32;
-  const det = found && !tooClose ? { cx: found.x, cy: found.y, rr: found.r, score: found.score } : null;
+  const tooClose = !!found && found.rr > fw * 0.32;
+  const det = found && !tooClose ? { cx: found.cx, cy: found.cy, rr: found.rr, score: found.score } : null;
   if (tooClose) {
     history.push(null);
     if (history.length > 10) history.shift();
@@ -304,8 +306,13 @@ $("retake").onclick = () => {
   setLocked(true, "Add a coin for scale");
   acquireCamera();
 };
+$("camClose").onclick = () => {
+  stopCamera();
+  cancelCapture();
+  showTab("tHome");
+};
+$("doneHome").onclick = () => showTab("tHome");
 $("usePhoto").onclick = () => { show("sMark"); setupMarkPhoto(); };
-$("backCam").onclick = () => { $("retake").onclick(); };
 $("altEntry").onclick = () => { loadSample(); };
 $("noCoin").onclick = () => {
   noScaleMode = true;
@@ -322,6 +329,9 @@ const MIN_FINE_SCORE = 0.5;
 let tf = null, model = null, processor = null, embeddings = null;
 let dmg = { points: [], pointMasks: [], mask: null, iou: 0 };
 let dmgLabel = "crack";
+let maskOverlayOn = true;
+/** UI hook for the overlay toggle (ui.js). Re-draws the mark canvas with the current setting. */
+window.__snapclaimOverlay = function (on) { maskOverlayOn = on !== false; if (photo) drawMark(); };
 
 function encodeRle(mask, w, h) {
   const counts = [];
@@ -344,8 +354,8 @@ function circleRle(cx, cy, r, w, h) {
 async function loadModel() {
   if (model) return;
   tf = await import(TF_URL);
-  model = await tf.SamModel.from_pretrained(MODEL_ID);
-  processor = await tf.AutoProcessor.from_pretrained(MODEL_ID);
+  model = await tf.SamModel.from_pretrained(MODEL_ID, { dtype: "q8" });
+  processor = await tf.AutoProcessor.from_pretrained(MODEL_ID, { dtype: "q8" });
 }
 function setupMarkPhoto() {
   const img = new Image();
@@ -356,6 +366,8 @@ function setupMarkPhoto() {
     photo.height = Math.round(img.height * scale);
     photo.getContext("2d", { willReadFrequently: true }).drawImage(img, 0, 0, photo.width, photo.height);
     dmg = { points: [], pointMasks: [], mask: null, iou: 0 };
+    lastMeasureLabel = ""; lastMeasureText = "";
+    if ($("numBadge")) $("numBadge").hidden = true;
     drawMark();
     $("measureBtn").disabled = true;
     $("status").textContent = "Tap the crack, then Measure.";
@@ -391,19 +403,84 @@ async function decodePoint(point) {
   for (let i = 0; i < out.length; i++) if (m[i]) { out[i] = 1; area++; }
   return area ? { mask: out, iou: scores[best] } : null;
 }
+function maskStats(mask, w, h) {
+  let sx = 0, sy = 0, n = 0;
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (!mask[y * w + x]) continue;
+    n++; sx += x + 0.5; sy += y + 0.5;
+    if (x < x0) x0 = x; if (x > x1) x1 = x;
+    if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  if (!n) return null;
+  return { cx: sx / n, cy: sy / n, x0, y0, x1, y1, area: n };
+}
+function badgeHtml(label, mmText) {
+  const cap = String(label.charAt(0).toUpperCase() + label.slice(1));
+  return `<span class="sq"></span><span>${esc(mmText ? `${cap} · ${mmText}` : cap)}</span>`;
+}
+function placeBadge(el, stats, w, h) {
+  if (!el || !stats) { if (el) el.hidden = true; return; }
+  // Anchor at the mask's right edge, vertically centered — like the reference.
+  const ax = Math.min(w - 4, Math.max(4, stats.x1));
+  const ay = Math.min(h - 4, Math.max(4, stats.cy));
+  el.style.left = (ax / w * 100).toFixed(2) + "%";
+  el.style.top = (ay / h * 100).toFixed(2) + "%";
+  el.hidden = false;
+}
+let lastMeasureLabel = "";
+let lastMeasureText = "";
+function updateMarkBadge() {
+  const el = $("markBadge");
+  if (!el) return;
+  if (!dmg.mask || !maskOverlayOn || !photo) { el.hidden = true; return; }
+  const stats = maskStats(dmg.mask, photo.width, photo.height);
+  dmg.stats = stats;
+  if (!stats) { el.hidden = true; return; }
+  el.innerHTML = badgeHtml(dmgLabel, "");
+  placeBadge(el, stats, photo.width, photo.height);
+}
+function updateNumBadge() {
+  const el = $("numBadge");
+  if (!el) return;
+  const stats = dmg.stats || (dmg.mask && photo ? maskStats(dmg.mask, photo.width, photo.height) : null);
+  if (!stats || !maskOverlayOn || !dmg.mask || !photo) { el.hidden = true; return; }
+  el.innerHTML = badgeHtml(lastMeasureLabel || dmgLabel, lastMeasureText);
+  placeBadge(el, stats, photo.width, photo.height);
+}
 function drawMark() {
   const c = $("markCanvas");
   c.width = photo.width; c.height = photo.height;
   const ctx = c.getContext("2d", { willReadFrequently: true });
   ctx.drawImage(photo, 0, 0);
-  if (dmg.mask) {
-    const img = ctx.getImageData(0, 0, c.width, c.height);
-    for (let i = 0; i < dmg.mask.length; i++) {
-      if (!dmg.mask[i]) continue;
+  if (dmg.mask && maskOverlayOn) {
+    const w = c.width, h = c.height, mask = dmg.mask;
+    const img = ctx.getImageData(0, 0, w, h);
+    const d = img.data;
+    // Pass 1: translucent red fill over the damage area.
+    for (let i = 0; i < mask.length; i++) {
+      if (!mask[i]) continue;
       const o = i * 4;
-      img.data[o] = img.data[o] * 0.55 + 196 * 0.45;
-      img.data[o + 1] = img.data[o + 1] * 0.55 + 31 * 0.45;
-      img.data[o + 2] = img.data[o + 2] * 0.55 + 41 * 0.45;
+      d[o] = d[o] * 0.55 + 224 * 0.45;
+      d[o + 1] = d[o + 1] * 0.55 + 26 * 0.45;
+      d[o + 2] = d[o + 2] * 0.55 + 43 * 0.45;
+    }
+    // Pass 2: crisp solid outline — edge pixels (3x3 touches background)
+    // go full red so the crack reads like the reference: tint + border.
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (!mask[i]) continue;
+      let edge = x === 0 || y === 0 || x === w - 1 || y === h - 1;
+      if (!edge) {
+        for (let dy = -1; dy <= 1 && !edge; dy++) for (let dx = -1; dx <= 1; dx++) {
+          if (!dx && !dy) continue;
+          const nx = x + dx, ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h || !mask[ny * w + nx]) { edge = true; break; }
+        }
+      }
+      if (!edge) continue;
+      const o = i * 4;
+      d[o] = 224; d[o + 1] = 26; d[o + 2] = 43; d[o + 3] = 255;
     }
     ctx.putImageData(img, 0, 0);
   }
@@ -421,6 +498,7 @@ function drawMark() {
     ctx.beginPath(); ctx.arc(x, y, Math.max(5, c.width / 120), 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   }
   $("measureBtn").disabled = !dmg.mask;
+  updateMarkBadge();
 }
 $("markCanvas").addEventListener("pointerdown", async (ev) => {
   if (!photo || !embeddings) { $("status").textContent = "Outlining model still loading…"; return; }
@@ -447,6 +525,7 @@ for (const [id, label] of [["chipCrack", "crack"], ["chipStain", "stain"], ["chi
     dmgLabel = label;
     for (const [o] of [["chipCrack"], ["chipStain"], ["chipPeel"], ["chipDent"]]) $(o).classList.remove("on");
     $(id).classList.add("on");
+    updateMarkBadge();
   };
 }
 
@@ -482,6 +561,7 @@ $("measureBtn").onclick = async () => {
     if (!mres.ok || !measured.ok) throw new Error(measured.error ?? mres.status);
     payloadObj = j.result;
     showMeasured(measured.result);
+    upsertCurrentCase({ component: j.result.component, masks: j.result.masks, scaleReference: j.result.scaleReference, measurement: measured.result, receipts: measured.result?.receipts, status: "measured" }).catch(() => {});
     show("sSay");
     startListening();
   } catch (e) { $("status").textContent = `Measuring failed (${e.message ?? e}).`; }
@@ -499,10 +579,19 @@ function measuredRows(findings) {
       `${f.statement ? `<br/><small>${esc(String(f.statement))}</small>` : ""}</li>`;
   }).join("");
 }
+/* Gated finding drafts carry {statement, citations} — never measurement fields. */
+function draftRows(drafts) {
+  return drafts.map((d) => `<li><p class="found">Finding</p>${esc(String(d.statement ?? ""))}` +
+    `<br/><small>cites: ${esc((d.citations ?? []).join(", "))}</small></li>`).join("");
+}
 function showMeasured(result) {
   const mode = result.mode === "absolute" ? "" : " (no coin: percent only)";
   $("measured").innerHTML = `<span class="badge ok">MEASURED${mode}</span><ul>${measuredRows(result.findings)}</ul>`;
   drawScheme(result.findings);
+  const first = (result.findings || [])[0];
+  lastMeasureLabel = first ? String(first.label || "") : "";
+  lastMeasureText = first && first.crackLengthMm !== null && first.crackLengthMm !== undefined ? `${first.crackLengthMm} mm` : "";
+  updateNumBadge();
   show("sNum");
 }
 function drawScheme(findings) {
@@ -573,7 +662,11 @@ function stopListening(landed, text) {
 async function startListening() {
   if (listening) return;
   heard.textContent = "Asking for the mic…";
-  if (!(await ensureMic())) return;
+  if (!(await ensureMic())) { micState.textContent = "Mic off"; return; }
+  try {
+    const health = await fetch(base() + "/v1/health").then((r) => r.json()).catch(() => null);
+    if (health && health.mode === "mock") $("voiceErr").textContent = "Demo mode: voice transcription is off — type the line below.";
+  } catch { /* advisory only */ }
   listening = true;
   document.getElementById("micwrap").classList.add("live");
   micState.textContent = "Listening";
@@ -607,17 +700,29 @@ function encodeWav(samples, rate) {
 }
 async function finishListening(landed) {
   stopListening(false);
-  if (!landed || !recorder || recorder.state === "recording") {
-    try { if (recorder?.state === "recording") recorder.stop(); } catch { /* noop */ }
+  const rec = recorder;
+  if (!landed || !rec || rec.state === "recording") {
+    try { if (rec?.state === "recording") rec.stop(); } catch { /* noop */ }
   }
-  await new Promise((r) => setTimeout(r, 300));
+  if (rec && rec.state !== "inactive") {
+    await Promise.race([
+      new Promise((res) => { rec.onstop = () => res(); }),
+      new Promise((res) => setTimeout(res, 2000)),
+    ]);
+  } else {
+    await new Promise((r) => setTimeout(r, 300));
+  }
   const clip = new Blob(recChunks, { type: recorder?.mimeType || "audio/webm" });
-  if (!landed || clip.size === 0) { if (landed) heard.textContent = "Didn't catch anything — type the line."; return; }
+  if (!landed || clip.size === 0) { if (landed) { heard.textContent = "Didn't catch anything — type the line."; micState.textContent = "Type instead"; } mic.disabled = false; return; }
   micState.textContent = "Transcribing…";
+  mic.disabled = true;
   try {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     const ctx = new Ctx();
-    const decoded = await ctx.decodeAudioData(await clip.arrayBuffer());
+    const decoded = await Promise.race([
+      ctx.decodeAudioData(await clip.arrayBuffer()),
+      new Promise((_, rej) => setTimeout(() => rej(new Error("audio decode timed out")), 15000)),
+    ]);
     const off = new OfflineAudioContext(1, Math.ceil(Math.min(decoded.duration, 10) * 16000), 16000);
     const src = off.createBufferSource(); src.buffer = decoded; src.connect(off.destination); src.start(0, 0, Math.min(decoded.duration, 10));
     const rendered = await off.startRendering();
@@ -635,17 +740,26 @@ async function finishListening(landed) {
     });
     const j = await res.json().catch(() => ({}));
     if (res.status === 503) { $("voiceErr").textContent = "Voice needs the backend API key — type the line."; $("transcriptBox").value = ""; return; }
+    if (res.status === 400 && /fixtureTranscript|mock/i.test(String(j.error ?? ""))) { $("voiceErr").textContent = "Demo mode has no voice model — type the line instead."; micState.textContent = "Type instead"; mic.disabled = false; return; }
     if (!res.ok || !j.ok) throw new Error(j.error ?? res.status);
     const text = String(j.result?.transcript ?? "").trim();
-    if (!text) { heard.textContent = "Didn't catch anything — type the line."; return; }
+    if (!text) { heard.textContent = "Didn't catch anything — type the line."; mic.disabled = false; return; }
     $("transcriptBox").value = text;
     heard.textContent = `“${text}”`;
     micState.textContent = "Heard";
-  } catch (e) { $("voiceErr").textContent = `Transcription failed — type the line. (${e.message ?? e})`; }
+    mic.disabled = false;
+  } catch (e) { $("voiceErr").textContent = `Transcription failed — type the line. (${e.message ?? e})`; mic.disabled = false; }
 }
 mic.onclick = () => { if (listening) finishListening(true); else startListening(); };
 $("sendBtn").onclick = () => runReport();
-$("backMark").onclick = () => show("sReview");
+$("backMark").onclick = () => {
+  if (sampleFlow || !stillDataUrl) { sampleFlow = false; writeDraft(null); showTab("tHome"); }
+  else show("sReview");
+};
+$("backCam").onclick = () => {
+  if (sampleFlow || !stillDataUrl) { sampleFlow = false; writeDraft(null); showTab("tHome"); }
+  else { $("retake").onclick(); }
+};
 $("backSay").onclick = () => show("sMark");
 
 /* ---------- report / skeptic / render ---------- */
@@ -662,32 +776,41 @@ async function runReport() {
   $("raw").textContent = JSON.stringify(j, null, 2);
   if (res.status === 503) {
     $("findings").innerHTML = `<span class="badge fail">AI FINDINGS UNAVAILABLE</span><pre>${esc(j.error ?? "API key missing")}</pre>`;
+    toast(`Report failed: ${j.error ?? "API key missing"}`);
     return;
   }
   if (!res.ok || !j.ok) {
     const fails = j.details ?? j.failures ?? [j.error];
     $("findings").innerHTML = `<span class="badge fail">GATED</span><pre>${esc(JSON.stringify(fails, null, 2))}</pre>`;
+    toast(`Report ${res.status === 422 ? "blocked by the evidence gate" : "failed"} — retry or check raw output.`);
     return;
   }
   lastMeasurement = j.result.measurement ?? null;
-  $("findings").innerHTML = `<span class="badge ok">GATE PASS</span><ul>${measuredRows(j.result.findings)}</ul>`;
+  upsertCurrentCase({ measurement: j.result.measurement, receipts: j.result.measurement?.receipts, findings: j.result.findings, transcript: body.transcript, mode: j.result.measurement?.mode, status: "reported" }).then(() => refreshCases().catch(() => {}));
+  $("findings").innerHTML = `<span class="badge ok">GATE PASS</span><ul>${draftRows(j.result.findings)}</ul>`;
   drawScheme(j.result.measurement?.findings ?? []);
   show("sNum");
 }
 $("toCheck").onclick = () => show("sCheck");
 $("toReport").onclick = () => show("sReport");
-$("backSay").onclick = () => show("sMark");
-$("backNum").onclick = () => show("sSay");
+$("backNum").onclick = () => show("sNum");
 $("backCheck").onclick = () => show("sCheck");
 $("skepticBtn").onclick = async () => {
-  if (!lastMeasurement) { $("skStatus").textContent = "run report first"; return; }
+  if (!lastMeasurement || !payloadObj) { $("skStatus").textContent = "run report first"; return; }
   $("skStatus").textContent = "asking…";
   $("skOut").innerHTML = "";
   let res, j;
   try {
+    // Send measurement inputs too so the backend recomputes receipts
+    // server-side instead of trusting client-supplied findings.
     res = await fetch(base() + "/v1/skeptic", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ transcript: $("transcriptBox").value, findings: lastMeasurement.findings, receipts: lastMeasurement.receipts }),
+      body: JSON.stringify({
+        component: payloadObj.component,
+        masks: payloadObj.masks,
+        ...(payloadObj.scaleReference ? { scaleReference: payloadObj.scaleReference } : {}),
+        transcript: $("transcriptBox").value, findings: lastMeasurement.findings, receipts: lastMeasurement.receipts,
+      }),
     });
     j = await res.json();
   } catch { $("skStatus").textContent = "backend unreachable"; return; }
@@ -703,6 +826,10 @@ $("skepticBtn").onclick = async () => {
 };
 $("xcheckBtn").onclick = async () => {
   if (!dmg.mask || !photo) { $("xStatus").textContent = "Mark the damage first."; return; }
+  try {
+    const health = await fetch(base() + "/v1/health").then((r) => r.json()).catch(() => null);
+    if (health && health.mode === "mock") { $("xStatus").textContent = "Demo mode has no SAM 3.1 — measure is still real. Set MOCK_MODE=0 + keys for cross-check."; return; }
+  } catch { /* fall through to segment attempt */ }
   $("xStatus").textContent = "Asking SAM 3.1…";
   try {
     const segRes = await fetch(base() + "/v1/segment", {
@@ -729,7 +856,7 @@ $("xcheckBtn").onclick = async () => {
     chip.className = `badge ${badge}`;
     chip.textContent = `${cc.result.verdict} · IoU ${cc.result.iou}`;
     $("xStatus").appendChild(chip);
-  } catch (e) { $("xStatus").textContent = `Cross-check failed (${e.message ?? e}). Mock mode has no SAM.`; }
+  } catch (e) { $("xStatus").textContent = `Cross-check failed (${e.message ?? e}). Live SAM needs MOCK_MODE=0 + META_API_KEY.`; }
 };
 $("renderBtn").onclick = async () => {
   if (!payloadObj) return;
@@ -737,8 +864,9 @@ $("renderBtn").onclick = async () => {
   body.transcript = $("transcriptBox").value;
   const res = await fetch(base() + "/v1/render", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   const j = await res.json();
-  if (!res.ok || !j.ok) return;
+  if (!res.ok || !j.ok) { toast(`Render failed (${j.error ?? res.status}) — retry or check the report first.`); return; }
   $("annex").innerHTML = j.result.svg;
+  upsertCurrentCase({ annexSvg: j.result.svg, status: "reported" }).catch(() => {});
   const blob = new Blob([j.result.svg], { type: "image/svg+xml" });
   const dl = $("dl");
   dl.href = URL.createObjectURL(blob);
@@ -762,11 +890,469 @@ async function loadSample() {
     const measured = await mres.json();
     if (!mres.ok || !measured.ok) throw new Error(measured.error ?? mres.status);
     payloadObj = sample;
+    sampleFlow = true;
+    try {
+      currentCaseId = CaseStore.newId();
+      await CaseStore.put({ id: currentCaseId, title: "Sample damage", property: "", notes: "", photos: [], createdAt: Date.now(), status: "measured", measurement: measured.result, receipts: measured.result?.receipts });
+      writeDraft(null);
+      refreshCases().catch(() => {});
+    } catch { /* demo path stays usable without storage */ }
     showMeasured(measured.result);
     show("sSay");
     startListening();
-  } catch (e) { hint.textContent = `Sample failed (${e.message ?? e}). Is the backend reachable?`; }
+  } catch (e) { hint.textContent = `Sample failed (${e.message ?? e}). Is the backend reachable?`; toast("Sample failed — the backend looks unreachable."); }
 }
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
 }
+
+/* ---------- tabs + local-first cases ---------- */
+const TABS = ["tHome", "tCases", "tSettings"];
+let currentCaseId = null;
+let sampleFlow = false;
+let toastTimer = null;
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
+}
+function hideTabs() {
+  for (const t of TABS) document.getElementById(t)?.classList.remove("on");
+  document.body.classList.remove("tabbing");
+}
+function showTab(id) {
+  hideTabs();
+  for (const s of ["sReview", "sMark", "sSay", "sNum", "sCheck", "sReport"]) document.getElementById(s)?.classList.remove("on");
+  document.body.classList.remove("reviewing", "step2");
+  stopCamera();
+  cancelCapture();
+  document.getElementById(id)?.classList.add("on");
+  document.body.classList.add("tabbing");
+  for (const b of document.querySelectorAll("#tabs button")) b.setAttribute("aria-selected", String(b.dataset.tab === id));
+  if (id === "tHome" || id === "tCases") refreshCases().catch(() => {});
+  if (id === "tSettings") refreshSettings().catch(() => {});
+}
+function enterCapture() {
+  hideTabs();
+  sampleFlow = false;
+  for (const b of document.querySelectorAll("#tabs button")) b.setAttribute("aria-selected", String(b.dataset.tab === "capture"));
+  coinSeen = false; smooth = null; coinLabel = ""; gateCoin = null; stillDataUrl = ""; noScaleMode = false;
+  history.length = 0;
+  setLocked(true, "Add a coin for scale");
+  acquireCamera();
+}
+for (const b of document.querySelectorAll("#tabs button")) {
+  b.addEventListener("click", () => {
+    const t = b.dataset.tab;
+    if (t === "capture") enterCapture();
+    else showTab(t);
+  });
+}
+function fmtDate(ts) {
+  try { return new Date(ts).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }); }
+  catch { return ""; }
+}
+function statusLabel(c) {
+  return c.status === "reported" ? "reported" : c.status === "measured" ? "measured" : c.photos?.length ? "photo" : "draft";
+}
+async function refreshCases() {
+  let cases = [];
+  try { cases = await CaseStore.list(); } catch { cases = []; }
+  const recent = $("recentList"), all = $("caseList");
+  const row = (c) => {
+    const li = document.createElement("li");
+    const b = document.createElement("button");
+    b.type = "button";
+    const n = c.photos?.length ?? 0;
+    b.innerHTML = `<span class="badge ok">${esc(statusLabel(c))}</span> <span class="case-title">${esc(c.title || "Untitled damage")}</span>` +
+      `<div class="case-meta">${esc(c.property || "No location")} · ${n} photo${n === 1 ? "" : "s"} · ${esc(fmtDate(c.updatedAt))} (device time)</div>`;
+    b.addEventListener("click", () => openCase(c.id));
+    li.appendChild(b);
+    return li;
+  };
+  recent.innerHTML = "";
+  cases.slice(0, 3).forEach((c) => recent.appendChild(row(c)));
+  $("recentEmpty").style.display = cases.length ? "none" : "block";
+  const draft = readDraft();
+  $("nextTitle").textContent = draft ? "Continue your draft" : "Document new damage";
+  $("nextSub").textContent = draft ? "Photo captured — pick up where you left off." : "Capture a photo, tap the damage, say what happened.";
+  $("ctaNew").textContent = draft ? "Continue draft" : "Document damage";
+  all.innerHTML = "";
+  cases.forEach((c) => all.appendChild(row(c)));
+  $("caseEmpty").style.display = cases.length ? "none" : "block";
+}
+function readDraft() {
+  try { return JSON.parse(localStorage.getItem("sc_draft") || "null"); } catch { return null; }
+}
+function writeDraft(d) {
+  try { if (d) localStorage.setItem("sc_draft", JSON.stringify(d)); else localStorage.removeItem("sc_draft"); } catch { /* private mode */ }
+}
+async function upsertCurrentCase(patch) {
+  if (!currentCaseId) return null;
+  try {
+    const c = (await CaseStore.get(currentCaseId)) || { id: currentCaseId, title: "", property: "", notes: "", photos: [], createdAt: Date.now(), status: "draft" };
+    const next = { ...c, ...patch };
+    await CaseStore.put(next);
+    return next;
+  } catch { toast("Couldn't save locally — storage is full or blocked."); return null; }
+}
+function downscaleDataUrl(dataUrl, maxSide = 1024) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, maxSide / Math.max(img.width, img.height));
+      if (k >= 1) { resolve({ url: dataUrl, w: img.width, h: img.height }); return; }
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      resolve({ url: c.toDataURL("image/jpeg", 0.85), w: c.width, h: c.height });
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+}
+/* upload fallback: file picker feeds the same review flow as the camera */
+$("uploadBtn").onclick = () => $("camFile").click();
+$("camFile").addEventListener("change", async () => {
+  const f = $("camFile").files?.[0];
+  $("camFile").value = "";
+  if (!f) return;
+  if (!f.type.startsWith("image/")) { toast("That file is not an image."); return; }
+  const url = URL.createObjectURL(f);
+  const raw = await new Promise((res) => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, 1024 / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      res({ url: c.toDataURL("image/jpeg", 0.85), w: c.width, h: c.height });
+    };
+    img.onerror = () => res(null);
+    img.src = url;
+  });
+  URL.revokeObjectURL(url);
+  if (!raw) { toast("Couldn't read that photo."); return; }
+  hideTabs();
+  stillDataUrl = raw.url;
+  gateCoin = null; noScaleMode = true;
+  document.getElementById("shotFull").src = stillDataUrl;
+  show("sReview");
+});
+/* hook photo capture into the case record */
+$("usePhoto").addEventListener("click", async () => {
+  try {
+    sampleFlow = false;
+    currentCaseId = CaseStore.newId();
+    await CaseStore.put({ id: currentCaseId, title: "", property: "", notes: "", photos: [{ id: "p1", url: stillDataUrl, caption: "", capturedAt: Date.now(), source: "camera" }], createdAt: Date.now(), status: "photo" });
+    writeDraft({ caseId: currentCaseId, at: Date.now() });
+  } catch { toast("Couldn't save locally — storage is full or blocked."); }
+  donatePhoto().catch(() => {});
+});
+
+/* ---------- dataset donation (opt-in, D1 via /v1/collect) ---------- */
+function readDonate() { try { return localStorage.getItem("sc_donate") === "1"; } catch { return false; } }
+function writeDonate(v) { try { localStorage.setItem("sc_donate", v ? "1" : "0"); } catch { /* private mode */ } }
+function downscaleDonate(dataUrl, maxSide = 768) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      resolve(c.toDataURL("image/jpeg", 0.8));
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+}
+async function donatePhoto() {
+  if (!readDonate() || !stillDataUrl) return;
+  const small = await downscaleDonate(stillDataUrl).catch(() => null);
+  if (!small) return;
+  const coinMm = noScaleMode ? null : Number($("coinKind")?.value ?? NaN);
+  const res = await fetch(base() + "/v1/collect", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      consent: true,
+      image: small,
+      label: typeof dmgLabel === "string" ? dmgLabel : null,
+      coinMm: Number.isFinite(coinMm) ? coinMm : null,
+      transcript: null,
+      userAgent: String(navigator.userAgent || "").slice(0, 200),
+    }),
+  }).catch(() => null);
+  if (!res) { toast("Donation failed — offline? Photo kept locally."); return; }
+  const j = await res.json().catch(() => null);
+  if (res.ok && j?.ok) toast("Photo donated — thank you.");
+  else toast(`Donation skipped (${j?.error ?? res.status}).`);
+}
+function syncDonateBoxes(from) {
+  const a = $("donateCheck"), b = $("donateSetting");
+  if (from === "a" && a) writeDonate(a.checked);
+  else if (from === "b" && b) writeDonate(b.checked);
+  const v = readDonate();
+  if (a && a.checked !== v) a.checked = v;
+  if (b && b.checked !== v) b.checked = v;
+}
+$("retake").addEventListener("click", () => { writeDraft(null); });
+/* double-submit guards on the async actions */
+function guard(btn, fn) {
+  return async (...a) => {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    try { await fn(...a); } finally { btn.disabled = false; }
+  };
+}
+/* export: real evidence package (JSON) + printable report + Web Share */
+function downloadBlob(name, blob) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+}
+function caseFilename(c, ext) {
+  const slug = (c.title || "snapclaim-case").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "snapclaim-case";
+  return `${slug}-${String(c.id).slice(-6)}.${ext}`;
+}
+function reportHtml(c) {
+  const photos = (c.photos || []).map((p, i) => `
+    <figure><img src="${p.url}" /><figcaption>Photo ${i + 1}${p.caption ? ` — ${esc(p.caption)}` : ""} · device time ${esc(fmtDate(p.capturedAt))} · source: ${esc(p.source || "unknown")}</figcaption></figure>`).join("");
+  const meas = (c.measurement?.findings || []).map((f) => `<tr><td>${esc(f.label)}</td><td>${esc(String(f.percent))}%</td><td>${esc(String(f.crackLengthMm ?? "—"))}</td><td>${esc(f.severity)}</td></tr>`).join("");
+  const finds = (c.findings || []).map((f) => `<li>${esc(f.statement)} <small>(${(f.citations || []).map(esc).join(", ")})</small></li>`).join("");
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(c.title || "SnapClaim report")}</title>
+<style>body{font-family:-apple-system,system-ui,sans-serif;max-width:700px;margin:32px auto;padding:0 20px;color:#111}figure{margin:0 0 16px}img{max-width:100%;border:1px solid #ccc}figcaption{font-size:12px;color:#555}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px 8px;font-size:13px;text-align:left}small{color:#555}.warn{background:#fff8e1;border:1px solid #e0c36a;padding:10px;font-size:13px}</style></head><body>
+<h1>${esc(c.title || "Damage report")}</h1>
+<p>Property: ${esc(c.property || "—")} · Device time: ${esc(fmtDate(c.updatedAt))} · Mode: ${esc(c.mode || "—")}</p>
+<div class="warn">Computed measurements, not generated claims. Dates are device-clock labels, not verified evidence time. Photos are stored locally; this export was created by an explicit user action.</div>
+<h2>Photos (${(c.photos || []).length})</h2>${photos || "<p>No photos.</p>"}
+<h2>Measurements</h2><table><tr><th>Damage</th><th>%</th><th>Length mm</th><th>Severity</th></tr>${meas}</table>
+<h2>Findings</h2><ul>${finds || "<li>—</li>"}</ul>
+${c.transcript ? `<h2>Spoken line</h2><p>“${esc(c.transcript)}”</p>` : ""}
+<p><small>SnapClaim · receipts ${((c.receipts || []).map((r) => r.id)).map(esc).join(", ") || "—"} · computed, not generated.</small></p>
+</body></html>`;
+}
+async function exportCase(id) {
+  const c = await CaseStore.get(id).catch(() => null);
+  if (!c) { toast("Case not found."); return; }
+  const payload = { ...c, exportedAt: new Date().toISOString(), exportedAtNote: "device clock, not verified evidence time" };
+  const file = new File([JSON.stringify(payload, null, 2)], caseFilename(c, "json"), { type: "application/json" });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: c.title || "SnapClaim case" }); return; }
+    catch (e) { if (e && e.name === "AbortError") return; }
+  }
+  downloadBlob(caseFilename(c, "json"), file);
+  toast("Evidence package downloaded.");
+}
+function printCase(id) {
+  CaseStore.get(id).then((c) => {
+    if (!c) { toast("Case not found."); return; }
+    const w = window.open("", "_blank");
+    if (!w) { toast("Pop-up blocked — allow pop-ups to print."); return; }
+    w.document.write(reportHtml(c));
+    w.document.close();
+    w.focus();
+    w.print();
+  }).catch(() => toast("Couldn't open the report."));
+}
+/* case dialog */
+let dlgPhotos = [];
+async function openCase(id) {
+  const c = await CaseStore.get(id).catch(() => null);
+  if (!c) { toast("Case not found."); return; }
+  currentCaseId = id;
+  $("dlgTitle").textContent = c.title || "Untitled damage";
+  $("dlgMeta").textContent = `${statusLabel(c)} · ${(c.photos || []).length} photo${(c.photos || []).length === 1 ? "" : "s"} · ${fmtDate(c.updatedAt)} (device time)`;
+  $("dlgName").value = c.title || "";
+  $("dlgProp").value = c.property || "";
+  $("dlgNotes").value = c.notes || "";
+  dlgPhotos = (c.photos || []).map((p) => ({ ...p }));
+  paintDlgPhotos();
+  $("dlgDelete").textContent = "Delete case";
+  $("dlgDelete").dataset.armed = "";
+  try { document.getElementById("caseDlg").showModal(); }
+  catch { toast("This browser can't open the case sheet — update iOS/Safari."); }
+}
+function paintDlgPhotos() {
+  const box = $("dlgPhotos");
+  box.innerHTML = "";
+  dlgPhotos.forEach((p, i) => {
+    const wrap = document.createElement("div");
+    wrap.style.position = "relative";
+    const img = document.createElement("img");
+    img.src = p.url; img.alt = `Case photo ${i + 1}`;
+    const cap = document.createElement("input");
+    cap.type = "text"; cap.value = p.caption || ""; cap.maxLength = 120;
+    cap.setAttribute("aria-label", `Caption for photo ${i + 1}`);
+    cap.placeholder = "Add a caption…";
+    cap.style.cssText = "width:100%;margin-top:4px;min-height:44px;border:1px solid #e2ddd0;border-radius:10px;font:inherit;font-size:13px;padding:0 10px;background:#fff";
+    cap.addEventListener("input", () => { dlgPhotos[i].caption = cap.value.slice(0, 120); });
+    const del = document.createElement("button");
+    del.type = "button"; del.textContent = "Remove"; del.setAttribute("aria-label", `Remove photo ${i + 1}`);
+    del.style.cssText = "position:absolute;left:4px;bottom:4px;min-height:44px;padding:6px 12px;border-radius:999px;border:0;background:rgba(11,30,70,.85);color:#fff;font-size:12px;font-weight:700";
+    del.addEventListener("click", () => {
+      if (!del.dataset.armed) { del.dataset.armed = "1"; del.textContent = "Tap again to confirm"; return; }
+      dlgPhotos.splice(i, 1);
+      paintDlgPhotos();
+    });
+    wrap.append(img, cap, del);
+    box.appendChild(wrap);
+  });
+}
+$("dlgAddPhoto").onclick = () => $("dlgFile").click();
+$("dlgFile").addEventListener("change", async () => {
+  const f = $("dlgFile").files?.[0];
+  $("dlgFile").value = "";
+  if (!f || !f.type.startsWith("image/")) { if (f) toast("That file is not an image."); return; }
+  const url = URL.createObjectURL(f);
+  const raw = await new Promise((res) => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, 1024 / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      res({ url: c.toDataURL("image/jpeg", 0.85), w: c.width, h: c.height });
+    };
+    img.onerror = () => res(null);
+    img.src = url;
+  });
+  URL.revokeObjectURL(url);
+  if (!raw) { toast("Couldn't read that photo."); return; }
+  dlgPhotos.push({ id: "p" + Date.now().toString(36), url: raw.url, caption: "", capturedAt: Date.now(), source: "upload" });
+  paintDlgPhotos();
+});
+$("dlgSave").onclick = guard($("dlgSave"), async () => {
+  const patch = { title: $("dlgName").value.trim().slice(0, 80), property: $("dlgProp").value.trim().slice(0, 120), notes: $("dlgNotes").value.trim().slice(0, 500), photos: dlgPhotos };
+  await upsertCurrentCase(patch);
+  document.getElementById("caseDlg").close();
+  refreshCases();
+  toast("Case saved on this device.");
+});
+$("dlgExport").onclick = () => { if (currentCaseId) exportCase(currentCaseId); };
+$("dlgDelete").onclick = guard($("dlgDelete"), async () => {
+  const b = $("dlgDelete");
+  if (!b.dataset.armed) { b.dataset.armed = "1"; b.textContent = "Tap again to confirm delete"; return; }
+  await CaseStore.remove(currentCaseId).catch(() => toast("Couldn't delete."));
+  b.dataset.armed = "";
+  document.getElementById("caseDlg").close();
+  if (currentCaseId && readDraft()?.caseId === currentCaseId) writeDraft(null);
+  refreshCases();
+  toast("Case deleted.");
+});
+$("dlgClose").onclick = () => document.getElementById("caseDlg").close();
+/* home actions */
+$("ctaNew").onclick = () => {
+  const d = readDraft();
+  if (d && d.photo) {
+    stillDataUrl = d.photo;
+    gateCoin = null; noScaleMode = true;
+    hideTabs();
+    document.getElementById("shotFull").src = stillDataUrl;
+    show("sReview");
+  } else enterCapture();
+};
+$("ctaSample").onclick = () => { hideTabs(); loadSample(); };
+/* persist draft photo on capture */
+$("usePhoto").addEventListener("click", () => writeDraft({ caseId: currentCaseId, photo: stillDataUrl, at: Date.now() }));
+/* settings */
+function syncUrls(from) {
+  const a = $("baseUrl"), b = $("baseUrl2");
+  if (from === "a") b.value = a.value; else a.value = b.value;
+}
+$("baseUrl").addEventListener("input", () => syncUrls("a"));
+$("baseUrl2").addEventListener("input", () => syncUrls("b"));
+$("setCheck").onclick = async () => {
+  $("setHealth").textContent = "checking…";
+  try {
+    const r = await fetch(base() + "/v1/health");
+    const j = await r.json();
+    $("setHealth").textContent = `ok v${j.version} mode:${j.mode}`;
+    $("healthOut").textContent = `ok v${j.version} mode:${j.mode}`;
+  } catch { $("setHealth").textContent = "unreachable — measuring needs a connection."; }
+};
+async function refreshSettings() {
+  $("baseUrl2").value = $("baseUrl").value;
+  let info = "";
+  try {
+    const est = await navigator.storage?.estimate?.();
+    if (est) info += `Using ${Math.round((est.usage || 0) / 1024 / 1024)} MB of ~${Math.round((est.quota || 0) / 1024 / 1024)} MB. `;
+  } catch { /* advisory */ }
+  try { info += `${(await CaseStore.list()).length} case(s) stored on this device.`; }
+  catch { info += "Local storage unavailable."; }
+  $("storeInfo").textContent = info;
+}
+$("exportAllBtn").onclick = guard($("exportAllBtn"), async () => {
+  const cases = await CaseStore.list().catch(() => null);
+  if (!cases) { toast("Storage unavailable."); return; }
+  downloadBlob("snapclaim-cases.json", new Blob([JSON.stringify(cases, null, 2)], { type: "application/json" }));
+  toast(`${cases.length} case(s) downloaded.`);
+});
+$("wipeBtn").onclick = async () => {
+  const b = $("wipeBtn");
+  if (!b.dataset.armed) { b.dataset.armed = "1"; b.textContent = "Tap again to delete everything"; return; }
+  b.dataset.armed = "";
+  await CaseStore.clear().catch(() => toast("Couldn't clear storage."));
+  writeDraft(null);
+  refreshCases(); refreshSettings();
+  toast("All local cases deleted.");
+};
+$("updateBtn").onclick = async () => {
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) { toast("No service worker — reload the page."); return; }
+    await reg.update();
+    toast(reg.waiting ? "Update ready — tap Reload." : "Already up to date.");
+    if (reg.waiting) $("updateBar").classList.add("show");
+  } catch { toast("Update check failed while offline."); }
+};
+$("updateGo").onclick = async () => {
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    reg?.waiting?.postMessage({ type: "SKIP_WAITING" });
+  } catch { /* reload below still applies */ }
+  location.reload();
+};
+/* network + install honesty */
+function updateNet() {
+  const pill = $("netPill");
+  const on = navigator.onLine;
+  pill.textContent = on ? "online" : "offline — cases still open";
+  pill.className = "pill " + (on ? "ok" : "bad");
+}
+window.addEventListener("online", updateNet);
+window.addEventListener("offline", updateNet);
+let deferredInstall = null;
+window.addEventListener("beforeinstallprompt", (e) => {
+  const hint = $("installHint");
+  if (!hint || deferredInstall) return; // no UI slot (or already holding one): let the browser handle it
+  e.preventDefault();
+  deferredInstall = e;
+  hint.textContent = "Install: tap here — Add to Home Screen, or use the button.";
+  const btn = document.createElement("button");
+  btn.type = "button"; btn.textContent = "Install app"; btn.className = "btn-ghostline";
+  btn.style.marginTop = "8px";
+  btn.onclick = async () => {
+    try { await deferredInstall.prompt(); await deferredInstall.userChoice.catch(() => {}); }
+    catch { /* user dismissed or prompt unavailable */ }
+    deferredInstall = null; btn.remove();
+  };
+  hint.after(btn);
+});
+/* ---------- init: tabbed home first, camera starts on capture ---------- */
+$("baseUrl2").value = $("baseUrl").value;
+try {
+  const v = readDonate();
+  if ($("donateCheck")) $("donateCheck").checked = v;
+  if ($("donateSetting")) $("donateSetting").checked = v;
+  $("donateCheck")?.addEventListener("change", () => syncDonateBoxes("a"));
+  $("donateSetting")?.addEventListener("change", () => syncDonateBoxes("b"));
+} catch { /* donate boxes are advisory */ }
+updateNet();
+showTab("tHome");
+refreshSettings().catch(() => {});
