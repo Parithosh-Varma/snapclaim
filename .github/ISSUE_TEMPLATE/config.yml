@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation / evaluation write-up
+    url: https://github.com/Parithosh-Varma/snapclaim/blob/main/docs/eval-report.md
+    about: Check the bench, baselines, and open gaps before filing.
+  - name: Security vulnerability (private)
+    url: https://github.com/Parithosh-Varma/snapclaim/security/advisories/new
+    about: Do not open public issues for vulnerabilities. See SECURITY.md.
