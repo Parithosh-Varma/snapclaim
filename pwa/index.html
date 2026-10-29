@@ -344,10 +344,23 @@
     <div class="group">
       <div class="group-title">Dataset donation</div>
       <div class="group-body">
-        <p class="sub">Off by default. When on, each photo you keep is also sent to our dataset store to improve the model. Canvas copies strip location/EXIF. <span class="leaf-chip"><svg class="icon-sm" aria-hidden="true"><use href="#i-upload"/></svg>Leaves your device</span></p>
+        <p class="sub">Off by default, separate from Terms. When on, each photo you keep is also sent to our dataset store to improve the model. Canvas copies strip location/EXIF. <span class="leaf-chip"><svg class="icon-sm" aria-hidden="true"><use href="#i-upload"/></svg>Leaves your device</span></p>
         <div class="switch-row">
           <label for="donateSetting" class="switch-label">Donate photos by default</label>
           <span class="switch"><input id="donateSetting" type="checkbox" /><span class="track" aria-hidden="true"></span></span>
+        </div>
+      </div>
+    </div>
+    <div class="group">
+      <div class="group-title">Legal</div>
+      <div class="group-body">
+        <p class="sub" id="legalStatus">…</p>
+        <div class="rowbtns">
+          <button id="viewTermsBtn" class="btn btn--ghost btn-ghostline" type="button">View Terms</button>
+          <button id="viewPrivacyBtn" class="btn btn--ghost btn-ghostline" type="button">View Privacy</button>
+        </div>
+        <div class="rowbtns">
+          <button id="withdrawTermsBtn" class="btn btn--danger btn-ghostline btn-danger" type="button">Withdraw agreement</button>
         </div>
       </div>
     </div>
@@ -441,7 +454,18 @@
       <li><span class="n" aria-hidden="true">3</span><div><b>Say what happened</b><p>One spoken line becomes gated findings — numbers cite receipts or fail.</p></div></li>
     </ol>
     <p class="sub" id="sc-ob-install"></p>
-    <button id="sc-ob-close" class="btn btn--primary btn-primary" type="button">Get started</button>
+    <label class="donate-row" for="sc-terms-check"><input id="sc-terms-check" type="checkbox" /><span>I agree to the <a href="./terms.html" id="sc-terms-link">Terms</a> and <a href="./privacy.html" id="sc-privacy-link">Privacy Policy</a> (v2026-10-29-v3). Documentation, not advice; photos stay on this device unless I share or separately donate.</span></label>
+    <button id="sc-ob-close" class="btn btn--primary btn-primary" type="button" disabled>I agree — get started</button>
+  </div>
+</dialog>
+
+<dialog id="legalDlg" aria-labelledby="legalTitle">
+  <div class="dlg-body">
+    <div class="dlg-head">
+      <h2 id="legalTitle">Legal</h2>
+      <button id="legalClose" class="dlg-x btn-ghostline" type="button" aria-label="Close legal dialog"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+    </div>
+    <div id="legalBody" class="sub"></div>
   </div>
 </dialog>
 

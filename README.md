@@ -142,8 +142,9 @@ Hard limits: 50 masks per call (chunk above), 1–16 point prompts per segment c
 
 ## Privacy and security
 
+- First-run Terms gate: the PWA opens a blocking `Terms + Privacy (v2026-10-29-v3)` dialog (`pwa/ui.js`, `pwa/terms.html`, `pwa/privacy.html`). The Get-started button stays disabled until the box is ticked; acceptance (`sc_terms_v1` + timestamp) is shown in Settings → Legal with withdraw (locks the app). Full text: [`TERMS.md`](./TERMS.md), [`PRIVACY.md`](./PRIVACY.md).
 - The photo stays on the phone: only COCO RLE masks travel to `/v1/observe`. Two explicit exceptions, both your tap: **Cross-check masks** sends the photo once to SAM 3.1 via the backend, and **Render** attaches it to the annexure. Only `data:`/`https:` URLs are accepted.
-- Dataset donation is off by default: ticking the box on the review screen sends a downscaled copy (768px, EXIF stripped by canvas) to `POST /v1/collect` in the `snapclaim-data` D1 table. Nothing uploads otherwise.
+- Dataset donation is off by default and separate from Terms: ticking the box on the review screen sends a downscaled copy (768px, EXIF stripped by canvas) to `POST /v1/collect` in the `snapclaim-data` D1 table. Nothing uploads otherwise.
 - Keys live in server env / Worker secrets, never in the PWA. Fail-closed 503 without them.
 - All model output rendered in the PWA is HTML-escaped; the page ships a Content-Security-Policy.
 - EXIF/XMP metadata is stripped from photos on intake.

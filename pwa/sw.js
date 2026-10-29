@@ -2,8 +2,8 @@
 // Version the cache; network-first for /v1 (never cache measurements),
 // cache-first for the shell. No photo bytes are cached. Private evidence
 // (IndexedDB cases) is never touched here.
-const CACHE = "snapclaim-shell-v11";
-const SHELL = ["./", "./index.html", "./styles.css", "./app.js", "./ui.js", "./theme.js", "./store.js", "./coin-model.js", "./photo-check.js", "./manifest.webmanifest", "./logo.svg", "./icon-192.png", "./icon-512.png"];
+const CACHE = "snapclaim-shell-v12";
+const SHELL = ["./", "./index.html", "./terms.html", "./privacy.html", "./styles.css", "./app.js", "./ui.js", "./theme.js", "./store.js", "./coin-model.js", "./photo-check.js", "./manifest.webmanifest", "./logo.svg", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

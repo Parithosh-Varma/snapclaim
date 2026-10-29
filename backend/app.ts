@@ -450,6 +450,9 @@ function proxyTarget(env: Env): { apiToken: string; accountId: string; databaseI
 
 /**
  * POST /v1/collect — tester dataset donation (explicit opt-in only).
+ * The PWA sends consent:true only after a separate unticked-by-default
+ * donation toggle; the server still rejects consent!==true (400) and
+ * fails closed without D1. Terms acceptance alone never sends here.
  *
  * Body: {consent: true, image: "data:image/jpeg;base64,...", label?, coinMm?, transcript?, masksJson?, receiptsJson?, userAgent?}
  * The canvas dataURL already strips EXIF. Images are capped so the 1MB JSON

@@ -1052,7 +1052,7 @@ $("usePhoto").addEventListener("click", async () => {
   donatePhoto().catch(() => {});
 });
 
-/* ---------- dataset donation (opt-in, D1 via /v1/collect) ---------- */
+/* ---------- dataset donation (separate opt-in, D1 via /v1/collect) ---------- */
 function readDonate() { try { return localStorage.getItem("sc_donate") === "1"; } catch { return false; } }
 function writeDonate(v) { try { localStorage.setItem("sc_donate", v ? "1" : "0"); } catch { /* private mode */ } }
 function downscaleDonate(dataUrl, maxSide = 768) {
@@ -1140,7 +1140,7 @@ ${c.transcript ? `<h2>Spoken line</h2><p>“${esc(c.transcript)}”</p>` : ""}
 async function exportCase(id) {
   const c = await CaseStore.get(id).catch(() => null);
   if (!c) { toast("Case not found."); return; }
-  const payload = { ...c, exportedAt: new Date().toISOString(), exportedAtNote: "device clock, not verified evidence time" };
+  const payload = { ...c, exportedAt: new Date().toISOString(), exportedAtNote: "device clock, not verified evidence time", terms: readTerms() };
   const file = new File([JSON.stringify(payload, null, 2)], caseFilename(c, "json"), { type: "application/json" });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try { await navigator.share({ files: [file], title: c.title || "SnapClaim case" }); return; }
@@ -1286,6 +1286,20 @@ async function refreshSettings() {
   try { info += `${(await CaseStore.list()).length} case(s) stored on this device.`; }
   catch { info += "Local storage unavailable."; }
   $("storeInfo").textContent = info;
+  try {
+    const t = readTerms();
+    $("legalStatus").textContent = t
+      ? `Accepted ${t.v} on ${new Date(t.at).toLocaleString()} (device time). Donation stays off unless you tick it.`
+      : "Not accepted — the first-run gate requires Terms + Privacy before use.";
+  } catch { /* legal status is advisory */ }
+}
+function readTerms() {
+  try {
+    const v = localStorage.getItem("sc_terms_v1");
+    const at = localStorage.getItem("sc_terms_at");
+    if (v) return { v, at: at || null };
+  } catch { /* private mode */ }
+  return null;
 }
 $("exportAllBtn").onclick = guard($("exportAllBtn"), async () => {
   const cases = await CaseStore.list().catch(() => null);
@@ -1346,6 +1360,21 @@ window.addEventListener("beforeinstallprompt", (e) => {
 });
 /* ---------- init: tabbed home first, camera starts on capture ---------- */
 $("baseUrl2").value = $("baseUrl").value;
+/* Legal: view + withdraw (acceptance itself happens in the first-run gate, ui.js). */
+try {
+  $("viewTermsBtn").onclick = () => { location.href = "./terms.html"; };
+  $("viewPrivacyBtn").onclick = () => { location.href = "./privacy.html"; };
+  $("legalClose").onclick = () => { try { $("legalDlg").close(); } catch { /* noop */ } };
+  $("withdrawTermsBtn").onclick = () => {
+    const b = $("withdrawTermsBtn");
+    if (!b.dataset.armed) { b.dataset.armed = "1"; b.textContent = "Tap again to withdraw (app locks)"; return; }
+    b.dataset.armed = "";
+    b.textContent = "Withdraw agreement";
+    try { localStorage.removeItem("sc_terms_v1"); localStorage.removeItem("sc_terms_at"); } catch { /* private mode */ }
+    refreshSettings().catch(() => {});
+    location.reload();
+  };
+} catch { /* legal buttons are advisory */ }
 try {
   const v = readDonate();
   if ($("donateCheck")) $("donateCheck").checked = v;

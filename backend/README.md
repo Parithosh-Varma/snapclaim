@@ -27,7 +27,7 @@ npm run replay -- request.json measurement.json
 | `POST /v1/skeptic` | mock/live | Independent re-check via Spark Open on Baseten, gated. Real per-token pricing charged to the ledger. `503` without `BASETEN_API_KEY`. |
 | `POST /v1/render` | mock/live | Gated report → code-drawn SVG annexure `{svg, gate}`. |
 | `GET /v1/spend` | any | `{spentUsd, remainingUsd, limitUsd, entries}`. Mock runs stay `$0`. |
-| `POST /v1/collect` | any + D1 | Tester dataset donation (opt-in only): `{consent: true, image, label?, coinMm?, transcript?}` → `{id, createdAt}`. Uses the `snapclaim_data` binding, else the `D1_PROXY_*` cross-account fallback. `503` when neither is configured. |
+| `POST /v1/collect` | any + D1 | Tester dataset donation (separate opt-in only, never bundled with Terms): `{consent: true, image, label?, coinMm?, transcript?}` → `{id, createdAt}`. Uses the `snapclaim_data` binding, else the `D1_PROXY_*` cross-account fallback. `503` when neither is configured. |
 | `GET /v1/collect/count` | any + D1 | `{count}` donations stored. Same binding/fallback rule as collect. |
 | `POST /v1/d1/query` | any + key | Generic relay to any D1 in any account: `{key, apiToken, accountId, databaseId, sql, params?}` → `{rows}`. Key must match the `D1_PROXY_KEY` secret (`503` unconfigured, `403` wrong key). |
 | `POST /v1/r2/put` | any + key | Operator object store via bound `snapclaim_images` bucket or the cross-account R2 holder (`R2_PROXY_URL` + `R2_PROXY_KEY`): `{auth, key, contentType, dataBase64}` → `{key, size}`. Auth must match `R2_PROXY_KEY` (`503` unconfigured, `403` wrong key). |

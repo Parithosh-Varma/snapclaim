@@ -90,32 +90,59 @@
   window.addEventListener("offline", updateOffline);
   updateOffline();
 
-  /* ---------- first-run onboarding ---------- */
+  /* ---------- first-run onboarding + Terms gate ---------- */
+  var TERMS_VERSION = "v2026-10-29-v3";
+  function termsAccepted() {
+    try { return localStorage.getItem("sc_terms_v1") === TERMS_VERSION; }
+    catch (e) { return false; }
+  }
   try {
-    if (!localStorage.getItem("sc_onboard_seen")) {
-      var ob = $("onboard");
-      var hint = $("sc-ob-install");
-      var isiOS = /iPhone|iPad|iPod/.test(navigator.userAgent || "");
-      var standalone = (window.navigator && window.navigator.standalone) || window.matchMedia("(display-mode: standalone)").matches;
-      if (hint && !standalone) {
-        hint.textContent = isiOS
-          ? "iPhone: Share, then Add to Home Screen to install."
-          : "Tip: browser menu, then Add to Home screen to install.";
+    var ob = $("onboard");
+    var hint = $("sc-ob-install");
+    var isiOS = /iPhone|iPad|iPod/.test(navigator.userAgent || "");
+    var standalone = (window.navigator && window.navigator.standalone) || window.matchMedia("(display-mode: standalone)").matches;
+    if (hint && !standalone) {
+      hint.textContent = isiOS
+        ? "iPhone: Share, then Add to Home Screen to install."
+        : "Tip: browser menu, then Add to Home screen to install.";
+    }
+    var check = $("sc-terms-check"), close = $("sc-ob-close");
+    if (check && close) {
+      close.disabled = !check.checked;
+      check.addEventListener("change", function () { close.disabled = !check.checked; });
+    }
+    // Terms links must not be trapped by the modal: open full pages.
+    ["sc-terms-link", "sc-privacy-link"].forEach(function (id) {
+      var a = $(id);
+      if (a) a.addEventListener("click", function (e) { e.stopPropagation(); });
+    });
+    if (ob && !termsAccepted()) {
+      try { ob.showModal(); } catch (e) { ob.setAttribute("open", ""); }
+      try { setTimeout(function () { try { (check || close).focus({ preventScroll: true }); } catch (e2) {} }, 100); } catch (e) {}
+      // Escape must not bypass agreement.
+      ob.addEventListener("cancel", function (e) { e.preventDefault(); });
+      if (close) {
+        close.addEventListener("click", function () {
+          if (check && !check.checked) return;
+          try {
+            localStorage.setItem("sc_terms_v1", TERMS_VERSION);
+            localStorage.setItem("sc_terms_at", new Date().toISOString());
+            localStorage.setItem("sc_onboard_seen", "1");
+          } catch (e) {}
+          try { ob.close(); } catch (e) { ob.removeAttribute("open"); }
+          close.blur();
+        });
       }
-      if (ob) {
-        ob.hidden = false;
-        var close = $("sc-ob-close");
-        if (close) {
-          close.addEventListener("click", function () {
-            ob.hidden = true;
-            try { localStorage.setItem("sc_onboard_seen", "1"); } catch (e) {}
-            close.blur();
-          });
-          setTimeout(function () { try { close.focus({ preventScroll: true }); } catch (e) {} }, 100);
-        }
-      }
+    } else if (ob && close && !close.dataset.wired) {
+      // Already accepted: keep dialog available for re-reads, closable normally.
+      close.disabled = false;
+      close.dataset.wired = "1";
+      close.addEventListener("click", function () {
+        try { ob.close(); } catch (e) { ob.removeAttribute("open"); }
+      });
     }
   } catch (e) {}
+  window.__snapclaimTerms = { version: TERMS_VERSION, accepted: termsAccepted };
 
   /* ---------- haptics ---------- */
   function buzz(ms) {
