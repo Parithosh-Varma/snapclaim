@@ -204,7 +204,8 @@ function main(): void {
   const runFiles = names.map((name) => ({ name, text: readFileSync(fileURLToPath(new URL(name, runsDir)), "utf8") }));
   const out = evaluate(split, runFiles, { allowUnrun: process.argv.includes("--allow-unrun") });
   for (const l of out.lines) console.log(l);
-  process.exit(out.exitCode);
+  // exitCode, not exit(): on Windows, exit() while piped stdout is still flushing aborts with a libuv assertion (exit 127)
+  process.exitCode = out.exitCode;
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main();

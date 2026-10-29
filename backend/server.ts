@@ -1,11 +1,15 @@
 import { createServer } from "node:http";
 import { pathToFileURL } from "node:url";
-import { corsHeaders, handleRequest } from "./app.ts";
+import { corsHeadersFor, handleRequest } from "./app.ts";
 
 const PORT = Number(process.env.PORT ?? 8787);
 
-function sendJson(res: import("node:http").ServerResponse, status: number, value: unknown): void {
-  res.writeHead(status, { "content-type": "application/json", ...corsHeaders() });
+function sendJson(res: import("node:http").ServerResponse, status: number, value: unknown, origin: string | null): void {
+  res.writeHead(status, {
+    "content-type": "application/json",
+    "x-content-type-options": "nosniff",
+    ...corsHeadersFor(origin, process.env),
+  });
   res.end(JSON.stringify(value));
 }
 
@@ -34,8 +38,9 @@ function readJson(req: import("node:http").IncomingMessage): Promise<unknown> {
 }
 
 export const server = createServer(async (req, res) => {
+  const origin = typeof req.headers.origin === "string" ? req.headers.origin : null;
   if (req.method === "OPTIONS") {
-    res.writeHead(204, corsHeaders());
+    res.writeHead(204, corsHeadersFor(origin, process.env));
     res.end();
     return;
   }
@@ -45,13 +50,13 @@ export const server = createServer(async (req, res) => {
     try {
       body = await readJson(req);
     } catch (error) {
-      sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : "invalid JSON", code: 400, requestId: "unknown" });
+      sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : "invalid JSON", code: 400, requestId: "unknown" }, origin);
       return;
     }
   }
   const fetchFn: typeof fetch = (url, init) => fetch(url, init);
   const handled = await handleRequest({ method: req.method ?? "GET", path, body, env: process.env, fetchFn });
-  sendJson(res, handled.status, handled.body);
+  sendJson(res, handled.status, handled.body, origin);
 });
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

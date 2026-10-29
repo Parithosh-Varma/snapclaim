@@ -8,6 +8,12 @@
       "source": "fixtures/masks/wall-crack.json",
       "surface": "wall",
       "hasScaleReference": true
+    },
+    {
+      "id": "photo-facade-crack-01",
+      "source": "fixtures/masks/facade-crack.json",
+      "surface": "brick facade",
+      "hasScaleReference": false
     }
   ],
   "heldOut": [

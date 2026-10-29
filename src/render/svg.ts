@@ -30,6 +30,7 @@ const OVERLAY_COLORS = new Map<string, string>([
   ["stain", "#f39c12"],
   ["peel", "#2980b9"],
   ["dent", "#8e44ad"],
+  ["coin", "#0f7a36"],
 ]);
 
 /** Round to 2 decimals for layout numbers. */
@@ -99,10 +100,12 @@ export function renderAnnexureSvg(input: AnnexureInput): string {
     .map((f, i) => {
       const y = 150 + i * 38;
       const mm = f.crackLengthMm === null ? "percent-only" : `${f.crackLengthMm} mm`;
+      const area = f.areaCm2 === null ? "" : ` · ${f.areaCm2} cm2`;
+      const width = f.crackWidthMm === null ? "" : ` · w ${f.crackWidthMm} mm`;
       const statement = input.statements?.[i]?.statement ?? "";
       return (
         `<rect x="24" y="${y}" width="14" height="14" fill="${severityColor(f.severity)}"/>` +
-        `<text x="46" y="${y + 12}" font-size="13" font-family="monospace">${esc(f.label)} ${esc(f.percent)}% · ${esc(mm)} · ${esc(f.severity)}</text>` +
+        `<text x="46" y="${y + 12}" font-size="13" font-family="monospace">${esc(f.label)} ${esc(f.percent)}%${esc(area)} · ${esc(mm)}${esc(width)} · ${esc(f.severity)}</text>` +
         (statement === ""
           ? ""
           : `<text x="46" y="${y + 27}" font-size="11" font-family="monospace" fill="#555">${esc(statement.slice(0, 110))}</text>`)

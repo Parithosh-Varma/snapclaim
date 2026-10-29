@@ -26,11 +26,14 @@ export function citingDrafts(findings: MeasuredFinding[]): FindingDraft[] {
   return findings.map((finding) => {
     const citations = [finding.receiptIds.ratio, finding.receiptIds.regions, finding.receiptIds.severity];
     if (finding.receiptIds.length !== null) citations.push(finding.receiptIds.length);
-    const statement =
-      finding.crackLengthMm === null
-        ? `${finding.label} covers ${finding.percent}% of the component; classified ${finding.severity}.`
-        : `${finding.label} covers ${finding.percent}% of the component and measures ${finding.crackLengthMm} mm; classified ${finding.severity}.`;
-    return { statement, citations };
+    if (finding.receiptIds.area !== null) citations.push(finding.receiptIds.area);
+    if (finding.receiptIds.width !== null) citations.push(finding.receiptIds.width);
+    const parts = [`${finding.label} covers ${finding.percent}% of the component`];
+    if (finding.crackLengthMm !== null) parts.push(`measures ${finding.crackLengthMm} mm`);
+    if (finding.areaCm2 !== null) parts.push(`covers ${finding.areaCm2} cm2`);
+    if (finding.crackWidthMm !== null) parts.push(`averages ${finding.crackWidthMm} mm wide`);
+    parts.push(`classified ${finding.severity}`);
+    return { statement: parts.join("; ") + ".", citations };
   });
 }
 

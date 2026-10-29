@@ -1,0 +1,7 @@
+{
+  "cases": [
+    { "maskId": "crack-1", "percent": 5.17, "crackLengthMm": null, "severity": "significant" },
+    { "maskId": "stain-1", "percent": 1.29, "crackLengthMm": null, "severity": "moderate" }
+  ],
+  "tolerance": { "percent": 0.01, "crackLengthMm": 0.05 }
+}

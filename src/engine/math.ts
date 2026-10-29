@@ -91,3 +91,31 @@ export function calibratedLengthMm(
   }
   return round(skeletonPx * scale, 1);
 }
+
+/**
+ * Calibrated damage area in cm². Requires a confident scale reference;
+ * returns null in percent-only mode so the report never invents units.
+ */
+export function areaCm2(areaPx: number, scaleMmPerPx: number): number {
+  assertNonNegative(areaPx, "areaPx");
+  assertFinite(scaleMmPerPx, "scaleMmPerPx");
+  if (scaleMmPerPx <= 0) {
+    throw new MeasurementError(`scaleMmPerPx must be greater than zero, got ${scaleMmPerPx}`);
+  }
+  return round((areaPx * scaleMmPerPx * scaleMmPerPx) / 100, 2);
+}
+
+/**
+ * Mean crack width in mm: area / centreline length × scale.
+ * Returns null without a skeleton (non-crack labels) — never divides by zero.
+ */
+export function crackWidthMm(areaPx: number, skeletonPx: number, scaleMmPerPx: number): number | null {
+  assertNonNegative(areaPx, "areaPx");
+  assertNonNegative(skeletonPx, "skeletonPx");
+  assertFinite(scaleMmPerPx, "scaleMmPerPx");
+  if (scaleMmPerPx <= 0) {
+    throw new MeasurementError(`scaleMmPerPx must be greater than zero, got ${scaleMmPerPx}`);
+  }
+  if (skeletonPx === 0) return null;
+  return round((areaPx / skeletonPx) * scaleMmPerPx, 1);
+}
