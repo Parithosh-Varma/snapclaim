@@ -349,11 +349,8 @@ $("noCoin").onclick = () => {
 };
 
 /* ---------- mark damage (photo canvas + SlimSAM taps) ---------- */
-const TF_URL = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2";
-const MODEL_ID = "Xenova/slimsam-77-uniform";
 const MAX_SIDE = 512;
-const MIN_FINE_SCORE = 0.5;
-let tf = null, model = null, processor = null, embeddings = null;
+let embeddings = null; // true once the worker has embedded the current photo
 let dmg = { points: [], pointMasks: [], mask: null, iou: 0 };
 let dmgLabel = "crack";
 
@@ -375,11 +372,36 @@ function circleRle(cx, cy, r, w, h) {
   }
   return encodeRle(mask, w, h);
 }
-async function loadModel() {
-  if (model) return;
-  tf = await import(TF_URL);
-  model = await tf.SamModel.from_pretrained(MODEL_ID);
-  processor = await tf.AutoProcessor.from_pretrained(MODEL_ID);
+// SlimSAM runs in sam-worker.js (WebGPU when the phone has it, CPU otherwise), so the
+// ~30 s embedding never freezes the page. A worker that fails only disables outlining.
+let samWorker = null, samPhotoId = 0, samDecodeId = 0;
+const samPending = new Map();
+function sam() {
+  if (samWorker) return samWorker;
+  // ?device=wasm|webgpu on the page URL forces the worker's backend, for comparisons.
+  const url = new URL("./sam-worker.js", import.meta.url);
+  const device = new URLSearchParams(location.search).get("device");
+  if (device) url.searchParams.set("device", device);
+  samWorker = new Worker(url, { type: "module" });
+  samWorker.onmessage = ({ data }) => {
+    if (data.type === "decoded") {
+      const p = samPending.get(data.id);
+      samPending.delete(data.id);
+      if (data.error) p?.reject(new Error(data.error)); else p?.resolve(data.result);
+      return;
+    }
+    if (data.photoId !== undefined && data.photoId !== samPhotoId) return; // stale photo
+    if (data.type === "progress") $("tfState").textContent = `Downloading the outlining model… ${data.percent}%`;
+    else if (data.type === "ready") {
+      embeddings = true;
+      $("tfState").textContent = "";
+      console.info(`[sam] embedded on ${data.device} in ${data.embedMs} ms`);
+    } else if (data.type === "error") {
+      $("status").textContent = `Outlining unavailable (${data.message}). Check the connection and retry.`;
+    }
+  };
+  samWorker.onerror = (e) => { $("status").textContent = `Outlining failed to start (${e.message ?? "worker error"}).`; };
+  return samWorker;
 }
 function setupMarkPhoto() {
   const img = new Image();
@@ -393,37 +415,20 @@ function setupMarkPhoto() {
     drawMark();
     $("measureBtn").disabled = true;
     $("status").textContent = "Tap the crack, then Measure.";
-    loadModel().then(prepareEmbeddings).catch(() => { $("status").textContent = "Outlining unavailable — measuring the whole-frame fallback is off. Retry."; });
+    embeddings = null;
+    samPhotoId++;
+    const image = photo.getContext("2d").getImageData(0, 0, photo.width, photo.height);
+    sam().postMessage({ type: "embed", photoId: samPhotoId, image: { data: image.data, width: image.width, height: image.height } }, [image.data.buffer]);
   };
   img.src = stillDataUrl;
 }
-async function prepareEmbeddings() {
-  const blob = await new Promise((r) => photo.toBlob(r, "image/png"));
-  const rawImage = await tf.RawImage.read(URL.createObjectURL(blob));
-  const inputs = await processor(rawImage);
-  embeddings = await model.get_image_embeddings(inputs);
-  $("tfState").textContent = "";
-}
-async function decodePoint(point) {
-  const inputs = await processor(await tf.RawImage.read(URL.createObjectURL(await new Promise((r) => photo.toBlob(r, "image/png")))), { input_points: [[point]] });
-  const outputs = await model({ ...embeddings, input_points: inputs.input_points, input_labels: inputs.input_labels });
-  const masks = await processor.post_process_masks(outputs.pred_masks, inputs.original_sizes, inputs.reshaped_input_sizes);
-  const scores = outputs.iou_scores.data;
-  const [, , h, w] = masks[0].dims;
-  const areaOf = (k) => { let n = 0; for (const v of masks[0].data.subarray(k * h * w, (k + 1) * h * w)) if (v) n++; return n; };
-  let best = 0;
-  for (let i = 1; i < scores.length; i++) if (scores[i] > scores[best]) best = i;
-  let fine = -1, fineArea = Infinity;
-  for (let i = 0; i < scores.length; i++) {
-    const a = areaOf(i);
-    if (scores[i] >= MIN_FINE_SCORE && a > 0 && a < fineArea) { fine = i; fineArea = a; }
-  }
-  if (fine >= 0) best = fine;
-  const m = masks[0].data.subarray(best * h * w, (best + 1) * h * w);
-  const out = new Uint8Array(h * w);
-  let area = 0;
-  for (let i = 0; i < out.length; i++) if (m[i]) { out[i] = 1; area++; }
-  return area ? { mask: out, iou: scores[best] } : null;
+// Cracks are thin, so the worker takes SAM's smallest confident candidate, not the wall around it.
+function decodePoint(point) {
+  const id = samDecodeId++;
+  return new Promise((resolve, reject) => {
+    samPending.set(id, { resolve, reject });
+    sam().postMessage({ type: "decode", id, photoId: samPhotoId, point, preferSmallest: true });
+  });
 }
 function drawMark() {
   const c = $("markCanvas");
@@ -716,6 +721,13 @@ async function finishListening(landed) {
     const src = off.createBufferSource(); src.buffer = decoded; src.connect(off.destination); src.start(0, 0, Math.min(decoded.duration, 10));
     const rendered = await off.startRendering();
     ctx.close().catch(() => {});
+    // On the device first (Whisper in voice-worker.js): the voice never leaves the phone
+    // and it works without the backend key. The server transcriber is the fallback.
+    try {
+      const local = await transcribeOnDevice(rendered.getChannelData(0).slice());
+      if (local) { landTranscript(local); return; }
+    } catch (e) { console.info(`[voice] on-device failed, trying the server: ${e.message ?? e}`); }
+    micState.textContent = "Transcribing…";
     const wav = encodeWav(rendered.getChannelData(0), 16000);
     const b64 = await new Promise((res, rej) => {
       const fr = new FileReader();
@@ -732,10 +744,27 @@ async function finishListening(landed) {
     if (!res.ok || !j.ok) throw new Error(j.error ?? res.status);
     const text = String(j.result?.transcript ?? "").trim();
     if (!text) { heard.textContent = "Didn't catch anything — type the line."; return; }
-    $("transcriptBox").value = text;
-    heard.textContent = `“${text}”`;
-    micState.textContent = "Heard";
+    landTranscript(text);
   } catch (e) { $("voiceErr").textContent = `Transcription failed — type the line. (${e.message ?? e})`; }
+}
+function landTranscript(text) {
+  $("transcriptBox").value = text;
+  heard.textContent = `“${text}”`;
+  micState.textContent = "Heard";
+}
+let voiceWorker = null, voiceId = 0;
+/** Mono 16 kHz samples → text, on the device. Empty string means nothing heard. */
+function transcribeOnDevice(audio) {
+  voiceWorker ??= new Worker(new URL("./voice-worker.js", import.meta.url), { type: "module" });
+  const id = voiceId++;
+  return new Promise((resolve, reject) => {
+    voiceWorker.onmessage = ({ data }) => {
+      if (data.type === "progress") micState.textContent = `Downloading speech model… ${data.percent}%`;
+      else if (data.type === "transcribed" && data.id === id) data.error ? reject(new Error(data.error)) : resolve(data.text);
+    };
+    voiceWorker.onerror = (e) => reject(new Error(e.message ?? "speech worker failed to start"));
+    voiceWorker.postMessage({ type: "transcribe", id, audio }, [audio.buffer]);
+  });
 }
 mic.onclick = () => { if (listening) finishListening(true); else startListening(); };
 $("sendBtn").onclick = () => runReport();
@@ -993,6 +1022,8 @@ $("renderBtn").onclick = async () => {
   setShareCopyEnabled(false);
   const body = JSON.parse(JSON.stringify(payloadObj));
   body.transcript = $("transcriptBox").value;
+  // The annexure draws the measured outlines over the photo itself, embedded as a JPEG.
+  if (body.overlay && photo) body.overlay.photoHref = photo.toDataURL("image/jpeg", 0.8);
   try {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), 30000);
