@@ -10,6 +10,7 @@ import { guardFor, spendStatus } from "./spend.ts";
 import { BudgetExceededError } from "../src/config/spend-guard.ts";
 import { configFromEnv, findingsProvider, requireLiveKeys, skepticProvider, visionProvider, HttpError, SAM_IMAGE_USD, type Env, type FetchFn } from "./providers.ts";
 import { encodeRle as encodeMaskRle } from "../src/vision/mask.ts";
+import { MemoryStore, type SavedSession, type Store } from "./store.ts";
 import { segmentWithSam, type SamPoint } from "../src/vision/sam.ts";
 
 export const VERSION = "0.2.0";
@@ -341,6 +342,21 @@ export function crossCheckMeasurement(body: Record<string, unknown>, findings: u
   }
 }
 
+const SESSION_MODES = ["absolute", "percent-only"];
+const defaultStore: Store = new MemoryStore();
+
+/** Validate a session body; picks only known keys. */
+export function toSavedSession(body: unknown): SavedSession {
+  if (!isRecord(body)) throw new HttpError(400, "body must be a JSON object");
+  const { id, at, findings, mode } = body;
+  if (typeof findings !== "number" || !Number.isInteger(findings) || findings < 0) throw new HttpError(400, "findings must be a non-negative integer");
+  if (typeof mode !== "string" || !SESSION_MODES.includes(mode)) throw new HttpError(400, `mode must be one of ${SESSION_MODES.join(", ")}`);
+  if (id !== undefined && typeof id !== "string") throw new HttpError(400, "id must be a string");
+  if (at !== undefined && typeof at !== "string") throw new HttpError(400, "at must be a string");
+  if (typeof at === "string" && (Number.isNaN(Date.parse(at)) || !/^\d{4}-\d{2}-\d{2}T/.test(at))) throw new HttpError(400, "at must be an ISO date");
+  return { id: id ?? crypto.randomUUID(), at: at ?? new Date().toISOString(), findings, mode };
+}
+
 export function corsHeaders(): Record<string, string> {
   return {
     "access-control-allow-origin": "*",
@@ -361,8 +377,10 @@ export async function handleRequest(input: {
   body?: unknown;
   env?: Env;
   fetchFn?: FetchFn;
+  store?: Store;
 }): Promise<HandledResponse> {
   const requestId = newRequestId();
+  const store = input.store ?? defaultStore;
   const env = input.env ?? {};
   try {
     if (input.method === "GET" && input.path === "/v1/health") return { status: 200, body: healthBody(env) };
@@ -374,6 +392,16 @@ export async function handleRequest(input: {
     if (input.method === "POST" && input.path === "/v1/findings") return { status: 200, body: await findingsBody(input.body, env, requestId, input.fetchFn) };
     if (input.method === "POST" && input.path === "/v1/skeptic") return { status: 200, body: await skepticBody(input.body, env, requestId, input.fetchFn) };
     if (input.method === "POST" && input.path === "/v1/render") return { status: 200, body: await renderBody(input.body, env, requestId, input.fetchFn) };
+    if (input.method === "POST" && input.path === "/v1/sessions") {
+      const started = Date.now();
+      const session = toSavedSession(input.body);
+      await store.save(session);
+      return { status: 200, body: envelope(requestId, started, session) };
+    }
+    if (input.method === "GET" && input.path === "/v1/sessions") {
+      const started = Date.now();
+      return { status: 200, body: envelope(requestId, started, { sessions: await store.list() }) };
+    }
     return { status: 404, body: errorBody("not found", 404, requestId, { method: input.method, path: input.path }) };
   } catch (error) {
     const status = error instanceof HttpError ? error.status : 400;
