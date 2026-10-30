@@ -1,26 +1,66 @@
 import { checkPhoto } from "./photo-check.js";
+import { closeMask, unionMasks } from "./mask-ops.js";
 import { decodeRle } from "./rle.js";
 import { mountTiltMeter } from "./tilt-meter.js";
+import { createCaseStore } from "./store.js";
 
 const $ = (id) => document.getElementById(id);
 mountTiltMeter($("tiltMeter")); // live level over the camera; hidden without orientation sensors
 let payloadObj = null;
 let lastMeasurement = null;
-function base() { return $("baseUrl").value.replace(/\/$/, ""); }
-function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+/** Backend URL allowlist: https: anywhere, or http: loopback for local dev.
+ * Anything else (http LAN, data:, javascript:) is rejected so a pasted
+ * "debug URL" cannot exfiltrate photos/voice to an attacker. */
+export function isAllowedBackendUrl(raw) {
+  if (typeof raw !== "string") return false;
+  const v = raw.trim().replace(/\/$/, "");
+  if (v === "") return false;
+  let url;
+  try {
+    url = new URL(v);
+  } catch {
+    return false;
+  }
+  if (url.username !== "" || url.password !== "") return false;
+  if (url.protocol === "https:") return true;
+  if (url.protocol === "http:") {
+    const h = url.hostname.toLowerCase();
+    return h === "localhost" || h === "127.0.0.1" || h === "[::1]" || h === "::1" || h.endsWith(".localhost");
+  }
+  return false;
+}
+function base() {
+  const raw = $("baseUrl").value.trim().replace(/\/$/, "");
+  if (!isAllowedBackendUrl(raw)) throw new Error("Backend URL must be https:// or http://localhost");
+  return raw;
+}
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
+/** Severity comes from the backend: allowlist it so it can never break out of
+ * the class attribute in metricCards (esc alone was not enough for attrs). */
+function escSeverity(s) {
+  const v = String(s);
+  return v === "significant" || v === "moderate" || v === "cosmetic" ? v : "cosmetic";
+}
 
 /* ---------- navigation ---------- */
 const SCREENS = ["sCam", "sReview", "sMark", "sSay", "sNum", "sCheck", "sReport"];
+const TAB_SCREENS = ["tHome", "tCases", "tSettings"];
 function show(id) {
+  if (id !== "sSay") { try { stopMicTracks(); } catch { /* mic not started */ } }
   for (const s of ["sReview", "sMark", "sSay", "sNum", "sCheck", "sReport"]) {
     document.getElementById(s)?.classList.toggle("on", s === id);
   }
+  for (const t of TAB_SCREENS) document.getElementById(t)?.classList.remove("on");
+  document.body.classList.remove("tabbing");
   document.body.classList.toggle("reviewing", id === "sReview");
   document.body.classList.toggle("step2", id === "sSay");
+  if (id === "sReview") { try { $("donateCheck").checked = !!localStorage.getItem("snapclaim.donatePhoto"); } catch { /* ignore */ } }
 }
 function backToCam() {
+  try { stopMicTracks(); } catch { /* noop */ }
   for (const s of ["sReview", "sMark", "sSay", "sNum", "sCheck", "sReport"]) document.getElementById(s)?.classList.remove("on");
-  document.body.classList.remove("reviewing", "step2");
+  for (const t of TAB_SCREENS) document.getElementById(t)?.classList.remove("on");
+  document.body.classList.remove("reviewing", "step2", "tabbing");
 }
 
 /* ---------- backend ---------- */
@@ -221,6 +261,34 @@ function findRing(edge, w, h) {
   return best;
 }
 
+/**
+ * Strongest circular rim around a tap, by radial luminance gradient averaged
+ * over angles. A tap says "the coin is here", so a coin with a soft rim (e.g.
+ * behind a plastic bag) still locks even when its edge blob is too broken for
+ * findRing. Returns {rr, score} in frame pixels, or null.
+ */
+function findRimAt(imgData, w, h, cx, cy) {
+  let best = null;
+  const rMax = Math.min(36, Math.round(Math.min(w, h) * 0.28));
+  for (let r = 6; r <= rMax; r++) {
+    let sum = 0, n = 0;
+    for (let a = 0; a < 360; a += 5) {
+      const t = (a * Math.PI) / 180;
+      const x1 = Math.round(cx + Math.cos(t) * (r - 1.5)), y1 = Math.round(cy + Math.sin(t) * (r - 1.5));
+      const x2 = Math.round(cx + Math.cos(t) * (r + 1.5)), y2 = Math.round(cy + Math.sin(t) * (r + 1.5));
+      if (x1 < 1 || y1 < 1 || x2 < 1 || y2 < 1 || x1 >= w - 1 || y1 >= h - 1 || x2 >= w - 1 || y2 >= h - 1) continue;
+      const i1 = (y1 * w + x1) * 4, i2 = (y2 * w + x2) * 4;
+      const g1 = 0.299 * imgData[i1] + 0.587 * imgData[i1 + 1] + 0.114 * imgData[i1 + 2];
+      const g2 = 0.299 * imgData[i2] + 0.587 * imgData[i2 + 1] + 0.114 * imgData[i2 + 2];
+      sum += Math.abs(g2 - g1); n++;
+    }
+    if (n < 36) continue;
+    const score = sum / n;
+    if (!best || score > best.score) best = { rr: r, score };
+  }
+  return best;
+}
+
 function scanFrame() {
   const fw = SW, fh = Math.round((SW * feed.videoHeight) / feed.videoWidth);
   work.width = fw; work.height = fh;
@@ -230,13 +298,22 @@ function scanFrame() {
   const edge = grayEdges(img.data, fw, fh);
   let found = null;
   if (assistPt) {
-    const r = Math.round(fw * 0.25);
-    const x0 = Math.max(0, Math.round(assistPt.x - r)), x1 = Math.min(fw, Math.round(assistPt.x + r));
-    const y0 = Math.max(0, Math.round(assistPt.y - r)), y1 = Math.min(fh, Math.round(assistPt.y + r));
-    const sub = new Uint8Array((x1 - x0) * (y1 - y0));
-    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) sub[(y - y0) * (x1 - x0) + (x - x0)] = edge[y * fw + x];
-    const sub0 = findRing(sub, x1 - x0, y1 - y0);
-    if (sub0) found = { cx: sub0.cx + x0, cy: sub0.cy + y0, rr: sub0.rr, score: sub0.score };
+    // The tap is the user's answer to "where is the coin": measure the rim
+    // around it first. A soft or partly hidden rim still scores here, where
+    // findRing's connected-blob score fails.
+    const ax = Math.round(assistPt.x), ay = Math.round(assistPt.y);
+    const rim = findRimAt(img.data, fw, fh, ax, ay);
+    if (rim && rim.score >= 22) {
+      found = { cx: ax, cy: ay, rr: rim.rr, score: Math.min(1, rim.score / 60) };
+    } else {
+      const r = Math.round(fw * 0.25);
+      const x0 = Math.max(0, Math.round(assistPt.x - r)), x1 = Math.min(fw, Math.round(assistPt.x + r));
+      const y0 = Math.max(0, Math.round(assistPt.y - r)), y1 = Math.min(fh, Math.round(assistPt.y + r));
+      const sub = new Uint8Array((x1 - x0) * (y1 - y0));
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) sub[(y - y0) * (x1 - x0) + (x - x0)] = edge[y * fw + x];
+      const sub0 = findRing(sub, x1 - x0, y1 - y0);
+      if (sub0) found = { cx: sub0.cx + x0, cy: sub0.cy + y0, rr: sub0.rr, score: sub0.score };
+    }
   } else {
     const f0 = findRing(edge, fw, fh);
     if (f0) found = { cx: f0.cx, cy: f0.cy, rr: f0.rr, score: f0.score };
@@ -289,14 +366,17 @@ function scanFrame() {
 document.getElementById("cam").addEventListener("pointerdown", (ev) => {
   if (coinSeen || !feed.videoWidth) return;
   const r = feed.getBoundingClientRect();
-  const fx = (ev.clientX - r.left) / r.width, fy = (ev.clientY - r.top) / r.height;
   const fw = SW, fh = Math.round((SW * feed.videoHeight) / feed.videoWidth);
   const vw = feed.videoWidth, vh = feed.videoHeight;
-  const scale = Math.max(vw / fw, vh / fh);
-  const ox = (vw - fw * scale) / 2 / scale, oy = (vh - fh * scale) / 2 / scale;
+  // The preview is object-fit: cover: a centred crop of the video fills the
+  // element. Tap coordinates must go through that crop, not straight to 0..1.
+  const scale = Math.max(r.width / vw, r.height / vh);
+  const dispW = vw * scale, dispH = vh * scale;
+  const ox = (dispW - r.width) / 2, oy = (dispH - r.height) / 2;
+  const fx = (ev.clientX - r.left + ox) / dispW, fy = (ev.clientY - r.top + oy) / dispH;
   assistPt = {
-    x: Math.max(0, Math.min(fw, fx * vw / scale - ox)),
-    y: Math.max(0, Math.min(fh, fy * vh / scale - oy)),
+    x: Math.max(0, Math.min(fw, fx * fw)),
+    y: Math.max(0, Math.min(fh, fy * fh)),
   };
   assistAt = scanCount;
   hint.textContent = "Checking that spot…";
@@ -341,7 +421,15 @@ $("retake").onclick = () => {
   setLocked(true, "Add a coin for scale");
   acquireCamera();
 };
-$("usePhoto").onclick = () => { show("sMark"); setupMarkPhoto(); };
+$("usePhoto").onclick = () => {
+  // Consent is recorded on-device only: there is no dataset endpoint yet,
+  // so checking this box never uploads anything by itself.
+  try {
+    if ($("donateCheck").checked) localStorage.setItem("snapclaim.donatePhoto", "1");
+    else localStorage.removeItem("snapclaim.donatePhoto");
+  } catch { /* storage may be unavailable; the photo flow must not break */ }
+  show("sMark"); setupMarkPhoto();
+};
 $("backCam").onclick = () => { $("retake").onclick(); };
 $("altEntry").onclick = () => { loadSample(); };
 $("noCoin").onclick = () => {
@@ -350,12 +438,37 @@ $("noCoin").onclick = () => {
   setLocked(false, "Percent-only — no scale. Tap to snap.");
   cancelCapture();
 };
+/* Upload fallback: an existing photo skips the coin gate, so it measures
+   percent-only (no scale reference was detected in it). */
+$("uploadBtn").onclick = () => $("camFile").click();
+$("camFile").addEventListener("change", () => {
+  const file = $("camFile").files?.[0];
+  $("camFile").value = "";
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    URL.revokeObjectURL(url);
+    const side = Math.max(img.width, img.height) > 1024 ? 1024 / Math.max(img.width, img.height) : 1;
+    const cap = document.createElement("canvas");
+    cap.width = Math.round(img.width * side); cap.height = Math.round(img.height * side);
+    cap.getContext("2d").drawImage(img, 0, 0, cap.width, cap.height);
+    stillDataUrl = cap.toDataURL("image/jpeg", 0.85); // canvas redraw strips EXIF
+    $("shotFull").src = stillDataUrl;
+    gateCoin = null; noScaleMode = true; coinLabel = "";
+    stopCamera();
+    show("sReview");
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); hint.textContent = "That photo could not be read — try another."; };
+  img.src = url;
+});
 
 /* ---------- mark damage (photo canvas + SlimSAM taps) ---------- */
 const MAX_SIDE = 512;
 let embeddings = null; // true once the worker has embedded the current photo
 let dmg = { points: [], pointMasks: [], mask: null, iou: 0, source: null };
 let dmgLabel = "crack";
+const MASK_COLORS = { crack: "#c0392b", stain: "#f39c12", peel: "#2980b9", dent: "#8e44ad", coin: "#0f7a36" };
 
 function encodeRle(mask, w, h) {
   const counts = [];
@@ -448,9 +561,11 @@ async function segmentViaApi(points) {
   });
   const j = await res.json().catch(() => ({}));
   if (!res.ok || !j.ok) throw new Error(j.error ?? `segment HTTP ${res.status}`);
-  const rec = j.result?.records?.[0];
-  if (!rec) throw new Error("SAM found nothing there — tap the middle of the damage and retry.");
-  return { mask: decodeRle(rec.rle), iou: rec.confidence ?? 0, rle: rec.rle };
+  // SAM may split one crack into several objects; all of them are the damage.
+  const records = j.result?.records ?? [];
+  if (!records.length) throw new Error("SAM found nothing there — tap the middle of the damage and retry.");
+  const mask = unionMasks(records.map((rec) => decodeRle(rec.rle)));
+  return { mask, iou: Math.min(...records.map((rec) => rec.confidence ?? 0)), rle: encodeRle(mask, photo.width, photo.height) };
 }
 // On-device union of one SlimSAM mask per tap; null when no tap found anything.
 async function segmentOnDevice() {
@@ -511,10 +626,18 @@ $("markCanvas").addEventListener("pointerdown", async (ev) => {
     try { out = await segmentOnDevice(); } catch { out = null; }
   }
   if (out) {
-    dmg.mask = out.mask; dmg.iou = out.iou; dmg.source = source;
+    // Bridge hairline gaps (≤4 px) so one crack reads as one region, not
+    // speckle. Done here so the outline shown is exactly what gets measured.
+    dmg.mask = closeMask(out.mask, photo.width, photo.height, 2); dmg.iou = out.iou; dmg.source = source;
     $("status").textContent = `Outlined (${Math.round(dmg.iou * 100)}% sure) via ${source === "api" ? "SAM 3.1 API" : "on-device"}.`;
   } else { dmg.mask = null; dmg.source = null; $("status").textContent = "No mask there. Tap the middle of it."; }
   drawMark();
+});
+$("coinKind").addEventListener("change", () => {
+  const opt = $("coinKind").selectedOptions[0];
+  // The user's confirmation wins over the gate's size guess (it can name a
+  // coin outside this list, e.g. a nickel, while the scale uses this value).
+  if (opt) coinLabel = opt.textContent.replace(/ · (\d+(?:\.\d+)?) mm$/, " · Ø$1 mm");
 });
 for (const [id, label] of [["chipCrack", "crack"], ["chipStain", "stain"], ["chipPeel", "peel"], ["chipDent", "dent"]]) {
   $(id).onclick = () => {
@@ -613,7 +736,7 @@ function metricCards(f) {
       <div class="metric"><b>${esc(String(f.regionCount ?? 1))}</b><span>Region${(f.regionCount ?? 1) === 1 ? "" : "s"}</span></div>
       ${area}${width}
     </div>
-    <div class="sevbar sev-${esc(String(f.severity))}"><span>${esc(String(f.severity)).toUpperCase()}</span><small>severity band</small></div>`;
+    <div class="sevbar sev-${escSeverity(f.severity)}"><span>${esc(String(f.severity)).toUpperCase()}</span><small>severity band</small></div>`;
 }
 
 function receiptChips(receipts) {
@@ -633,11 +756,108 @@ function measuredRows(findings, receipts) {
   }).join("");
 }
 
+/** Bounding box of the on pixels, or null when the mask is empty. */
+function maskBox(mask, w, h) {
+  let minX = w, minY = h, maxX = -1, maxY = -1;
+  for (let i = 0; i < mask.length; i++) {
+    if (!mask[i]) continue;
+    const x = i % w, y = (i / w) | 0;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  return maxX < 0 ? null : { minX, minY, maxX, maxY };
+}
+
+/**
+ * Outline the mask the backend measured and tag it with its own numbers, on the
+ * numbers photo card. Runs from the /v1/observe reply, so it is on screen as soon
+ * as the claim leaves the transcript step — no report generation needed.
+ */
+function drawNumOverlay() {
+  const svg = $("numPhotoOverlay");
+  if (!svg) return;
+  svg.replaceChildren();
+  const ov = payloadObj?.overlay;
+  const first = (lastMeasurement?.findings ?? [])[0];
+  if (!ov || !stillDataUrl || !(ov.width > 0) || !(ov.height > 0) || !first) return;
+  const NS = "http://www.w3.org/2000/svg";
+  const W = ov.width, H = ov.height;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+  const el = (name, attrs) => {
+    const node = document.createElementNS(NS, name);
+    for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v));
+    return node;
+  };
+  const colorFor = (label) => MASK_COLORS[label] ?? "#7f8c8d";
+  for (const mask of ov.masks) {
+    const color = colorFor(mask.label);
+    svg.appendChild(el("path", {
+      d: mask.path, fill: color, "fill-opacity": "0.18", stroke: color,
+      "stroke-width": 2, "vector-effect": "non-scaling-stroke", "fill-rule": "evenodd",
+    }));
+  }
+  // Tag the damage outline, never the scale coin.
+  const target = ov.masks.find((m) => m.label !== "coin");
+  const box = target && dmg.mask ? maskBox(dmg.mask, W, H) : null;
+  if (!box) return;
+  const color = colorFor(target.label);
+  const label = String(first.label);
+  const number = `${String(first.percent)}%${first.crackLengthMm == null ? "" : ` · ${String(first.crackLengthMm)} mm`}`;
+  const text = `${label.charAt(0).toUpperCase() + label.slice(1)} · ${number}`;
+  const fs = Math.max(11, W * 0.036);
+  const tagW = text.length * fs * 0.6 + fs * 1.2;
+  const tagH = fs * 1.75;
+  const gap = fs * 0.8;
+  const edge = fs * 0.4;
+  const cx = (box.minX + box.maxX) / 2;
+  // Above the damage, else below it, else beside a full-height crack.
+  let x = cx - tagW / 2, y, place;
+  if (box.minY - gap - tagH >= edge) { y = box.minY - gap - tagH; place = "above"; }
+  else if (box.maxY + gap + tagH <= H - edge) { y = box.maxY + gap; place = "below"; }
+  else if (box.maxX + gap + tagW <= W - edge) { x = box.maxX + gap; y = box.minY; place = "right"; }
+  else { x = box.minX - gap - tagW; y = box.minY; place = "left"; }
+  x = Math.min(Math.max(x, edge), Math.max(edge, W - tagW - edge));
+  y = Math.min(Math.max(y, edge), Math.max(edge, H - tagH - edge));
+  const midY = Math.min(Math.max(y + tagH / 2, box.minY), box.maxY);
+  // Beside a full-height crack the connector must meet the mask's edge at that row,
+  // not the mask's global bounding box (which could sit under the tag).
+  let sideX = null;
+  if (place === "left" || place === "right") {
+    const row = Math.min(H - 1, Math.max(0, Math.round(midY)));
+    const base = row * W;
+    if (place === "right") {
+      for (let px = W - 1; px >= 0; px--) if (dmg.mask[base + px]) { sideX = px; break; }
+    } else {
+      for (let px = 0; px < W; px++) if (dmg.mask[base + px]) { sideX = px; break; }
+    }
+  }
+  let line = null;
+  if (place === "right" && sideX !== null) line = { x1: x, y1: midY, x2: sideX, y2: midY };
+  else if (place === "left" && sideX !== null) line = { x1: x + tagW, y1: midY, x2: sideX, y2: midY };
+  else if (place === "below") line = { x1: Math.min(Math.max(cx, x + fs * 0.6), x + tagW - fs * 0.6), y1: y, x2: cx, y2: box.maxY };
+  else if (place === "above") line = { x1: Math.min(Math.max(cx, x + fs * 0.6), x + tagW - fs * 0.6), y1: y + tagH, x2: cx, y2: box.minY };
+  if (line) svg.appendChild(el("line", { ...line, stroke: color, "stroke-width": 1.5, "vector-effect": "non-scaling-stroke" }));
+  svg.appendChild(el("rect", {
+    x, y, width: tagW, height: tagH, rx: tagH / 2,
+    fill: "#fffdf8", stroke: color, "stroke-width": 2, "vector-effect": "non-scaling-stroke",
+  }));
+  const tag = el("text", {
+    x: x + tagW / 2, y: y + tagH / 2, "text-anchor": "middle", "dominant-baseline": "central",
+    "font-family": "Archivo, system-ui, sans-serif", "font-weight": 700, "font-size": fs, fill: "#0b1e46",
+  });
+  tag.textContent = text;
+  svg.appendChild(tag);
+}
+
 function fillPhotoCard() {
   const card = $("numPhotoCard");
   if (!card || !stillDataUrl) return;
   card.hidden = false;
   $("numPhoto").src = stillDataUrl;
+  drawNumOverlay();
   $("numChip").textContent = coinLabel ? `${coinLabel} · measured` : (noScaleMode ? "Percent only · no coin" : "Measured");
 }
 function setNumLoading(on) {
@@ -726,11 +946,18 @@ async function ensureMic() {
     return true;
   } catch { heard.textContent = "Mic blocked — allow access or type below."; return false; }
 }
+function stopMicTracks() {
+  try { micStream?.getTracks()?.forEach((t) => t.stop()); } catch { /* noop */ }
+  try { recStream?.getTracks()?.forEach((t) => t !== null && t !== undefined && t.stop?.()); } catch { /* noop */ }
+  micStream = null; recStream = null; micReady = false; analyser = null; analyserData = null;
+}
 function stopListening(landed, text) {
   clearTimeout(micTimer); micTimer = null; listening = false;
   document.getElementById("micwrap").classList.remove("live");
   micState.textContent = landed ? "Heard" : "Listening";
   heard.textContent = landed ? (text ?? "") : "";
+  // The OS mic indicator must not linger after leaving the Say step.
+  if (!landed) stopMicTracks();
 }
 async function startListening() {
   if (listening) return;
@@ -925,9 +1152,15 @@ async function runSkeptic(auto) {
   renderCheckCard(); updateReportGate();
   $("skOut").innerHTML = `<div class="skel" role="status" aria-label="Skeptic is checking"></div>`;
   try {
+    // /v1/skeptic re-measures server-side: it needs component + masks,
+    // not just findings/receipts (else 422 "component and masks are required").
+    // Send only the measure inputs, not the overlay (SVG paths are large).
+    const measureInputs = payloadObj
+      ? { component: payloadObj.component, masks: payloadObj.masks, ...(payloadObj.scaleReference ? { scaleReference: payloadObj.scaleReference } : {}) }
+      : {};
     const res = await fetch(base() + "/v1/skeptic", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ transcript: $("transcriptBox").value, findings: lastMeasurement.findings, receipts: lastMeasurement.receipts }),
+      body: JSON.stringify({ ...measureInputs, transcript: $("transcriptBox").value, findings: lastMeasurement.findings, receipts: lastMeasurement.receipts }),
     });
     const j = await res.json().catch(() => ({}));
     if (!res.ok || !j.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
@@ -1054,6 +1287,7 @@ $("copyBtn").onclick = async () => {
   catch { $("reportState").textContent = "Copy failed in this browser — select the summary manually."; }
 };
 $("newClaimBtn").onclick = () => {
+  currentCaseId = null;
   payloadObj = null; lastMeasurement = null;
   dmg = { points: [], pointMasks: [], mask: null, iou: 0, source: null };
   gateCoin = null; stillDataUrl = ""; noScaleMode = false; coinLabel = "";
@@ -1061,6 +1295,7 @@ $("newClaimBtn").onclick = () => {
   $("transcriptBox").value = ""; $("heard").textContent = "";
   $("voiceErr").textContent = ""; $("raw").textContent = "{}";
   $("measured").innerHTML = ""; $("findings").innerHTML = ""; drawScheme([]);
+  $("numPhotoOverlay").replaceChildren();
   $("skOut").innerHTML = ""; $("skStatus").textContent = ""; $("xStatus").textContent = "";
   const card = $("numPhotoCard"); if (card) card.hidden = true;
   $("annexWrap").innerHTML = `<img id="annexImg" alt="Generated report annexure" hidden />`;
@@ -1096,7 +1331,13 @@ $("renderBtn").onclick = async () => {
       j = await res.json();
     } finally { clearTimeout(timer); }
     if (!res.ok || !j.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
-    const blob = new Blob([j.result.svg], { type: "image/svg+xml" });
+    // Preview renders in <img> (script-inert), but the downloaded .svg opens
+    // as a document and would run embedded scripts. Strip scriptable content.
+    const cleanSvg = String(j.result.svg)
+      .replace(/<script[\s\S]*?<\/script\s*>/gi, "")
+      .replace(/<foreignObject[\s\S]*?<\/foreignObject\s*>/gi, "")
+      .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+    const blob = new Blob([cleanSvg], { type: "image/svg+xml" });
     const url = URL.createObjectURL(blob);
     const img = document.getElementById("annexImg");
     await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = () => reject(new Error("preview failed to render")); img.src = url; img.hidden = false; });
@@ -1109,6 +1350,7 @@ $("renderBtn").onclick = async () => {
     fillReportDoc(true);
     setShareCopyEnabled(true);
     state.textContent = "";
+    saveCaseFromReport();
   } catch (e) {
     const name = e instanceof Error ? e.name : "";
     const what = name === "AbortError" ? "timed out after 30 s" : (e instanceof Error ? e.message : String(e));
@@ -1140,8 +1382,263 @@ async function loadSample() {
     startListening();
   } catch (e) { hint.textContent = `Sample failed (${e.message ?? e}). Is the backend reachable?`; }
 }
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+/* ---------- local cases, tabs, settings (store.js) ---------- */
+let caseStore;
+try { caseStore = createCaseStore(localStorage); } catch { caseStore = createCaseStore({ getItem: () => null, setItem: () => {}, removeItem: () => {} }); }
+let currentCaseId = null;
+let dlgCaseId = null;
+let swReg = null;
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg; t.hidden = false;
+  $("appLive").textContent = msg;
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { t.hidden = true; }, 2600);
 }
-// Open the camera on arrival; a refusal or missing camera shows the Enable camera button.
-acquireCamera();
+function download(name, text, type = "application/json") {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+function caseItem(c) {
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "caseitem";
+  const when = new Date(c.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  const meta = [c.label ? `${c.label} ${c.percent ?? "?"}%` : null, c.severity, when].filter(Boolean).join(" · ");
+  // c.photo is a canvas data URL we wrote; never interpolate it raw — a
+  // quote-breakout (" onerror=) would run on open. Validate before use.
+  const img = document.createElement("img");
+  img.alt = "";
+  const span = document.createElement("span");
+  const name = document.createElement("b");
+  name.textContent = c.name ?? "Untitled case";
+  const small = document.createElement("small");
+  small.textContent = meta;
+  span.append(name, small);
+  if (typeof c.photo === "string" && /^data:image\/(png|jpeg|webp);base64,/.test(c.photo)) {
+    img.src = c.photo;
+    b.append(img, span);
+  } else {
+    b.append(span);
+  }
+  b.onclick = () => openCase(c.id);
+  return b;
+}
+function renderCases() {
+  const cases = caseStore.list();
+  const recent = $("recentList");
+  recent.replaceChildren(...cases.slice(0, 3).map(caseItem));
+  $("recentEmpty").style.display = cases.length ? "none" : "block";
+  const list = $("caseList");
+  list.replaceChildren(...cases.map(caseItem));
+  $("caseEmpty").style.display = cases.length ? "none" : "block";
+  if (cases.length) {
+    $("nextTitle").textContent = "Start a new claim";
+    $("nextSub").textContent = `${cases.length} case${cases.length === 1 ? "" : "s"} saved on this device.`;
+  }
+  updateStoreInfo();
+}
+async function updateStoreInfo() {
+  const n = caseStore.list().length;
+  const kb = Math.max(1, Math.round(caseStore.bytesUsed() / 1024));
+  let quota = "";
+  try {
+    const est = await navigator.storage?.estimate?.();
+    if (est?.quota) quota = ` of ~${Math.round(est.quota / 1048576)} MB available to this site`;
+  } catch { /* estimate is advisory */ }
+  $("storeInfo").textContent = `Storage: ${n} case${n === 1 ? "" : "s"} · ~${kb} KB used${quota}. Tapping damage sends the photo to the backend for outlining (falls back to on-device); Cross-check and report attach also upload.`;
+  $("sc-store-meter").style.width = `${Math.min(100, (caseStore.bytesUsed() / (5 * 1048576)) * 100)}%`;
+}
+function showTab(id) {
+  for (const s of ["sReview", "sMark", "sSay", "sNum", "sCheck", "sReport"]) document.getElementById(s)?.classList.remove("on");
+  for (const t of TAB_SCREENS) document.getElementById(t)?.classList.toggle("on", t === id);
+  document.body.classList.add("tabbing");
+  document.body.classList.remove("reviewing", "step2");
+  for (const b of document.querySelectorAll("#tabs [data-tab]")) {
+    if (b.dataset.tab === id) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+  }
+  stopCamera();
+  renderCases();
+  syncNetPill();
+}
+function startCapture() {
+  currentCaseId = null;
+  backToCam();
+  setLocked(true, "Add a coin for scale");
+  acquireCamera();
+}
+function syncNetPill() {
+  const pill = $("netPill");
+  pill.textContent = navigator.onLine ? "Online" : "Offline";
+  pill.className = `badge ${navigator.onLine ? "ok" : "wait"}`;
+}
+for (const b of document.querySelectorAll("#tabs [data-tab]")) {
+  b.onclick = () => { if (b.dataset.tab === "capture") startCapture(); else showTab(b.dataset.tab); };
+}
+$("ctaNew").onclick = startCapture;
+$("tabNew").onclick = startCapture;
+$("ctaSample").onclick = () => { backToCam(); loadSample(); };
+$("doneHome").onclick = () => showTab("tHome");
+function openCase(id) {
+  const c = caseStore.get(id);
+  if (!c) return;
+  dlgCaseId = id;
+  $("dlgName").value = c.name ?? "";
+  $("dlgProp").value = c.property ?? "";
+  $("dlgNotes").value = c.notes ?? "";
+  $("dlgPhotos").replaceChildren();
+  if (typeof c.photo === "string" && /^data:image\/(png|jpeg|webp);base64,/.test(c.photo)) {
+    const img = document.createElement("img");
+    img.src = c.photo;
+    img.alt = "Case photo";
+    $("dlgPhotos").append(img);
+  } else {
+    const div = document.createElement("div");
+    div.className = "empty";
+    div.textContent = c.photoDropped ? "Photo was dropped to fit device storage." : "No photo saved for this case.";
+    $("dlgPhotos").append(div);
+  }
+  $("caseDlg").showModal();
+}
+$("dlgClose").onclick = () => $("caseDlg").close();
+$("dlgSave").onclick = () => {
+  if (!dlgCaseId) return;
+  caseStore.save({ id: dlgCaseId, name: $("dlgName").value.trim() || "Untitled case", property: $("dlgProp").value.trim(), notes: $("dlgNotes").value.trim() });
+  renderCases();
+  toast("Case saved on this device");
+};
+$("dlgDelete").onclick = () => {
+  if (!dlgCaseId || !confirm("Delete this case? This cannot be undone.")) return;
+  caseStore.remove(dlgCaseId);
+  dlgCaseId = null;
+  $("caseDlg").close();
+  renderCases();
+  toast("Case deleted");
+};
+$("dlgExport").onclick = () => {
+  const c = dlgCaseId ? caseStore.get(dlgCaseId) : null;
+  if (c) download(`snapclaim-case-${c.id}.json`, JSON.stringify(c, null, 2));
+};
+$("dlgAddPhoto").onclick = () => $("dlgFile").click();
+$("dlgFile").addEventListener("change", () => {
+  const file = $("dlgFile").files?.[0];
+  $("dlgFile").value = "";
+  if (!file || !dlgCaseId) return;
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    URL.revokeObjectURL(url);
+    const side = Math.max(img.width, img.height) > 1024 ? 1024 / Math.max(img.width, img.height) : 1;
+    const cap = document.createElement("canvas");
+    cap.width = Math.round(img.width * side); cap.height = Math.round(img.height * side);
+    cap.getContext("2d").drawImage(img, 0, 0, cap.width, cap.height);
+    const saved = caseStore.save({ id: dlgCaseId, photo: cap.toDataURL("image/jpeg", 0.85), photoDropped: false });
+    openCase(saved.id);
+    renderCases();
+    toast(saved.photoDropped ? "Photo too large for device storage — case kept without it" : "Photo updated");
+  };
+  img.src = url;
+});
+$("exportAllBtn").onclick = () => {
+  if (!caseStore.list().length) { toast("No cases to export"); return; }
+  download("snapclaim-cases.json", caseStore.exportAll());
+};
+$("wipeBtn").onclick = () => {
+  if (!caseStore.list().length) { toast("No cases to delete"); return; }
+  if (!confirm("Delete ALL cases from this device? Export first — there is no cloud copy.")) return;
+  caseStore.clear();
+  renderCases();
+  toast("All cases deleted");
+};
+/* theme (theme.js applied it before paint; these buttons change it) */
+function paintThemeButtons() {
+  const theme = caseStore.getSettings().theme ?? document.documentElement.dataset.theme ?? "auto";
+  for (const [id, v] of [["sc-theme-light", "light"], ["sc-theme-auto", "auto"], ["sc-theme-dark", "dark"]]) {
+    $(id).classList.toggle("on", v === theme);
+  }
+}
+for (const [id, v] of [["sc-theme-light", "light"], ["sc-theme-auto", "auto"], ["sc-theme-dark", "dark"]]) {
+  $(id).onclick = () => {
+    caseStore.setSettings({ theme: v });
+    document.documentElement.dataset.theme = v;
+    paintThemeButtons();
+  };
+}
+paintThemeButtons();
+/* settings: donate default, backend mirror, health, updates */
+try { $("donateSetting").checked = !!localStorage.getItem("snapclaim.donatePhoto"); } catch { /* ignore */ }
+$("donateSetting").onchange = () => {
+  try {
+    if ($("donateSetting").checked) localStorage.setItem("snapclaim.donatePhoto", "1");
+    else localStorage.removeItem("snapclaim.donatePhoto");
+  } catch { /* ignore */ }
+  $("donateCheck").checked = $("donateSetting").checked;
+};
+$("baseUrl2").value = $("baseUrl").value;
+$("baseUrl2").addEventListener("input", () => { $("baseUrl").value = $("baseUrl2").value; });
+$("baseUrl").addEventListener("input", () => { $("baseUrl2").value = $("baseUrl").value; });
+async function checkBackend() {
+  try {
+    const r = await fetch(base() + "/v1/health");
+    const j = await r.json();
+    $("setHealth").textContent = `ok v${j.version} mode:${j.mode}`;
+    $("healthOut").textContent = $("setHealth").textContent;
+  } catch { $("setHealth").textContent = "unreachable — check the URL and your connection"; }
+  syncNetPill();
+}
+$("setCheck").onclick = checkBackend;
+$("updateBtn").onclick = async () => {
+  if (!swReg) { toast("Service worker not registered yet — reload once, then check again"); return; }
+  await swReg.update().catch(() => {});
+  toast($("updateBar").hidden ? "You are on the latest version" : "Update ready — tap Reload at the top");
+};
+function saveCaseFromReport() {
+  const f = (lastMeasurement?.findings ?? [])[0];
+  if (!f) return;
+  const saved = caseStore.save({
+    id: currentCaseId ?? undefined,
+    name: `${String(f.label).charAt(0).toUpperCase() + String(f.label).slice(1)} — ${new Date().toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`,
+    transcript: $("transcriptBox").value.trim(),
+    label: String(f.label), percent: f.percent, severity: String(f.severity),
+    crackLengthMm: f.crackLengthMm ?? null, areaCm2: f.areaCm2 ?? null,
+    mode: lastMeasurement?.mode ?? "", photo: stillDataUrl || null,
+  });
+  currentCaseId = saved.id;
+  renderCases();
+  toast(saved.photoDropped ? "Case saved without photo (device storage full)" : "Case saved on this device");
+}
+
+/* ---------- offline banner + service-worker update flow ---------- */
+function syncOfflineBar() { $("offlineBar").hidden = navigator.onLine; syncNetPill(); }
+window.addEventListener("online", syncOfflineBar);
+window.addEventListener("offline", syncOfflineBar);
+syncOfflineBar();
+let waitingSw = null;
+let reloading = false;
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", async () => {
+    try {
+      const reg = await navigator.serviceWorker.register("./sw.js");
+      swReg = reg;
+      if (reg.waiting && navigator.serviceWorker.controller) { waitingSw = reg.waiting; $("updateBar").hidden = false; }
+      reg.addEventListener("updatefound", () => {
+        const sw = reg.installing;
+        if (!sw) return;
+        sw.addEventListener("statechange", () => {
+          if (sw.state === "installed" && navigator.serviceWorker.controller) { waitingSw = sw; $("updateBar").hidden = false; }
+        });
+      });
+    } catch { /* the app still runs uncached */ }
+  });
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (reloading) return;
+    reloading = true;
+    location.reload();
+  });
+}
+$("updateGo").onclick = () => { if (waitingSw) waitingSw.postMessage("SKIP_WAITING"); };
+// Land on Home; the camera starts from New (tab bar or Home CTA), so arrival
+// never triggers a permission prompt before the user asks for it.
+showTab("tHome");

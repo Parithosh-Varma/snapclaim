@@ -80,7 +80,7 @@ test("live findings without a key fails closed with 503", async () => {
   const res = await handleRequest({
     method: "POST",
     path: "/v1/findings",
-    body: { transcript: "x", findings: result.findings, receipts: result.receipts },
+    body: { ...p, transcript: "x", findings: result.findings, receipts: result.receipts },
     env: { MOCK_MODE: "0" },
   });
   assert.equal(res.status, 503);
