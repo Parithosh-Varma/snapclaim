@@ -155,3 +155,21 @@ test("segment in live mode without a key fails closed with 503", async () => {
   });
   assert.equal(res.status, 503);
 });
+
+test("live findings strips markdown code fences and passes shorthand receipt ids", async () => {
+  const drafts = citingDrafts(wallSession().findings).map((d) => ({
+    ...d,
+    citations: d.citations.map((c) => c.toLowerCase().replace(/^r0*(\d+)$/, "r$1")),
+  }));
+  const fencedFetch: typeof fetch = (async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      choices: [{ message: { content: "```json\n" + JSON.stringify(drafts) + "\n```" } }],
+      usage: { prompt_tokens: 80, completion_tokens: 40 },
+    }),
+  })) as unknown as typeof fetch;
+
+  const res = await handleRequest({ method: "POST", path: "/v1/report", body: payload(), env: LIVE_ENV, fetchFn: fencedFetch });
+  assert.equal(res.status, 200);
+});

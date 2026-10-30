@@ -110,6 +110,8 @@ export class MetaFindingsProvider implements FindingsProvider {
       label: f.label,
       percent: f.percent,
       crackLengthMm: f.crackLengthMm,
+      areaCm2: f.areaCm2,
+      crackWidthMm: f.crackWidthMm,
       severity: f.severity,
       receiptIds: f.receiptIds,
     }));
@@ -171,6 +173,8 @@ export class BasetenSkepticProvider implements FindingsProvider {
       label: f.label,
       percent: f.percent,
       crackLengthMm: f.crackLengthMm,
+      areaCm2: f.areaCm2,
+      crackWidthMm: f.crackWidthMm,
       severity: f.severity,
       receiptIds: f.receiptIds,
     }));
@@ -225,9 +229,15 @@ export class BasetenSkepticProvider implements FindingsProvider {
   }
 }
 
-export function parseFindingDrafts(content: string, source = "Meta findings"): FindingDraft[] {  let parsed: unknown;
+export function parseFindingDrafts(content: string, source = "Meta findings"): FindingDraft[] {
+  const cleaned = content
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "")
+    .trim();
+  let parsed: unknown;
   try {
-    parsed = JSON.parse(content);
+    parsed = JSON.parse(cleaned);
   } catch {
     throw new HttpError(502, `${source} did not return JSON`);
   }
