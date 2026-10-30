@@ -49,7 +49,7 @@ export default {
           { status: 400, headers },
         );
       }
-      if (text.length > MAX_BODY_BYTES) {
+      if (new TextEncoder().encode(text).length > MAX_BODY_BYTES) {
         return Response.json(
           { ok: false, error: "body too large (1MB cap)", code: 400, requestId: "unknown" },
           { status: 400, headers },
@@ -63,7 +63,7 @@ export default {
           { status: 400, headers },
         );
       }
-      if (JSON.stringify(body).length > MAX_BODY_BYTES) {
+      if (new TextEncoder().encode(JSON.stringify(body)).length > MAX_BODY_BYTES) {
         return Response.json(
           { ok: false, error: "body too large (1MB cap)", code: 400, requestId: "unknown" },
           { status: 400, headers },

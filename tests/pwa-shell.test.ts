@@ -90,6 +90,8 @@ test("service worker caches the shell, never the API", () => {
   assert.ok(app.includes("unavailable in mock mode"), "segment-mock reason shown instead of a generic failure");
   assert.ok(app.includes("minReferenceConfidence") && app.includes("thresholds"), "skeptic sends the same measure inputs as report");
   assert.ok(app.includes("function backendErr"), "status + details ride on a shared error helper");
+  assert.ok(app.includes("manualCoinRadius"), "manual coin ring shares its radius with the measured reference");
+  assert.ok(!app.includes("coinSrc"), "no dead coin-radius variable with its own math");
 });
 
 test("PWA scripts load as the right module type", () => {
