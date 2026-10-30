@@ -18,10 +18,28 @@ export interface CocoRle {
   counts: number[] | string;
 }
 
-export function createMask(width: number, height: number): BinaryMask {
-  if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) {
-    throw new MeasurementError(`mask size must be positive integers, got ${width}x${height}`);
+/** Hard pixel budget: every mask path allocates width×height bytes (plus 3× in
+ * connectedRegions). A 2-element RLE like {size:[100000,100000], counts:[0,1e10]}
+ * fits in bytes on the wire but expands to 10 GB. Cap before allocating. */
+export const MAX_MASK_DIMENSION = 4096;
+export const MAX_MASK_PIXELS = 16_777_216;
+export const MAX_RLE_RUNS = 1_000_000;
+
+export function assertMaskSize(width: number, height: number): void {
+  if (
+    !Number.isInteger(width) || !Number.isInteger(height) ||
+    width <= 0 || height <= 0 ||
+    width > MAX_MASK_DIMENSION || height > MAX_MASK_DIMENSION ||
+    width * height > MAX_MASK_PIXELS
+  ) {
+    throw new MeasurementError(
+      `mask size must be 1–${MAX_MASK_DIMENSION}px per side and ≤${MAX_MASK_PIXELS} pixels total, got ${width}x${height}`,
+    );
   }
+}
+
+export function createMask(width: number, height: number): BinaryMask {
+  assertMaskSize(width, height);
   return { width, height, data: new Uint8Array(width * height) };
 }
 
@@ -81,8 +99,15 @@ function decodeCountsString(encoded: string): number[] {
 /** COCO RLE → row-major binary mask. Run totals must cover the image exactly. */
 export function decodeRle(rle: CocoRle): BinaryMask {
   const [height, width] = rle.size;
-  const mask = createMask(width, height);
+  assertMaskSize(width, height);
   const counts = typeof rle.counts === "string" ? decodeCountsString(rle.counts) : rle.counts;
+  if (!Array.isArray(counts)) {
+    throw new MeasurementError("RLE counts must be an array or COCO string");
+  }
+  if (counts.length > MAX_RLE_RUNS) {
+    throw new MeasurementError(`RLE has ${counts.length} runs, capped at ${MAX_RLE_RUNS}`);
+  }
+  const mask = createMask(width, height);
 
   let index = 0;
   let on = false;
@@ -218,8 +243,9 @@ export function maskFromRegions(width: number, height: number, regions: Region[]
 /**
  * Zhang–Suen thinning: reduces a crack mask to a one-pixel centreline.
  * Deterministic and dependency-free, so the same skeleton replays anywhere.
+ * Capped iterations so a crafted solid mask cannot block the event loop.
  */
-export function skeletonize(mask: BinaryMask): BinaryMask {
+export function skeletonize(mask: BinaryMask, maxIterations = 500): BinaryMask {
   assertMask(mask);
   const { width, height } = mask;
   const img = Uint8Array.from(mask.data, (v) => (v !== 0 ? 1 : 0));
@@ -228,7 +254,11 @@ export function skeletonize(mask: BinaryMask): BinaryMask {
 
   const toClear: number[] = [];
   let changed = true;
+  let iterations = 0;
   while (changed) {
+    if (++iterations > maxIterations) {
+      throw new MeasurementError(`skeletonize exceeded ${maxIterations} iterations — mask too large or adversarial`);
+    }
     changed = false;
     for (const step of [0, 1]) {
       toClear.length = 0;

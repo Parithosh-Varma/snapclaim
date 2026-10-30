@@ -19,7 +19,7 @@ test("spend starts at zero", async () => {
   assert.equal((res.body as { spentUsd: number }).spentUsd, 0);
 });
 
-test("live findings record token usage with $0 until pricing is confirmed", async () => {
+test("live findings record token usage at conservative Spark pricing", async () => {
   resetSpendForTests();
   const config = loadConfig({ MOCK_MODE: "0", SPEND_GUARD_USD: "10" });
   const guard = new SpendGuard(10);
@@ -41,7 +41,8 @@ test("live findings record token usage with $0 until pricing is confirmed", asyn
   });
   const drafts = await provider.draftFindings({ transcript: "t", findings: session.findings, receipts: session.receipts });
   assert.deepEqual(drafts, []);
-  assert.equal(guard.spentUsd, 0);
+  // 120 prompt + 40 completion at 1.25 / 4.25 per MTok = 0.00032 (was $0: spend-guard bypass).
+  assert.equal(guard.spentUsd, 0.00032);
   assert.ok(guard.entries[0]?.label.includes("in=120 out=40"));
 });
 
@@ -72,14 +73,30 @@ test("skeptic charges real Baseten pricing from usage", async () => {
 
 test("skeptic without a key fails closed with 503", async () => {
   const config = loadConfig({ MOCK_MODE: "0", SPEND_GUARD_USD: "10" });
+  const fixture = loadWallFixture();
+  const session = measureSession({
+    component: fixture.component,
+    masks: fixture.masks,
+    scaleReference: fixture.scaleReference,
+  });
   const res = await handleRequest({
     method: "POST",
     path: "/v1/skeptic",
-    body: { transcript: "x", findings: [], receipts: [] },
+    body: { component: fixture.component, masks: fixture.masks, scaleReference: fixture.scaleReference, transcript: "x", findings: session.findings, receipts: session.receipts },
     env: { MOCK_MODE: "0", META_API_KEY: "test" },
   });
   assert.equal(res.status, 503);
   void config;
+});
+
+test("skeptic without measurement inputs is rejected with 422", async () => {
+  const res = await handleRequest({
+    method: "POST",
+    path: "/v1/skeptic",
+    body: { transcript: "x", findings: [], receipts: [] },
+    env: { MOCK_MODE: "0", META_API_KEY: "test", BASETEN_API_KEY: "test" },
+  });
+  assert.equal(res.status, 422);
 });
 
 test("skeptic returns gated drafts from the live provider", async () => {
@@ -95,7 +112,7 @@ test("skeptic returns gated drafts from the live provider", async () => {
   const res = await handleRequest({
     method: "POST",
     path: "/v1/skeptic",
-    body: { transcript: "t", findings: result.findings, receipts: result.receipts },
+    body: { ...p, transcript: "t", findings: result.findings, receipts: result.receipts },
     env: LIVE_ENV,
     fetchFn: modelFetch(citingDrafts(result.findings as Parameters<typeof citingDrafts>[0])),
   });

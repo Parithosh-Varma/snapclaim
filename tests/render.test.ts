@@ -86,16 +86,18 @@ test("overlay draws scaled mask paths over the photo", () => {
 
 test("overlay drops hostile photo hrefs and escapes strings", () => {
   const base = renderBase();
-  const mask = { id: 'a"b', label: "<x>", path: 'M 0 0" onload="x' };
+  const mask = { id: 'a"b', label: "<x>", path: "M 0 0 L 1 1 Z" };
   const js = renderAnnexureSvg({ ...base, overlay: { width: 10, height: 10, photoHref: "javascript:alert(1)", masks: [mask] } });
   assert.ok(!js.includes("<image"));
   assert.ok(!js.includes("javascript:"));
+  // Hostile https hrefs with quote-breakouts are dropped entirely (fail closed),
+  // not escaped into the markup.
   const inj = renderAnnexureSvg({
     ...base,
     overlay: { width: 10, height: 10, photoHref: 'https://x.test/a.png" onload="alert(1)', masks: [mask] },
   });
-  assert.ok(inj.includes("&quot; onload=&quot;alert(1)"));
-  assert.ok(!inj.includes('" onload="'));
+  assert.ok(!inj.includes("<image"));
+  assert.ok(!inj.includes("onload="));
   assert.ok(!inj.includes("<x>"));
 });
 
@@ -128,6 +130,25 @@ test("overlay caption and non-scaling stroke", () => {
   const svg = renderAnnexureSvg({ ...base, overlay: { width: 10, height: 10, masks: [{ id: "m", label: "crack", path: "M 0 0 Z" }] } });
   assert.ok(svg.includes("outlines traced from segmentation masks; bars are proportional schematics from receipts"));
   assert.ok(svg.includes('vector-effect="non-scaling-stroke"'));
+});
+
+test("overlay legend labels each measured outline with its own numbers", () => {
+  const base = renderBase();
+  const svg = renderAnnexureSvg({
+    ...base,
+    overlay: {
+      width: 100,
+      height: 80,
+      masks: [
+        { id: "damage-1", label: "crack", path: "M 0 0 L 10 0 L 10 10 Z" },
+        { id: "coin", label: "coin", path: "M 20 20 L 30 20 L 30 30 Z" },
+      ],
+    },
+  });
+  // The crack outline is labelled with the measured value; the scale coin is not a finding.
+  assert.ok(svg.includes("Crack 5.17% · 85.9 mm"));
+  assert.ok(!svg.includes("Coin 5.17%"));
+  assert.ok(svg.indexOf("Crack 5.17%") < svg.indexOf("Findings ("));
 });
 
 test("no-overlay svg is pinned (golden hash)", () => {

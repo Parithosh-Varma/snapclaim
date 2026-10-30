@@ -2,10 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
-<meta name="theme-color" content="#000000" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f1ea" />
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a1120" />
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+<script src="./theme.js"></script>
 <meta name="description" content="SnapClaim — photo + one line in, measured damage report out." />
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; connect-src 'self' https:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; worker-src 'self' blob:; media-src blob: data:" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; connect-src 'self' https://snapclaim-backend.parithosh.workers.dev http://127.0.0.1:8787 http://localhost:8787 https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; worker-src 'self' blob:; media-src blob: data:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'" />
 <link rel="manifest" href="./manifest.webmanifest" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -64,8 +67,18 @@
   #noCoin{position:absolute;z-index:3;left:50%;transform:translateX(-50%);
     bottom:calc(126px + env(safe-area-inset-bottom));border:0;background:none;
     color:rgba(255,255,255,.85);font-size:13px;font-weight:600;text-decoration:underline;padding:8px;white-space:nowrap}
-  body.reviewing #altEntry,body.reviewing #noCoin,
-  body.step2 #altEntry,body.step2 #noCoin{display:none}
+  body.reviewing #altEntry,body.reviewing #noCoin,body.reviewing #uploadBtn,
+  body.step2 #altEntry,body.step2 #noCoin,body.step2 #uploadBtn{display:none}
+  #uploadBtn{position:absolute;z-index:3;left:50%;transform:translateX(-50%);
+    bottom:calc(190px + env(safe-area-inset-bottom));border:0;background:none;
+    color:rgba(255,255,255,.85);font-size:13px;font-weight:600;text-decoration:underline;padding:8px;white-space:nowrap}
+  #camStep{position:absolute;z-index:3;left:16px;top:calc(54px + env(safe-area-inset-top));
+    color:#fff;background:rgba(11,30,70,.88);padding:6px 12px;border-radius:999px}
+  #updateBar{position:fixed;left:12px;right:12px;top:calc(12px + env(safe-area-inset-top));z-index:21;
+    background:var(--ink);color:#fff;border-radius:14px;padding:12px 14px;font-size:13px;font-weight:600;
+    box-shadow:0 10px 30px rgba(0,0,0,.3);display:flex;align-items:center;gap:10px}
+  #updateBar[hidden]{display:none}
+  #updateGo{margin-left:auto;flex:none;min-height:44px;border:0;border-radius:12px;background:var(--coin);color:#fff;font-weight:800;padding:0 16px}
 
   /* ---------- screens ---------- */
   .screen{position:fixed;inset:0;z-index:5;background:var(--paper);color:var(--ink);
@@ -118,24 +131,25 @@
   .eyebrow .dashes i{display:block;width:30px;height:4px;border-radius:2px;background:#e2ddd0}
   .eyebrow .dashes i.on{background:var(--coin)}
   .photocard{position:relative;border-radius:18px;overflow:hidden;border:1px solid #e2ddd0;background:#000;margin-bottom:12px}
-  .photocard img{width:100%;height:220px;object-fit:cover;display:block}
+  .photocard img{width:100%;height:auto;display:block;background:#000}
+  #numPhotoOverlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
   .photocard .chip{position:absolute;left:12px;bottom:12px;background:#fff;color:var(--ink);border-radius:999px;
     padding:7px 12px;font-weight:700;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.25);display:flex;gap:7px;align-items:center}
   .photocard .chip i{width:9px;height:9px;border-radius:50%;background:var(--damage);display:block}
   .metrics{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
   .metric{background:#fffdf8;border:1px solid #e2ddd0;border-radius:14px;padding:12px 10px}
   .metric b{font-size:21px;letter-spacing:-.02em;display:block;line-height:1.05}
-  .metric span{font-size:11px;color:#5b6b8c;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+  .metric span{font-size:12px;color:#5b6b8c;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
   .sevbar{display:flex;align-items:center;justify-content:space-between;gap:10px;border-radius:14px;padding:12px 14px;margin-bottom:12px;font-weight:800}
   .sevbar small{font-weight:600;color:#5b6b8c}
   .sev-significant{background:#fdecec;color:#8f1220}.sev-moderate{background:#fdf0e2;color:#8a4b12}.sev-cosmetic{background:#e4f3ea;color:#0b5c33}
   .receipts{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
-  .receipts code{font-family:"IBM Plex Mono",monospace;font-size:11px;background:#f1eee5;border:1px solid #e2ddd0;border-radius:999px;padding:4px 8px;color:#33415e}
+  .receipts code{font-family:"IBM Plex Mono",monospace;font-size:12px;background:#f1eee5;border:1px solid #e2ddd0;border-radius:999px;padding:4px 8px;color:#33415e}
   #measured ul,#skOut ul,#findings ul{margin:10px 0 0;padding:0;list-style:none}
   #measured li,#skOut li,#findings li{padding:12px;border:1px solid #e2ddd0;border-radius:14px;margin-bottom:8px;background:#fff;font-size:15px}
   #measured li small,#findings li small,#skOut li small{color:#5b6b8c}
   .found{font-size:22px;font-weight:800;margin:0 0 8px}
-  .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;
+  .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;
     font-family:"IBM Plex Mono",monospace;letter-spacing:.06em;text-transform:uppercase}
   .ok{background:#e4f3ea;color:#0e8a4d}.fail{background:#fdecec;color:#c81e2b}.wait{background:#f1eee5;color:#5b6b8c}
   .checkcard{background:#fffdf8;border:1px solid #e2ddd0;border-radius:18px;padding:16px;margin-bottom:12px}
@@ -160,6 +174,97 @@
   details.dev{border:1px solid #e2ddd0;border-radius:16px;background:#fffdf8;padding:14px;margin-top:12px}
   details.dev summary{cursor:pointer;font-weight:700}
   a#dl{font-weight:700;color:var(--ink)}
+
+  /* ---------- tabs, cases, settings ---------- */
+  #tabs{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(560px,100%);z-index:15;
+    display:none;grid-template-columns:repeat(4,minmax(0,1fr));background:#fffdf8;border-top:1px solid #e2ddd0;
+    box-shadow:0 -8px 28px rgba(11,30,70,.10);padding-bottom:env(safe-area-inset-bottom)}
+  body.tabbing #tabs{display:grid}
+  #tabs button{min-height:56px;min-width:0;border:0;background:none;font-weight:700;font-size:12px;color:#5b6b8c;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:8px 2px 6px;
+    white-space:nowrap;position:relative}
+  #tabs button svg{width:22px;height:22px;flex:none}
+  #tabs button[aria-current="page"]{color:var(--coin)}
+  #tabs button[aria-current="page"]::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);
+    width:26px;height:3px;border-radius:0 0 3px 3px;background:var(--coin)}
+  #tabs #tabNew{color:#5b6b8c;font-size:12px}
+  #tabs #tabNew .fabdot{width:44px;height:44px;margin-top:-20px;border-radius:50%;background:var(--coin);color:#fff;
+    display:grid;place-items:center;box-shadow:0 6px 18px rgba(14,138,77,.40);border:3px solid #fffdf8}
+  #tabs #tabNew .fabdot svg{width:22px;height:22px}
+  .screen.tab{z-index:6}
+  .screen.tab .wrap{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+  .caseitem{display:flex;width:100%;text-align:left;gap:12px;align-items:center;background:#fffdf8;
+    border:1px solid #e2ddd0;border-radius:16px;padding:12px 14px;margin-bottom:8px;color:var(--ink);font:inherit}
+  .caseitem img{width:52px;height:52px;object-fit:cover;border-radius:10px;flex:none;background:#000}
+  .caseitem b{display:block;font-size:15px}
+  .caseitem small{color:#5b6b8c;font-size:12px}
+  .empty{border:1px dashed #cfc8b8;border-radius:16px;padding:20px;text-align:center;color:#5b6b8c;font-size:14px;margin-bottom:12px}
+  #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));z-index:22;
+    background:var(--ink);color:#fff;border-radius:999px;padding:10px 18px;font-size:13px;font-weight:700;
+    box-shadow:0 10px 30px rgba(0,0,0,.3);max-width:92vw;text-align:center}
+  #toast[hidden]{display:none}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  dialog#caseDlg{border:1px solid #e2ddd0;border-radius:18px;padding:20px;width:min(520px,92vw);
+    max-height:86vh;overflow-y:auto;background:#fffdf8;color:var(--ink)}
+  dialog#caseDlg::backdrop{background:rgba(11,30,70,.5)}
+  dialog#caseDlg input[type="text"],dialog#caseDlg textarea{width:100%;font:inherit;font-size:15px;padding:10px;
+    border:1px solid #e2ddd0;border-radius:12px;background:#fff;margin-top:6px}
+  #dlgPhotos img{width:100%;height:auto;border-radius:12px;display:block}
+  .group{background:#fffdf8;border:1px solid #e2ddd0;border-radius:18px;padding:16px;margin-bottom:12px}
+  .group h3{font-size:15px;margin:0 0 10px}
+  .meter{height:8px;border-radius:4px;background:#e2ddd0;overflow:hidden;margin-top:8px}
+  .meter i{display:block;height:100%;background:var(--coin);width:0}
+  .switchrow{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600}
+  .switchrow input{width:22px;height:22px;flex:none}
+  textarea#transcriptBox{resize:vertical}
+
+  /* ---------- dark theme (data-theme from theme.js; auto follows the OS) ---------- */
+  html[data-theme="dark"] .screen{background:#0a1120;color:#eef1f6}
+  html[data-theme="dark"] .card,html[data-theme="dark"] .checkcard,html[data-theme="dark"] .statecard,
+  html[data-theme="dark"] .doc,html[data-theme="dark"] details.dev,html[data-theme="dark"] .metric,
+  html[data-theme="dark"] .group,html[data-theme="dark"] .caseitem,html[data-theme="dark"] dialog#caseDlg{background:#121a2e;border-color:#26314d;color:#eef1f6}
+  html[data-theme="dark"] .sub,html[data-theme="dark"] .checkcard p,html[data-theme="dark"] .doc th,
+  html[data-theme="dark"] #micState,html[data-theme="dark"] .caseitem small{color:#9aa7c2}
+  html[data-theme="dark"] .btn-dark{background:#eef1f6;color:#0a1120}
+  html[data-theme="dark"] .btn-ghostline{color:#eef1f6;border-color:#354163}
+  html[data-theme="dark"] .seg button{background:#1a2340;border-color:#354163;color:#eef1f6}
+  html[data-theme="dark"] .seg button.on{background:var(--damage);border-color:var(--damage);color:#fff}
+  html[data-theme="dark"] input,html[data-theme="dark"] select,html[data-theme="dark"] textarea{background:#1a2340;color:#eef1f6;border-color:#354163}
+  html[data-theme="dark"] .doc blockquote{background:#1a2340}
+  html[data-theme="dark"] .receipts code{background:#1a2340;border-color:#354163;color:#c9d2e3}
+  html[data-theme="dark"] #measured li,html[data-theme="dark"] #findings li,html[data-theme="dark"] #skOut li{background:#121a2e;border-color:#26314d}
+  html[data-theme="dark"] .statecard.err{background:#2a1218}
+  html[data-theme="dark"] .stickycta{background:color-mix(in srgb,#0a1120 92%,transparent)}
+  html[data-theme="dark"] #tabs{background:#121a2e;border-color:#26314d}
+  html[data-theme="dark"] #tabs button{color:#9aa7c2}
+  html[data-theme="dark"] #tabs button[aria-current="page"]{color:#3ecf82}
+  html[data-theme="dark"] #tabs #tabNew .fabdot{border-color:#121a2e}
+  html[data-theme="dark"] svg.schematic{background:#121a2e}
+  html[data-theme="dark"] .empty{border-color:#354163;color:#9aa7c2}
+  @media (prefers-color-scheme: dark){
+    html[data-theme="auto"] .screen{background:#0a1120;color:#eef1f6}
+    html[data-theme="auto"] .card,html[data-theme="auto"] .checkcard,html[data-theme="auto"] .statecard,
+    html[data-theme="auto"] .doc,html[data-theme="auto"] details.dev,html[data-theme="auto"] .metric,
+    html[data-theme="auto"] .group,html[data-theme="auto"] .caseitem,html[data-theme="auto"] dialog#caseDlg{background:#121a2e;border-color:#26314d;color:#eef1f6}
+    html[data-theme="auto"] .sub,html[data-theme="auto"] .checkcard p,html[data-theme="auto"] .doc th,
+    html[data-theme="auto"] #micState,html[data-theme="auto"] .caseitem small{color:#9aa7c2}
+    html[data-theme="auto"] .btn-dark{background:#eef1f6;color:#0a1120}
+    html[data-theme="auto"] .btn-ghostline{color:#eef1f6;border-color:#354163}
+    html[data-theme="auto"] .seg button{background:#1a2340;border-color:#354163;color:#eef1f6}
+    html[data-theme="auto"] .seg button.on{background:var(--damage);border-color:var(--damage);color:#fff}
+    html[data-theme="auto"] input,html[data-theme="auto"] select,html[data-theme="auto"] textarea{background:#1a2340;color:#eef1f6;border-color:#354163}
+    html[data-theme="auto"] .doc blockquote{background:#1a2340}
+    html[data-theme="auto"] .receipts code{background:#1a2340;border-color:#354163;color:#c9d2e3}
+    html[data-theme="auto"] #measured li,html[data-theme="auto"] #findings li,html[data-theme="auto"] #skOut li{background:#121a2e;border-color:#26314d}
+    html[data-theme="auto"] .statecard.err{background:#2a1218}
+    html[data-theme="auto"] .stickycta{background:color-mix(in srgb,#0a1120 92%,transparent)}
+    html[data-theme="auto"] #tabs{background:#121a2e;border-color:#26314d}
+    html[data-theme="auto"] #tabs button{color:#9aa7c2}
+    html[data-theme="auto"] #tabs button[aria-current="page"]{color:#3ecf82}
+    html[data-theme="auto"] #tabs #tabNew .fabdot{border-color:#121a2e}
+    html[data-theme="auto"] svg.schematic{background:#121a2e}
+    html[data-theme="auto"] .empty{border-color:#354163;color:#9aa7c2}
+  }
 </style>
 </head>
 <body>
@@ -169,6 +274,7 @@
 <span class="corner tl" aria-hidden="true"></span><span class="corner tr" aria-hidden="true"></span>
 <span class="corner bl" aria-hidden="true"></span><span class="corner br" aria-hidden="true"></span>
 <div class="coinring" id="coinRing" aria-hidden="true" style="display:none"></div>
+<div id="camStep" class="step-tag">01 / 06 · Capture</div>
 <div id="coinHint">Add a coin for scale</div>
 <button id="enableCam" type="button" style="display:none;position:absolute;z-index:4;left:50%;top:55%;transform:translateX(-50%);border:2px solid #fff;background:rgba(5,10,25,.55);backdrop-filter:blur(6px);color:#fff;font:inherit;font-weight:800;font-size:17px;padding:14px 26px;border-radius:999px;cursor:pointer">Enable camera</button>
 <!-- live level: hold the phone square to the wall (the coin's ellipse corrects the rest) -->
@@ -177,12 +283,18 @@
 <div id="count" aria-hidden="true"></div>
 <button id="shutter" type="button" aria-label="Capture"></button>
 <div class="flash" id="flash"></div>
+<button id="uploadBtn" type="button">have a photo? upload it</button>
+<input id="camFile" type="file" accept="image/*" hidden />
 <button id="altEntry" type="button">no camera? use a sample</button>
 <button id="noCoin" type="button">no coin? continue without scale</button>
 
 <!-- 02 · review -->
 <section class="screen" id="sReview" aria-label="Review photo">
   <img id="shotFull" alt="Captured photo" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000" />
+  <label style="position:absolute;left:18px;right:18px;bottom:calc(96px + env(safe-area-inset-bottom));display:flex;gap:10px;align-items:center;color:#fff;font-size:13px;font-weight:600;background:rgba(11,30,70,.88);padding:10px 14px;border-radius:14px">
+    <input id="donateCheck" type="checkbox" style="width:22px;height:22px;flex:none" />
+    Donate this photo to the dataset (consent saved on this device; nothing is uploaded now)
+  </label>
   <div style="position:absolute;left:0;right:0;bottom:0;display:flex;gap:10px;padding:14px 18px calc(26px + env(safe-area-inset-bottom));background:linear-gradient(transparent,rgba(0,0,0,.65))">
     <button id="retake" type="button" style="flex:1;min-height:56px;border-radius:16px;border:2px solid rgba(255,255,255,.85);background:transparent;color:#fff;font-weight:800;font-size:17px">Retake</button>
     <button id="usePhoto" type="button" style="flex:1;min-height:56px;border-radius:16px;border:0;background:var(--coin);color:#fff;font-weight:800;font-size:17px">Use photo</button>
@@ -193,7 +305,7 @@
 <section class="screen" id="sMark" aria-labelledby="h-mark">
   <div class="wrap">
     <div class="navrow"><button id="backCam" type="button">‹ Camera</button></div>
-    <div class="eyebrow">01 / 05 <span class="dashes" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><i></i></span></div>
+    <div class="eyebrow">02 / 06 <span class="dashes" aria-hidden="true"><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i></span></div>
     <h1 id="h-mark">Tap the damage.</h1>
     <p class="sub">One tap on the crack. The coin is already outlined from the gate.</p>
     <div class="card">
@@ -230,7 +342,7 @@
 <section class="screen" id="sSay" aria-labelledby="h-say">
   <div class="wrap" style="display:flex;flex-direction:column;align-items:center;text-align:center">
     <div class="navrow" style="align-self:stretch"><button id="backMark" type="button">‹ Mark</button></div>
-    <div class="eyebrow" style="align-self:stretch">02 / 05 <span class="dashes" aria-hidden="true"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></span></div>
+    <div class="eyebrow" style="align-self:stretch">03 / 06 <span class="dashes" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i></span></div>
     <h1 id="h-say">Say what happened.</h1>
     <p class="sub">It listens on its own. Tap the mic to finish early.</p>
     <div class="voicemock">
@@ -252,11 +364,12 @@
 <section class="screen" id="sNum" aria-labelledby="h-num">
   <div class="wrap">
     <div class="navrow"><button id="backSay" type="button">‹ Say</button></div>
-    <div class="eyebrow">03 / 05 <span class="dashes" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span></div>
+    <div class="eyebrow">04 / 06 <span class="dashes" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span></div>
     <h1 id="h-num">Get the numbers.</h1>
     <p class="sub">Outlined and measured, not guessed.</p>
     <div class="photocard" id="numPhotoCard" hidden>
       <img id="numPhoto" alt="Your captured damage photo" />
+      <svg id="numPhotoOverlay" aria-hidden="true" focusable="false"></svg>
       <span class="chip"><i aria-hidden="true"></i><span id="numChip">Measured</span></span>
     </div>
     <div id="measured" aria-live="polite"></div>
@@ -272,7 +385,7 @@
 <section class="screen" id="sCheck" aria-labelledby="h-check">
   <div class="wrap">
     <div class="navrow"><button id="backNum" type="button">‹ Numbers</button></div>
-    <div class="eyebrow">04 / 05 <span class="dashes" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span></div>
+    <div class="eyebrow">05 / 06 <span class="dashes" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span></div>
     <h1 id="h-check">Checked twice.</h1>
     <p class="sub">A second check has to agree. Disagreements print red, never hidden.</p>
     <div class="checkcard">
@@ -296,7 +409,7 @@
 <section class="screen" id="sReport" aria-labelledby="h-send">
   <div class="wrap">
     <div class="navrow"><button id="backCheck" type="button">‹ Checked</button></div>
-    <div class="eyebrow">05 / 05 <span class="dashes" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></span></div>
+    <div class="eyebrow">06 / 06 <span class="dashes" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></span></div>
     <h1 id="h-send">Send the report.</h1>
     <p class="sub">To your landlord or insurer, in one tap.</p>
     <article class="doc" id="reportDoc" aria-label="Damage report preview">
@@ -312,14 +425,15 @@
     <div class="card">
       <button id="renderBtn" class="btn-primary" type="button">Generate report</button>
       <div class="rowbtns">
-        <button id="shareBtn" type="button" disabled>Share</button>
-        <button id="copyBtn" type="button" disabled>Copy summary</button>
+        <button id="shareBtn" class="btn-ghostline" type="button" disabled>Share</button>
+        <button id="copyBtn" class="btn-ghostline" type="button" disabled>Copy summary</button>
       </div>
       <div class="rowbtns">
         <a id="dl" style="display:none;flex:1;text-align:center;padding:12px;border:1px solid #e2ddd0;border-radius:14px">Download SVG annexure</a>
-        <button id="installBtn" type="button" hidden>Install app</button>
+        <button id="installBtn" class="btn-ghostline" type="button" hidden>Install app</button>
       </div>
       <button id="newClaimBtn" class="btn-ghostline" type="button" style="margin-top:10px">Start a new claim</button>
+      <button id="doneHome" class="btn-ghostline" type="button" style="margin-top:10px">Back to home</button>
       <div id="annexWrap" style="margin-top:12px"><img id="annexImg" alt="Generated report annexure" hidden /></div>
     </div>
     <details class="dev">
@@ -328,7 +442,7 @@
         <label class="field">Backend URL
           <input id="baseUrl" type="text" value="https://snapclaim-backend.parithosh.workers.dev" style="min-height:46px;border:1px solid #e2ddd0;border-radius:12px;width:100%;font:inherit;padding:0 10px" />
         </label>
-        <button id="healthBtn" type="button">Check backend</button>
+        <button id="healthBtn" class="btn-ghostline" type="button">Check backend</button>
         <span id="healthOut" style="font-family:'IBM Plex Mono',monospace;font-size:12px"></span>
         <h3 style="margin:12px 0 6px">Raw report</h3>
         <pre id="raw">{}</pre>
@@ -336,6 +450,102 @@
     </details>
   </div>
 </section>
+<!-- Home tab -->
+<section class="screen tab" id="tHome" aria-labelledby="h-home">
+  <div class="wrap">
+    <div class="navrow"><span class="step-tag">SnapClaim</span><span id="netPill" class="badge wait" role="status">Checking…</span></div>
+    <h1 id="h-home">Measured damage reports.</h1>
+    <p class="sub">Photo + one line in, measured damage report out. Cases stay on this device.</p>
+    <div class="card">
+      <p class="found" id="nextTitle">Start a new claim</p>
+      <p class="sub" id="nextSub">Point the camera at the damage with a coin beside it for scale.</p>
+      <button id="ctaNew" class="btn-primary" type="button">New claim</button>
+      <div class="rowbtns"><button id="ctaSample" class="btn-ghostline" type="button">Use sample measurement</button></div>
+    </div>
+    <h2 style="font-size:17px;margin:16px 0 8px">Recent cases</h2>
+    <div id="recentList"></div>
+    <div id="recentEmpty" class="empty">No cases yet. Your finished reports will appear here.</div>
+  </div>
+</section>
+
+<!-- Cases tab -->
+<section class="screen tab" id="tCases" aria-labelledby="h-cases">
+  <div class="wrap">
+    <h1 id="h-cases" style="font-size:32px">Cases</h1>
+    <p class="sub">Saved on this device only. Export before deleting — there is no cloud copy.</p>
+    <div id="caseList"></div>
+    <div id="caseEmpty" class="empty">No cases saved yet.</div>
+  </div>
+</section>
+
+<!-- Settings tab -->
+<section class="screen tab" id="tSettings" aria-labelledby="h-settings">
+  <div class="wrap">
+    <h1 id="h-settings" style="font-size:32px">Settings</h1>
+    <div class="group">
+      <h3>Theme</h3>
+      <div class="seg" role="group" aria-label="Theme" style="grid-template-columns:1fr 1fr 1fr">
+        <button id="sc-theme-light" type="button">Light</button>
+        <button id="sc-theme-auto" type="button">Auto</button>
+        <button id="sc-theme-dark" type="button">Dark</button>
+      </div>
+    </div>
+    <div class="group">
+      <h3>Privacy</h3>
+      <label class="switchrow"><input id="donateSetting" type="checkbox" /> Donate photos to the dataset by default (consent only — nothing uploads without your tap)</label>
+      <p class="sub" style="margin-top:10px" id="installHint">On iPhone: Share → Add to Home Screen installs SnapClaim. Installed apps keep their data; Safari may evict uninstalled sites.</p>
+    </div>
+    <div class="group">
+      <h3>App</h3>
+      <button id="updateBtn" class="btn-ghostline" type="button">Check for updates</button>
+      <p class="sub" style="margin-top:10px" id="storeInfo">Storage: …</p>
+      <div class="meter" aria-hidden="true"><i id="sc-store-meter"></i></div>
+      <div class="rowbtns">
+        <button id="exportAllBtn" class="btn-ghostline" type="button">Export all cases</button>
+        <button id="wipeBtn" class="btn-ghostline" type="button">Delete all cases</button>
+      </div>
+    </div>
+    <div class="group">
+      <h3>Backend</h3>
+      <label class="field">Backend URL
+        <input id="baseUrl2" type="text" style="min-height:46px;border:1px solid #e2ddd0;border-radius:12px;width:100%;font:inherit;padding:0 10px;margin-top:6px" />
+      </label>
+      <button id="setCheck" class="btn-ghostline" type="button">Check backend</button>
+      <span id="setHealth" role="status" style="display:block;font-family:'IBM Plex Mono',monospace;font-size:12px;margin-top:8px;min-height:1.2em"></span>
+    </div>
+  </div>
+</section>
+
+<!-- Case editor -->
+<dialog id="caseDlg" aria-labelledby="h-case">
+  <h2 id="h-case" style="font-size:20px;margin-bottom:12px">Case</h2>
+  <label class="field">Name<input id="dlgName" type="text" /></label>
+  <label class="field">Property<input id="dlgProp" type="text" placeholder="e.g. Flat 4B, MG Road" /></label>
+  <label class="field">Notes<textarea id="dlgNotes" rows="3"></textarea></label>
+  <div id="dlgPhotos" style="margin-bottom:12px"></div>
+  <div class="rowbtns">
+    <button id="dlgAddPhoto" class="btn-ghostline" type="button">Replace photo</button>
+    <input id="dlgFile" type="file" accept="image/*" hidden />
+  </div>
+  <div class="rowbtns">
+    <button id="dlgSave" class="btn-primary" type="button">Save</button>
+    <button id="dlgExport" class="btn-ghostline" type="button">Export</button>
+  </div>
+  <div class="rowbtns">
+    <button id="dlgDelete" class="btn-ghostline" type="button">Delete case</button>
+    <button id="dlgClose" class="btn-ghostline" type="button">Close</button>
+  </div>
+</dialog>
+
+<nav id="tabs" aria-label="Main">
+  <button type="button" data-tab="tHome"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 9.5V21h5v-6h4v6h5V9.5"/></svg>Home</button>
+  <button type="button" data-tab="capture" id="tabNew"><span class="fabdot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>New</button>
+  <button type="button" data-tab="tCases"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Cases</button>
+  <button type="button" data-tab="tSettings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 8h9M19 8h1M4 16h3M13 16h7"/><circle cx="16" cy="8" r="2.2"/><circle cx="10" cy="16" r="2.2"/></svg>Settings</button>
+</nav>
+<div id="toast" role="status" hidden></div>
+<div id="appLive" class="sr-only" aria-live="polite"></div>
+<div id="updateBar" role="status" hidden><span>A new version of SnapClaim is ready.</span><button id="updateGo" type="button">Reload</button></div>
 <div id="offlineBar" role="status" hidden>You are offline. The app shell is saved; measuring and reporting need a connection.</div>
 
 <script src="./coin-model.js"></script>
