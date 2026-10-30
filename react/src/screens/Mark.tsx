@@ -39,6 +39,19 @@ export default function Mark() {
   const [coinKind, setCoinKind] = useState(s.coinKindMm);
   const [hasMask, setHasMask] = useState(!!s.dmg.mask);
   const [ready, setReady] = useState(false);
+  const [coinCorrect, setCoinCorrect] = useState(false);
+  const [coinFixHint, setCoinFixHint] = useState("");
+  const [taped, setTaped] = useState(s.coinTaped);
+
+  /** Manual radius matches measure()'s circleRef radius (gate-derived, or a
+   * 3.5% fallback when the gate missed) so the ring shows what gets measured. */
+  const manualCoinRadius = () => {
+    const photo = s.photo;
+    if (!photo) return 12;
+    return s.gateCoin
+      ? Math.max(3, (s.gateCoin.rr / s.gateCoin.fw) * (photo.width / s.gateCoin.sw))
+      : Math.max(10, photo.width * 0.035);
+  };
 
   const drawMark = useCallback(() => {
     const c = canvasRef.current;
@@ -60,17 +73,28 @@ export default function Mark() {
       }
       g.putImageData(img, 0, 0);
     }
-    if (s.gateCoin) {
+    if (s.gateCoin && !s.coinManualPt) {
       const kx = photo.width / s.gateCoin.sw;
       const ky = photo.height / s.gateCoin.sh;
       const cx = (s.gateCoin.cx / s.gateCoin.fw) * s.gateCoin.sw * kx;
       const cy = (s.gateCoin.cy / s.gateCoin.fh) * s.gateCoin.sh * ky;
       const r = (s.gateCoin.rr / s.gateCoin.fw) * s.gateCoin.sw * kx;
-      g.strokeStyle = "#0e8a4d";
+      g.strokeStyle = s.coinTaped ? "#e6a700" : "#0e8a4d";
       g.lineWidth = 3;
       g.beginPath();
       g.arc(cx, cy, r, 0, Math.PI * 2);
       g.stroke();
+    }
+    if (s.coinManualPt) {
+      g.strokeStyle = "#c81e2b";
+      g.lineWidth = 3;
+      g.beginPath();
+      g.arc(s.coinManualPt[0], s.coinManualPt[1], manualCoinRadius(), 0, Math.PI * 2);
+      g.stroke();
+      g.fillStyle = "#c81e2b";
+      g.beginPath();
+      g.arc(s.coinManualPt[0], s.coinManualPt[1], 4, 0, Math.PI * 2);
+      g.fill();
     }
     g.fillStyle = "#c81e2b";
     g.strokeStyle = "#fff";
@@ -110,6 +134,8 @@ export default function Mark() {
       s.photo = photo;
       s.photoFor = s.stillDataUrl;
       resetDmg(s);
+      // A manual coin tap is pixel coords of the previous photo — never reuse it.
+      s.coinManualPt = null;
       embeddings.current = false;
       setReady(true);
       drawMark();
@@ -141,11 +167,14 @@ export default function Mark() {
         }
       }
       const circle = Math.PI * r * r;
-      if (area < circle * 0.4 || area > circle * 1.6) return null;
-      if (Math.hypot(sx / area - cx, sy / area - cy) > r * 0.5) return null;
+      // Tape halo inflates the mask (coin + tape strip) — allow 2.5× and a
+      // looser centroid when taped, matching the vanilla PWA.
+      const taped = s.coinTaped;
+      if (area < circle * 0.4 || area > circle * (taped ? 2.5 : 1.6)) return null;
+      if (Math.hypot(sx / area - cx, sy / area - cy) > r * (taped ? 0.75 : 0.5)) return null;
       return out;
     },
-    [embeddings, sam],
+    [embeddings, sam, s],
   );
 
   const measure = useCallback(async () => {
@@ -163,13 +192,28 @@ export default function Mark() {
       masks: [{ id: "damage-1", label: s.dmgLabel, rle: encodeRle(s.dmg.mask, w, h), confidence: s.dmg.iou || 0.8 }],
     };
     let circleRef: Record<string, unknown> | null = null;
-    if (s.gateCoin) {
+    // Manual coin tap wins over the gate — taped coin or missed detection.
+    const coinCxCyR = (() => {
+      if (s.coinManualPt) {
+        const estR = Math.max(10, w * 0.035);
+        return {
+          cx: s.coinManualPt[0],
+          cy: s.coinManualPt[1],
+          r: s.gateCoin ? Math.max(3, (s.gateCoin.rr / s.gateCoin.fw) * (w / s.gateCoin.sw)) : estR,
+        };
+      }
+      if (!s.gateCoin) return null;
       const kx = w / s.gateCoin.sw;
       const ky = h / s.gateCoin.sh;
-      const cx = (s.gateCoin.cx / s.gateCoin.fw) * s.gateCoin.sw * kx;
-      const cy = (s.gateCoin.cy / s.gateCoin.fh) * s.gateCoin.sh * ky;
-      const r = Math.max(3, (s.gateCoin.rr / s.gateCoin.fw) * s.gateCoin.sw * kx);
-      circleRef = { id: "coin", rle: circleRle(cx, cy, r, w, h), knownMm: s.coinKindMm, confidence: 0.85 };
+      return {
+        cx: (s.gateCoin.cx / s.gateCoin.fw) * s.gateCoin.sw * kx,
+        cy: (s.gateCoin.cy / s.gateCoin.fh) * s.gateCoin.sh * ky,
+        r: Math.max(3, (s.gateCoin.rr / s.gateCoin.fw) * s.gateCoin.sw * kx),
+      };
+    })();
+    if (coinCxCyR) {
+      const { cx, cy, r } = coinCxCyR;
+      circleRef = { id: "coin", rle: circleRle(cx, cy, r, w, h), knownMm: s.coinKindMm, confidence: s.coinManualPt ? 0.9 : 0.85 };
       // The coin's real outline, not the gate's circle: a tilted wall shows the
       // coin as an ellipse, and the backend uses that to correct crack lengths.
       const traced = await traceCoin(cx, cy, r, w, h);
@@ -212,6 +256,13 @@ export default function Mark() {
     const r = c.getBoundingClientRect();
     const x = Math.round((ev.clientX - r.left) * (c.width / r.width));
     const y = Math.round((ev.clientY - r.top) * (c.height / r.height));
+    if (coinCorrect) {
+      s.coinManualPt = [x, y];
+      setCoinCorrect(false);
+      setCoinFixHint("Coin corrected — will use your tap");
+      drawMark();
+      return;
+    }
     s.dmg.points.push([x, y]);
     setStatus("Outlining…");
     // SAM 3.1 API first; the on-device model only when the API call fails.
@@ -307,6 +358,37 @@ export default function Mark() {
                 <option key={o.label} value={o.value}>{o.label}</option>
               ))}
             </select>
+          </label>
+          <div style={{ display: "flex", gap: 8, margin: "6px 0 10px" }}>
+            <button
+              id="coinFixBtn"
+              className={coinCorrect ? "btn-dark" : "btn-ghostline"}
+              type="button"
+              style={{ flex: 1, minHeight: 44 }}
+              onClick={() => {
+                if (!s.photo) return;
+                setCoinCorrect((v) => {
+                  setCoinFixHint(v ? "" : "Tap the coin center on the photo");
+                  return !v;
+                });
+              }}
+            >
+              {coinCorrect ? "Cancel" : "Tap coin to correct"}
+            </button>
+            <span id="coinFixHint" style={{ fontSize: 12, color: "#5b6b8c", alignSelf: "center" }}>{coinFixHint}</span>
+          </div>
+          <label className="switchrow" style={{ margin: "8px 0 4px" }}>
+            <input
+              id="coinTaped"
+              type="checkbox"
+              checked={taped}
+              onChange={(e) => {
+                setTaped(e.target.checked);
+                s.coinTaped = e.target.checked;
+                drawMark();
+              }}
+            />{" "}
+            Coin has tape — use lenient outline (allows tape halo)
           </label>
           <div id="photoNotes" className="hint" style={{ fontSize: 13, color: "#5b6b8c" }}>{photoNotes}</div>
           <div id="tfState" style={{ fontSize: 12, color: "#5b6b8c", fontFamily: "'IBM Plex Mono',monospace" }}>{tfState}</div>

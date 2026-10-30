@@ -61,6 +61,14 @@ test("React port keeps backend, worker and privacy contracts", () => {
   assert.ok(!check.includes("...(s.payload ?? {})"), "React skeptic no longer sprays the overlay at the backend");
   const api = read("react/src/lib/api.ts");
   assert.ok(api.includes("backendError"), "shared status + details error helper");
+  const mark = read("react/src/screens/Mark.tsx");
+  assert.ok(mark.includes("coinManualPt"), "React keeps a manual coin correction like the PWA");
+  assert.ok(mark.includes("manualCoinRadius"), "React manual ring shares the measured radius");
+  assert.ok(mark.includes("Tap coin to correct"), "React offers the coin correction tap");
+  assert.ok(mark.includes("coinTaped"), "React offers the taped-coin lenient outline");
+  assert.ok(mark.includes("2.5"), "React tape halo uses the lenient outline margin");
+  const session = read("react/src/lib/session.ts");
+  assert.ok(session.includes("coinManualPt") && session.includes("coinTaped"), "session carries the correction");
   for (const w of ["react/public/sam-worker.js", "react/public/voice-worker.js"]) {
     assert.ok(read(w).includes('tf.env.logLevel = "error"'), `${w} quiets ONNX Runtime warnings`);
   }

@@ -580,6 +580,12 @@ function setupMarkPhoto() {
     photo.height = Math.round(img.height * scale);
     photo.getContext("2d", { willReadFrequently: true }).drawImage(img, 0, 0, photo.width, photo.height);
     dmg = { points: [], pointMasks: [], mask: null, iou: 0, source: null };
+    // A manual coin tap is pixel coords of the previous photo — never reuse it.
+    coinManualPt = null; coinCorrectMode = false;
+    const fixBtn = $("coinFixBtn");
+    if (fixBtn) { fixBtn.textContent = "Tap coin to correct"; fixBtn.classList.remove("on"); }
+    const fixHint = $("coinFixHint");
+    if (fixHint) fixHint.textContent = "";
     drawMark();
     $("measureBtn").disabled = true;
     $("status").textContent = "Tap the crack, then Measure.";
