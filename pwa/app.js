@@ -516,9 +516,9 @@ $("markCanvas").addEventListener("pointerdown", async (ev) => {
   try {
     out = await segmentViaApi(dmg.points);
   } catch (e) {
+    startEmbed(); // iPhone: the on-device model only now, when the API failed
     console.info("[sam] API failed, using on-device", e);
     source = "device";
-    startEmbed();
     if (!embeddings) { dmg.points.pop(); $("status").textContent = "Outlining model still loading…"; return; }
     try { out = await segmentOnDevice(); } catch { out = null; }
   }
