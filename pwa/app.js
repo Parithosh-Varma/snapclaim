@@ -358,6 +358,71 @@ fab.addEventListener("click", () => {
   setTimeout(() => { show("sReview"); flash.classList.remove("go"); }, 160);
 });
 
+/** Load an uploaded or pasted image file, strip EXIF via canvas re-encode, and check for a coin. */
+function handleImageFile(file) {
+  if (!file || !file.type.startsWith("image/")) return;
+  cancelCapture();
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    URL.revokeObjectURL(url);
+    const vw = img.naturalWidth || img.width, vh = img.naturalHeight || img.height;
+    if (!vw || !vh) return;
+    const cap = document.createElement("canvas");
+    const side = Math.max(vw, vh) > 1024 ? 1024 / Math.max(vw, vh) : 1;
+    cap.width = Math.round(vw * side); cap.height = Math.round(vh * side);
+    cap.getContext("2d").drawImage(img, 0, 0, cap.width, cap.height);
+    stillDataUrl = cap.toDataURL("image/jpeg", 0.85);
+    document.getElementById("shotFull").src = stillDataUrl;
+    gateCoin = null; coinLabel = "";
+    if (!noScaleMode) {
+      const fw = SW, fh = Math.round((SW * vh) / vw);
+      work.width = fw; work.height = fh;
+      wctx.drawImage(cap, 0, 0, fw, fh);
+      const det = findRing(grayEdges(wctx.getImageData(0, 0, fw, fh).data, fw, fh), fw, fh);
+      if (det && det.rr <= fw * 0.32) {
+        gateCoin = { cx: det.cx, cy: det.cy, rr: det.rr, fw, fh, sw: cap.width, sh: cap.height, sx: 1, sy: 1 };
+        try {
+          const px = cap.getContext("2d").getImageData(0, 0, cap.width, cap.height);
+          const fv = CoinModel.extractFeatures(px.data, cap.width, cap.height, {
+            x: (cap.width / fw) * det.cx,
+            y: (cap.height / fh) * det.cy,
+            r: (cap.width / fw) * det.rr,
+          });
+          const best = clf.predict(fv, { countries: COUNTRIES })[0];
+          const def = best && best.label !== "unknown" && CoinModel.DB.find((d) => d.id === best.label);
+          if (def) {
+            coinLabel = `${def.label} · Ø${def.diam} mm`;
+            const opt = [...$("coinKind").options].find((o) => Math.abs(Number(o.value) - def.diam) < 0.05);
+            if (opt) $("coinKind").value = opt.value;
+          }
+        } catch { /* advisory */ }
+      }
+    }
+    stopCamera();
+    $("reviewNote").textContent = gateCoin
+      ? `Coin found in photo${coinLabel ? ` (${coinLabel})` : ""}. Check the damage is sharp.`
+      : "No coin detected in photo, so the report gives percentages, not millimetres.";
+    show("sReview");
+  };
+  img.src = url;
+}
+$("photoUpload")?.addEventListener("change", (ev) => {
+  const file = ev.target.files?.[0];
+  if (file) handleImageFile(file);
+  ev.target.value = "";
+});
+window.addEventListener("paste", (ev) => {
+  const items = ev.clipboardData?.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.type.startsWith("image/")) {
+      const file = item.getAsFile();
+      if (file) { handleImageFile(file); break; }
+    }
+  }
+});
+
 /** Back to a fresh viewfinder. Keeps the coin / no-coin choice. */
 function openCamera() {
   backToCam();
