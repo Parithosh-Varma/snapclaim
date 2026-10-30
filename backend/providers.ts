@@ -65,6 +65,11 @@ export function findingsProvider(
  */
 export const SPARK_OPEN_PRICE = Object.freeze({ inputUsdPerMTok: 1.25, outputUsdPerMTok: 4.25 });
 
+/** Muse Spark pricing is unpublished ($0 metered per README). Until Meta
+ * publishes rates, bill conservatively at the Spark Open rate so the spend
+ * guard actually moves. Post-adjust when real pricing lands. */
+export const SPARK_PRICE = SPARK_OPEN_PRICE;
+
 /** SAM 3.1 image pricing, per dev.meta.ai/models/sam-3-1: $2.50 / 1k images. */
 export const SAM_IMAGE_USD = 0.0025;
 
@@ -106,14 +111,17 @@ export class MetaFindingsProvider implements FindingsProvider {
     if (spend && spend.remainingUsd <= 0) {
       throw new HttpError(429, `spend guard: $0 remaining of $${spend.limitUsd} limit`);
     }
-    const facts = request.findings.map((f) => ({
-      label: f.label,
-      percent: f.percent,
-      crackLengthMm: f.crackLengthMm,
-      severity: f.severity,
-      receiptIds: f.receiptIds,
+    // Prompt-injection + cost caps: attacker strings are concatenated into the
+    // LLM user message. Bound them so a 1 MB transcript cannot inflate the bill.
+    const transcript = String(request.transcript ?? "").slice(0, 2000);
+    const facts = request.findings.slice(0, 64).map((f) => ({
+      label: String((f as { label?: unknown }).label ?? "").slice(0, 64),
+      percent: (f as { percent?: unknown }).percent,
+      crackLengthMm: (f as { crackLengthMm?: unknown }).crackLengthMm,
+      severity: (f as { severity?: unknown }).severity,
+      receiptIds: (f as { receiptIds?: unknown }).receiptIds,
     }));
-    const receipts = request.receipts.map((r) => ({ id: r.id, output: r.output, formula: r.formula }));
+    const receipts = request.receipts.slice(0, 256).map((r) => ({ id: (r as { id?: unknown }).id, output: (r as { output?: unknown }).output, formula: String((r as { formula?: unknown }).formula ?? "").slice(0, 500) }));
 
     const res = await this.#opts.fetchFn(`${this.#opts.base}/chat/completions`, {
       method: "POST",
@@ -129,10 +137,11 @@ export class MetaFindingsProvider implements FindingsProvider {
           },
           {
             role: "user",
-            content: JSON.stringify({ transcript: request.transcript, facts, receipts }),
+            content: JSON.stringify({ transcript, facts, receipts }),
           },
         ],
       }),
+      signal: AbortSignal.timeout(30_000),
     });
     if (!res.ok) throw new HttpError(502, `Meta findings failed: HTTP ${res.status}`);
     const data = (await res.json()) as {
@@ -140,10 +149,12 @@ export class MetaFindingsProvider implements FindingsProvider {
       usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
     if (spend) {
-      const inputTokens = data.usage?.prompt_tokens ?? 0;
-      const outputTokens = data.usage?.completion_tokens ?? 0;
+      const usd = estimateCostUsd(
+        { inputTokens: data.usage?.prompt_tokens ?? 0, outputTokens: data.usage?.completion_tokens ?? 0 },
+        SPARK_PRICE,
+      );
       try {
-        spend.charge(`spark findings in=${inputTokens} out=${outputTokens}`, 0);
+        spend.charge(`spark findings in=${data.usage?.prompt_tokens ?? 0} out=${data.usage?.completion_tokens ?? 0}`, usd);
       } catch (error) {
         if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
         throw error;
@@ -151,7 +162,13 @@ export class MetaFindingsProvider implements FindingsProvider {
     }
     const content = data.choices?.[0]?.message?.content;
     if (!content) throw new HttpError(502, "Meta findings returned no content");
-    return parseFindingDrafts(content);
+    const drafts = parseFindingDrafts(content);
+    for (const d of drafts) {
+      if (d.statement.length > 2000) throw new HttpError(502, "Meta findings returned an overlong statement");
+      if (d.citations.length > 32) throw new HttpError(502, "Meta findings returned too many citations");
+    }
+    if (drafts.length > 64) throw new HttpError(502, "Meta findings returned too many drafts");
+    return drafts;
   }
 }
 
@@ -167,14 +184,15 @@ export class BasetenSkepticProvider implements FindingsProvider {
     if (spend && spend.remainingUsd <= 0) {
       throw new HttpError(429, `spend guard: $0 remaining of $${spend.limitUsd} limit`);
     }
-    const facts = request.findings.map((f) => ({
-      label: f.label,
-      percent: f.percent,
-      crackLengthMm: f.crackLengthMm,
-      severity: f.severity,
-      receiptIds: f.receiptIds,
+    const transcript = String(request.transcript ?? "").slice(0, 2000);
+    const facts = request.findings.slice(0, 64).map((f) => ({
+      label: String((f as { label?: unknown }).label ?? "").slice(0, 64),
+      percent: (f as { percent?: unknown }).percent,
+      crackLengthMm: (f as { crackLengthMm?: unknown }).crackLengthMm,
+      severity: (f as { severity?: unknown }).severity,
+      receiptIds: (f as { receiptIds?: unknown }).receiptIds,
     }));
-    const receipts = request.receipts.map((r) => ({ id: r.id, output: r.output, formula: r.formula }));
+    const receipts = request.receipts.slice(0, 256).map((r) => ({ id: (r as { id?: unknown }).id, output: (r as { output?: unknown }).output, formula: String((r as { formula?: unknown }).formula ?? "").slice(0, 500) }));
 
     const res = await this.#opts.fetchFn(`${this.#opts.base}/chat/completions`, {
       method: "POST",
@@ -194,10 +212,11 @@ export class BasetenSkepticProvider implements FindingsProvider {
           },
           {
             role: "user",
-            content: JSON.stringify({ transcript: request.transcript, facts, receipts }),
+            content: JSON.stringify({ transcript, facts, receipts }),
           },
         ],
       }),
+      signal: AbortSignal.timeout(30_000),
     });
     if (!res.ok) throw new HttpError(502, `Baseten skeptic failed: HTTP ${res.status}`);
     const data = (await res.json()) as {

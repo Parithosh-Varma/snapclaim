@@ -30,6 +30,9 @@ async function hasWebGpu() {
 async function loadModel() {
   if (model) return;
   tf = await import(TF_URL);
+  // ORT prints "Some nodes were not assigned..." warnings per session.
+  // Harmless (shape ops pinned to CPU on purpose) but noisy, so drop to errors only.
+  try { tf.env.logLevel = "error"; } catch { /* older transformers build */ }
   const progress_callback = (p) => {
     if (p.status === "progress") postMessage({ type: "progress", percent: Math.round(p.progress) });
   };

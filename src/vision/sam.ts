@@ -1,7 +1,7 @@
 import { decodeMaskToRaster } from "@meta-sam/parser";
 import { MeasurementError } from "../engine/math.ts";
 import type { BinaryMask, CocoRle } from "./mask.ts";
-import { decodeRle, encodeRle as encodeRleMask, rleRoundTrip as rleRoundTripMask } from "./mask.ts";
+import { MAX_MASK_PIXELS, assertMaskSize, decodeRle, encodeRle as encodeRleMask, rleRoundTrip as rleRoundTripMask } from "./mask.ts";
 
 export { encodeRleMask as encodeRle, rleRoundTripMask as rleRoundTrip };
 
@@ -77,10 +77,12 @@ export interface SamFrame {
 }
 
 function assertSize(size: SamSize): void {
-  if (!Number.isInteger(size.width) || !Number.isInteger(size.height) || size.width <= 0 || size.height <= 0) {
-    throw new MeasurementError(`media size must be positive integers, got ${size.width}x${size.height}`);
-  }
+  assertMaskSize(size.width, size.height);
 }
+
+/** Upper bound on a decoded SAM mask raster (prevents a malicious upstream
+ * from OOMing the backend with w=50000,h=50000). */
+const MAX_SAM_RASTER_PIXELS = MAX_MASK_PIXELS;
 
 function assertPointInMedia(point: SamPoint, size: SamSize): void {
   if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) {
@@ -232,8 +234,9 @@ export function parseSamOutputText(outputText: string): SamFrame[] {
 
 /** Decodes one parsed mask token to a row-major binary raster using the official parser. */
 export function maskTokenToBinaryMask(mask: SamMaskToken): BinaryMask {
-  if (mask.h <= 0 || mask.w <= 0) {
-    throw new MeasurementError(`mask raster must be positive, got ${mask.h}x${mask.w}`);
+  assertMaskSize(mask.w, mask.h);
+  if (mask.w * mask.h > MAX_SAM_RASTER_PIXELS) {
+    throw new MeasurementError(`mask raster ${mask.w}x${mask.h} exceeds the ${MAX_SAM_RASTER_PIXELS}-pixel cap`);
   }
   // The wire grammar puts the encoding marker before the payload (`!`/`~`);
   // the official decoder wants the payload WITH its marker, so re-attach it.
@@ -304,7 +307,7 @@ export async function segmentWithSam(input: {
   if (points.length === 0) throw new MeasurementError("at least one point prompt is required");
   const prompt = buildObjectPrompt(size, [{ id: input.request.objectId ?? 1, points }]);
 
-  const res = await fetchFn(`${input.base}/responses`, {
+  const res = await (fetchFn as typeof fetch)(`${input.base}/responses`, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${input.apiKey}` },
     body: JSON.stringify({
@@ -322,11 +325,13 @@ export async function segmentWithSam(input: {
       stream: true,
       metadata: { mask_encoding: "one_bit", include_confidence: "true" },
     }),
+    signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) throw new Error(`SAM 3.1 request failed: HTTP ${res.status}`);
   const sse = await res.text();
 
   let outputText = "";
+  const MAX_SSE_CHARS = 5_000_000;
   for (const chunk of sse.split("\n\n")) {
     for (const line of chunk.split("\n")) {
       if (!line.startsWith("data:")) continue;
@@ -338,13 +343,19 @@ export async function segmentWithSam(input: {
       } catch {
         throw new Error("SAM 3.1 stream sent invalid JSON");
       }
-      if (typeof event.delta === "string") outputText += event.delta;
+      if (typeof event.delta === "string") {
+        outputText += event.delta;
+        if (outputText.length > MAX_SSE_CHARS) {
+          throw new Error(`SAM 3.1 stream exceeded the ${MAX_SSE_CHARS}-char cap`);
+        }
+      }
     }
   }
   if (outputText.trim() === "") throw new Error("SAM 3.1 returned no segmentation output");
   const frames = parseSamOutputText(outputText);
   const first = frames[0];
   if (!first || first.records.length === 0) throw new Error("SAM 3.1 found no matching object");
+  if (first.records.length > 50) throw new Error(`SAM 3.1 returned ${first.records.length} records, capped at 50`);
   return {
     outputText,
     records: first.records.map((record) => {
