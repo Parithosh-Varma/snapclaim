@@ -55,6 +55,7 @@ test("service worker caches the shell, never the API", () => {
   assert.ok(app.includes("/v1/transcribe"), "voice posts to the transcribe proxy");
   assert.ok(app.includes("OfflineAudioContext"), "clip is resampled on-device");
   assert.ok(app.includes("/v1/crosscheck"), "PWA can cross-check on-device masks against SAM");
+  assert.ok(app.includes("/v1/sessions"), "PWA records completed claim sessions");
   assert.ok(app.includes("CoinModel.extractFeatures"), "coin ID uses the real feature extractor");
   assert.ok(app.includes("findRing"), "coin gate uses edge + radial-uniformity detection");
   assert.ok(!app.includes("$(\"raw\").innerHTML"), "no raw HTML injection of backend output");
