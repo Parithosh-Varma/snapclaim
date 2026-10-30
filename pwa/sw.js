@@ -1,10 +1,11 @@
 // SnapClaim service worker: the app shell opens on a bad connection.
 // Version the cache; network-first for /v1 (never cache measurements),
 // cache-first for the shell. No photo bytes are cached.
-const CACHE = "snapclaim-shell-v4";
-const SHELL = ["./", "./index.html", "./app.js", "./coin-model.js", "./photo-check.js", "./manifest.webmanifest",
+const CACHE = "snapclaim-shell-v9";
+const SHELL = ["./", "./index.html", "./app.js", "./coin-model.js", "./coin-detect.js", "./photo-check.js", "./rle.js", "./manifest.webmanifest",
   "./sam-worker.js", "./voice-worker.js", "./tilt-meter.js",
-  "./icons/icon-192.png", "./icons/icon-512.png", "./icons/maskable-512.png", "./icons/apple-touch-icon.png"];
+  "./icons/icon-192.png", "./icons/icon-512.png", "./icons/maskable-512.png", "./icons/apple-touch-icon.png",
+  "./privacy.html", "./terms.html", "./legal.css", "./assets/sample-wall.jpg", "./assets/sample-wall-mask.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

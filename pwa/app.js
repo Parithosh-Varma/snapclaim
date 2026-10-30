@@ -1,6 +1,6 @@
 import { checkPhoto } from "./photo-check.js";
 import { decodeRle } from "./rle.js";
-import { mountTiltMeter } from "./tilt-meter.js";
+import { mountTiltMeter, tiltFromOrientation, tiltZone } from "./tilt-meter.js";
 
 const $ = (id) => document.getElementById(id);
 mountTiltMeter($("tiltMeter")); // live level over the camera; hidden without orientation sensors
@@ -10,18 +10,15 @@ function base() { return $("baseUrl").value.replace(/\/$/, ""); }
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 
 /* ---------- navigation ---------- */
-const SCREENS = ["sCam", "sReview", "sMark", "sSay", "sNum", "sCheck", "sReport"];
+// Home, then four steps: Photo (camera + review), Mark, Describe, Report. The camera sits under every screen.
+const SCREENS = ["sHome", "sReview", "sMark", "sSay", "sReport"];
 function show(id) {
-  for (const s of ["sReview", "sMark", "sSay", "sNum", "sCheck", "sReport"]) {
-    document.getElementById(s)?.classList.toggle("on", s === id);
-  }
-  document.body.classList.toggle("reviewing", id === "sReview");
-  document.body.classList.toggle("step2", id === "sSay");
+  for (const s of SCREENS) document.getElementById(s)?.classList.toggle("on", s === id);
 }
 function backToCam() {
-  for (const s of ["sReview", "sMark", "sSay", "sNum", "sCheck", "sReport"]) document.getElementById(s)?.classList.remove("on");
-  document.body.classList.remove("reviewing", "step2");
+  for (const s of SCREENS) document.getElementById(s)?.classList.remove("on");
 }
+const COIN_ASK = "Put a coin next to the damage";
 
 /* ---------- backend ---------- */
 $("healthBtn").onclick = async () => {
@@ -55,6 +52,20 @@ let coinLabel = "";
 let gateCoin = null; // {cx, cy, rr} in capture-still pixels + still size
 let photo = null;    // downscaled capture canvas for marking
 let stillDataUrl = "";
+
+/* Guided capture: each tick is a signal the app actually reads, never a promise. */
+const ckCoin = $("ckCoin"), ckSteady = $("ckSteady"), ckLevel = $("ckLevel");
+function updateChecklist() {
+  ckCoin.hidden = ckSteady.hidden = noScaleMode;
+  ckCoin.classList.toggle("on", coinSeen || (lastDetAt > 0 && scanCount - lastDetAt < 5));
+  ckSteady.classList.toggle("on", coinSeen);
+}
+window.addEventListener("deviceorientation", (e) => {
+  const deg = tiltFromOrientation(e.beta, e.gamma);
+  if (deg == null) return; // no sensor readings: the level tick stays hidden
+  ckLevel.hidden = false;
+  ckLevel.classList.toggle("on", tiltZone(deg) === "ok");
+});
 
 function setLocked(locked, label) {
   fab.classList.toggle("locked", locked);
@@ -91,14 +102,15 @@ function acquireCamera() {
     .then((stream) => {
       camStream = stream;
       stream.oninactive = () => {
+        if (camStream !== stream) return; // stopped on purpose (closed, captured)
         coinSeen = false; smooth = null; history.length = 0; cancelCapture();
-        setLocked(true, "Add a coin for scale");
+        setLocked(true, COIN_ASK);
         explainCam({ name: "stopped" });
       };
       feed.srcObject = stream;
       return feed.play().then(() => {
         $("enableCam").style.display = "none";
-        scan();
+        startScan();
       });
     })
     .catch(explainCam);
@@ -149,9 +161,15 @@ function identifyCoin(det, fw, fh) {
       const def = CoinModel.DB.find((d) => d.id === best.label);
       coinLabel = def ? `${def.label} · Ø${def.diam} mm` : best.label;
       hint.textContent = `${coinLabel} (${Math.round(best.confidence * 100)}%) — hold steady…`;
+      // Preselect the matching coin on the mark screen; the user still confirms it there.
+      const opt = def && [...$("coinKind").options].find((o) => Math.abs(Number(o.value) - def.diam) < 0.05);
+      if (opt) $("coinKind").value = opt.value;
     } else { coinLabel = ""; hint.textContent = "Coin found — hold steady…"; }
   } catch { /* ID is advisory; the gate stands on geometry */ }
 }
+// One scan loop for the page's life: reopening the camera must not start a second one.
+let scanning = false;
+function startScan() { if (!scanning) { scanning = true; scan(); } }
 function scan() {
   if (!feed.videoWidth) { setTimeout(scan, 500); return; }
   try {
@@ -248,6 +266,7 @@ function scanFrame() {
     if (history.length > 10) history.shift();
     cancelCapture();
     if (coinSeen) hint.textContent = "A bit too close — move back a little";
+    updateChecklist();
     return;
   }
   history.push(det);
@@ -281,8 +300,9 @@ function scanFrame() {
   } else if (coinSeen && recent.length < 3) {
     cancelCapture();
     coinSeen = false; smooth = null; coinLabel = ""; assistPt = null;
-    setLocked(true, "Add a coin for scale");
+    setLocked(true, COIN_ASK);
   }
+  updateChecklist();
 }
 // Tap-to-assist: tapping the viewfinder narrows the search to that spot.
 // The ring must still be detected there — a tap alone never unlocks.
@@ -330,26 +350,68 @@ fab.addEventListener("click", () => {
     }
   } catch { /* stills are best-effort */ }
   stopCamera();
+  $("reviewNote").textContent = gateCoin
+    ? `Coin locked${coinLabel ? ` (${coinLabel})` : ""}. Check the damage is sharp.`
+    : "No coin, so the report gives percentages, not millimetres.";
   const flash = $("flash");
   flash.classList.add("go");
   setTimeout(() => { show("sReview"); flash.classList.remove("go"); }, 160);
 });
-$("retake").onclick = () => {
+
+/** Back to a fresh viewfinder. Keeps the coin / no-coin choice. */
+function openCamera() {
   backToCam();
-  coinSeen = false; smooth = null; coinLabel = ""; gateCoin = null; stillDataUrl = ""; noScaleMode = false;
+  coinSeen = false; smooth = null; coinLabel = ""; gateCoin = null; stillDataUrl = "";
   history.length = 0;
-  setLocked(true, "Add a coin for scale");
-  acquireCamera();
-};
-$("usePhoto").onclick = () => { show("sMark"); setupMarkPhoto(); };
-$("backCam").onclick = () => { $("retake").onclick(); };
-$("altEntry").onclick = () => { loadSample(); };
-$("noCoin").onclick = () => {
-  noScaleMode = true;
-  gateCoin = null;
-  setLocked(false, "Percent-only — no scale. Tap to snap.");
   cancelCapture();
-};
+  if (noScaleMode) setLocked(false, "No coin: percentages only. Tap to snap.");
+  else setLocked(true, COIN_ASK);
+  updateChecklist();
+  acquireCamera();
+}
+$("retake").onclick = openCamera;
+$("usePhoto").onclick = () => { show("sMark"); setupMarkPhoto(); };
+$("backCam").onclick = openCamera;
+$("startBtn").onclick = openCamera;
+$("camClose").onclick = () => { cancelCapture(); stopCamera(); show("sHome"); };
+$("altEntry").onclick = () => { loadSample(); };
+
+/* ---------- the website in front of the app ---------- */
+// Every "Start a claim" / "See a sample" on the site goes through the same two paths.
+const menu = document.querySelector(".menu");
+for (const b of document.querySelectorAll("[data-start]")) b.addEventListener("click", () => { if (menu) menu.open = false; openCamera(); });
+for (const b of document.querySelectorAll("[data-sample]")) b.addEventListener("click", () => { if (menu) menu.open = false; loadSample(); });
+for (const a of document.querySelectorAll(".menu .panel a")) a.addEventListener("click", () => { menu.open = false; });
+// Footer audience links open their tab.
+for (const a of document.querySelectorAll("[data-tab]")) a.addEventListener("click", () => { const r = $(a.dataset.tab); if (r) r.checked = true; });
+// Quick starts in the describe composer.
+for (const b of document.querySelectorAll("[data-say]")) b.addEventListener("click", () => { const box = $("transcriptBox"); box.value = b.dataset.say; box.focus(); });
+// Sections fade up as they scroll in; the numbers band counts up once.
+{
+  const items = document.querySelectorAll("#sHome .rv");
+  if ("IntersectionObserver" in window && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        e.target.classList.add("in");
+        if (e.target.querySelector("[data-count]")) countUp(e.target);
+        io.unobserve(e.target);
+      }
+    }, { root: $("sHome"), threshold: 0.12, rootMargin: "0px 0px -6% 0px" });
+    items.forEach((el) => io.observe(el));
+  } else items.forEach((el) => el.classList.add("in"));
+}
+function setScaleMode(none) {
+  noScaleMode = none;
+  $("withCoin").classList.toggle("on", !none); $("withCoin").setAttribute("aria-pressed", String(!none));
+  $("noCoin").classList.toggle("on", none); $("noCoin").setAttribute("aria-pressed", String(none));
+  cancelCapture();
+  if (none) { gateCoin = null; setLocked(false, "No coin: percentages only. Tap to snap."); }
+  else { coinSeen = false; smooth = null; history.length = 0; setLocked(true, COIN_ASK); }
+  updateChecklist();
+}
+$("noCoin").onclick = () => setScaleMode(true);
+$("withCoin").onclick = () => setScaleMode(false);
 
 /* ---------- mark damage (photo canvas + SlimSAM taps) ---------- */
 const MAX_SIDE = 512;
@@ -394,16 +456,16 @@ function sam() {
       return;
     }
     if (data.photoId !== undefined && data.photoId !== samPhotoId) return; // stale photo
-    if (data.type === "progress") $("tfState").textContent = `Downloading the outlining model… ${data.percent}%`;
+    if (data.type === "progress") $("tfState").textContent = data.percent >= 100 ? "Preparing the on-device outliner…" : `Downloading the on-device outliner… ${data.percent}%`;
     else if (data.type === "ready") {
       embeddings = true;
       $("tfState").textContent = "";
       console.info(`[sam] embedded on ${data.device} in ${data.embedMs} ms`);
     } else if (data.type === "error") {
-      $("status").textContent = `Outlining unavailable (${data.message}). Check the connection and retry.`;
+      $("tfState").textContent = `On-device outliner unavailable (${data.message}).`;
     }
   };
-  samWorker.onerror = (e) => { $("status").textContent = `Outlining failed to start (${e.message ?? "worker error"}).`; };
+  samWorker.onerror = (e) => { $("tfState").textContent = `On-device outliner failed to start (${e.message ?? "worker error"}).`; };
   return samWorker;
 }
 function setupMarkPhoto() {
@@ -416,8 +478,11 @@ function setupMarkPhoto() {
     photo.getContext("2d", { willReadFrequently: true }).drawImage(img, 0, 0, photo.width, photo.height);
     dmg = { points: [], pointMasks: [], mask: null, iou: 0, source: null };
     drawMark();
+    syncTapButtons();
     $("measureBtn").disabled = true;
-    $("status").textContent = "Tap the crack, then Measure.";
+    $("coinField").hidden = !gateCoin; // no coin, no coin to confirm
+    $("photoNotes").textContent = "";
+    setStatus("Tap the damage to outline it.");
     embeddings = null;
     samPhotoId++;
     const image = photo.getContext("2d").getImageData(0, 0, photo.width, photo.height);
@@ -493,13 +558,17 @@ function drawMark() {
   }
   $("measureBtn").disabled = !dmg.mask;
 }
-$("markCanvas").addEventListener("pointerdown", async (ev) => {
-  if (!photo) return;
-  const c = $("markCanvas"), r = c.getBoundingClientRect();
-  const x = Math.round((ev.clientX - r.left) * (c.width / r.width));
-  const y = Math.round((ev.clientY - r.top) * (c.height / r.height));
-  dmg.points.push([x, y]);
-  $("status").textContent = "Outlining…";
+function setStatus(text, isError = false) {
+  $("status").textContent = text;
+  $("status").classList.toggle("err", isError);
+}
+function syncTapButtons() {
+  $("undoBtn").disabled = !dmg.points.length;
+  $("clearBtn").disabled = !dmg.points.length;
+}
+/** Outlines all taps so far; on failure the last tap is dropped (when dropOnFail) so a bad tap never sticks. */
+async function outline(dropOnFail) {
+  setStatus("Outlining…");
   // SAM 3.1 API first; the on-device model only when the API call fails.
   let out = null, source = "api";
   try {
@@ -507,20 +576,51 @@ $("markCanvas").addEventListener("pointerdown", async (ev) => {
   } catch (e) {
     console.info("[sam] API failed, using on-device", e);
     source = "device";
-    if (!embeddings) { dmg.points.pop(); $("status").textContent = "Outlining model still loading…"; return; }
+    if (!embeddings) {
+      if (dropOnFail) dmg.points.pop();
+      setStatus("The outlining model is still loading. Tap again in a moment.");
+      drawMark(); syncTapButtons();
+      return;
+    }
     try { out = await segmentOnDevice(); } catch { out = null; }
   }
   if (out) {
     dmg.mask = out.mask; dmg.iou = out.iou; dmg.source = source;
-    $("status").textContent = `Outlined (${Math.round(dmg.iou * 100)}% sure) via ${source === "api" ? "SAM 3.1 API" : "on-device"}.`;
-  } else { dmg.mask = null; dmg.source = null; $("status").textContent = "No mask there. Tap the middle of it."; }
+    const n = dmg.points.length;
+    setStatus(`Outlined · ${n} tap${n === 1 ? "" : "s"} · ${Math.round(dmg.iou * 100)}% sure`);
+    $("status").title = source === "api" ? "Outlined by SAM 3.1" : "Outlined on this phone";
+  } else { dmg.mask = null; dmg.source = null; setStatus("Nothing outlined there. Tap the middle of the damage.", true); }
+  drawMark(); syncTapButtons();
+}
+$("markCanvas").addEventListener("pointerdown", (ev) => {
+  if (!photo) return;
+  const c = $("markCanvas"), r = c.getBoundingClientRect();
+  const x = Math.round((ev.clientX - r.left) * (c.width / r.width));
+  const y = Math.round((ev.clientY - r.top) * (c.height / r.height));
+  dmg.points.push([x, y]);
   drawMark();
+  outline(true);
 });
+$("undoBtn").onclick = () => {
+  dmg.points.pop();
+  dmg.pointMasks.length = Math.min(dmg.pointMasks.length, dmg.points.length);
+  if (dmg.points.length) { outline(false); return; }
+  dmg.mask = null; dmg.source = null;
+  setStatus("Tap the damage to outline it.");
+  drawMark(); syncTapButtons();
+};
+$("clearBtn").onclick = () => {
+  dmg = { points: [], pointMasks: [], mask: null, iou: 0, source: null };
+  setStatus("Tap the damage to outline it.");
+  drawMark(); syncTapButtons();
+};
 for (const [id, label] of [["chipCrack", "crack"], ["chipStain", "stain"], ["chipPeel", "peel"], ["chipDent", "dent"]]) {
   $(id).onclick = () => {
     dmgLabel = label;
-    for (const [o] of [["chipCrack"], ["chipStain"], ["chipPeel"], ["chipDent"]]) $(o).classList.remove("on");
-    $(id).classList.add("on");
+    for (const o of ["chipCrack", "chipStain", "chipPeel", "chipDent"]) {
+      $(o).classList.toggle("on", o === id);
+      $(o).setAttribute("aria-pressed", String(o === id));
+    }
   };
 }
 
@@ -533,18 +633,17 @@ function checkPhotoNotes() {
   } catch { /* advisory only */ }
 }
   let checkState = { skeptic: "idle", xcheck: "idle" }; // idle|loading|ok|error per check
+let skepticTally = null; // { agreed, disputed } from the last skeptic run, for the report
 
 $("measureBtn").onclick = async () => {
   if (!dmg.mask) return;
   checkPhotoNotes();
   const w = photo.width, h = photo.height;
-  show("sNum");
-  fillPhotoCard();
-  setNumLoading(true);
-  $("numError").hidden = true;
+  // Measuring takes a second or two: the button says so, and the page stays put until numbers exist.
+  const btn = $("measureBtn");
+  btn.disabled = true; btn.classList.add("busy"); btn.textContent = "Measuring…";
+  const done = () => { btn.classList.remove("busy"); btn.textContent = "Measure it"; btn.disabled = !dmg.mask; };
   $("measured").innerHTML = "";
-  $("findings").innerHTML = "";
-  drawScheme([]);
   const body = { masks: [{ id: "damage-1", label: dmgLabel, rle: encodeRle(dmg.mask, w, h), confidence: dmg.iou || 0.8 }] };
   let circleRef = null;
   if (gateCoin) {
@@ -558,7 +657,6 @@ $("measureBtn").onclick = async () => {
     const traced = await traceCoin(cx, cy, r, w, h);
     body.reference = traced ? { ...circleRef, rle: encodeRle(traced.mask, w, h), confidence: traced.iou } : circleRef;
   } else if (noScaleMode) body.note = "percent-only requested";
-  $("status").textContent = "";
   try {
     const observe = (b) => fetch(base() + "/v1/observe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) });
     let res = await observe(body);
@@ -576,13 +674,13 @@ $("measureBtn").onclick = async () => {
     if (!mres.ok || !measured.ok) throw new Error(measured.error ?? mres.status);
     payloadObj = j.result;
     lastMeasurement = measured.result;
+    reportKey = "";
     showMeasured(lastMeasurement);
+    done();
     show("sSay");
-    startListening();
   } catch (e) {
-    setNumLoading(false);
-    $("status").textContent = `Measuring failed (${e.message ?? e}).`;
-    showNumError("Measurement failed", String(e.message ?? e), () => $("measureBtn").click());
+    done();
+    setStatus(`Measuring failed (${e.message ?? e}). Tap Measure to try again.`, true);
   }
 };
 /** SAM's outline of the coin at the gate's circle, or null when it doesn't look like that coin. */
@@ -600,91 +698,111 @@ async function traceCoin(cx, cy, r, w, h) {
   return out;
 }
 
-function metricCards(f) {
-  const mm = f.crackLengthMm == null ? "—" : `${esc(String(f.crackLengthMm))} mm`;
-  const area = f.areaCm2 == null ? "" : `<div class="metric"><b>${esc(String(f.areaCm2))} cm²</b><span>Area</span></div>`;
-  const width = f.crackWidthMm == null ? "" : `<div class="metric"><b>${esc(String(f.crackWidthMm))} mm</b><span>Width</span></div>`;
-  const label = String(f.label);
-  const cap = label.charAt(0).toUpperCase() + label.slice(1);
-  return `<p class="found">${esc(cap)} found</p>
-    <div class="metrics">
-      <div class="metric"><b>${esc(String(f.percent))}%</b><span>Of the wall</span></div>
-      <div class="metric"><b>${mm}</b><span>Length</span></div>
-      <div class="metric"><b>${esc(String(f.regionCount ?? 1))}</b><span>Region${(f.regionCount ?? 1) === 1 ? "" : "s"}</span></div>
-      ${area}${width}
-    </div>
-    <div class="sevbar sev-${esc(String(f.severity))}"><span>${esc(String(f.severity)).toUpperCase()}</span><small>severity band</small></div>`;
+/** A number that counts up into place; the final text is in the markup, so it reads right without the motion. */
+function num(value, unit) {
+  return `<b data-count="${esc(String(value))}" data-unit="${esc(unit)}">${esc(String(value))}${esc(unit)}</b>`;
+}
+/** Receipts are "R001" in the ledger; models cite them as "r1". One key for both. */
+function receiptKey(id) { return String(id).trim().toLowerCase().replace(/^r0*(\d+)$/, "r$1"); }
+function rid(id) { return id ? `<code class="rid" title="Receipt ${esc(id)}">${esc(id)}</code>` : ""; }
+const cap = (s) => { const t = String(s); return t.charAt(0).toUpperCase() + t.slice(1); };
+const sevChip = (s) => `<span class="sev sev-${esc(String(s))}">${esc(String(s))}</span>`;
+/** The card in the chat: one big number (length with a coin, share of the wall without), then the rest as facts. */
+function measuredCard(f, more) {
+  const big = f.crackLengthMm != null ? num(f.crackLengthMm, " mm") : num(f.percent, "%");
+  const facts = [
+    f.crackLengthMm != null && `${esc(String(f.percent))}% of the wall`,
+    f.crackLengthMm == null && "No coin, so no millimetres",
+    f.areaCm2 != null && `${esc(String(f.areaCm2))} cm² area`,
+    f.crackWidthMm != null && `${esc(String(f.crackWidthMm))} mm wide`,
+    `${esc(String(f.regionCount ?? 1))} region${(f.regionCount ?? 1) === 1 ? "" : "s"}`,
+    more > 0 && `+${more} more finding${more === 1 ? "" : "s"}`,
+  ].filter(Boolean).map((t) => `<span>${t}</span>`).join("");
+  return `<span class="lbl">${esc(cap(f.label))} · ${f.crackLengthMm != null ? "length" : "of the wall"}</span>
+    <div class="big">${big}${sevChip(f.severity)}</div><div class="facts">${facts}</div>`;
+}
+/** Stripe-style count-up, same decimals as the measured value; skipped under reduced motion. */
+function countUp(root) {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  for (const el of root.querySelectorAll("[data-count]")) {
+    const target = Number(el.dataset.count);
+    if (!Number.isFinite(target)) continue;
+    const dp = (el.dataset.count.split(".")[1] || "").length;
+    const unit = el.dataset.unit || "";
+    const t0 = performance.now(), ms = 700;
+    const step = (t) => {
+      const k = Math.min(1, (t - t0) / ms), e = 1 - Math.pow(1 - k, 3);
+      el.textContent = (k < 1 ? (target * e).toFixed(dp) : el.dataset.count) + unit;
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
 }
 
 function receiptChips(receipts) {
   return (receipts || []).slice(0, 12).map((r) => `<code>${esc(r.id)} · ${esc(String(r.output?.value ?? ""))} ${esc(r.output?.unit ?? "")}</code>`).join("");
 }
-
-function measuredRows(findings, receipts) {
-  return findings.map((f) => {
-    const mm = f.crackLengthMm === null ? "—" : `${esc(String(f.crackLengthMm))} mm`;
-    const label = String(f.label);
-    const cap = label.charAt(0).toUpperCase() + label.slice(1);
-    return `<li><p class="found">${esc(cap)} found</p>` +
-      `<b>${esc(String(f.percent))}%</b> <small>of the wall</small> · <b>${mm}</b> <small>length</small> · ` +
-      `${esc(String(f.regionCount ?? 1))} region${(f.regionCount ?? 1) === 1 ? "" : "s"} · ` +
-      `<span class="badge ok">${esc(String(f.severity))}</span>` +
-      `${f.statement ? `<br/><small>${esc(String(f.statement))}</small>` : ""}</li>`;
-  }).join("");
+/** Receipts folded away: the proof is one tap off, not in the way. */
+function receiptsBlock(receipts) {
+  const n = (receipts || []).length;
+  if (!n) return "";
+  return `<details class="ticker"><summary><span class="mono">${n}</span> receipt${n === 1 ? "" : "s"} behind these numbers</summary>` +
+    `<div class="receipts" aria-label="Receipts">${receiptChips(receipts)}</div></details>`;
 }
 
 function fillPhotoCard() {
   const card = $("numPhotoCard");
-  if (!card || !stillDataUrl) return;
-  card.hidden = false;
-  $("numPhoto").src = stillDataUrl;
-  $("numChip").textContent = coinLabel ? `${coinLabel} · measured` : (noScaleMode ? "Percent only · no coin" : "Measured");
-}
-function setNumLoading(on) {
-  const bar = $("numLoading");
-  if (bar) bar.hidden = !on;
-}
-function showNumError(title, detail, retry) {
-  $("measured").innerHTML =
-    `<div class="statecard err" role="alert"><b>${esc(title)}</b>` +
-    `<p style="margin:8px 0 12px;color:#5b6b8c">${esc(detail)}</p>` +
-    `<button class="btn-dark" type="button" id="numRetry" style="width:100%">Try again</button></div>`;
-  const btn = document.getElementById("numRetry");
-  if (btn) btn.onclick = retry;
+  if (!card) return;
+  card.hidden = !stillDataUrl;
+  if (!stillDataUrl) return;
+  // The marked photo (outline + coin ring) when there is one: it shows what was measured.
+  let src = stillDataUrl;
+  if (photo && dmg.mask) { try { src = $("markCanvas").toDataURL("image/jpeg", 0.85); } catch { /* keep the still */ } }
+  $("numPhoto").src = src;
+  $("numChip").textContent = coinLabel ? `Scale: ${coinLabel}` : (gateCoin ? "Scale: coin" : "Outlined damage");
 }
 function showMeasured(result) {
-  setNumLoading(false);
-  $("numError").hidden = true;
   fillPhotoCard();
   const first = result.findings[0];
-  const mode = result.mode === "absolute" ? "" : " · percent only (no coin)";
-  $("measured").innerHTML =
-    `<span class="badge ok">MEASURED${esc(mode)}</span>` +
-    (first ? metricCards(first) : "") +
-    (result.findings.length > 1
-      ? `<ul>${measuredRows(result.findings.slice(1), result.receipts)}</ul>`
-      : "") +
-    `<div class="receipts" aria-label="Receipts">${receiptChips(result.receipts)}</div>`;
-  drawScheme(result.findings);
+  $("measured").innerHTML = first
+    ? measuredCard(first, result.findings.length - 1)
+    : `<span class="lbl">Nothing measurable</span><p style="margin-top:6px">Go back and tap the middle of the damage.</p>`;
+  countUp($("measured"));
+  $("thread").scrollTop = 0;
 }
+/** Bars compare findings, so the chart only appears when there are two or more. */
 function drawScheme(findings) {
   const svg = $("scheme");
   svg.innerHTML = "";
+  const rows = findings.slice(0, 8);
+  svg.hidden = rows.length < 2;
+  if (svg.hidden) return;
   const NS = "http://www.w3.org/2000/svg";
-  const color = (s) => s === "significant" ? "#c0392b" : s === "moderate" ? "#e67e22" : "#27ae60";
-  findings.slice(0, 8).forEach((f, i) => {
-    const w = Math.max(4, Math.min(380, (f.percent ?? 0) * 12));
-    const y = 12 + i * 32;
+  const color = (s) => s === "significant" ? "var(--damage)" : s === "moderate" ? "#d9822b" : "var(--go)";
+  const max = Math.max(...rows.map((f) => f.percent ?? 0), 0.01);
+  svg.setAttribute("viewBox", `0 0 400 ${16 + rows.length * 30}`);
+  rows.forEach((f, i) => {
+    const y = 12 + i * 30;
+    const track = document.createElementNS(NS, "rect");
+    track.setAttribute("x", "116"); track.setAttribute("y", String(y)); track.setAttribute("rx", "5");
+    track.setAttribute("width", "220"); track.setAttribute("height", "14");
+    track.style.fill = "var(--sand-deep)";
+    svg.appendChild(track);
     const rect = document.createElementNS(NS, "rect");
-    rect.setAttribute("x", "110"); rect.setAttribute("y", String(y));
-    rect.setAttribute("width", String(w)); rect.setAttribute("height", "18");
-    rect.setAttribute("fill", color(f.severity));
+    rect.setAttribute("x", "116"); rect.setAttribute("y", String(y)); rect.setAttribute("rx", "5");
+    rect.setAttribute("width", String(Math.max(6, (220 * (f.percent ?? 0)) / max))); rect.setAttribute("height", "14");
+    rect.style.fill = color(f.severity);
     svg.appendChild(rect);
     const t = document.createElementNS(NS, "text");
-    t.setAttribute("x", "4"); t.setAttribute("y", String(y + 14));
-    t.setAttribute("font-size", "12");
-    t.textContent = `${f.label} ${f.percent}%`;
+    t.setAttribute("x", "14"); t.setAttribute("y", String(y + 11.5));
+    t.setAttribute("font-size", "13"); t.setAttribute("font-weight", "700"); t.setAttribute("fill", "currentColor");
+    t.textContent = String(f.label);
     svg.appendChild(t);
+    const v = document.createElementNS(NS, "text");
+    v.setAttribute("x", "386"); v.setAttribute("y", String(y + 11.5)); v.setAttribute("text-anchor", "end");
+    v.setAttribute("font-size", "12.5"); v.setAttribute("fill", "currentColor");
+    v.textContent = `${f.percent}%`;
+    svg.appendChild(v);
   });
 }
 
@@ -709,9 +827,11 @@ function paintWave() {
   }
 }
 setInterval(() => { if ($("sSay").classList.contains("on")) paintWave(); }, 90);
+/** Small notices (mic blocked, nothing heard) live under the mic, not in the transcript headline. */
+function voiceNote(text) { $("voiceErr").textContent = text; }
 async function ensureMic() {
   if (micReady) return true;
-  if (!navigator.mediaDevices?.getUserMedia) { heard.textContent = "No microphone on this device."; return false; }
+  if (!navigator.mediaDevices?.getUserMedia) { micState.textContent = "Mic off"; voiceNote("No microphone on this device. Type the line below."); return false; }
   try {
     micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     micReady = true;
@@ -724,18 +844,24 @@ async function ensureMic() {
       src.connect(analyser);
     } catch { /* levels stay simulated */ }
     return true;
-  } catch { heard.textContent = "Mic blocked — allow access or type below."; return false; }
+  } catch { micState.textContent = "Mic off"; voiceNote("The mic is blocked. Allow it in the browser, or type the line below."); return false; }
 }
 function stopListening(landed, text) {
   clearTimeout(micTimer); micTimer = null; listening = false;
   document.getElementById("micwrap").classList.remove("live");
-  micState.textContent = landed ? "Heard" : "Listening";
-  heard.textContent = landed ? (text ?? "") : "";
+  micState.textContent = landed ? "Heard" : "Tap to talk";
+  if (landed) heard.textContent = text ?? "";
 }
+/** The composer's listening row also shows while asking for the mic and transcribing. */
+function micWorking(on) { $("micwrap").classList.toggle("working", on); }
 async function startListening() {
   if (listening) return;
-  heard.textContent = "Asking for the mic…";
-  if (!(await ensureMic())) return;
+  voiceNote("");
+  micWorking(true);
+  micState.textContent = "Asking for the mic…";
+  const ok = await ensureMic();
+  micWorking(false);
+  if (!ok) return;
   listening = true;
   document.getElementById("micwrap").classList.add("live");
   micState.textContent = "Listening";
@@ -774,8 +900,12 @@ async function finishListening(landed) {
   }
   await new Promise((r) => setTimeout(r, 300));
   const clip = new Blob(recChunks, { type: recorder?.mimeType || "audio/webm" });
-  if (!landed || clip.size === 0) { if (landed) heard.textContent = "Didn't catch anything — type the line."; return; }
+  if (!landed || clip.size === 0) { if (landed) voiceNote("Didn't catch anything. Tap the mic to try again, or type it."); return; }
   micState.textContent = "Transcribing…";
+  micWorking(true);
+  try { await transcribeClip(clip); } finally { micWorking(false); micState.textContent = "Tap to talk"; }
+}
+async function transcribeClip(clip) {
   try {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     const ctx = new Ctx();
@@ -789,7 +919,7 @@ async function finishListening(landed) {
     try {
       // Whisper writes non-speech as tags like [Music] or (wind blowing); those are not words.
       const local = (await transcribeOnDevice(rendered.getChannelData(0).slice())).replace(/\[[^\]]*\]|\([^)]*\)/g, "").trim();
-      if (local) landTranscript(local); else heard.textContent = "Didn't catch anything — type the line.";
+      if (local) landTranscript(local); else voiceNote("Didn't catch anything. Tap the mic to try again, or type it.");
       return;
     } catch (e) { console.info(`[voice] on-device failed, trying the server: ${e.message ?? e}`); }
     micState.textContent = "Transcribing…";
@@ -808,15 +938,19 @@ async function finishListening(landed) {
     if (res.status === 503) { $("voiceErr").textContent = "Voice needs the backend API key — type the line."; $("transcriptBox").value = ""; return; }
     if (!res.ok || !j.ok) throw new Error(j.error ?? res.status);
     const text = String(j.result?.transcript ?? "").trim();
-    if (!text) { heard.textContent = "Didn't catch anything — type the line."; return; }
+    if (!text) { voiceNote("Didn't catch anything. Tap the mic to try again, or type it."); return; }
     landTranscript(text);
   } catch (e) { $("voiceErr").textContent = `Transcription failed — type the line. (${e.message ?? e})`; }
 }
 function landTranscript(text) {
   $("transcriptBox").value = text;
-  heard.textContent = `“${text}”`;
+  heard.textContent = text;
   micState.textContent = "Heard";
+  heard.scrollIntoView({ block: "end", behavior: "smooth" });
 }
+// Typing shows up as the user's reply in the chat, same as a spoken line.
+$("transcriptBox").addEventListener("input", () => { heard.textContent = $("transcriptBox").value.trim(); });
+$("transcriptBox").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("sendBtn").click(); } });
 let voiceWorker = null, voiceId = 0;
 /** Mono 16 kHz samples → text, on the device. Empty string means nothing heard. */
 function transcribeOnDevice(audio) {
@@ -832,14 +966,28 @@ function transcribeOnDevice(audio) {
   });
 }
 mic.onclick = () => { if (listening) finishListening(true); else startListening(); };
-$("sendBtn").onclick = () => runReport();
-$("backMark").onclick = () => show("sReview");
-$("backSay").onclick = () => show("sMark");
+// The summary and both checks are billed calls: going back and forward again with the same
+// measurement and the same line reuses them instead of paying twice.
+let reportKey = "";
+$("sendBtn").onclick = () => {
+  if (listening) finishListening(true);
+  if (!lastMeasurement) return;
+  const key = JSON.stringify([payloadObj, $("transcriptBox").value.trim()]);
+  show("sReport");
+  if (key === reportKey) return;
+  reportKey = key;
+  resetRender();
+  fillReportDoc();
+  runReport();
+};
+$("backMark").onclick = () => show(photo ? "sMark" : "sHome");
+$("backSay").onclick = () => show("sSay");
 
 /* ---------- report / skeptic / render ---------- */
 async function runReport() {
   if (!payloadObj) return;
-  $("findings").innerHTML = "";
+  const ask = reportKey;
+  $("findings").innerHTML = `<div class="skel"></div><div class="skel" style="width:70%"></div>`;
   const body = JSON.parse(JSON.stringify(payloadObj));
   body.transcript = $("transcriptBox").value;
   let res, j;
@@ -847,31 +995,29 @@ async function runReport() {
     res = await fetch(base() + "/v1/report", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     j = await res.json();
   } catch { j = { ok: false, error: "backend unreachable" }; res = { status: 0 }; }
+  if (ask !== reportKey) return; // a newer report started meanwhile
   $("raw").textContent = JSON.stringify(j, null, 2);
   if (res.status === 503 || !res.ok || !j.ok) {
     const fails = res.status === 503 ? [j.error ?? "API key missing"] : (j.details ?? j.failures ?? [j.error]);
-    $("findings").innerHTML = `<span class="badge fail">${res.status === 503 ? "AI FINDINGS UNAVAILABLE" : "GATED"}</span><pre>${esc(JSON.stringify(fails, null, 2))}</pre>`;
-    return;
+    const reasons = (Array.isArray(fails) ? fails : [fails]).map((f) => `<li>${esc(typeof f === "string" ? f : JSON.stringify(f))}</li>`).join("");
+    $("findings").innerHTML = res.status === 503
+      ? `<p class="muted"><span class="chip wait">Unavailable</span> The measurements stand on their own. The written summary needs the backend's API key.</p><ul>${reasons}</ul>`
+      : `<p class="muted"><span class="chip fail">Held back</span> The summary was blocked because a sentence didn't cite a measured number:</p><ul>${reasons}</ul>`;
+  } else {
+    lastMeasurement = j.result.measurement ?? lastMeasurement;
+    const drafts = (j.result.findings ?? []).filter((f) => f && typeof f.statement === "string" && f.statement.trim());
+    $("findings").innerHTML = drafts.length
+      ? drafts.map((d) => `<p>${esc(d.statement)} ${(d.citations ?? []).map(rid).join(" ")}</p>`).join("") +
+        `<p style="margin-top:8px"><span class="chip ok">Every number cited</span></p>`
+      : `<p class="muted">No written summary came back. The measurements above stand on their own.</p>`;
+    fillReportDoc();
   }
-  lastMeasurement = j.result.measurement ?? null;
-  resetCheckState();
-  const f0 = (j.result.findings ?? [])[0];
-  const summary = f0 && typeof f0.statement === "string" ? f0.statement : null;
-  $("findings").innerHTML =
-    `<span class="badge ok">GATE PASS</span>` +
-    (summary ? `<p style="margin:10px 0 0;font-weight:600">${esc(summary)}</p>` : "") +
-    `<div class="receipts" aria-label="Receipts">${receiptChips(lastMeasurement?.receipts)}</div>`;
-  drawScheme(lastMeasurement?.findings ?? []);
-  show("sNum");
   runChecksAuto();
 }
-$("toCheck").onclick = () => { resetCheckState(); show("sCheck"); runChecksAuto(); };
-$("toReport").onclick = () => { if (canProceedToReport()) show("sReport"); };
-$("backSay").onclick = () => show("sMark");
-$("backNum").onclick = () => show("sSay");
-$("backCheck").onclick = () => show("sCheck");
 function resetCheckState() {
   checkState = { skeptic: "idle", xcheck: "idle" };
+  skepticTally = null;
+  delete $("xState").dataset.verdict;
   renderCheckCard();
   updateReportGate();
 }
@@ -882,9 +1028,9 @@ function setCheck(which, state, html) {
   void html;
 }
 function verdictBadge(verdict) {
-  if (verdict === "AGREED") return `<span class="badge ok">AGREED</span>`;
-  if (verdict === "DISPUTED") return `<span class="badge fail">DISPUTED</span>`;
-  return `<span class="badge wait">PENDING</span>`;
+  if (verdict === "AGREED") return `<span class="chip ok">Agreed</span>`;
+  if (verdict === "DISPUTED") return `<span class="chip fail">Disputed</span>`;
+  return `<span class="chip wait">Pending</span>`;
 }
 function checkStates() {
   return [
@@ -892,31 +1038,39 @@ function checkStates() {
     { key: "xcheck", title: "Mask cross-check", el: $("xStatus"), out: null },
   ];
 }
+const CHECK_CHIP = { idle: ["wait", "Waiting"], loading: ["wait spin", "Checking"], ok: ["ok", "Done"], error: ["fail", "Failed"] };
 function renderCheckCard() {
   const s = $("skStatus");
   if (!s) return;
-  // skeptic card body
   if (checkState.skeptic === "loading") s.textContent = "Asking the skeptic model…";
-  // xcheck line
   const x = $("xStatus");
-  if (x && checkState.xcheck === "loading") x.textContent = "Asking SAM 3.1…";
-}
-function updateReportGate() {
-  const btn = $("toReport");
-  if (!btn) return;
-  const done = checkState.skeptic === "ok" || checkState.skeptic === "error";
-  const doneX = checkState.xcheck === "ok" || checkState.xcheck === "error";
-  btn.disabled = !(done && doneX);
-  btn.textContent = done && doneX ? "Make the report →" : "Run both checks to continue";
-}
-function canProceedToReport() {
-  const done = (checkState.skeptic === "ok" || checkState.skeptic === "error") &&
-    (checkState.xcheck === "ok" || checkState.xcheck === "error");
-  if (!done) {
-    $("skStatus").textContent = "Run both checks to continue — retry any failed one.";
-    show("sCheck");
+  if (x && checkState.xcheck === "loading") x.textContent = "Outlining the same taps with the second model…";
+  // header chips; a finished cross-check shows its verdict instead of "Done"
+  for (const [key, id] of [["skeptic", "skState"], ["xcheck", "xState"]]) {
+    const el = $(id);
+    if (!el || (key === "xcheck" && checkState.xcheck === "ok" && el.dataset.verdict)) continue;
+    const [cls, text] = CHECK_CHIP[checkState[key]] ?? CHECK_CHIP.idle;
+    el.className = `chip ${cls}`; el.textContent = text;
   }
-  return done;
+}
+/** The report file waits for both checks (a failed check counts as finished: it shows in the report). */
+function updateReportGate() {
+  const btn = $("renderBtn");
+  const done = (k) => checkState[k] === "ok" || checkState[k] === "error";
+  const finished = done("skeptic") && done("xcheck");
+  if (!btn.classList.contains("busy")) {
+    btn.disabled = !finished || !payloadObj;
+    btn.textContent = finished ? "Create report file" : "Waiting for the checks…";
+  }
+  const gate = $("docGate");
+  const disputed = (skepticTally?.disputed ?? 0) > 0 || $("xState").dataset.verdict === "DISPUTED";
+  const failed = checkState.skeptic === "error" || checkState.xcheck === "error";
+  const [cls, text] = !lastMeasurement ? ["wait", "Pending"]
+    : !finished ? ["wait spin", "Checking"]
+    : disputed ? ["fail", "Disputed"]
+    : failed ? ["warn", "Check failed"]
+    : ["ok", "Checked"];
+  gate.className = `chip ${cls}`; gate.textContent = text;
 }
 async function runSkeptic(auto) {
   if (checkState.skeptic === "loading") return;
@@ -927,21 +1081,28 @@ async function runSkeptic(auto) {
   try {
     const res = await fetch(base() + "/v1/skeptic", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ transcript: $("transcriptBox").value, findings: lastMeasurement.findings, receipts: lastMeasurement.receipts }),
+      body: JSON.stringify({
+        transcript: $("transcriptBox").value,
+        findings: lastMeasurement.findings,
+        receipts: lastMeasurement.receipts,
+      }),
     });
     const j = await res.json().catch(() => ({}));
     if (!res.ok || !j.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
+    skepticTally = { agreed: 0, disputed: 0, disputedIds: new Set() };
     const rows = (j.result.findings ?? []).map((f) => {
       const disputed = /disputed/i.test(f.statement || "");
+      skepticTally[disputed ? "disputed" : "agreed"]++;
+      if (disputed) for (const c of f.citations ?? []) skepticTally.disputedIds.add(receiptKey(c));
       return `<li>${verdictBadge(disputed ? "DISPUTED" : "AGREED")} ${esc(f.statement ?? "")}<br/><small>cites: ${esc((f.citations ?? []).join(", "))}</small></li>`;
     }).join("");
     $("skOut").innerHTML = `<ul>${rows}</ul>`;
-    $("skStatus").textContent = `skeptic ok ${j.requestId ?? ""}`.trim();
+    $("skStatus").textContent = "";
     setCheck("skeptic", "ok");
+    fillReportDoc(); // disputed rows turn red
   } catch (e) {
-    $("skOut").innerHTML = `<div class="statecard err" role="alert"><b>Skeptic check failed.</b><p style="margin:8px 0 12px;color:#5b6b8c">${esc(e instanceof Error ? e.message : String(e))}</p><button class="btn-dark" type="button" id="skRetry" style="width:100%">Retry skeptic</button></div>`;
-    const b = document.getElementById("skRetry");
-    if (b) b.onclick = () => { checkState.skeptic = "idle"; runSkeptic(false); };
+    skepticTally = null;
+    $("skOut").innerHTML = `<div class="statecard err" role="alert"><b>The skeptic couldn't finish.</b><p style="margin-top:6px">${esc(e instanceof Error ? e.message : String(e))}</p></div>`;
     $("skStatus").textContent = "";
     setCheck("skeptic", "error");
   }
@@ -950,6 +1111,7 @@ async function runXcheck(auto) {
   if (checkState.xcheck === "loading") return;
   if (!dmg.mask || !photo) { if (!auto) $("xStatus").textContent = "Mark the damage first."; return; }
   checkState.xcheck = "loading";
+  delete $("xState").dataset.verdict;
   renderCheckCard(); updateReportGate();
   try {
     // Cross-check against the model that did NOT draw the mask: API mask vs on-device, or the reverse.
@@ -968,18 +1130,17 @@ async function runXcheck(auto) {
     });
     const cc = await ccRes.json().catch(() => ({}));
     if (!ccRes.ok || !cc.ok) throw new Error(cc.error ?? "cross-check failed");
-    const x = $("xStatus");
-    x.innerHTML = "";
-    const chip = document.createElement("span");
-    chip.className = `badge ${cc.result.verdict === "AGREED" ? "ok" : "fail"}`;
-    chip.textContent = `${cc.result.verdict} · IoU ${cc.result.iou}`;
-    x.appendChild(chip);
+    const agreed = cc.result.verdict === "AGREED";
+    const chip = $("xState");
+    chip.dataset.verdict = String(cc.result.verdict);
+    chip.className = `chip ${agreed ? "ok" : "fail"}`;
+    chip.textContent = agreed ? "Agreed" : "Disputed";
+    $("xStatus").textContent = agreed
+      ? `The two outlines overlap (IoU ${cc.result.iou}, needs 0.5).`
+      : `The two outlines don't match (IoU ${cc.result.iou}, needs 0.5). Check the taps before sending.`;
     setCheck("xcheck", "ok");
   } catch (e) {
-    const x = $("xStatus");
-    x.innerHTML = `<div class="statecard err" role="alert"><b>Cross-check failed.</b><p style="margin:8px 0 12px;color:#5b6b8c">${esc(e instanceof Error ? e.message : String(e))}</p><button class="btn-ghostline" type="button" id="xRetry" style="width:100%">Retry cross-check</button></div>`;
-    const b = document.getElementById("xRetry");
-    if (b) b.onclick = () => { checkState.xcheck = "idle"; runXcheck(false); };
+    $("xStatus").innerHTML = `<div class="statecard err" role="alert"><b>The cross-check couldn't finish.</b><p style="margin-top:6px">${esc(e instanceof Error ? e.message : String(e))}</p></div>`;
     setCheck("xcheck", "error");
   }
 }
@@ -1013,24 +1174,91 @@ function reportSummaryText() {
   bits.push(`classified ${f.severity}`);
   return `SnapClaim: ${bits.join("; ")}. Every number cited by receipt.`;
 }
-function fillReportDoc(ok) {
-  const gate = $("docGate");
-  if (ok) { gate.textContent = "Gate pass"; gate.className = "badge ok"; }
-  else { gate.textContent = "Pending"; gate.className = "badge wait"; }
-  if (stillDataUrl) { const p = $("docPhoto"); p.src = stillDataUrl; p.style.display = "block"; }
+/** Close-up for the report grid: the marked photo cropped to the outline, with some margin. */
+function outlineCrop() {
+  const c = $("markCanvas");
+  if (!photo || !dmg.mask || !c.width) return "";
+  const w = c.width, h = c.height;
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let i = 0; i < dmg.mask.length; i++) {
+    if (!dmg.mask[i]) continue;
+    const x = i % w, y = (i / w) | 0;
+    if (x < x0) x0 = x;
+    if (x > x1) x1 = x;
+    if (y < y0) y0 = y;
+    if (y > y1) y1 = y;
+  }
+  if (x1 < 0) return "";
+  const pad = Math.max(16, Math.round(Math.max(x1 - x0, y1 - y0) * 0.25));
+  x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad);
+  x1 = Math.min(w, x1 + pad); y1 = Math.min(h, y1 + pad);
+  const out = document.createElement("canvas");
+  out.width = x1 - x0; out.height = y1 - y0;
+  out.getContext("2d").drawImage(c, x0, y0, out.width, out.height, 0, 0, out.width, out.height);
+  try { return out.toDataURL("image/jpeg", 0.85); } catch { return ""; }
+}
+/** The report document, filled from what is known so far; called again as the summary and checks land. */
+let heroCounted = "";
+function fillReportDoc() {
+  updateReportGate();
+  $("docGrid").hidden = !stillDataUrl;
+  if (stillDataUrl) {
+    // Spectora-style grid: the whole photo with the outline drawn on, then a close-up.
+    let full = stillDataUrl;
+    if (photo && dmg.mask) { try { full = $("markCanvas").toDataURL("image/jpeg", 0.85); } catch { /* keep the still */ } }
+    $("docPhoto").src = full;
+    $("docCrop").src = outlineCrop() || full;
+    $("docGrid").hidden = false;
+  }
   const t = $("transcriptBox").value.trim();
   const q = $("docQuote");
   if (t) { q.hidden = false; q.textContent = `“${t}”`; } else q.hidden = true;
   const d = new Date();
-  $("docMeta").textContent = `Generated ${d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} · ${lastMeasurement ? lastMeasurement.findings.length : 0} finding${lastMeasurement?.findings?.length === 1 ? "" : "s"}`;
+  $("docMeta").textContent = `${d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} · ${lastMeasurement ? lastMeasurement.findings.length : 0} finding${lastMeasurement?.findings?.length === 1 ? "" : "s"}`;
   const f = (lastMeasurement?.findings ?? [])[0];
-  if (f) {
-    $("docRows").innerHTML =
-      (f.crackLengthMm != null ? `<tr><th scope="row">Crack length</th><td>${esc(String(f.crackLengthMm))} mm</td><td><span class="badge ok">Confirmed</span></td></tr>` : "") +
-      `<tr><th scope="row">Surface affected</th><td>${esc(String(f.percent))} %</td><td><span class="badge ok">Confirmed</span></td></tr>` +
-      (f.areaCm2 != null ? `<tr><th scope="row">Area</th><td>${esc(String(f.areaCm2))} cm²</td><td><span class="badge ok">Confirmed</span></td></tr>` : "") +
-      `<tr><th scope="row">Severity</th><td>${esc(String(f.severity))}</td><td><span class="badge ok">Confirmed</span></td></tr>`;
-  }
+  $("docTable").hidden = $("docHero").hidden = !f;
+  $("docEmpty").hidden = !!f;
+  if (!f) return;
+  const ids = f.receiptIds ?? {};
+  const tally = skepticTally;
+  $("heroLabel").textContent = `${cap(f.label)} · ${f.crackLengthMm != null ? "length" : "share of the wall"}`;
+  const heroText = f.crackLengthMm != null ? [f.crackLengthMm, " mm"] : [f.percent, "%"];
+  // Count up once per measurement, not on every refill.
+  const heroKey = JSON.stringify(heroText);
+  if (heroCounted !== heroKey) { heroCounted = heroKey; $("heroValue").innerHTML = num(heroText[0], heroText[1]); countUp($("docHero")); }
+  $("heroSev").className = `sev sev-${String(f.severity)}`; $("heroSev").textContent = String(f.severity);
+  $("receiptsOut").innerHTML = receiptsBlock(lastMeasurement.receipts);
+  drawScheme(lastMeasurement.findings ?? []);
+  $("heroSub").textContent = [
+    f.crackLengthMm != null ? `${f.percent} % of the wall` : "Percent only, no coin for scale",
+    coinLabel ? `scale: ${coinLabel}` : "",
+    tally ? (tally.disputed ? `${tally.disputed} disputed by the second model` : "second model agreed") : "",
+  ].filter(Boolean).join(" · ");
+  // Rows are measured, not "confirmed". A row whose receipt the skeptic disputed turns red.
+  const rows = [
+    f.crackLengthMm != null && ["Crack length", `${f.crackLengthMm} mm`, ids.length],
+    ["Surface affected", `${f.percent} %`, ids.ratio],
+    f.areaCm2 != null && ["Area", `${f.areaCm2} cm²`, ids.area],
+    f.crackWidthMm != null && ["Width", `${f.crackWidthMm} mm`, ids.width],
+    ["Severity", String(f.severity), ids.severity],
+    ...(lastMeasurement.findings ?? []).slice(1).flatMap((extra) => {
+      const eids = extra.receiptIds ?? {};
+      const prefix = cap(extra.label);
+      return [
+        [`${prefix} surface`, `${extra.percent} %`, eids.ratio],
+        extra.areaCm2 != null && [`${prefix} area`, `${extra.areaCm2} cm²`, eids.area],
+        [`${prefix} severity`, String(extra.severity), eids.severity],
+      ].filter(Boolean);
+    }),
+  ].filter(Boolean);
+  let n = 0;
+  $("docRows").innerHTML = rows.map(([name, value, id]) => {
+    const bad = !!(id && tally?.disputedIds?.has(receiptKey(id)));
+    const badge = bad ? `<span class="chip fail">Disputed</span>` : `<span class="chip ok">Measured</span>`;
+    return `<tr${bad ? ' class="disputed"' : ""}><td class="n">${++n}</td><th scope="row">${esc(name)} ${rid(id)}</th><td>${esc(value)}</td><td>${badge}</td></tr>`;
+  }).join("") + (!tally ? ""
+    : `<tr${tally.disputed ? ' class="disputed"' : ""}><td class="n">${++n}</td><th scope="row">Second model</th><td>${tally.agreed} agreed</td><td>${tally.disputed
+      ? `<span class="chip fail">${tally.disputed} disputed</span>` : `<span class="chip ok">None disputed</span>`}</td></tr>`);
 }
 function setShareCopyEnabled(on) {
   $("shareBtn").disabled = !on;
@@ -1044,7 +1272,7 @@ $("shareBtn").onclick = async () => {
     else throw new Error("no native share sheet");
   } catch {
     try { await navigator.clipboard.writeText(text); $("reportState").textContent = "Copied — no share sheet on this device."; }
-    catch { $("reportState").textContent = "Sharing unavailable here — use Download SVG."; }
+    catch { $("reportState").textContent = "Sharing unavailable here. Use Download annexure."; }
   }
 };
 $("copyBtn").onclick = async () => {
@@ -1053,35 +1281,41 @@ $("copyBtn").onclick = async () => {
   try { await navigator.clipboard.writeText(text); $("reportState").textContent = "Summary copied to clipboard."; }
   catch { $("reportState").textContent = "Copy failed in this browser — select the summary manually."; }
 };
-$("newClaimBtn").onclick = () => {
-  payloadObj = null; lastMeasurement = null;
+/** Forget the current claim: photo, taps, numbers, line, checks and the report file. */
+function resetClaim() {
+  payloadObj = null; lastMeasurement = null; reportKey = ""; heroCounted = "";
   dmg = { points: [], pointMasks: [], mask: null, iou: 0, source: null };
-  gateCoin = null; stillDataUrl = ""; noScaleMode = false; coinLabel = "";
+  photo = null; gateCoin = null; stillDataUrl = ""; coinLabel = "";
   history.length = 0; smooth = null; coinSeen = false;
   $("transcriptBox").value = ""; $("heard").textContent = "";
   $("voiceErr").textContent = ""; $("raw").textContent = "{}";
   $("measured").innerHTML = ""; $("findings").innerHTML = ""; drawScheme([]);
   $("skOut").innerHTML = ""; $("skStatus").textContent = ""; $("xStatus").textContent = "";
-  const card = $("numPhotoCard"); if (card) card.hidden = true;
-  $("annexWrap").innerHTML = `<img id="annexImg" alt="Generated report annexure" hidden />`;
-  $("dl").style.display = "none"; $("dl").removeAttribute("href");
-  $("docGate").textContent = "Pending"; $("docGate").className = "badge wait";
-  $("docMeta").textContent = "Not generated yet";
-  $("docPhoto").style.display = "none";
+  $("numPhotoCard").hidden = true;
+  $("docMeta").textContent = "Not started";
+  $("docGrid").hidden = true; $("docHero").hidden = true; $("docTable").hidden = true; $("docEmpty").hidden = false;
+  $("docPhoto").removeAttribute("src"); $("docCrop").removeAttribute("src");
   $("docQuote").hidden = true;
-  $("docRows").innerHTML = `<tr><th>Measurement</th><td>Generate the report to fill this in.</td></tr>`;
+  $("docRows").innerHTML = ""; $("receiptsOut").innerHTML = "";
+  resetRender();
+  resetCheckState();
+}
+/** Back to "no report file yet": the file is made from this report's numbers only. */
+function resetRender() {
+  $("annexWrap").innerHTML = `<img id="annexImg" alt="Generated report annexure" hidden />`;
+  $("fileBox").hidden = true; $("fileBox").open = false;
+  $("dl").style.display = "none"; $("dl").removeAttribute("href");
+  $("renderBtn").hidden = false;
+  $("shareRow").hidden = true;
   $("reportState").textContent = "";
   setShareCopyEnabled(false);
-  resetCheckState();
-  backToCam();
-  setLocked(true, "Add a coin for scale");
-  acquireCamera();
-};
+}
+$("newClaimBtn").onclick = () => { resetClaim(); openCamera(); };
 $("renderBtn").onclick = async () => {
   if (!payloadObj) return;
-  const state = $("reportState");
-  state.textContent = "Generating report…";
-  $("annexWrap").innerHTML = `<img id="annexImg" alt="Generated report annexure" hidden /><div class="skel" role="status" aria-label="Generating report"></div>`;
+  const btn = $("renderBtn");
+  btn.classList.add("busy"); btn.disabled = true; btn.textContent = "Creating the file…";
+  $("reportState").textContent = "";
   setShareCopyEnabled(false);
   const body = JSON.parse(JSON.stringify(payloadObj));
   body.transcript = $("transcriptBox").value;
@@ -1100,22 +1334,22 @@ $("renderBtn").onclick = async () => {
     const url = URL.createObjectURL(blob);
     const img = document.getElementById("annexImg");
     await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = () => reject(new Error("preview failed to render")); img.src = url; img.hidden = false; });
-    document.querySelector("#annexWrap .skel")?.remove();
     const dl = $("dl");
     dl.href = url;
-    dl.download = "snapclaim-annexure.svg";
-    dl.style.display = "block";
-    dl.textContent = "Download SVG annexure";
-    fillReportDoc(true);
+    dl.download = "snapclaim-report.svg";
+    dl.style.display = "flex";
+    $("fileBox").hidden = false;
+    btn.hidden = true;
+    $("shareRow").hidden = false;
     setShareCopyEnabled(true);
-    state.textContent = "";
+    $("reportState").textContent = "Report file ready.";
   } catch (e) {
     const name = e instanceof Error ? e.name : "";
-    const what = name === "AbortError" ? "timed out after 30 s" : (e instanceof Error ? e.message : String(e));
-    $("annexWrap").innerHTML = `<img id="annexImg" alt="Generated report annexure" hidden />
-      <div class="statecard err" role="alert"><b>Report failed.</b><p style="margin:8px 0 12px;color:#5b6b8c">${esc(what)}</p><button class="btn-dark" type="button" id="renderRetry" style="width:100%">Retry</button></div>`;
-    document.getElementById("renderRetry").onclick = () => $("renderBtn").click();
-    state.textContent = "";
+    const what = name === "AbortError" ? "it timed out after 30 s" : (e instanceof Error ? e.message : String(e));
+    $("reportState").textContent = `The file couldn't be created (${what}). Tap to try again.`;
+  } finally {
+    btn.classList.remove("busy");
+    updateReportGate();
   }
 };
 
@@ -1129,19 +1363,26 @@ async function loadSample() {
     ],
     scaleReference: { id: "coin-10inr", knownMm: 27, lengthPx: 287, confidence: 0.88 },
   };
+  const btn = $("altEntry");
+  btn.classList.add("busy"); btn.disabled = true;
   try {
     const mres = await fetch(base() + "/v1/measure", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(sample) });
     const measured = await mres.json();
     if (!mres.ok || !measured.ok) throw new Error(measured.error ?? mres.status);
+    resetClaim();
     payloadObj = sample;
-    fillPhotoCard();
+    lastMeasurement = measured.result;
     showMeasured(measured.result);
     show("sSay");
-    startListening();
-  } catch (e) { hint.textContent = `Sample failed (${e.message ?? e}). Is the backend reachable?`; }
+  } catch (e) {
+    $("homeNote").textContent = `The sample couldn't load (${e.message ?? e}). Is the backend reachable?`;
+  } finally { btn.classList.remove("busy"); btn.disabled = false; }
 }
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
 }
-// Open the camera on arrival; a refusal or missing camera shows the Enable camera button.
-acquireCamera();
+const syncOffline = () => { const bar = $("offlineBar"); if (bar) bar.hidden = navigator.onLine !== false; };
+window.addEventListener("online", syncOffline);
+window.addEventListener("offline", syncOffline);
+syncOffline();
+// The camera opens from Start a claim, so the permission prompt comes with a reason.
