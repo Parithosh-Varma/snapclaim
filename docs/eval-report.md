@@ -52,6 +52,7 @@ Scored by `scoreDisputes` in `bench/score.ts`, with DISPUTED as the positive cla
 | Date | Bench | Disputes | Notes |
 |---|---|---|---|
 | 2026-10-28 | 2 pass, 0 skip, 0 fail | scorer unit-tested, no live runs yet | wall-crack: 5.17% / 85.9 mm / 2.6 mm wide / 2.19 cm² (significant); stain: 1.29% percent-only (moderate) |
+| 2026-10-29 | 7 pass, 0 skip, 0 fail | scorer + archive normalization unit-tested (`r1` → `R001`, case-insensitive `DISPUTED`) | 2 dev + 4 held-out public no-scale fixtures + `sample-wall` all pass deterministic eval |
 
 ## Failures and misses
 

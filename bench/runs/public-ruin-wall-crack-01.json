@@ -1,0 +1,26 @@
+{
+  "caseId": "public-ruin-wall-crack-01",
+  "provenance": {
+    "gitSha": "665aeb5",
+    "model": "sam-3.1 + meta-models/muse-spark-open-1026",
+    "promptVersion": "v1-receipts-gate",
+    "timestamp": "2026-10-30T05:10:53.622Z"
+  },
+  "findings": [
+    {
+      "maskId": "crack-1",
+      "crackLengthMm": null
+    }
+  ],
+  "receipts": [
+    {
+      "unit": "percent"
+    },
+    {
+      "unit": "count"
+    },
+    {
+      "unit": "band"
+    }
+  ]
+}
