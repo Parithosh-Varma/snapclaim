@@ -28,10 +28,12 @@ test("PWA shell is installable and honest", () => {
   assert.ok(html.includes('id="usePhoto"') && html.includes('id="retake"'), "review actions exist");
   assert.ok(html.includes('id="markCanvas"'), "mark screen exists");
   assert.ok(html.includes('id="noCoin"'), "no-coin percent-only path exists");
-  for (const step of ["01 / 05","02 / 05","03 / 05","04 / 05","05 / 05"]) {
-    assert.ok(html.includes(step), `eyebrow ${step} exists`);
+  // Home, then four steps, each tagged in its top bar.
+  assert.ok(html.includes('id="sHome"') && html.includes('id="startBtn"'), "home screen starts a claim");
+  for (const step of ["<span>Step 1</span>Photo", "<span>Step 2</span>Mark", "<span>Step 3</span>Describe", "<span>Step 4</span>Report"]) {
+    assert.ok(html.includes(step), `step tag ${step} exists`);
   }
-  for (const id of ["numPhotoCard","numPhoto","numChip","numLoading","numError","reportDoc","docGate","docMeta","docPhoto","docQuote","docRows","annexImg","shareBtn","copyBtn","newClaimBtn","installBtn","offlineBar","toReport","renderBtn"]) {
+  for (const id of ["numPhotoCard","numPhoto","numChip","measured","transcriptBox","sendBtn","reportDoc","docGate","docMeta","docPhoto","docQuote","docRows","findings","skState","xState","annexImg","shareBtn","copyBtn","newClaimBtn","installBtn","offlineBar","renderBtn"]) {
     assert.ok(html.includes(`id="${id}"`), `report/check element ${id} exists`);
   }
   assert.ok(html.includes('id="xcheckBtn"') || html.includes("Cross-check"), "cross-check exists");
@@ -45,6 +47,8 @@ test("service worker caches the shell, never the API", () => {
   assert.ok(sw.includes("/v1/"), "API bypass is explicit");
   assert.ok(sw.includes("skipWaiting"), "updates activate");
   assert.ok(sw.includes("coin-model.js"), "coin model cached for offline gating");
+  assert.ok(sw.includes("rle.js"), "RLE decoder cached for offline shell");
+  assert.ok(sw.includes("coin-detect.js"), "coin detector cached for offline shell");
 
   const app = read("pwa/app.js");
   assert.ok(app.includes("serviceWorker"), "PWA registers the service worker");
