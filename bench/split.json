@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "note": "Held-out split for the eval. heldOut is frozen before any prompt or threshold tuning; once frozenAt is set, cases only get added, never moved. The first four held-out cases are public photos without a scale reference: they test that the pipeline refuses to invent millimetres. Measured-accuracy cases (coin or ruler in frame) are still missing. Photo files stay local in fixtures/photos/ (gitignored); source and license are recorded here.",
+  "note": "Held-out split for the eval. heldOut is frozen before any prompt or threshold tuning; once frozenAt is set, cases only get added, never moved. The first four held-out cases are public photos without a scale reference: they test that the pipeline refuses to invent millimetres. Seven team photos (coin in the crack's plane) were added 2026-10-30 as the first scale cases; DSC_0684 and DSC_0685 are the same crack at two distances and stay in dev together, so held-out has no near-duplicates. None of the seven has a measured length yet, so accuracy on them stays UNSCORED until someone puts a tape on the wall. Photo files stay local in fixtures/photos/ (gitignored); source and license are recorded here.",
   "frozenAt": "2026-10-28T18:05:00+03:00",
   "dev": [
     {
@@ -60,6 +60,118 @@
       "author": "Mk2010",
       "license": "CC BY-SA 4.0",
       "note": "Broken floor tiles, oblique angle, no scale object."
+    },
+    {
+      "id": "team-coin-0693",
+      "file": "fixtures/photos/DSC_0693.JPG",
+      "surface": "wall",
+      "hasScaleReference": true,
+      "source": "team photo, Parithosh (DSLR, 2026-10-29, shared Drive folder)",
+      "author": "Parithosh",
+      "license": "team-internal, not redistributed; photo file stays local",
+      "coin": {
+        "id": "coin-2inr",
+        "knownMm": 25.0,
+        "note": "new-series 2 INR coin, 25 mm; confirm against the physical coin"
+      },
+      "expected": "no crack finding; the only lines are mortar joints or brush marks, so no millimetre claim and no severity",
+      "note": "Negative case: mortar/joint lines and a brush mark, no crack."
+    },
+    {
+      "id": "team-coin-0695",
+      "file": "fixtures/photos/DSC_0695.JPG",
+      "surface": "wall",
+      "hasScaleReference": true,
+      "source": "team photo, Parithosh (DSLR, 2026-10-29, shared Drive folder)",
+      "author": "Parithosh",
+      "license": "team-internal, not redistributed; photo file stays local",
+      "coin": {
+        "id": "coin-2inr",
+        "knownMm": 25.0,
+        "note": "new-series 2 INR coin, 25 mm; confirm against the physical coin"
+      },
+      "expected": "no crack finding; the only lines are mortar joints or brush marks, so no millimetre claim and no severity",
+      "note": "Negative case: mortar lines and a paint stain, no crack."
+    },
+    {
+      "id": "team-coin-0688",
+      "file": "fixtures/photos/DSC_0688.JPG",
+      "surface": "wall",
+      "hasScaleReference": true,
+      "source": "team photo, Parithosh (DSLR, 2026-10-29, shared Drive folder)",
+      "author": "Parithosh",
+      "license": "team-internal, not redistributed; photo file stays local",
+      "coin": {
+        "id": "coin-2inr",
+        "knownMm": 25.0,
+        "note": "new-series 2 INR coin, 25 mm; confirm against the physical coin"
+      },
+      "expected": "one crack, coin in the crack's plane, so a millimetre length with coin receipts; ground truth missing until the wall is measured, so accuracy stays UNSCORED",
+      "note": "Full-frame wall crack, coin same plane."
+    },
+    {
+      "id": "team-coin-0690",
+      "file": "fixtures/photos/DSC_0690.JPG",
+      "surface": "floor",
+      "hasScaleReference": true,
+      "source": "team photo, Parithosh (DSLR, 2026-10-29, shared Drive folder)",
+      "author": "Parithosh",
+      "license": "team-internal, not redistributed; photo file stays local",
+      "coin": {
+        "id": "coin-2inr",
+        "knownMm": 25.0,
+        "note": "new-series 2 INR coin, 25 mm; confirm against the physical coin"
+      },
+      "expected": "one crack, coin in the crack's plane, so a millimetre length with coin receipts; ground truth missing until the wall is measured, so accuracy stays UNSCORED",
+      "note": "Full-frame floor crack, coin same plane."
+    },
+    {
+      "id": "team-coin-0691",
+      "file": "fixtures/photos/DSC_0691.JPG",
+      "surface": "wall",
+      "hasScaleReference": true,
+      "source": "team photo, Parithosh (DSLR, 2026-10-29, shared Drive folder)",
+      "author": "Parithosh",
+      "license": "team-internal, not redistributed; photo file stays local",
+      "coin": {
+        "id": "coin-2inr",
+        "knownMm": 25.0,
+        "note": "new-series 2 INR coin, 25 mm; confirm against the physical coin"
+      },
+      "expected": "one crack, coin in the crack's plane, so a millimetre length with coin receipts; ground truth missing until the wall is measured, so accuracy stays UNSCORED",
+      "note": "Full-frame horizontal wall crack, coin same plane."
+    },
+    {
+      "id": "team-coin-0697",
+      "file": "fixtures/photos/DSC_0697.JPG",
+      "surface": "wall",
+      "hasScaleReference": true,
+      "source": "team photo, Parithosh (DSLR, 2026-10-29, shared Drive folder)",
+      "author": "Parithosh",
+      "license": "team-internal, not redistributed; photo file stays local",
+      "coin": {
+        "id": "coin-2inr",
+        "knownMm": 25.0,
+        "note": "new-series 2 INR coin, 25 mm; confirm against the physical coin"
+      },
+      "expected": "crack leaves the frame; report the visible length as a lower bound, not as the full crack length",
+      "note": "Crack runs out of the frame at the bottom."
+    },
+    {
+      "id": "team-coin-0683",
+      "file": "fixtures/photos/DSC_0683.JPG",
+      "surface": "wall",
+      "hasScaleReference": true,
+      "source": "team photo, Parithosh (DSLR, 2026-10-29, shared Drive folder)",
+      "author": "Parithosh",
+      "license": "team-internal, not redistributed; photo file stays local",
+      "coin": {
+        "id": "coin-2inr",
+        "knownMm": 25.0,
+        "note": "new-series 2 INR coin, 25 mm; confirm against the physical coin"
+      },
+      "expected": "crack leaves the frame; report the visible length as a lower bound, not as the full crack length",
+      "note": "Crack runs out of the frame at the bottom."
     }
   ]
 }
