@@ -739,8 +739,9 @@ async function finishListening(landed) {
 }
 mic.onclick = () => { if (listening) finishListening(true); else startListening(); };
 $("sendBtn").onclick = () => runReport();
-$("backMark").onclick = () => show("sReview");
-$("backSay").onclick = () => show("sMark");
+// Back chain follows the screen order: Say → Mark, Numbers → Say,
+// Checked → Numbers, Report → Checked. (Was off by one, skipping a screen.)
+$("backMark").onclick = () => show("sMark");
 
 /* ---------- report / skeptic / render ---------- */
 function updateOfflineBar() {
@@ -799,8 +800,8 @@ async function runReport() {
 }
 $("toCheck").onclick = () => { resetCheckState(); show("sCheck"); runChecksAuto(); };
 $("toReport").onclick = () => { if (canProceedToReport()) show("sReport"); };
-$("backSay").onclick = () => show("sMark");
-$("backNum").onclick = () => show("sSay");
+$("backSay").onclick = () => show("sSay");
+$("backNum").onclick = () => show("sNum");
 $("backCheck").onclick = () => show("sCheck");
 function resetCheckState() {
   checkState = { skeptic: "idle", xcheck: "idle" };

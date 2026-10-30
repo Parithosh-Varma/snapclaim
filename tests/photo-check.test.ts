@@ -19,7 +19,9 @@ function gray(w: number, h: number, fn: (x: number, y: number) => number) {
 
 test("sharp edges score far above blurred ones", () => {
   const sharp = gray(32, 32, (x) => (x < 16 ? 0 : 255));
-  const soft = gray(32, 32, (x) => Math.max(0, Math.min(255, Math.round(((x - 13) * 255) / 6))));
+  // Wide gradient (heavily defocused): variance ~14 at 64px, well under the
+  // 40 default calibrated on smooth-plaster DSLR shots (which score 53+).
+  const soft = gray(64, 64, (x) => Math.max(0, Math.min(255, Math.round(((x - 26) * 255) / 12))));
   assert.ok(laplacianVariance(sharp) > 10 * laplacianVariance(soft));
   assert.deepEqual(checkPhoto(sharp), []);
   assert.ok(checkPhoto(soft).some((note: string) => note.includes("blurry")));

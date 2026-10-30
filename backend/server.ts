@@ -17,17 +17,21 @@ function readJson(req: import("node:http").IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let size = 0;
+    let oversized = false;
     req.on("data", (chunk: Buffer) => {
       size += chunk.length;
-      if (size > 1_000_000) {
-        reject(new Error("body too large (1MB cap)"));
-        req.destroy();
-        return;
-      }
-      chunks.push(chunk);
+      // Don't destroy the socket: keep draining so we can answer with a
+      // proper 400 instead of hanging up (which the PWA reports only as
+      // "backend unreachable"). Oversized bodies are rejected at the end.
+      if (size > 1_000_000) oversized = true;
+      if (!oversized) chunks.push(chunk);
     });
     req.on("end", () => {
       try {
+        if (oversized) {
+          reject(new Error("body too large (1MB cap)"));
+          return;
+        }
         resolve(chunks.length === 0 ? {} : JSON.parse(Buffer.concat(chunks).toString("utf8")));
       } catch (error) {
         reject(error instanceof Error ? error : new Error("invalid JSON"));

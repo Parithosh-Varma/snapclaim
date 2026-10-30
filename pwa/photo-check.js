@@ -27,7 +27,10 @@ export function laplacianVariance(pixels) {
 
 export function checkPhoto(pixels, originalSide = 0, thresholds = {}) {
   const { width, height, data } = pixels;
-  const blurBelow = thresholds.blurBelow ?? 150;
+  // Calibrated on 16 real DSLR wall photos (smooth plaster scores 53–140):
+  // the old 150 false-flagged sharp tripod shots of smooth walls, including
+  // the hero crack+coin frames. Texture variance measures texture, not focus.
+  const blurBelow = thresholds.blurBelow ?? 40;
   const notes = [];
   if (width === 0 || height === 0 || !data || data.length < width * height * 4) {
     return ["Could not read this photo. Try another one."];
