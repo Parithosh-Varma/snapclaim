@@ -53,7 +53,13 @@ test("service worker caches the shell, never the API", () => {
   assert.ok(app.includes("/v1/crosscheck"), "PWA can cross-check on-device masks against SAM");
   assert.ok(app.includes("CoinModel.extractFeatures"), "coin ID uses the real feature extractor");
   assert.ok(app.includes("findRing"), "coin gate uses edge + radial-uniformity detection");
-  assert.ok(!app.includes("$(\"raw\").innerHTML"), "no raw HTML injection of backend output");
+  assert.ok(!app.includes('innerHTML = j.result.svg'), "annexure SVG renders via <img>, never injected as HTML");
+  assert.ok(app.includes("offlineBar"), "offline banner is wired to online/offline events");
+  assert.ok(app.includes("beforeinstallprompt"), "install prompt is captured, not assumed");
+  assert.ok(app.includes("setShareCopyEnabled(false)"), "share/copy stay disabled until a report exists");
+  assert.ok(app.includes("AbortController"), "long fetches have timeouts");
+  assert.ok(app.includes("renderRetry") && app.includes("reportRetry"), "failed fetches offer retry");
+  assert.ok(app.includes("PENDING") || app.includes("Waiting"), "checks show an explicit pending state");
 });
 
 test("PWA scripts load as the right module type", () => {

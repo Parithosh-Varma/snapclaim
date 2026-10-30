@@ -743,20 +743,46 @@ $("backMark").onclick = () => show("sReview");
 $("backSay").onclick = () => show("sMark");
 
 /* ---------- report / skeptic / render ---------- */
+function updateOfflineBar() {
+  const bar = document.getElementById("offlineBar");
+  if (bar) bar.hidden = navigator.onLine;
+}
+window.addEventListener("online", updateOfflineBar);
+window.addEventListener("offline", updateOfflineBar);
+updateOfflineBar();
+
 async function runReport() {
   if (!payloadObj) return;
-  $("findings").innerHTML = "";
+  // Numbers screen first, with visible loading — no dead air on send.
+  show("sNum");
+  fillPhotoCard();
+  setNumLoading(true);
+  $("numError").hidden = true;
+  $("measured").innerHTML = "";
+  $("findings").innerHTML = "<p>Running gated report…</p>";
+  drawScheme([]);
   const body = JSON.parse(JSON.stringify(payloadObj));
   body.transcript = $("transcriptBox").value;
   let res, j;
   try {
-    res = await fetch(base() + "/v1/report", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-    j = await res.json();
-  } catch { j = { ok: false, error: "backend unreachable" }; res = { status: 0 }; }
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 45000);
+    try {
+      res = await fetch(base() + "/v1/report", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: ctl.signal });
+      j = await res.json();
+    } finally { clearTimeout(timer); }
+  } catch (e) { j = { ok: false, error: e instanceof Error && e.name === "AbortError" ? "timed out after 45 s" : "backend unreachable" }; res = { status: 0 }; }
   $("raw").textContent = JSON.stringify(j, null, 2);
-  if (res.status === 503 || !res.ok || !j.ok) {
+  setNumLoading(false);
+  if (!res.ok || !j.ok) {
     const fails = res.status === 503 ? [j.error ?? "API key missing"] : (j.details ?? j.failures ?? [j.error]);
-    $("findings").innerHTML = `<span class="badge fail">${res.status === 503 ? "AI FINDINGS UNAVAILABLE" : "GATED"}</span><pre>${esc(JSON.stringify(fails, null, 2))}</pre>`;
+    const title = res.status === 503 ? "AI findings unavailable" : (!navigator.onLine ? "You are offline" : res.status === 422 ? "Evidence gate failed" : "Report failed");
+    $("findings").innerHTML =
+      `<div class="statecard err" role="alert"><span class="badge fail">${res.status === 503 ? "NO KEY" : res.status === 422 ? "GATED" : "ERROR"}</span> ` +
+      `<b>${esc(title)}</b><pre style="margin-top:8px">${esc(JSON.stringify(fails, null, 2))}</pre>` +
+      `<button class="btn-dark" type="button" id="reportRetry" style="width:100%;margin-top:8px">Try again</button></div>`;
+    const rb = document.getElementById("reportRetry");
+    if (rb) rb.onclick = () => runReport();
     return;
   }
   lastMeasurement = j.result.measurement ?? null;
@@ -781,31 +807,27 @@ function resetCheckState() {
   renderCheckCard();
   updateReportGate();
 }
-function setCheck(which, state, html) {
+function setCheck(which, state) {
   checkState[which] = state;
   renderCheckCard();
   updateReportGate();
-  void html;
 }
 function verdictBadge(verdict) {
   if (verdict === "AGREED") return `<span class="badge ok">AGREED</span>`;
   if (verdict === "DISPUTED") return `<span class="badge fail">DISPUTED</span>`;
   return `<span class="badge wait">PENDING</span>`;
 }
-function checkStates() {
-  return [
-    { key: "skeptic", title: "Independent skeptic", el: $("skStatus"), out: $("skOut") },
-    { key: "xcheck", title: "Mask cross-check", el: $("xStatus"), out: null },
-  ];
-}
 function renderCheckCard() {
   const s = $("skStatus");
-  if (!s) return;
-  // skeptic card body
-  if (checkState.skeptic === "loading") s.textContent = "Asking the skeptic model…";
-  // xcheck line
+  if (s) {
+    if (checkState.skeptic === "loading") s.textContent = "Asking the skeptic model…";
+    else if (checkState.skeptic === "idle") s.textContent = "Waiting — runs automatically, or tap Ask skeptic.";
+  }
   const x = $("xStatus");
-  if (x && checkState.xcheck === "loading") x.textContent = "Asking SAM 3.1…";
+  if (x) {
+    if (checkState.xcheck === "loading") x.textContent = "Asking SAM 3.1…";
+    else if (checkState.xcheck === "idle") x.textContent = "Waiting — runs automatically, or tap Cross-check.";
+  }
 }
 function updateReportGate() {
   const btn = $("toReport");
