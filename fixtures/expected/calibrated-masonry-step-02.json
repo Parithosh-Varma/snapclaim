@@ -4,6 +4,7 @@
       "maskId": "crack-1",
       "percent": 0.95,
       "crackLengthMm": 86.6,
+      "rulerGtMm": 92.2,
       "severity": "cosmetic"
     }
   ],

@@ -1,6 +1,6 @@
 {
   "imageId": "calibrated-stone-oblique-03",
-  "note": "Calibrated real-photo eval: oblique stone crack (ruler 88.5 mm) + Euro 1 EUR coin (23.25 mm at 36.8 deg tilt) segmented live by SAM 3.1.",
+  "note": "800x600 canvas composite over Wikimedia Commons Crack_in_the_wall,_Larkbeare_Road,_Exeter (CC BY-SA 2.0) with a drawn 88.5 mm oblique crack path and Euro 1 EUR coin (23.25 mm at 0.80 aspect / 36.8 deg tilt), segmented live via POST /v1/segment (SAM 3.1; raw RLEs in fixtures/rle/calibrated-stone-oblique-03.json). component.areaPx=480000 is observeBody's full-frame 800x600 default; masks[0] and scaleReference (lengthPx=96.9, confidence=0.961) are computed deterministically by observeBody from fixtures/rle/calibrated-stone-oblique-03.json.",
   "component": {
     "id": "photo",
     "areaPx": 480000,

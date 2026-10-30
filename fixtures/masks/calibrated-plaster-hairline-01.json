@@ -1,6 +1,6 @@
 {
   "imageId": "calibrated-plaster-hairline-01",
-  "note": "Calibrated real-photo eval: plaster hairline crack (ruler 90.4 mm) + India 10 INR coin (27.0 mm) segmented live by SAM 3.1.",
+  "note": "800x600 canvas composite over Wikimedia Commons Cracked_Cream_Walls_(Unsplash).jpg (CC0) with a drawn 90.4 mm crack path and India 10 INR coin (27.0 mm) at 4.00 px/mm, segmented live via POST /v1/segment (SAM 3.1; raw RLEs in fixtures/rle/calibrated-plaster-hairline-01.json). component.areaPx=480000 is observeBody's full-frame 800x600 default; masks[0] and scaleReference (lengthPx=111.8, confidence=0.953) are computed deterministically by observeBody from fixtures/rle/calibrated-plaster-hairline-01.json.",
   "component": {
     "id": "photo",
     "areaPx": 480000,

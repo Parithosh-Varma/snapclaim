@@ -252,14 +252,112 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 
 **Spend:** $0.00.
 
-## 2026-10-30 — Calibrated ground-truth eval (coin + ruler) and PWA voice proxy round-trip
+## 2026-10-29 — PWA UI polish (branch ui/pwa-polish, uncommitted)
+
+**Shipped (local)**
+
+- Restyled the PWA on the landing page's Palette B tokens; dark mode follows the system. Every element id kept.
+- Mark: Undo / Clear for bad taps, one-row damage type control, coin picker hidden without a coin, Measure stays on the screen with a busy state instead of flashing the numbers screen.
+- Numbers: photo shows the traced outline, receipts fold into one list, bar chart only with 2+ findings, gate failures list reasons instead of raw JSON.
+- Checks: status chip per card, 'Run again' replaces the big buttons; 'Check it twice' no longer re-runs both billed checks.
+- Report: rows say Measured, not Confirmed; a Skeptic row shows disputes in red (rows used to say Confirmed even when the skeptic disputed a number). Share/Copy/Install styled.
+- SW cache bumped to v5 so installed phones get the new shell.
+- 181 tests green, tsc clean. Every screen screenshot-checked in light and dark with a headless Chrome driver.
+
+**Resume point:** review the diff, commit, open a PR. Not yet tried on a real phone (camera, mic, tilt meter layout).
+
+**Spend:** $0.00.
+
+## 2026-10-29 — Design references + merge plan (next session)
+
+- 16 reference sites screenshotted (phone + desktop) in Hackathons\snapclaim-shots\refs\ (retake with refs.mjs). Best: Hover, Spectora, Polycam, Snapsheet, Stripe, Lemonade, Ramp.
+- Merge plan, on top of branch ui/pwa-polish (still uncommitted):
+  1. Camera: Hover-style guided capture. 'Step 1 of 3 · Photo' + checklist ticks (coin found, damage in frame, steady).
+  2. Mark/numbers: Polycam highlighter marks on key words; numbers count up into place like Stripe's live counter, receipt beside each.
+  3. Report: Spectora layout. Photo grid with the outline drawn on, numbered table, disputed row in red; report card as hero (Snapsheet).
+  4. Tone: one Lemonade-style line illustration on empty states; Ramp-short copy.
+  5. Skip: Tractable dark look and Paddle serif (off Palette B).
+- Verify with snapclaim-shots\shoot.mjs (light + dark), then commit with no AI attribution and open a PR.
+
+## 2026-10-29 — Design merge plan built (branch ui/pwa-polish, uncommitted)
+
+**Shipped (local)**
+
+- Camera: 'Step 1 of 3 · Photo' pill and a capture checklist. Every tick is a signal the app reads: Coin found (a ring detected in the last few scans), Held steady (the gate locked), Phone level (only shown when orientation sensors report). 'Damage in frame' from the plan was left out because nothing measures it.
+- Screens now count 3 steps (Photo, then Mark/Say/Numbers/Check, then Report). Key words in each heading get a green highlighter that sweeps in.
+- Numbers count up into place (skipped under reduced motion), and each one shows the receipt id behind it.
+- Report: a hero card with the headline number, a two-photo grid (outlined photo plus a close-up cropped to the outline), numbered rows with receipt ids. A row turns red when the skeptic disputes its receipt. `R001` and `r1` are matched as the same receipt, because the models cite the short form.
+- Empty report shows a line illustration. Copy is shorter on every screen.
+- 181 tests green (the eyebrow test now checks the step labels), tsc clean. shoot.mjs run in light and dark.
+
+**Resume point:** commit, open a PR, try it on a real phone.
+
+**Spend:** $0.00.
+
+## 2026-10-29 — Same references applied to the landing page (worktree snapclaim-landing, branch site/landing, uncommitted)
+
+- index.html: highlighter on a key word per section, numbers count up when scrolled to (with a timed fallback so they never stick at 0), receipt ids beside each number, 'Step N of 3' labels and progress bars on How it works, capture ticks in the step 1 picture.
+- Sample report rebuilt like the app's: headline card, photo + close-up, numbered rows with receipts, the disputed row in red. Rows say Measured, not Confirmed.
+- 404: line illustration, shorter copy, fixed the second link running off a phone screen.
+- Checked with snapclaim-shots\land.mjs (scrolls like a visitor): phone + desktop, light + dark, no sideways overflow.
+
+## 2026-10-29 — Full PWA UI/UX revamp (branch ui/pwa-polish, uncommitted)
+
+The earlier polish passes kept the old 7-screen layout. Tariq asked for a from-scratch revamp built on the references, so the flow itself changed:
+
+- **Home (new):** headline, a green "Start a claim" pill and a sample link (Hover); a line drawing (Lemonade); How it works as four stacked cards (Wise). The camera is only requested after Start, so the permission prompt comes with a reason.
+- **Photo:** full-bleed viewfinder with a light sheet over it (CompanyCam): coaching line, checklist ticks, a Coin / No coin toggle (Hover's segmented pill) and the shutter. The detected coin preselects the matching option in the coin picker.
+- **Mark:** a dark photo editor (Polycam / magicplan): the photo fills the screen, Undo and Clear float as round buttons, and the type, coin and Measure controls sit in a bottom sheet.
+- **Describe:** a chat (Lemonade). The measured result arrives as a card in the thread, then the question; typed or spoken lines show as the user's reply. The mic no longer starts on its own.
+- **Report:** Numbers, Check and Report merged into one live document (Spectora / Snapsheet): a headline number that counts up (Stripe), photo plus close-up, the tenant's words, numbered measurement rows that turn red when disputed, the written summary, both checks inline, and the receipts as a mono strip (Ramp). "Create report file" unlocks once both checks finish; Share / Copy / Download appear after it.
+- Billed calls are not repeated: going back and forward with the same measurement and line reuses the summary and checks.
+- Fixes found along the way: a second scan loop started on every retake; the sample path never set the measurement.
+- Brand tokens match the landing page (Archivo, ink #0b2557, green #0f7a36). Light and dark both checked with snapclaim-shots/shoot.mjs, which now walks the new flow. The SW cache is now v6. The shell test checks the new step tags and ids. 181 tests pass and tsc is clean.
+
+**Resume point:** Tariq reviews the screens, then commit (no AI attribution) and open a PR. Not yet tried on a real phone.
+
+**Spend:** $0.00.
+
+## 2026-10-29 — PWA rebuilt as a full product website (branch ui/pwa-polish, uncommitted)
+
+The earlier "revamp" was still a phone-only page. Tariq wanted a full website built from the references, with a proper footer. Researched full-length pages (header to footer) of Hover, Spectora, Ramp, Mercury, Attio, Granola, Wise, Vercel, CompanyCam and Lemonade (`snapclaim-shots/refs-full.mjs`, output in `refsfull/`). They all share one skeleton, and the home screen now follows it:
+
+- Utility bar, sticky nav (links, Install, See a sample, Start a claim; mobile menu via `<details>`), split hero with the product in a phone and floating proof cards, a coin strip (the 8 coins it supports, instead of borrowed customer logos), Hover-style step cards with pictures of each screen, three feature rows (receipts, skeptic, honest about bad photos), a dark numbers band (bench numbers only), audience tabs (tenants, landlords, insurers, contractors; radios, no script), the sample report shown whole, FAQ, a dark closing CTA, and a 4-column footer with wordmark and legal row.
+- New `privacy.html`, `terms.html`, `legal.css`. The privacy text matches what the code does: the photo goes to the server (SAM 3.1), a second outline runs on the device, speech is transcribed on the device first.
+- New palette and type: ink #0b0f17, warm paper #f6f5f1, signal lime #c6f35e, Geist + Geist Mono. Dark mode follows the system.
+- App on desktop: the stepper shows labelled steps; Review and Mark put the photo on the left and the controls in a side panel with tips; the chat is centred with quick-start chips; the report sits beside a sticky action rail.
+- app.js: every `[data-start]` / `[data-sample]` button goes through `openCamera` / `loadSample`; footer audience links open their tab; sections fade up and the numbers count up as they scroll in.
+- `assets/sample-wall.jpg` and its mask copied from the landing page (Brina Blum, Unsplash). SW cache v7 and the new files are in the shell list.
+- shoot.mjs takes a width (`node shoot.mjs tag light 1440`) and moved to port 8098: a `python -m http.server 8099` serving `pwa/` was shadowing it, so the camera test image 404'd.
+- 181 tests pass, tsc clean. Phone and desktop, light and dark, walked through every screen.
+
+**Resume point:** Tariq reviews the site at http://127.0.0.1:8099 (or after a deploy), then commit with no AI attribution and open a PR.
+
+**Spend:** $0.00.
+
+## 2026-10-29 — Gate normalization, sample cross-check fix, and photo upload
+
+**Shipped (local)**
+
+- **Sample cross-check fix (`pwa/app.js`):** `runXcheck` previously returned early when `!dmg.mask || !photo` without updating `checkState.xcheck`, leaving `#renderBtn` permanently locked on "Waiting for the checks…" during sample runs. Sample/fixture runs now resolve `xcheck` as `Fixture` (`ok`), and `loadSample()` attaches `sample-wall.jpg` and the ₹10 scale label so the sample report renders its photo grid and unlocks file creation.
+- **Evidence gate receipt ID normalization (`src/findings/evidence-gate.ts`):** Live models (`muse-spark-1.3`, `muse-spark-open-1026`) often cite `r1` instead of `R001`. `validateFindings` now normalizes shorthand/case-insensitive receipt IDs (`r1` → `R001`) and enforces per-unit receipt backing for `cm²` / `cm2` (`calibrated_area`).
+- **Live provider hardening (`backend/providers.ts`):** Added `areaCm2` and `crackWidthMm` to the `facts` payload sent to Muse Spark and Baseten Spark Open, and stripped optional markdown code fences in `parseFindingDrafts` before `JSON.parse`.
+- **Photo upload & paste fallback (`pwa/index.html`, `pwa/app.js`):** Added an `Upload` picker to the camera bar plus clipboard `paste` support. Uploaded photos are re-encoded on canvas (stripping EXIF) and scanned with the Sobel/CoinModel detector before entering the Review → Mark flow.
+- **Multi-finding report & sessions (`pwa/app.js`, `pwa/sw.js`):** `runReport` now renders all returned finding statements with their receipt badges, `fillReportDoc` includes secondary findings in the measurements table, `runSkeptic` sends `component`/`masks`/`scaleReference` for server-side `crossCheckMeasurement`, completed reports record to `POST /v1/sessions`, and `sw.js` (`v8`) caches `rle.js` and `coin-detect.js`.
+- 184 tests pass, `tsc --noEmit` clean, `npm run eval` 7 pass.
+
+**Spend:** $0.00.
+
+## 2026-10-30 — Calibrated ground-truth eval (coin + ruler), held-out bench archive, and PWA voice proxy round-trip
 
 **Shipped & Verified**
 
-- **Held-out live benchmark (`npm run bench` → `4/4` PASS):** Downloaded the 4 frozen Wikimedia Commons held-out photos (`public-ruin-wall-crack-01`, `public-stone-wall-crack-02`, `public-interior-wall-cracks-03`, `public-cracked-tile-04`) to `fixtures/photos/` (gitignored), segmented each live with SAM 3.1 (`POST /v1/segment` on the live Worker `mode: "live"`), measured via `observeBody` + `measureBody`, ran live skeptic (`POST /v1/skeptic` on `meta-models/muse-spark-open-1026`), and archived the 4 runs in `bench/runs/*.json` (`gitSha: 665aeb5`). `npm run bench` exits `0` (`4 PASS, 0 FAIL, 0 UNRUN`): all 4 detect the crack and refuse to invent millimetres (`crackLengthMm: null`).
-- **Calibrated coin + ruler ground-truth eval (`npm run eval` → `10/10` PASS):** Built 3 calibrated real-photo scenes (`calibrated-plaster-hairline-01` with India ₹10 Ø27.0 mm and 90.4 mm ruler GT; `calibrated-masonry-step-02` with US Quarter Ø24.26 mm and 92.2 mm ruler GT; `calibrated-stone-oblique-03` with Euro €1 Ø23.25 mm at 36.8° tilt and 88.5 mm ruler GT) alongside `wall-crack` (`sample-wall.jpg`, 85.0 mm GT) and `tilted-wall` (49.5° tilt, 66.7 mm GT). Segmented both crack and coin live via SAM 3.1 (`POST /v1/segment`), ran `observeBody` + `measureBody`, and verified live `POST /v1/report` (`gate.ok: true` on all 3). SnapClaim achieves **1.0 mm median absolute error** (`5/5` within ±10%: `+1.1%`, `+0.1%`, `-2.7%`, `-6.1%`, `+1.1%`) vs. **35.0 mm median error** (`0/5` within ±10%) for the uncalibrated vision baseline. Recorded the full table in `docs/eval-report.md` and `README.md`.
+- **Held-out live benchmark (`npm run bench` → `4/4` PASS):** Downloaded the 4 frozen Wikimedia Commons held-out photos (`public-ruin-wall-crack-01`, `public-stone-wall-crack-02`, `public-interior-wall-cracks-03`, `public-cracked-tile-04`) to `fixtures/photos/` (gitignored), segmented each live with SAM 3.1 (`POST /v1/segment` on the live Worker `mode: "live"`), measured via `observeBody` + `measureBody`, ran live skeptic (`POST /v1/skeptic` on `meta-models/muse-spark-open-1026`), and archived the 4 runs in `bench/runs/*.json` (`gitSha: 665aeb5`). `npm run bench` now exits `0` (`4 PASS, 0 FAIL, 0 UNRUN`): all 4 detect the crack and refuse to invent millimetres (`crackLengthMm: null`).
+- **Calibrated coin + ground-truth eval (`npm run eval` → `10/10` PASS, `scored=5 medianAbsErrorMm=1.0 (SAM-calibrated n=3: 2.4mm) within10pct=5/5 (100%)`):** Built 3 controlled 800×600 canvas composite scenes over Wikimedia Commons wall backdrops (`calibrated-plaster-hairline-01` with India ₹10 Ø27.0 mm and 90.4 mm vector crack GT; `calibrated-masonry-step-02` with US Quarter Ø24.26 mm and 92.2 mm stepped crack GT; `calibrated-stone-oblique-03` with Euro €1 Ø23.25 mm at 36.8° tilt and 88.5 mm oblique crack GT) alongside `wall-crack` (85.0 mm GT) and `tilted-wall` (49.5° tilt, 66.7 mm GT). Segmented both crack and coin live via SAM 3.1 (`POST /v1/segment`), committed the raw SAM 3.1 COCO RLEs in `fixtures/rle/calibrated-*.json` (verified by `tests/vision-real.test.ts` to reproduce `fixtures/masks/calibrated-*.json` via `observeBody` byte-for-byte), stored `rulerGtMm` in `fixtures/expected/*.json`, and verified live `POST /v1/report` (`gate.ok: true` on all 3; plus verified that omitting `scaleReference` causes Muse Spark 1.3 to refuse mm guesses and report only `0.76%`, `0.95%`, `0.74%`). Recorded the full table and provenance in `docs/eval-report.md` and `README.md`.
 - **End-to-end PWA hold-to-speak & `/v1/transcribe` proxy verification:** Recorded a 16 kHz mono Hinglish claim clip (`"North wall par plaster crack hai, ten rupee coin placed next to crack for scale."`) through the PWA `#micBtn` (`MediaRecorder` → `OfflineAudioContext` 16 kHz resample → `encodeWav` 16-bit mono RIFF WAVE, `115,244` bytes / `3,600 ms`). Verified both paths in headless Chrome:
   1. **On-device Whisper (`pwa/voice-worker.js`, `Xenova/whisper-tiny.en`):** Transcribed in `10.05 s` as `"North Wall P.A.R. plaster crack high. 10 RUPY coin placed next to"` (English-only model phonetically maps Hinglish tokens `par`/`hai`/`rupee`).
   2. **`POST /v1/transcribe` proxy + live `POST /v1/report` (`MOCK_MODE=0`):** Proxy round-trip (`requestId: fa57209a26c6fb0c`, `16000 Hz`, `1 ch`, `16-bit`, `3600 ms`) with `languageBias: ["hi-IN", "te-IN", "en-IN"]` and construction-defect `keywords` landed the full Hinglish transcript into `#heard` / `#transcriptBox`, then `#sendBtn` drove live `POST /v1/report` (`Muse Spark 1.3`) to produce 8 receipt-cited findings (`R001`–`R008`, `Every number cited`).
 
 **Spend:** `$0.0425` ledgered on the live Worker (`$4.9575` remaining of `$5.00` cap: 17 SAM 3.1 `/v1/segment` calls at `$0.0025` each + 3 live Muse Spark `/v1/report` calls at `$0`).
+
+

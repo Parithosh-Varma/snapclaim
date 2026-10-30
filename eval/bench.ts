@@ -3,6 +3,9 @@
  *
  * Loads every `fixtures/masks/*.json`, runs `measureSession`, and compares
  * against `fixtures/expected/<same-name>.json` when present.
+ * When an expected case carries `rulerGtMm`, also scores measured accuracy
+ * against the known ground-truth length (per-case error, median absolute error,
+ * and share within ±10%).
  *
  * Constantine's plug-in point: drop a new masks file plus its expected file
  * (same shape as `fixtures/expected/wall-crack.json`) and run `npm run eval`.
@@ -19,6 +22,7 @@ interface ExpectedCase {
   maskId: string;
   percent: number;
   crackLengthMm: number | null;
+  rulerGtMm?: number;
   severity: string;
 }
 
@@ -34,11 +38,20 @@ function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, "utf8"));
 }
 
+function median(values: number[]): number {
+  const s = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 === 1 ? s[mid]! : (s[mid - 1]! + s[mid]!) / 2;
+}
+
 function main(): void {
   const files = readdirSync(MASKS_DIR).filter((f) => f.endsWith(".json")).sort();
   let pass = 0;
   let skip = 0;
   let fail = 0;
+  const gtErrorsAll: number[] = [];
+  const gtErrorsSam: number[] = [];
+  let gtWithin10 = 0;
 
   for (const file of files) {
     const stem = basename(file, ".json");
@@ -80,20 +93,45 @@ function main(): void {
           : Math.abs(got.crackLengthMm - want.crackLengthMm);
       const okSeverity = got.severity === want.severity;
       const ok = dPercent <= expected.tolerance.percent && dLen <= expected.tolerance.crackLengthMm && okSeverity;
+
+      let gtSuffix = "";
+      if (typeof want.rulerGtMm === "number" && got.crackLengthMm !== null) {
+        const diff = got.crackLengthMm - want.rulerGtMm;
+        const absErr = Math.abs(diff);
+        const relPct = (diff / want.rulerGtMm) * 100;
+        const within = absErr <= 0.1 * want.rulerGtMm;
+        gtErrorsAll.push(Number(absErr.toFixed(2)));
+        if (stem.startsWith("calibrated-")) {
+          gtErrorsSam.push(Number(absErr.toFixed(2)));
+        }
+        if (within) gtWithin10 += 1;
+        const sign = diff >= 0 ? "+" : "";
+        gtSuffix = ` [gt=${want.rulerGtMm}mm err=${sign}${diff.toFixed(1)}mm (${sign}${relPct.toFixed(1)}%)]`;
+      }
+
       if (ok) {
         pass += 1;
-        console.log(`PASS ${stem}/${want.maskId}: ${got.percent}% len=${got.crackLengthMm} ${got.severity}`);
+        console.log(`PASS ${stem}/${want.maskId}: ${got.percent}% len=${got.crackLengthMm} ${got.severity}${gtSuffix}`);
       } else {
         fail += 1;
         console.log(
           `FAIL ${stem}/${want.maskId}: got ${got.percent}% len=${got.crackLengthMm} ${got.severity} ` +
-            `want ${want.percent}% len=${want.crackLengthMm} ${want.severity}`,
+            `want ${want.percent}% len=${want.crackLengthMm} ${want.severity}${gtSuffix}`,
         );
       }
     }
   }
 
   console.log(`\neval: ${pass} pass, ${skip} skip, ${fail} fail`);
+  if (gtErrorsAll.length > 0) {
+    const medAll = median(gtErrorsAll).toFixed(1);
+    const medSam = gtErrorsSam.length > 0 ? median(gtErrorsSam).toFixed(1) : "n/a";
+    const pct10 = ((gtWithin10 / gtErrorsAll.length) * 100).toFixed(0);
+    console.log(
+      `ground-truth accuracy: scored=${gtErrorsAll.length} medianAbsErrorMm=${medAll} ` +
+        `(SAM-calibrated n=${gtErrorsSam.length}: ${medSam}mm) within10pct=${gtWithin10}/${gtErrorsAll.length} (${pct10}%)`,
+    );
+  }
   if (fail > 0) process.exit(1);
 }
 

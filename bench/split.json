@@ -7,13 +7,66 @@
       "id": "fixture-wall-crack-01",
       "source": "fixtures/masks/wall-crack.json",
       "surface": "wall",
-      "hasScaleReference": true
+      "hasScaleReference": true,
+      "groundTruth": {
+        "maskId": "crack-1",
+        "crackLengthMm": 85.0
+      }
+    },
+    {
+      "id": "fixture-tilted-wall-01",
+      "source": "fixtures/masks/tilted-wall.json",
+      "surface": "wall",
+      "hasScaleReference": true,
+      "groundTruth": {
+        "maskId": "crack-1",
+        "crackLengthMm": 66.7
+      }
     },
     {
       "id": "photo-facade-crack-01",
       "source": "fixtures/masks/facade-crack.json",
       "surface": "brick facade",
       "hasScaleReference": false
+    },
+    {
+      "id": "calibrated-plaster-hairline-01",
+      "source": "fixtures/masks/calibrated-plaster-hairline-01.json",
+      "rleSource": "fixtures/rle/calibrated-plaster-hairline-01.json",
+      "backdropSource": "https://commons.wikimedia.org/wiki/File:Cracked_Cream_Walls_(Unsplash).jpg",
+      "surface": "wall",
+      "hasScaleReference": true,
+      "groundTruth": {
+        "maskId": "crack-1",
+        "crackLengthMm": 90.4
+      },
+      "note": "800x600 canvas composite over CC0 plaster backdrop with 90.4 mm vector crack and India 10 INR coin (27.0 mm) at 4.00 px/mm; segmented live via SAM 3.1 (POST /v1/segment)."
+    },
+    {
+      "id": "calibrated-masonry-step-02",
+      "source": "fixtures/masks/calibrated-masonry-step-02.json",
+      "rleSource": "fixtures/rle/calibrated-masonry-step-02.json",
+      "backdropSource": "https://commons.wikimedia.org/wiki/File:Crack_in_the_wall_(44892).jpg",
+      "surface": "wall",
+      "hasScaleReference": true,
+      "groundTruth": {
+        "maskId": "crack-1",
+        "crackLengthMm": 92.2
+      },
+      "note": "800x600 canvas composite over CC BY-SA 4.0 stone backdrop with 92.2 mm stepped vector crack and US Quarter (24.26 mm) at 4.00 px/mm; segmented live via SAM 3.1 (POST /v1/segment)."
+    },
+    {
+      "id": "calibrated-stone-oblique-03",
+      "source": "fixtures/masks/calibrated-stone-oblique-03.json",
+      "rleSource": "fixtures/rle/calibrated-stone-oblique-03.json",
+      "backdropSource": "https://commons.wikimedia.org/wiki/File:Crack_in_the_wall,_Larkbeare_Road,_Exeter_-_geograph.org.uk_-_5058687.jpg",
+      "surface": "wall",
+      "hasScaleReference": true,
+      "groundTruth": {
+        "maskId": "crack-1",
+        "crackLengthMm": 88.5
+      },
+      "note": "800x600 canvas composite over CC BY-SA 2.0 garden-wall backdrop with 88.5 mm oblique vector crack and Euro 1 EUR coin (23.25 mm at 0.80 aspect / 36.8 deg tilt); segmented live via SAM 3.1 (POST /v1/segment)."
     }
   ],
   "heldOut": [

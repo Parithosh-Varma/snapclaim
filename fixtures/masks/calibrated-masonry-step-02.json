@@ -1,6 +1,6 @@
 {
   "imageId": "calibrated-masonry-step-02",
-  "note": "Calibrated real-photo eval: stepped masonry crack (ruler 92.2 mm) + US Quarter (24.26 mm) segmented live by SAM 3.1.",
+  "note": "800x600 canvas composite over Wikimedia Commons Crack_in_the_wall_(44892).jpg (CC BY-SA 4.0) with a drawn 92.2 mm stepped crack path and US Quarter (24.26 mm) at 4.00 px/mm, segmented live via POST /v1/segment (SAM 3.1; raw RLEs in fixtures/rle/calibrated-masonry-step-02.json). component.areaPx=480000 is observeBody's full-frame 800x600 default; masks[0] and scaleReference (lengthPx=100.4, confidence=0.972) are computed deterministically by observeBody from fixtures/rle/calibrated-masonry-step-02.json.",
   "component": {
     "id": "photo",
     "areaPx": 480000,
