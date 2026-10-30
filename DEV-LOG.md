@@ -261,6 +261,7 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 - Skeptic/cross-check never send empty requests: missing measurement is a UI guard, not a 422. `/v1/skeptic` re-measures server-side from the same measure inputs (no overlay spray), rejects findings that do not match recomputation, one automatic retry on gate failure only. 4xx states named (Skeptic/Cross-check unavailable) with status logged, still continuable.
 - Coin correction: manual tap wins over the gate, taped-coin lenient outline, dark/auto theme contrast fixes, offline honesty (saved cases + capture work offline, measuring needs connection, on-device models need one online load). Covered by `tests/pwa-offline-copy.test.ts`.
 - `src/vision/coin-detect.js` moved out of the shipped PWA folder (algorithm harness only); SW cache bumps v9/v6 with stale-deploy fingerprint on Worker 404. Covered by `tests/sw-version.test.ts`.
+- Removed dead 501 stub in `visionProvider` (live `/v1/segment` runs through `segmentBody` + `segmentWithSam`, verified 2026-10-29); the unreachable branch now says so.
 - 214 tests green, `tsc` clean, eval 7 pass, `bench` UNRUN ×4 (strict exit 1, honest). Smoke green on alternate port (local :8787 is macOS msgsrvr).
 
 **Spend:** $0.00.

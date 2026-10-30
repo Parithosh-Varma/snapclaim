@@ -34,12 +34,9 @@ export function visionProvider(env: Env, config: AppConfig, fixture?: VisionResu
     return new MockVisionProvider(fixture);
   }
   requireLiveKeys(env, config);
-  return {
-    // SAM 3.1 request shape is not yet verified against the live API. Fail loudly, never fake a mask.
-    async segment(_request: VisionRequest): Promise<VisionResult> {
-      throw new HttpError(501, "live SAM 3.1 segment not wired yet: request shape unverified");
-    },
-  };
+  // Unreachable: live /v1/segment is handled directly by segmentBody
+  // (SAM 3.1 point prompts via segmentWithSam). This provider is mock-only.
+  throw new HttpError(500, "unreachable: live segment is handled by segmentBody");
 }
 
 export function findingsProvider(
