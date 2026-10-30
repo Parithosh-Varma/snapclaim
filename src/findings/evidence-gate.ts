@@ -55,6 +55,13 @@ function maskIdsOf(cited: Receipt[]): string[] {
   return [...new Set(ids)];
 }
 
+export function normalizeReceiptId(id: string): string {
+  const trimmed = id.trim();
+  const match = /^[rR]0*(\d+)$/.exec(trimmed);
+  if (match) return `R${match[1]!.padStart(3, "0")}`;
+  return trimmed;
+}
+
 function unitFailures(statement: string, cited: Receipt[]): string[] {
   const failures: string[] = [];
   const units = new Set(cited.map((receipt) => receipt.output.unit));
@@ -64,6 +71,9 @@ function unitFailures(statement: string, cited: Receipt[]): string[] {
   }
   if (/mm\b/i.test(statement) && !units.has("mm")) {
     failures.push(`statement cites millimetres without a cited calibrated-length receipt: "${statement}"`);
+  }
+  if (/\bcm(?:2|²)(?![a-z0-9])/i.test(statement) && !units.has("cm2")) {
+    failures.push(`statement cites square centimetres without a cited calibrated-area receipt: "${statement}"`);
   }
   if (/(?<![a-z])m2\b|m²\b/i.test(statement)) {
     failures.push(`statement uses square metres, which this engine never emits (use mm or cm²): "${statement}"`);
@@ -92,7 +102,7 @@ function validateFinding(
 
   const cited: Receipt[] = [];
   for (const id of draft.citations) {
-    const receipt = receipts.get(id);
+    const receipt = receipts.get(id) ?? receipts.get(normalizeReceiptId(id));
     if (receipt === undefined) {
       failures.push(`${label}: cites unknown receipt "${id}"`);
     } else {
@@ -115,6 +125,10 @@ function validateFinding(
     .filter((receipt) => receipt.output.unit === "mm")
     .map((receipt) => receipt.output.value)
     .filter((value): value is number => typeof value === "number");
+  const cm2Outputs = cited
+    .filter((receipt) => receipt.output.unit === "cm2")
+    .map((receipt) => receipt.output.value)
+    .filter((value): value is number => typeof value === "number");
 
   const tokens = numbersIn(draft.statement);
   // Every finding must cite at least one measured number. Qualitative-only
@@ -134,7 +148,8 @@ function validateFinding(
   }
 
   // Per-unit backing: a % number must match a cited percent receipt,
-  // an mm number must match a cited calibrated-length receipt.
+  // an mm number must match a cited calibrated-length receipt,
+  // and a cm2/cm² number must match a cited calibrated-area receipt.
   if (/(?:\d\s*)%|percent\b/i.test(draft.statement) && tokens.length > 0 && percentOutputs.length > 0) {
     const backedByPercent = tokens.some((token) => percentOutputs.some((value) => matchesReceipt(token, value)));
     if (!backedByPercent) {
@@ -145,6 +160,12 @@ function validateFinding(
     const backedByMm = tokens.some((token) => mmOutputs.some((value) => matchesReceipt(token, value)));
     if (!backedByMm) {
       failures.push(`${label}: millimetre value does not match any cited calibrated-length receipt`);
+    }
+  }
+  if (/\bcm(?:2|²)(?![a-z0-9])/i.test(draft.statement) && tokens.length > 0 && cm2Outputs.length > 0) {
+    const backedByCm2 = tokens.some((token) => cm2Outputs.some((value) => matchesReceipt(token, value)));
+    if (!backedByCm2) {
+      failures.push(`${label}: square-centimetre value does not match any cited calibrated-area receipt`);
     }
   }
 
@@ -176,7 +197,11 @@ function validateFinding(
 }
 
 export function validateFindings(drafts: FindingDraft[], receipts: Receipt[]): GateResult {
-  const byId = new Map(receipts.map((receipt) => [receipt.id, receipt]));
+  const byId = new Map<string, Receipt>();
+  for (const receipt of receipts) {
+    byId.set(receipt.id, receipt);
+    byId.set(normalizeReceiptId(receipt.id), receipt);
+  }
   const failures = drafts.flatMap((draft, index) => validateFinding(draft, byId, index));
   return { ok: failures.length === 0, failures };
 }
