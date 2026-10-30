@@ -37,6 +37,7 @@ test("PWA shell is installable and honest", () => {
     assert.ok(html.includes(`id="${id}"`), `report/check element ${id} exists`);
   }
   assert.ok(html.includes('id="xcheckBtn"') || html.includes("Cross-check"), "cross-check exists");
+  assert.ok(html.includes('id="photoUpload"'), "photo upload fallback exists");
   assert.ok(html.includes('id="coinKind"'), "coin options exist");
   assert.ok(html.includes("India"), "Indian coin options exist");
 });
