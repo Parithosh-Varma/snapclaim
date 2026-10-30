@@ -761,8 +761,12 @@ export async function handleRequest(input: {
     }
     return { status: 404, body: errorBody("not found", 404, requestId, { method: input.method, path: input.path }) };
   } catch (error) {
-    const status = error instanceof HttpError ? error.status : 400;
+    // Outbound model calls use AbortSignal.timeout: an AbortError/TimeoutError
+    // is the upstream hanging, not a bad client request — 502, not 400.
     const message = error instanceof Error ? error.message : "invalid request";
+    const isUpstreamTimeout = error instanceof Error &&
+      (error.name === "TimeoutError" || error.name === "AbortError" || /aborted due to timeout/i.test(message));
+    const status = error instanceof HttpError ? error.status : isUpstreamTimeout ? 502 : 400;
     const details = (error as { details?: unknown })?.details;
     // EvidenceError from the gate carries its failures in the message; surface them structured too.
     const failures = (error as { failures?: unknown })?.failures;
