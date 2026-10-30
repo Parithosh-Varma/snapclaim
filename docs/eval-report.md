@@ -64,4 +64,6 @@ Scored by `scoreDisputes` in `bench/score.ts`, with DISPUTED as the positive cla
 
 The four held-out photos above are the only external data so far. Photo files stay local; source URLs are in `bench/split.json`.
 
+Seven team photos (Parithosh, DSLR, 2026-10-29, a 2 INR coin in the crack's plane) joined the held-out set on 2026-10-30 as `team-coin-*`: two with no crack, three full-frame cracks, two cracks that leave the frame. They are team-internal and not redistributed. None has a measured crack length yet, so they test detection and refusal behaviour; accuracy on them stays UNSCORED until the wall is measured.
+
 Every public dataset used here gets its name, license and exact split listed.
