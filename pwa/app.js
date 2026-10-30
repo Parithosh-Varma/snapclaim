@@ -1109,7 +1109,19 @@ async function runSkeptic(auto) {
 }
 async function runXcheck(auto) {
   if (checkState.xcheck === "loading") return;
-  if (!dmg.mask || !photo) { if (!auto) $("xStatus").textContent = "Mark the damage first."; return; }
+  if (!dmg.mask || !photo) {
+    if (payloadObj) {
+      const chip = $("xState");
+      chip.dataset.verdict = "AGREED";
+      chip.className = "chip ok";
+      chip.textContent = "Fixture";
+      $("xStatus").textContent = "Sample uses pre-computed masks (no live tap cross-check needed).";
+      setCheck("xcheck", "ok");
+    } else if (!auto) {
+      $("xStatus").textContent = "Mark the damage first.";
+    }
+    return;
+  }
   checkState.xcheck = "loading";
   delete $("xState").dataset.verdict;
   renderCheckCard(); updateReportGate();
@@ -1370,6 +1382,8 @@ async function loadSample() {
     const measured = await mres.json();
     if (!mres.ok || !measured.ok) throw new Error(measured.error ?? mres.status);
     resetClaim();
+    stillDataUrl = "./assets/sample-wall.jpg";
+    coinLabel = "India ₹10 · Ø27 mm";
     payloadObj = sample;
     lastMeasurement = measured.result;
     showMeasured(measured.result);
