@@ -6,7 +6,7 @@ import { BackButton, Badge, Stepper, downloadFile } from "../lib/ui";
 
 export default function Report() {
   const ctx = useApp();
-  const { session: s, go, base, setBase, store, toast, bumpCases } = ctx;
+  const { session: s, go, base, store, toast, bumpCases } = ctx;
   const [rendering, setRendering] = useState(false);
   const [renderError, setRenderError] = useState<string | null>(null);
   const [state, setState] = useState("");
@@ -265,16 +265,9 @@ export default function Report() {
         <details className="dev">
           <summary>Developer — backend, payload &amp; raw output</summary>
           <div style={{ marginTop: 12 }}>
-            <label className="field">
-              Backend URL
-              <input
-                id="baseUrl"
-                type="text"
-                value={base}
-                onChange={(e) => setBase(e.target.value)}
-                style={{ minHeight: 46, border: "1px solid #e2ddd0", borderRadius: 12, width: "100%", font: "inherit", padding: "0 10px" }}
-              />
-            </label>
+            <p className="fineprint" style={{ margin: "0 0 10px" }}>
+              Backend: <span id="baseUrl">{base}</span> <span style={{ fontWeight: 400 }}>(change it in Settings → Connection → Advanced)</span>
+            </p>
             <button
               id="healthBtn"
               className="btn-ghostline"
@@ -283,8 +276,9 @@ export default function Report() {
                 try {
                   const { j } = await apiGet(base, "/v1/health");
                   setHealthOut(`ok v${String(j.version)} mode:${String(j.mode)}`);
-                } catch {
-                  setHealthOut("unreachable");
+                } catch (e) {
+                  const msg = e instanceof Error ? e.message : String(e);
+                  setHealthOut(msg.includes("security policy") ? msg : "unreachable");
                 }
               }}
             >

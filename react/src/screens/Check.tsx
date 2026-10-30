@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp, type CheckPhase } from "../App";
-import { apiPost } from "../lib/api";
+import { apiPost, backendError } from "../lib/api";
 import { encodeRle } from "../lib/rle";
 import { segmentViaApi, type SamClient } from "../lib/sam";
 import type { SamMask, Session } from "../lib/session";
@@ -28,33 +28,45 @@ export default function Check() {
   const { session: s, go, base, sam, embeddings, checks, setChecks } = ctx;
   const [skStatus, setSkStatus] = useState("");
   const [skRows, setSkRows] = useState<{ disputed: boolean; statement: string; citations: string }[] | null>(null);
-  const [skError, setSkError] = useState<string | null>(null);
+  const [skError, setSkError] = useState<{ title: string; message: string; details: string[] } | null>(null);
   const [xBadge, setXBadge] = useState<{ verdict: string; iou: unknown } | null>(null);
-  const [xError, setXError] = useState<string | null>(null);
+  const [xError, setXError] = useState<{ title: string; message: string; details: string[] } | null>(null);
   const [xNote, setXNote] = useState("");
   const checksRef = useRef(checks);
   checksRef.current = checks;
   const setPhase = (which: "skeptic" | "xcheck", phase: CheckPhase) =>
     setChecks({ ...checksRef.current, [which]: phase });
 
-  const runSkeptic = useCallback(async (auto: boolean) => {
-    if (checksRef.current.skeptic === "loading") return;
-    if (!s.measurement) {
-      if (!auto) setSkStatus("The findings load from the Numbers step — measure first.");
+  const runSkeptic = useCallback(async (auto: boolean, retried = false) => {
+    if (checksRef.current.skeptic === "loading" && !retried) return;
+    // Never send an empty request: without a measurement there is nothing to check.
+    if (!s.payload || !s.measurement) {
+      if (!auto) setSkStatus("Run the measurement first");
       return;
     }
     setPhase("skeptic", "loading");
     setSkError(null);
-    setSkRows(null);
-    setSkStatus("Asking the skeptic model…");
+    if (!retried) {
+      setSkRows(null);
+      setSkStatus("Asking the skeptic model…");
+    } else {
+      setSkStatus("First draft failed the gate — retrying once…");
+    }
     try {
+      // /v1/skeptic re-measures server-side: it needs the same measure inputs
+      // /v1/report used, not just findings/receipts. No overlay (SVG paths are large).
+      const p = (s.payload ?? {}) as Record<string, unknown>;
       const { res, j } = await apiPost(base, "/v1/skeptic", {
-        ...(s.payload ?? {}),
+        component: p.component,
+        masks: p.masks,
+        ...(p.scaleReference !== undefined ? { scaleReference: p.scaleReference } : {}),
+        ...(p.thresholds !== undefined ? { thresholds: p.thresholds } : {}),
+        ...(p.minReferenceConfidence !== undefined ? { minReferenceConfidence: p.minReferenceConfidence } : {}),
         transcript: s.transcript,
         findings: s.measurement.findings,
         receipts: s.measurement.receipts,
       });
-      if (!res.ok || !j.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
+      if (!res.ok || !j.ok) throw backendError(res, j, "skeptic failed");
       const rows = ((j.result as { findings?: { statement?: string; citations?: string[] }[] } | undefined)?.findings ?? []).map((f) => ({
         disputed: /disputed/i.test(f.statement || ""),
         statement: f.statement ?? "",
@@ -64,7 +76,19 @@ export default function Check() {
       setSkStatus(`skeptic ok ${j.requestId ?? ""}`.trim());
       setPhase("skeptic", "ok");
     } catch (e) {
-      setSkError(e instanceof Error ? e.message : String(e));
+      // The model is nondeterministic: one automatic retry on gate failure only.
+      if (!retried && /Evidence gate failed/.test(e instanceof Error ? e.message : String(e))) {
+        return runSkeptic(auto, true);
+      }
+      const err = e as { message?: string; status?: unknown; details?: string[] };
+      const status = typeof err.status === "number" ? err.status : NaN;
+      console.error(`[skeptic] HTTP ${Number.isNaN(status) ? "?" : status}: ${err.message ?? e}`, err.details ?? "");
+      const unavailable = !Number.isNaN(status) && status >= 400 && status < 500;
+      setSkError({
+        title: unavailable ? `Skeptic unavailable (HTTP ${status})` : "Skeptic check failed.",
+        message: err.message ?? String(e),
+        details: err.details ?? [],
+      });
       setSkStatus("");
       setPhase("skeptic", "error");
     }
@@ -84,7 +108,9 @@ export default function Check() {
       // Cross-check against the model that did NOT draw the mask.
       let other;
       if (s.dmg.source === "api") {
-        if (!embeddings.current) throw new Error("On-device model still loading — retry in a moment.");
+        if (!embeddings.current) throw new Error(navigator.onLine === false
+          ? "On-device outlining model not available offline yet — reconnect once to download it, then it works offline."
+          : "On-device model still loading — retry in a moment.");
         const dev = await segmentOnDevice(sam, s);
         if (!dev) throw new Error("The on-device model found nothing at those taps.");
         other = encodeRle(dev.mask, s.photo.width, s.photo.height);
@@ -96,12 +122,28 @@ export default function Check() {
         b: other,
         threshold: 0.5,
       });
-      if (!res.ok || !j.ok) throw new Error(j.error ?? "cross-check failed");
+      if (!res.ok || !j.ok) throw backendError(res, j, "cross-check failed");
       const result = j.result as unknown as { verdict: string; iou: unknown };
       setXBadge({ verdict: result.verdict, iou: result.iou });
       setPhase("xcheck", "ok");
     } catch (e) {
-      setXError(e instanceof Error ? e.message : String(e));
+      const err = e as { message?: string; status?: unknown; details?: string[] };
+      const msg = err.message ?? String(e);
+      const status = typeof err.status === "number" ? err.status : NaN;
+      console.error(`[xcheck] HTTP ${Number.isNaN(status) ? "?" : status}: ${msg}`, err.details ?? "");
+      // /v1/segment is unavailable in mock mode, so a mask drawn by the API
+      // path has nothing to cross-check against — say so, not "failed".
+      const noSam = /mock segment|not wired|HTTP 501/.test(msg);
+      const unavailable = !Number.isNaN(status) && status >= 400 && status < 500;
+      setXError({
+        title: noSam
+          ? "Cross-check unavailable — SAM 3.1 is unavailable in mock mode"
+          : unavailable
+            ? `Cross-check unavailable (HTTP ${status})`
+            : "Cross-check failed.",
+        message: msg,
+        details: err.details ?? [],
+      });
       setPhase("xcheck", "error");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -147,8 +189,15 @@ export default function Check() {
             {checks.skeptic === "loading" && <div className="skel" role="status" aria-label="Skeptic is checking" />}
             {skError && (
               <div className="statecard err" role="alert">
-                <b>Skeptic check failed.</b>
-                <p style={{ margin: "8px 0 12px", color: "#5b6b8c" }}>{skError}</p>
+                <b>{skError.title}</b>
+                <p style={{ margin: "8px 0 12px", color: "#5b6b8c" }}>{skError.message}</p>
+                {skError.details.length > 0 && (
+                  <ul>
+                    {skError.details.map((d, i) => (
+                      <li key={i}><small>{d}</small></li>
+                    ))}
+                  </ul>
+                )}
                 <button className="btn-dark" type="button" style={{ width: "100%" }} onClick={() => void runSkeptic(false)}>
                   Retry skeptic
                 </button>
@@ -192,8 +241,15 @@ export default function Check() {
             )}
             {xError && (
               <span className="statecard err" role="alert" style={{ display: "block" }}>
-                <b>Cross-check failed.</b>
-                <p style={{ margin: "8px 0 12px", color: "#5b6b8c" }}>{xError}</p>
+                <b>{xError.title}</b>
+                <p style={{ margin: "8px 0 12px", color: "#5b6b8c" }}>{xError.message}</p>
+                {xError.details.length > 0 && (
+                  <ul>
+                    {xError.details.map((d, i) => (
+                      <li key={i}><small>{d}</small></li>
+                    ))}
+                  </ul>
+                )}
                 <button className="btn-ghostline" type="button" style={{ width: "100%" }} onClick={() => void runXcheck(false)}>
                   Retry cross-check
                 </button>

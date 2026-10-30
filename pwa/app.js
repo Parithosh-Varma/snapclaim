@@ -8,9 +8,18 @@ const $ = (id) => document.getElementById(id);
 mountTiltMeter($("tiltMeter")); // live level over the camera; hidden without orientation sensors
 let payloadObj = null;
 let lastMeasurement = null;
-/** Backend URL allowlist: https: anywhere, or http: loopback for local dev.
- * Anything else (http LAN, data:, javascript:) is rejected so a pasted
- * "debug URL" cannot exfiltrate photos/voice to an attacker. */
+/** Backend URL allowlist, mirrored by the <meta> CSP connect-src in index.html.
+ * Only the default Worker host (https) and loopback http for local dev are
+ * allowed. Anything else is rejected so a pasted "debug URL" cannot exfiltrate
+ * photos/voice to an attacker — and so validation never passes a URL the CSP
+ * would then block. To self-host: add the host to connect-src in
+ * pwa/index.html (and react/index.html) AND to DEFAULT_BACKEND_HOST below.
+ * See README "Self-hosted backend". */
+export const DEFAULT_BACKEND_HOST = "snapclaim-backend.parithosh.workers.dev";
+export const POLICY_BACKEND_MESSAGE =
+  "This backend isn't allowed by the app's security policy — use https://" +
+  DEFAULT_BACKEND_HOST +
+  " or http://localhost:8787 for local dev.";
 export function isAllowedBackendUrl(raw) {
   if (typeof raw !== "string") return false;
   const v = raw.trim().replace(/\/$/, "");
@@ -22,19 +31,55 @@ export function isAllowedBackendUrl(raw) {
     return false;
   }
   if (url.username !== "" || url.password !== "") return false;
-  if (url.protocol === "https:") return true;
+  if (url.protocol === "https:") {
+    return url.hostname.toLowerCase() === DEFAULT_BACKEND_HOST;
+  }
   if (url.protocol === "http:") {
     const h = url.hostname.toLowerCase();
     return h === "localhost" || h === "127.0.0.1" || h === "[::1]" || h === "::1" || h.endsWith(".localhost");
   }
   return false;
 }
+/* Single source of truth for the backend URL: one variable persisted to
+ * localStorage, read by base(). The Settings tab holds the ONE editable
+ * input (#baseUrl2); the Report developer panel only shows the value and its
+ * own Check button. (Two inputs kept in sync by JS used to drift, and base()
+ * used to read the hidden one.) */
+const BACKEND_KEY = "snapclaim.backendUrl";
+const DEFAULT_BACKEND_URL = `https://${DEFAULT_BACKEND_HOST}`;
+let backendUrl = (() => {
+  try {
+    const saved = localStorage.getItem(BACKEND_KEY);
+    if (saved && isAllowedBackendUrl(saved)) return saved.trim().replace(/\/$/, "");
+  } catch { /* storage may be unavailable */ }
+  return DEFAULT_BACKEND_URL;
+})();
+function setBackendUrl(raw) {
+  const v = String(raw ?? "").trim().replace(/\/$/, "");
+  if (!isAllowedBackendUrl(v)) throw new Error(POLICY_BACKEND_MESSAGE);
+  backendUrl = v;
+  try { localStorage.setItem(BACKEND_KEY, v); } catch { /* ignore */ }
+  syncBackendInputs();
+  return v;
+}
+function syncBackendInputs() {
+  const settings = $("baseUrl2");
+  if (settings && settings.value !== backendUrl) settings.value = backendUrl;
+  const show = $("baseUrlShow");
+  if (show) show.textContent = backendUrl;
+}
 function base() {
-  const raw = $("baseUrl").value.trim().replace(/\/$/, "");
-  if (!isAllowedBackendUrl(raw)) throw new Error("Backend URL must be https:// or http://localhost");
-  return raw;
+  if (!isAllowedBackendUrl(backendUrl)) throw new Error(POLICY_BACKEND_MESSAGE);
+  return backendUrl;
 }
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
+/* Offline honesty: the service worker never caches cross-origin responses, so
+ * the jsDelivr/Hugging Face bytes behind sam-worker.js and voice-worker.js
+ * need one online load. Name that state instead of a raw import error. */
+function isOfflineNow() { return typeof navigator !== "undefined" && navigator.onLine === false; }
+function offlineModelMessage(kind) {
+  return `On-device ${kind} model not available offline yet — reconnect once to download it, then it works offline.`;
+}
 /** Severity comes from the backend: allowlist it so it can never break out of
  * the class attribute in metricCards (esc alone was not enough for attrs). */
 function escSeverity(s) {
@@ -65,8 +110,15 @@ function backToCam() {
 
 /* ---------- backend ---------- */
 $("healthBtn").onclick = async () => {
+  let b;
   try {
-    const r = await fetch(base() + "/v1/health");
+    b = base();
+  } catch (e) {
+    $("healthOut").textContent = e instanceof Error ? e.message : String(e);
+    return;
+  }
+  try {
+    const r = await fetch(b + "/v1/health");
     const j = await r.json();
     $("healthOut").textContent = `ok v${j.version} mode:${j.mode}`;
   } catch {
@@ -513,10 +565,10 @@ function sam() {
       $("tfState").textContent = "";
       console.info(`[sam] embedded on ${data.device} in ${data.embedMs} ms`);
     } else if (data.type === "error") {
-      $("status").textContent = `Outlining unavailable (${data.message}). Check the connection and retry.`;
+      $("status").textContent = isOfflineNow() ? offlineModelMessage("outlining") : `Outlining unavailable (${data.message}). Check the connection and retry.`;
     }
   };
-  samWorker.onerror = (e) => { $("status").textContent = `Outlining failed to start (${e.message ?? "worker error"}).`; };
+  samWorker.onerror = (e) => { $("status").textContent = isOfflineNow() ? offlineModelMessage("outlining") : `Outlining failed to start (${e.message ?? "worker error"}). Check the connection and retry.`; };
   return samWorker;
 }
 function setupMarkPhoto() {
@@ -560,7 +612,7 @@ async function segmentViaApi(points) {
     }),
   });
   const j = await res.json().catch(() => ({}));
-  if (!res.ok || !j.ok) throw new Error(j.error ?? `segment HTTP ${res.status}`);
+  if (!res.ok || !j.ok) throw backendErr(res, j, "segment failed");
   // SAM may split one crack into several objects; all of them are the damage.
   const records = j.result?.records ?? [];
   if (!records.length) throw new Error("SAM found nothing there — tap the middle of the damage and retry.");
@@ -593,14 +645,21 @@ function drawMark() {
     }
     ctx.putImageData(img, 0, 0);
   }
-  // auto coin outline from the gate (green ring)
-  if (gateCoin) {
+  // auto coin outline from the gate (green ring) + manual correction (red)
+  const hasManualCoin = !!coinManualPt;
+  const coinSrc = hasManualCoin ? { cx: coinManualPt[0], cy: coinManualPt[1], r: (gateCoin ? (gateCoin.rr / gateCoin.fw) * (photo.width / gateCoin.sw) * (photo.width / gateCoin.sw) : 22) } : null;
+  if (gateCoin && !hasManualCoin) {
     const kx = photo.width / gateCoin.sw, ky = photo.height / gateCoin.sh;
     const cx = (gateCoin.cx / gateCoin.fw) * gateCoin.sw * kx;
     const cy = (gateCoin.cy / gateCoin.fh) * gateCoin.sh * ky;
     const r = (gateCoin.rr / gateCoin.fw) * gateCoin.sw * kx;
-    ctx.strokeStyle = "#0e8a4d"; ctx.lineWidth = 3;
+    ctx.strokeStyle = $("coinTaped")?.checked ? "#e6a700" : "#0e8a4d"; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+  }
+  if (hasManualCoin) {
+    ctx.strokeStyle = "#c81e2b"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(coinManualPt[0], coinManualPt[1], Math.max(12, photo.width * 0.03), 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = "#c81e2b"; ctx.beginPath(); ctx.arc(coinManualPt[0], coinManualPt[1], 4, 0, Math.PI * 2); ctx.fill();
   }
   ctx.fillStyle = "#c81e2b"; ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
   for (const [x, y] of dmg.points) {
@@ -610,9 +669,18 @@ function drawMark() {
 }
 $("markCanvas").addEventListener("pointerdown", async (ev) => {
   if (!photo) return;
-  const c = $("markCanvas"), r = c.getBoundingClientRect();
-  const x = Math.round((ev.clientX - r.left) * (c.width / r.width));
-  const y = Math.round((ev.clientY - r.top) * (c.height / r.height));
+  const c = $("markCanvas"), rc = c.getBoundingClientRect();
+  const x = Math.round((ev.clientX - rc.left) * (c.width / rc.width));
+  const y = Math.round((ev.clientY - rc.top) * (c.height / rc.height));
+  if (coinCorrectMode) {
+    coinManualPt = [x, y];
+    coinCorrectMode = false;
+    $("coinFixHint").textContent = "Coin corrected — will use your tap";
+    $("coinFixBtn").textContent = "Tap coin to correct";
+    $("coinFixBtn").classList.remove("on");
+    drawMark();
+    return;
+  }
   dmg.points.push([x, y]);
   $("status").textContent = "Outlining…";
   // SAM 3.1 API first; the on-device model only when the API call fails.
@@ -622,7 +690,7 @@ $("markCanvas").addEventListener("pointerdown", async (ev) => {
   } catch (e) {
     console.info("[sam] API failed, using on-device", e);
     source = "device";
-    if (!embeddings) { dmg.points.pop(); $("status").textContent = "Outlining model still loading…"; return; }
+    if (!embeddings) { dmg.points.pop(); $("status").textContent = isOfflineNow() ? offlineModelMessage("outlining") : "Outlining model still loading…"; return; }
     try { out = await segmentOnDevice(); } catch { out = null; }
   }
   if (out) {
@@ -670,12 +738,20 @@ $("measureBtn").onclick = async () => {
   drawScheme([]);
   const body = { masks: [{ id: "damage-1", label: dmgLabel, rle: encodeRle(dmg.mask, w, h), confidence: dmg.iou || 0.8 }] };
   let circleRef = null;
-  if (gateCoin) {
+  // Manual coin tap wins over the gate — taped coin or missed detection.
+  const coinCxCyR = (() => {
+    if (coinManualPt) {
+      const r = gateCoin ? Math.max(3, (gateCoin.rr / gateCoin.fw) * (w / gateCoin.sw) * (w / gateCoin.sw > 1 ? 1 : 1)) : Math.max(12, w * 0.035);
+      const estR = Math.max(10, w * 0.035);
+      return { cx: coinManualPt[0], cy: coinManualPt[1], r: gateCoin ? Math.max(3, (gateCoin.rr / gateCoin.fw) * (w / gateCoin.sw)) : estR };
+    }
+    if (!gateCoin) return null;
     const kx = w / gateCoin.sw, ky = h / gateCoin.sh;
-    const cx = (gateCoin.cx / gateCoin.fw) * gateCoin.sw * kx;
-    const cy = (gateCoin.cy / gateCoin.fh) * gateCoin.sh * ky;
-    const r = Math.max(3, (gateCoin.rr / gateCoin.fw) * gateCoin.sw * kx);
-    circleRef = { id: "coin", rle: circleRle(cx, cy, r, w, h), knownMm: Number($("coinKind").value), confidence: 0.85 };
+    return { cx: (gateCoin.cx / gateCoin.fw) * gateCoin.sw * kx, cy: (gateCoin.cy / gateCoin.fh) * gateCoin.sh * ky, r: Math.max(3, (gateCoin.rr / gateCoin.fw) * gateCoin.sw * kx) };
+  })();
+  if (coinCxCyR) {
+    const { cx, cy, r } = coinCxCyR;
+    circleRef = { id: "coin", rle: circleRle(cx, cy, r, w, h), knownMm: Number($("coinKind").value), confidence: coinManualPt ? 0.9 : 0.85 };
     // The coin's real outline, not the gate's circle: a tilted wall shows the coin as an
     // ellipse, and the backend uses that ellipse to correct the crack lengths.
     const traced = await traceCoin(cx, cy, r, w, h);
@@ -708,6 +784,15 @@ $("measureBtn").onclick = async () => {
     showNumError("Measurement failed", String(e.message ?? e), () => $("measureBtn").click());
   }
 };
+let coinManualPt = null, coinCorrectMode = false;
+$("coinTaped")?.addEventListener("change", () => { if (photo) drawMark(); });
+$("coinFixBtn")?.addEventListener("click", () => {
+  if (!photo) return;
+  coinCorrectMode = !coinCorrectMode;
+  $("coinFixHint").textContent = coinCorrectMode ? "Tap the coin center on the photo" : "";
+  $("coinFixBtn").textContent = coinCorrectMode ? "Cancel" : "Tap coin to correct";
+  $("coinFixBtn").classList.toggle("on", coinCorrectMode);
+});
 /** SAM's outline of the coin at the gate's circle, or null when it doesn't look like that coin. */
 async function traceCoin(cx, cy, r, w, h) {
   if (!embeddings) return null;
@@ -718,8 +803,17 @@ async function traceCoin(cx, cy, r, w, h) {
   for (let i = 0; i < out.mask.length; i++) if (out.mask[i]) { area++; sx += i % w; sy += (i / w) | 0; }
   // An ellipse seen at up to ~60° keeps half its area; much more means SAM took the wall.
   const circle = Math.PI * r * r;
-  if (area < circle * 0.4 || area > circle * 1.6) return null;
-  if (Math.hypot(sx / area - cx, sy / area - cy) > r * 0.5) return null;
+  const taped = !!$("coinTaped")?.checked;
+  // Tape halo inflates the mask (coin + tape strip) — allow 2.5× and a looser centroid when checked.
+  const lo = 0.4, hi = taped ? 2.5 : 1.6, drift = taped ? 0.75 : 0.5;
+  if (area < circle * lo || area > circle * hi) {
+    if (!taped) return null;
+    // Taped: try to peel tape — keep the strongest inner circular rim instead of the blob.
+    // Re-estimate radius from area and check it still looks like a disk, not a long strip.
+    const estR = Math.sqrt(area / Math.PI);
+    if (estR > r * 2.0 || estR < r * 0.5) return null;
+  }
+  if (Math.hypot(sx / area - cx, sy / area - cy) > r * drift) return null;
   return out;
 }
 
@@ -846,7 +940,7 @@ function drawNumOverlay() {
   }));
   const tag = el("text", {
     x: x + tagW / 2, y: y + tagH / 2, "text-anchor": "middle", "dominant-baseline": "central",
-    "font-family": "Archivo, system-ui, sans-serif", "font-weight": 700, "font-size": fs, fill: "#0b1e46",
+    "font-family": "Archivo, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif", "font-weight": 700, "font-size": fs, fill: "#0b1e46",
   });
   tag.textContent = text;
   svg.appendChild(tag);
@@ -1037,7 +1131,7 @@ async function finishListening(landed) {
     const text = String(j.result?.transcript ?? "").trim();
     if (!text) { heard.textContent = "Didn't catch anything — type the line."; return; }
     landTranscript(text);
-  } catch (e) { $("voiceErr").textContent = `Transcription failed — type the line. (${e.message ?? e})`; }
+  } catch (e) { $("voiceErr").textContent = isOfflineNow() ? `${offlineModelMessage("speech")} Or type the line.` : `Transcription failed — type the line. (${e.message ?? e})`; }
 }
 function landTranscript(text) {
   $("transcriptBox").value = text;
@@ -1092,9 +1186,12 @@ async function runReport() {
   show("sNum");
   runChecksAuto();
 }
-$("toCheck").onclick = () => { resetCheckState(); show("sCheck"); runChecksAuto(); };
+$("toCheck").onclick = () => {
+  // The auto checks already ran once for this report; going forward only shows them.
+  show("sCheck");
+  if (checkState.skeptic === "idle" && checkState.xcheck === "idle") runChecksAuto();
+};
 $("toReport").onclick = () => { if (canProceedToReport()) show("sReport"); };
-$("backSay").onclick = () => show("sMark");
 $("backNum").onclick = () => show("sSay");
 $("backCheck").onclick = () => show("sCheck");
 function resetCheckState() {
@@ -1102,22 +1199,15 @@ function resetCheckState() {
   renderCheckCard();
   updateReportGate();
 }
-function setCheck(which, state, html) {
+function setCheck(which, state) {
   checkState[which] = state;
   renderCheckCard();
   updateReportGate();
-  void html;
 }
 function verdictBadge(verdict) {
   if (verdict === "AGREED") return `<span class="badge ok">AGREED</span>`;
   if (verdict === "DISPUTED") return `<span class="badge fail">DISPUTED</span>`;
   return `<span class="badge wait">PENDING</span>`;
-}
-function checkStates() {
-  return [
-    { key: "skeptic", title: "Independent skeptic", el: $("skStatus"), out: $("skOut") },
-    { key: "xcheck", title: "Mask cross-check", el: $("xStatus"), out: null },
-  ];
 }
 function renderCheckCard() {
   const s = $("skStatus");
@@ -1145,25 +1235,30 @@ function canProceedToReport() {
   }
   return done;
 }
-async function runSkeptic(auto) {
-  if (checkState.skeptic === "loading") return;
-  if (!lastMeasurement) { if (!auto) $("skStatus").textContent = "run report first"; return; }
+async function runSkeptic(auto, retried = false) {
+  if (checkState.skeptic === "loading" && !retried) return;
+  // Never send an empty request: without a measurement there is nothing to check.
+  if (!payloadObj || !lastMeasurement) { if (!auto) $("skStatus").textContent = "Run the measurement first"; return; }
   checkState.skeptic = "loading";
   renderCheckCard(); updateReportGate();
-  $("skOut").innerHTML = `<div class="skel" role="status" aria-label="Skeptic is checking"></div>`;
+  if (!retried) $("skOut").innerHTML = `<div class="skel" role="status" aria-label="Skeptic is checking"></div>`;
+  else $("skStatus").textContent = "First draft failed the gate — retrying once…";
   try {
-    // /v1/skeptic re-measures server-side: it needs component + masks,
-    // not just findings/receipts (else 422 "component and masks are required").
-    // Send only the measure inputs, not the overlay (SVG paths are large).
-    const measureInputs = payloadObj
-      ? { component: payloadObj.component, masks: payloadObj.masks, ...(payloadObj.scaleReference ? { scaleReference: payloadObj.scaleReference } : {}) }
-      : {};
+    // /v1/skeptic re-measures server-side: it needs the same measure inputs
+    // /v1/report used, not just findings/receipts (else 422 "component and
+    // masks are required"). Only the measure inputs, not the overlay (SVG paths are large).
+    const measureInputs = {
+      component: payloadObj.component, masks: payloadObj.masks,
+      ...(payloadObj.scaleReference ? { scaleReference: payloadObj.scaleReference } : {}),
+      ...(payloadObj.thresholds ? { thresholds: payloadObj.thresholds } : {}),
+      ...(payloadObj.minReferenceConfidence !== undefined ? { minReferenceConfidence: payloadObj.minReferenceConfidence } : {}),
+    };
     const res = await fetch(base() + "/v1/skeptic", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ ...measureInputs, transcript: $("transcriptBox").value, findings: lastMeasurement.findings, receipts: lastMeasurement.receipts }),
     });
     const j = await res.json().catch(() => ({}));
-    if (!res.ok || !j.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
+    if (!res.ok || !j.ok) throw backendErr(res, j, "skeptic failed");
     const rows = (j.result.findings ?? []).map((f) => {
       const disputed = /disputed/i.test(f.statement || "");
       return `<li>${verdictBadge(disputed ? "DISPUTED" : "AGREED")} ${esc(f.statement ?? "")}<br/><small>cites: ${esc((f.citations ?? []).join(", "))}</small></li>`;
@@ -1172,7 +1267,15 @@ async function runSkeptic(auto) {
     $("skStatus").textContent = `skeptic ok ${j.requestId ?? ""}`.trim();
     setCheck("skeptic", "ok");
   } catch (e) {
-    $("skOut").innerHTML = `<div class="statecard err" role="alert"><b>Skeptic check failed.</b><p style="margin:8px 0 12px;color:#5b6b8c">${esc(e instanceof Error ? e.message : String(e))}</p><button class="btn-dark" type="button" id="skRetry" style="width:100%">Retry skeptic</button></div>`;
+    // The model is nondeterministic: one automatic retry on gate failure only.
+    // Any other 4xx/5xx is shown once with a manual Retry button — never an auto loop.
+    if (!retried && /Evidence gate failed/.test(e.message ?? "")) return runSkeptic(auto, true);
+    const status = e.status ?? "?";
+    console.error(`[skeptic] HTTP ${status}: ${e.message ?? e}`, e.details ?? "");
+    const unavailable = typeof status === "number" && status >= 400 && status < 500;
+    const detailList = Array.isArray(e.details) && e.details.length
+      ? `<ul>${e.details.map((d) => `<li><small>${esc(d)}</small></li>`).join("")}</ul>` : "";
+    $("skOut").innerHTML = `<div class="statecard err" role="alert"><b>${unavailable ? `Skeptic unavailable (HTTP ${status})` : "Skeptic check failed."}</b><p style="margin:8px 0 12px;color:#5b6b8c">${esc(e instanceof Error ? e.message : String(e))}</p>${detailList}<button class="btn-dark" type="button" id="skRetry" style="width:100%">Retry skeptic</button></div>`;
     const b = document.getElementById("skRetry");
     if (b) b.onclick = () => { checkState.skeptic = "idle"; runSkeptic(false); };
     $("skStatus").textContent = "";
@@ -1188,7 +1291,7 @@ async function runXcheck(auto) {
     // Cross-check against the model that did NOT draw the mask: API mask vs on-device, or the reverse.
     let other;
     if (dmg.source === "api") {
-      if (!embeddings) throw new Error("On-device model still loading — retry in a moment.");
+      if (!embeddings) throw new Error(isOfflineNow() ? offlineModelMessage("outlining") : "On-device model still loading — retry in a moment.");
       const dev = await segmentOnDevice();
       if (!dev) throw new Error("The on-device model found nothing at those taps.");
       other = encodeRle(dev.mask, photo.width, photo.height);
@@ -1200,7 +1303,7 @@ async function runXcheck(auto) {
       body: JSON.stringify({ a: encodeRle(dmg.mask, photo.width, photo.height), b: other, threshold: 0.5 }),
     });
     const cc = await ccRes.json().catch(() => ({}));
-    if (!ccRes.ok || !cc.ok) throw new Error(cc.error ?? "cross-check failed");
+    if (!ccRes.ok || !cc.ok) throw backendErr(ccRes, cc, "cross-check failed");
     const x = $("xStatus");
     x.innerHTML = "";
     const chip = document.createElement("span");
@@ -1209,17 +1312,40 @@ async function runXcheck(auto) {
     x.appendChild(chip);
     setCheck("xcheck", "ok");
   } catch (e) {
+    const status = e.status ?? "?";
+    console.error(`[xcheck] HTTP ${status}: ${e.message ?? e}`, e.details ?? "");
+    // /v1/segment is unavailable in mock mode, so a mask drawn by the API path
+    // has nothing to cross-check against — say so instead of a generic failure.
+    const noSam = /mock segment|not wired|HTTP 501/.test(e.message ?? "");
+    const unavailable = typeof status === "number" && status >= 400 && status < 500;
+    const title = noSam ? "Cross-check unavailable — SAM 3.1 is unavailable in mock mode"
+      : unavailable ? `Cross-check unavailable (HTTP ${status})` : "Cross-check failed.";
+    const detailList = Array.isArray(e.details) && e.details.length
+      ? `<ul>${e.details.map((d) => `<li><small>${esc(d)}</small></li>`).join("")}</ul>` : "";
     const x = $("xStatus");
-    x.innerHTML = `<div class="statecard err" role="alert"><b>Cross-check failed.</b><p style="margin:8px 0 12px;color:#5b6b8c">${esc(e instanceof Error ? e.message : String(e))}</p><button class="btn-ghostline" type="button" id="xRetry" style="width:100%">Retry cross-check</button></div>`;
+    x.innerHTML = `<div class="statecard err" role="alert"><b>${title}</b><p style="margin:8px 0 12px;color:#5b6b8c">${esc(e instanceof Error ? e.message : String(e))}</p>${detailList}<button class="btn-ghostline" type="button" id="xRetry" style="width:100%">Retry cross-check</button></div>`;
     const b = document.getElementById("xRetry");
     if (b) b.onclick = () => { checkState.xcheck = "idle"; runXcheck(false); };
     setCheck("xcheck", "error");
   }
 }
+let autoChecksFor = null; // lastMeasurement the auto checks ran for: once per report
 function runChecksAuto() {
-  resetCheckState();
-  runSkeptic(true);
-  runXcheck(true);
+  // Once per report. Manual retries go through the buttons below, never an auto
+  // loop, so a failing backend is hit once (plus one gate-failure retry), not stacked up.
+  if (autoChecksFor === lastMeasurement) return;
+  autoChecksFor = lastMeasurement;
+  if (checkState.skeptic === "idle") runSkeptic(true);
+  if (checkState.xcheck === "idle") runXcheck(true);
+}
+/** Backend failure with HTTP status + structured details attached; no payloads. */
+function backendErr(res, j, fallback) {
+  const raw = j.details ?? j.failures;
+  const details = Array.isArray(raw) ? raw.map(String) : (raw === undefined ? undefined : [String(raw)]);
+  const summary = details?.length ? `: ${details.join("; ").slice(0, 500)}` : "";
+  const err = new Error(`${j.error ?? fallback ?? `HTTP ${res.status}`}${summary}`);
+  err.status = res.status; err.details = details;
+  return err;
 }
 $("skepticBtn").onclick = () => { checkState.skeptic = "idle"; runSkeptic(false); };
 $("xcheckBtn").onclick = () => { checkState.xcheck = "idle"; runXcheck(false); };
@@ -1288,6 +1414,7 @@ $("copyBtn").onclick = async () => {
 };
 $("newClaimBtn").onclick = () => {
   currentCaseId = null;
+  autoChecksFor = null;
   payloadObj = null; lastMeasurement = null;
   dmg = { points: [], pointMasks: [], mask: null, iou: 0, source: null };
   gateCoin = null; stillDataUrl = ""; noScaleMode = false; coinLabel = "";
@@ -1448,7 +1575,7 @@ async function updateStoreInfo() {
     const est = await navigator.storage?.estimate?.();
     if (est?.quota) quota = ` of ~${Math.round(est.quota / 1048576)} MB available to this site`;
   } catch { /* estimate is advisory */ }
-  $("storeInfo").textContent = `Storage: ${n} case${n === 1 ? "" : "s"} · ~${kb} KB used${quota}. Tapping damage sends the photo to the backend for outlining (falls back to on-device); Cross-check and report attach also upload.`;
+  $("storeInfo").textContent = `Storage: ${n} case${n === 1 ? "" : "s"} · ~${kb} KB used${quota}. Saved cases and capture work offline; measuring and reports need a connection. Tapping damage sends the photo to the backend for outlining (falls back to on-device once its model has downloaded); cross-check and report attach also upload. First use contacts Google Fonts, jsDelivr and Hugging Face for fonts and on-device models.`;
   $("sc-store-meter").style.width = `${Math.min(100, (caseStore.bytesUsed() / (5 * 1048576)) * 100)}%`;
 }
 function showTab(id) {
@@ -1567,7 +1694,7 @@ for (const [id, v] of [["sc-theme-light", "light"], ["sc-theme-auto", "auto"], [
   };
 }
 paintThemeButtons();
-/* settings: donate default, backend mirror, health, updates */
+/* settings: donate default, backend (single input), health, updates */
 try { $("donateSetting").checked = !!localStorage.getItem("snapclaim.donatePhoto"); } catch { /* ignore */ }
 $("donateSetting").onchange = () => {
   try {
@@ -1576,12 +1703,41 @@ $("donateSetting").onchange = () => {
   } catch { /* ignore */ }
   $("donateCheck").checked = $("donateSetting").checked;
 };
-$("baseUrl2").value = $("baseUrl").value;
-$("baseUrl2").addEventListener("input", () => { $("baseUrl").value = $("baseUrl2").value; });
-$("baseUrl").addEventListener("input", () => { $("baseUrl2").value = $("baseUrl").value; });
+syncBackendInputs();
+$("baseUrl2").addEventListener("input", () => {
+  // Commit while valid so base() never reads a rejected URL; surface the
+  // security-policy message inline instead of silently keeping the old value.
+  const draft = $("baseUrl2").value.trim().replace(/\/$/, "");
+  if (draft === "") { $("setHealth").textContent = ""; return; }
+  if (isAllowedBackendUrl(draft)) {
+    try { setBackendUrl(draft); } catch { /* validated above */ }
+    $("setHealth").textContent = "";
+  } else {
+    $("setHealth").textContent = POLICY_BACKEND_MESSAGE;
+  }
+});
 async function checkBackend() {
+  // The Settings Check button validates the visible draft: with an invalid
+  // draft still in the box, reporting "ok" for the last good value would lie.
+  const draft = $("baseUrl2").value.trim().replace(/\/$/, "");
+  if (!isAllowedBackendUrl(draft)) {
+    $("setHealth").textContent = POLICY_BACKEND_MESSAGE;
+    $("healthOut").textContent = POLICY_BACKEND_MESSAGE;
+    syncNetPill();
+    return;
+  }
+  let b;
   try {
-    const r = await fetch(base() + "/v1/health");
+    b = setBackendUrl(draft);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    $("setHealth").textContent = msg;
+    $("healthOut").textContent = msg;
+    syncNetPill();
+    return;
+  }
+  try {
+    const r = await fetch(b + "/v1/health");
     const j = await r.json();
     $("setHealth").textContent = `ok v${j.version} mode:${j.mode}`;
     $("healthOut").textContent = $("setHealth").textContent;

@@ -82,6 +82,14 @@ test("service worker caches the shell, never the API", () => {
   assert.ok(app.includes("CoinModel.extractFeatures"), "coin ID uses the real feature extractor");
   assert.ok(app.includes("findRing"), "coin gate uses edge + radial-uniformity detection");
   assert.ok(!app.includes("$(\"raw\").innerHTML"), "no raw HTML injection of backend output");
+  assert.ok(app.includes("Run the measurement first"), "skeptic guards a missing measurement instead of sending an empty request");
+  assert.ok(app.includes("Evidence gate failed") && app.includes("retried"), "one automatic retry on gate failure only");
+  assert.ok(app.includes("autoChecksFor"), "auto checks run once per report, manual retries via buttons");
+  assert.ok(app.includes("console.error"), "backend errors are logged with status");
+  assert.ok(app.includes("Skeptic unavailable") && app.includes("Cross-check unavailable"), "4xx states named, still continuable");
+  assert.ok(app.includes("unavailable in mock mode"), "segment-mock reason shown instead of a generic failure");
+  assert.ok(app.includes("minReferenceConfidence") && app.includes("thresholds"), "skeptic sends the same measure inputs as report");
+  assert.ok(app.includes("function backendErr"), "status + details ride on a shared error helper");
 });
 
 test("PWA scripts load as the right module type", () => {

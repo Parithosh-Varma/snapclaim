@@ -1,7 +1,7 @@
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
 } from "react";
-import { DEFAULT_BASE, isAllowedBackendUrl } from "./lib/api";
+import { DEFAULT_BASE, POLICY_BACKEND_MESSAGE, isAllowedBackendUrl } from "./lib/api";
 import { SamClient } from "./lib/sam";
 import { createSession, resetDmg, type Session } from "./lib/session";
 import { appStore, type CaseStore } from "./lib/store";
@@ -87,7 +87,7 @@ export default function App() {
 
   const setBase = useCallback((url: string) => {
     if (!isAllowedBackendUrl(url)) {
-      toast("Backend URL must be https:// or http://localhost");
+      toast(POLICY_BACKEND_MESSAGE);
       return;
     }
     setBaseState(url.trim().replace(/\/$/, ""));
@@ -238,7 +238,7 @@ export default function App() {
       )}
       {!online && (
         <div id="offlineBar" role="status">
-          You are offline. The app shell is saved; measuring and reporting need a connection.
+          You&apos;re offline. Saved cases and capture still work here — new measurements, reports and checks need a connection. On-device outlining and voice need one online load first to download their models.
         </div>
       )}
       {toastMsg && <div id="toast" role="status">{toastMsg}</div>}

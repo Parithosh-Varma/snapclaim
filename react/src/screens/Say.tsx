@@ -87,7 +87,10 @@ export default function Say() {
       }
       landTranscript(text);
     } catch (e) {
-      setVoiceErr(`Transcription failed — type the line. (${e instanceof Error ? e.message : String(e)})`);
+      const msg = e instanceof Error ? e.message : String(e);
+      setVoiceErr(navigator.onLine === false
+        ? "On-device speech model not available offline yet — reconnect once to download it, or type the line."
+        : `Transcription failed — type the line. (${msg})`);
     }
   }, [base, landTranscript]);
 

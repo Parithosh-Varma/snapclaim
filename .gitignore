@@ -9,6 +9,9 @@ coverage/
 
 fixtures/photos/
 
+# OpenCode loop state (local agent scratch, never committed)
+.opencode/
+
 # Marketing lives in the private snapclaim-marketing repo, not here.
 /site/
 /promo/

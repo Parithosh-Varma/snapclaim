@@ -12,6 +12,11 @@ let transcriber = null;
 async function loadModel() {
   if (transcriber) return transcriber;
   const tf = await import(TF_URL);
+  // Same ORT log-level drop as sam-worker.js. The remaining
+  // "Unable to determine content-length" message comes from transformers.js
+  // itself when the CDN omits Content-Length; progress still works and the
+  // transcript is unaffected, so it is harmless (we don't control that CDN).
+  try { tf.env.logLevel = "error"; } catch { /* older transformers build */ }
   transcriber = await tf.pipeline("automatic-speech-recognition", MODEL_ID, {
     dtype: "q8",
     progress_callback: (p) => {

@@ -92,7 +92,9 @@ export default function Mark() {
       setTfState("");
       console.info(`[sam] embedded on ${device} in ${embedMs} ms`);
     };
-    sam.onError = (message) => setStatus(`Outlining unavailable (${message}). Check the connection and retry.`);
+    sam.onError = (message) => setStatus(navigator.onLine === false
+      ? "On-device outlining model not available offline yet — reconnect once to download it, then it works offline."
+      : `Outlining unavailable (${message}). Check the connection and retry.`);
     if (s.photo && s.photoFor === s.stillDataUrl) {
       setReady(true);
       drawMark();
@@ -222,7 +224,9 @@ export default function Mark() {
       source = "device";
       if (!embeddings.current) {
         s.dmg.points.pop();
-        setStatus("Outlining model still loading…");
+        setStatus(navigator.onLine === false
+          ? "On-device outlining model not available offline yet — reconnect once to download it, then it works offline."
+          : "Outlining model still loading…");
         drawMark();
         return;
       }
