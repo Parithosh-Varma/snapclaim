@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useApp } from "../App";
 import { loadSample } from "../lib/sample";
-import { DEFAULT_BASE, POLICY_BACKEND_MESSAGE, apiGet } from "../lib/api";
+import { DEFAULT_BASE, DEFAULT_BACKEND_HOST, POLICY_BACKEND_MESSAGE, apiGet } from "../lib/api";
 import type { SnapCase } from "../lib/store";
 import { Badge, downloadFile } from "../lib/ui";
 
@@ -329,7 +329,7 @@ function validBackendUrl(v: string): string {
     const u = new URL(t);
     if (u.username !== "" || u.password !== "") return POLICY_BACKEND_MESSAGE;
     if (u.protocol === "https:") {
-      if (u.hostname.toLowerCase() !== "snapclaim-backend.parithosh.workers.dev") return POLICY_BACKEND_MESSAGE;
+      if (u.hostname.toLowerCase() !== DEFAULT_BACKEND_HOST) return POLICY_BACKEND_MESSAGE;
       return "";
     }
     if (u.protocol === "http:") {

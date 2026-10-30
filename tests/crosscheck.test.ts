@@ -58,6 +58,17 @@ test("worker rejects oversized bodies and routes unknown paths", async () => {
     {},
   );
   assert.equal(big.status, 400);
+  // Multibyte bypass: 400k CJK chars are under 1M UTF-16 units but ~1.2M
+  // bytes. The cap is bytes (parity with the Node streaming cap), so reject.
+  const wide = await worker.fetch(
+    new Request("https://x/v1/measure", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ note: "あ".repeat(400_000) }),
+    }),
+    {},
+  );
+  assert.equal(wide.status, 400);
   const unknown = await worker.fetch(new Request("https://x/v1/nope", { method: "GET" }), {});
   assert.equal(unknown.status, 404);
   // The Worker's own 404 envelope fingerprints a stale deploy: method + path included.

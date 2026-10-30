@@ -264,4 +264,14 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 - Removed dead 501 stub in `visionProvider` (live `/v1/segment` runs through `segmentBody` + `segmentWithSam`, verified 2026-10-29); the unreachable branch now says so.
 - 214 tests green, `tsc` clean, eval 7 pass, `bench` UNRUN ×4 (strict exit 1, honest). Smoke green on alternate port (local :8787 is macOS msgsrvr).
 
+## 2026-10-30 — Audit round: dead code, byte caps, parity
+
+**Shipped**
+
+- PWA coin radius: removed dead `coinSrc` (squared scale, unused) and dead `r` (`... > 1 ? 1 : 1`, unused). The manual red ring now uses `manualCoinRadius()`, the same gate-derived / 3.5%-fallback radius `measure()` sends, so the ring shows what gets measured. `tests/pwa-shell.test.ts` pins it.
+- Worker body cap now counts bytes (`TextEncoder`), not UTF-16 units — parity with the Node streaming cap. `tests/crosscheck.test.ts` covers the multibyte bypass (400k CJK chars under 1M units, over 1M bytes → 400).
+- `react/src/screens/Tabs.tsx` uses shared `DEFAULT_BACKEND_HOST` instead of a hardcoded host string.
+- `pwa/sw.js` CACHE v9 → v10 (shell changed).
+- Full audit: no TODOs, no secrets in tree, `.env` untracked, XSS paths escaped (`esc` + `escSeverity` allowlist), caps (50 masks, 1MB both servers, RLE runs, statement chars), CORS allowlist + rate limit on both servers, allowlist/CSP/offline-copy/skeptic-payload parity PWA↔React (React lacks manual coin correction — PWA-only, noted not ported).
+
 **Spend:** $0.00.

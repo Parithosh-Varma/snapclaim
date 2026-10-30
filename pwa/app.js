@@ -645,9 +645,13 @@ function drawMark() {
     }
     ctx.putImageData(img, 0, 0);
   }
-  // auto coin outline from the gate (green ring) + manual correction (red)
+  // auto coin outline from the gate (green ring) + manual correction (red).
+  // The manual radius matches measure()'s circleRef radius (gate-derived, or
+  // a 3.5% fallback when the gate missed) so the ring shows what gets measured.
   const hasManualCoin = !!coinManualPt;
-  const coinSrc = hasManualCoin ? { cx: coinManualPt[0], cy: coinManualPt[1], r: (gateCoin ? (gateCoin.rr / gateCoin.fw) * (photo.width / gateCoin.sw) * (photo.width / gateCoin.sw) : 22) } : null;
+  const manualCoinRadius = () => gateCoin
+    ? Math.max(3, (gateCoin.rr / gateCoin.fw) * (photo.width / gateCoin.sw))
+    : Math.max(10, photo.width * 0.035);
   if (gateCoin && !hasManualCoin) {
     const kx = photo.width / gateCoin.sw, ky = photo.height / gateCoin.sh;
     const cx = (gateCoin.cx / gateCoin.fw) * gateCoin.sw * kx;
@@ -658,7 +662,7 @@ function drawMark() {
   }
   if (hasManualCoin) {
     ctx.strokeStyle = "#c81e2b"; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(coinManualPt[0], coinManualPt[1], Math.max(12, photo.width * 0.03), 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(coinManualPt[0], coinManualPt[1], manualCoinRadius(), 0, Math.PI * 2); ctx.stroke();
     ctx.fillStyle = "#c81e2b"; ctx.beginPath(); ctx.arc(coinManualPt[0], coinManualPt[1], 4, 0, Math.PI * 2); ctx.fill();
   }
   ctx.fillStyle = "#c81e2b"; ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
@@ -741,7 +745,6 @@ $("measureBtn").onclick = async () => {
   // Manual coin tap wins over the gate — taped coin or missed detection.
   const coinCxCyR = (() => {
     if (coinManualPt) {
-      const r = gateCoin ? Math.max(3, (gateCoin.rr / gateCoin.fw) * (w / gateCoin.sw) * (w / gateCoin.sw > 1 ? 1 : 1)) : Math.max(12, w * 0.035);
       const estR = Math.max(10, w * 0.035);
       return { cx: coinManualPt[0], cy: coinManualPt[1], r: gateCoin ? Math.max(3, (gateCoin.rr / gateCoin.fw) * (w / gateCoin.sw)) : estR };
     }
