@@ -1082,6 +1082,7 @@ async function runSkeptic(auto) {
     const res = await fetch(base() + "/v1/skeptic", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({
+        ...(payloadObj ? { component: payloadObj.component, masks: payloadObj.masks, scaleReference: payloadObj.scaleReference } : {}),
         transcript: $("transcriptBox").value,
         findings: lastMeasurement.findings,
         receipts: lastMeasurement.receipts,
