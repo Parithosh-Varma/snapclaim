@@ -13,10 +13,15 @@ export interface Store {
 
 export const SESSION_LIST_LIMIT = 50;
 
+/** Hard cap on the in-memory session log: unauthenticated POST /v1/sessions
+ * could otherwise grow the array forever (memory-DoS). Oldest evicted first. */
+export const SESSION_STORE_CAP = 1000;
+
 export class MemoryStore implements Store {
   #items: SavedSession[] = [];
   async save(session: SavedSession): Promise<void> {
     this.#items.push({ ...session });
+    while (this.#items.length > SESSION_STORE_CAP) this.#items.shift();
   }
   async list(): Promise<SavedSession[]> {
     return this.#items
