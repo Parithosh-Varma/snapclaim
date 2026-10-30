@@ -1,13 +1,20 @@
 import { createServer } from "node:http";
 import { pathToFileURL } from "node:url";
-import { corsHeadersFor, handleRequest } from "./app.ts";
+import { checkRateLimit, corsHeadersFor, handleRequest } from "./app.ts";
 
 const PORT = Number(process.env.PORT ?? 8787);
 
-function sendJson(res: import("node:http").ServerResponse, status: number, value: unknown, origin: string | null): void {
+function clientIp(req: import("node:http").IncomingMessage): string {
+  const forwarded = req.headers["x-forwarded-for"];
+  const first = Array.isArray(forwarded) ? forwarded[0] : (forwarded ?? "").split(",")[0]?.trim();
+  return first !== "" ? String(first) : (req.socket.remoteAddress ?? "unknown");
+}
+
+function sendJson(res: import("node:http").ServerResponse, status: number, value: unknown, origin: string | null, retryAfterSec?: number): void {
   res.writeHead(status, {
     "content-type": "application/json",
     "x-content-type-options": "nosniff",
+    ...(retryAfterSec !== undefined ? { "retry-after": String(retryAfterSec) } : {}),
     ...corsHeadersFor(origin, process.env),
   });
   res.end(JSON.stringify(value));
@@ -45,6 +52,14 @@ export const server = createServer(async (req, res) => {
     return;
   }
   const path = new URL(req.url ?? "/", "http://localhost").pathname;
+  // Per-IP rate limit before touching the body: anonymous billable routes
+  // would otherwise let one client loop 1 MB POSTs and drain quota / CPU.
+  const limit = checkRateLimit(`node:${clientIp(req)}`);
+  if (!limit.ok) {
+    sendJson(res, 429, { ok: false, error: `rate limited: retry in ${limit.retryAfterSec}s`, code: 429, requestId: "unknown" }, origin, limit.retryAfterSec);
+    try { req.destroy(); } catch { /* noop */ }
+    return;
+  }
   let body: unknown;
   if (req.method === "POST") {
     try {

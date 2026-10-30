@@ -69,7 +69,8 @@ test("POST /v1/sessions rejects bad bodies with 400", async () => {
     { findings: "2", mode: "absolute" },
     { findings: 1, mode: "bogus" },
     { findings: 1 },
-    { findings: 1, mode: "absolute", id: 5 },
+    // NOTE: client-supplied id is ignored (server mints UUIDs), so {id: 5}
+    // is no longer in the bad list — it saves with a fresh id.
     { findings: 1, mode: "absolute", at: 5 },
     { findings: 1, mode: "absolute", at: "not a date" },
   ];
