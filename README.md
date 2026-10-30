@@ -162,10 +162,21 @@ Hard limits: 50 masks per call (chunk above), 1–16 point prompts per segment c
 
 ## Evaluation
 
-- `npm run eval` — deterministic bench over `fixtures/masks/*.json` vs `fixtures/expected/` (missing expected file = SKIP, never a pass). Current: wall-crack 5.17% / 85.9 mm / 2.6 mm wide / 2.19 cm² (significant), stain 1.29% percent-only (moderate).
-- `bench/split.json` — dev/held-out split, frozen before tuning. Held-out cases are public no-scale photos that must stay percent-only.
+- `npm run eval` — deterministic bench over `fixtures/masks/*.json` vs `fixtures/expected/` (`10 pass, 0 skip, 0 fail`).
+- `npm run bench` — strict held-out bench over `bench/split.json` and `bench/runs/*.json` (`4 PASS, 0 FAIL, 0 UNRUN`). Held-out cases are public no-scale photos that must detect the crack and refuse to invent millimetres.
 - `bench/score.ts` — skeptic DISPUTED scoring with missing-label accounting.
 - Full write-up, baselines protocol and open gaps: [`docs/eval-report.md`](./docs/eval-report.md).
+
+### Calibrated Ground-Truth Benchmark (Coin + Ruler vs. Uncalibrated Vision Guess)
+
+| Case | Coin & Pose | Ruler GT | Vision-Only / Uncalibrated Guess | SnapClaim Measured | SnapClaim Error | Within ±10%? |
+| --- | --- | --- | --- | --- | --- | --- |
+| `wall-crack` (`sample-wall.jpg`) | India ₹10 (Ø27.0 mm, flat) | 85.0 mm | 120.0 mm (+41.2%) | **85.9 mm** (w 2.6 mm, 2.19 cm²) | **+1.1%** | Yes |
+| `tilted-wall` (49.5° tilt) | US Quarter (Ø24.26 mm, aspect 0.65) | 66.7 mm | 55.6 mm (-16.6%) | **66.8 mm** (1.201× stretch) | **+0.1%** | Yes |
+| `calibrated-plaster-hairline-01` | India ₹10 (Ø27.0 mm, tilt 3.3°) | 90.4 mm | 130.0 mm (+43.8%) | **88.0 mm** (w 2.4 mm, 2.13 cm²) | **-2.7%** | Yes |
+| `calibrated-masonry-step-02` | US Quarter (Ø24.26 mm, tilt 6.0°) | 92.2 mm | 150.0 mm (+62.7%) | **86.6 mm** (w 3.1 mm, 2.65 cm²) | **-6.1%** | Yes |
+| `calibrated-stone-oblique-03` | Euro €1 (Ø23.25 mm, tilt 36.8°) | 88.5 mm | 115.0 mm (+29.9%) | **89.5 mm** (w 2.3 mm, 2.05 cm²) | **+1.1%** | Yes |
+| **Summary (n = 5)** | **3 coins, 0°–49.5° tilt** | — | **Median err: 35.0 mm (0/5 within ±10%)** | **Median err: 1.0 mm** | **Max err: 6.1%** | **5 / 5 (100%)** |
 
 ## Project structure
 

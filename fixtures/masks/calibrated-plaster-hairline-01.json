@@ -1,0 +1,25 @@
+{
+  "imageId": "calibrated-plaster-hairline-01",
+  "note": "Calibrated real-photo eval: plaster hairline crack (ruler 90.4 mm) + India 10 INR coin (27.0 mm) segmented live by SAM 3.1.",
+  "component": {
+    "id": "photo",
+    "areaPx": 480000,
+    "confidence": 1
+  },
+  "masks": [
+    {
+      "id": "crack-1",
+      "label": "crack",
+      "areaPx": 3647,
+      "regionCount": 1,
+      "confidence": 0.89453125,
+      "skeletonPx": 364.5
+    }
+  ],
+  "scaleReference": {
+    "id": "coin-10inr",
+    "knownMm": 27,
+    "lengthPx": 111.8,
+    "confidence": 0.953
+  }
+}

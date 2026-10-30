@@ -1,0 +1,27 @@
+{
+  "imageId": "calibrated-masonry-step-02",
+  "note": "Calibrated real-photo eval: stepped masonry crack (ruler 92.2 mm) + US Quarter (24.26 mm) segmented live by SAM 3.1.",
+  "component": {
+    "id": "photo",
+    "areaPx": 480000,
+    "confidence": 1
+  },
+  "masks": [
+    {
+      "id": "crack-1",
+      "label": "crack",
+      "areaPx": 4538,
+      "regionCount": 1,
+      "confidence": 0.87109375,
+      "skeletonPx": 358.3,
+      "straightRegionCount": 1,
+      "straightAreaPx": 4538
+    }
+  ],
+  "scaleReference": {
+    "id": "coin-us-quarter",
+    "knownMm": 24.26,
+    "lengthPx": 100.4,
+    "confidence": 0.972
+  }
+}

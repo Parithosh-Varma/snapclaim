@@ -1,0 +1,27 @@
+{
+  "imageId": "calibrated-stone-oblique-03",
+  "note": "Calibrated real-photo eval: oblique stone crack (ruler 88.5 mm) + Euro 1 EUR coin (23.25 mm at 36.8 deg tilt) segmented live by SAM 3.1.",
+  "component": {
+    "id": "photo",
+    "areaPx": 480000,
+    "confidence": 1
+  },
+  "masks": [
+    {
+      "id": "crack-1",
+      "label": "crack",
+      "areaPx": 3563,
+      "regionCount": 1,
+      "confidence": 0.8671875,
+      "skeletonPx": 373.2,
+      "straightRegionCount": 1,
+      "straightAreaPx": 3563
+    }
+  ],
+  "scaleReference": {
+    "id": "coin-1eur",
+    "knownMm": 23.25,
+    "lengthPx": 96.9,
+    "confidence": 0.961
+  }
+}
