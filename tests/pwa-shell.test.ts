@@ -20,6 +20,9 @@ test("PWA shell is installable and honest", () => {
   const html = read("pwa/index.html");
   assert.ok(html.includes('rel="manifest"'), "index links the manifest");
   assert.ok(html.includes("Content-Security-Policy"), "index sets a CSP");
+  for (const host of ["https://cdn.jsdelivr.net", "https://huggingface.co"]) {
+    assert.ok(html.includes(host), `CSP connect-src allows the on-device model CDN (${host})`);
+  }
   assert.ok(html.includes('id="micBtn"'), "voice capture button exists");
   assert.ok(html.includes('id="wave"'), "waveform exists");
   assert.ok(html.includes('id="shutter"'), "camera shutter exists");
@@ -28,8 +31,13 @@ test("PWA shell is installable and honest", () => {
   assert.ok(html.includes('id="usePhoto"') && html.includes('id="retake"'), "review actions exist");
   assert.ok(html.includes('id="markCanvas"'), "mark screen exists");
   assert.ok(html.includes('id="noCoin"'), "no-coin percent-only path exists");
-  for (const step of ["01 / 05","02 / 05","03 / 05","04 / 05","05 / 05"]) {
+  for (const step of ["01 / 06","02 / 06","03 / 06","04 / 06","05 / 06","06 / 06"]) {
     assert.ok(html.includes(step), `eyebrow ${step} exists`);
+  }
+  assert.ok(!html.includes("user-scalable=no"), "viewport allows pinch zoom");
+  assert.ok(html.includes('id="apple-touch-icon"') || html.includes('rel="apple-touch-icon"'), "iOS home-screen icon linked");
+  for (const id of ["camStep","uploadBtn","camFile","donateCheck","updateBar","updateGo"]) {
+    assert.ok(html.includes(`id="${id}"`), `shell element ${id} exists`);
   }
   for (const id of ["numPhotoCard","numPhoto","numChip","numLoading","numError","reportDoc","docGate","docMeta","docPhoto","docQuote","docRows","annexImg","shareBtn","copyBtn","newClaimBtn","installBtn","offlineBar","toReport","renderBtn"]) {
     assert.ok(html.includes(`id="${id}"`), `report/check element ${id} exists`);
@@ -37,6 +45,15 @@ test("PWA shell is installable and honest", () => {
   assert.ok(html.includes('id="xcheckBtn"') || html.includes("Cross-check"), "cross-check exists");
   assert.ok(html.includes('id="coinKind"'), "coin options exist");
   assert.ok(html.includes("India"), "Indian coin options exist");
+  for (const id of ["tHome","netPill","nextTitle","nextSub","ctaNew","ctaSample","recentList","recentEmpty",
+    "tCases","caseList","caseEmpty","tSettings","sc-theme-light","sc-theme-auto","sc-theme-dark","donateSetting",
+    "installHint","updateBtn","storeInfo","sc-store-meter","exportAllBtn","wipeBtn","baseUrl2","setCheck","setHealth",
+    "caseDlg","dlgName","dlgProp","dlgNotes","dlgPhotos","dlgAddPhoto","dlgFile","dlgSave","dlgExport","dlgDelete","dlgClose",
+    "tabs","toast","appLive","doneHome"]) {
+    assert.ok(html.includes(`id="${id}"`), `tab/case element ${id} exists`);
+  }
+  assert.ok(html.includes('data-tab="capture"'), "tab bar has the centre New action");
+  assert.ok(html.includes('<script src="./theme.js"></script>'), "theme.js loads before first paint");
 });
 
 test("service worker caches the shell, never the API", () => {
@@ -44,9 +61,20 @@ test("service worker caches the shell, never the API", () => {
   assert.ok(/snapclaim-shell-v\d+/.test(sw), "versioned cache");
   assert.ok(sw.includes("/v1/"), "API bypass is explicit");
   assert.ok(sw.includes("skipWaiting"), "updates activate");
+  assert.ok(sw.includes("SKIP_WAITING"), "updates wait for the Reload button, not install");
+  assert.ok(sw.includes("location.origin"), "cross-origin requests are never cached");
+  assert.ok(sw.includes('caches.match("./index.html")'), "offline navigations fall back to the shell");
   assert.ok(sw.includes("coin-model.js"), "coin model cached for offline gating");
 
+  assert.ok(sw.includes("store.js") && sw.includes("theme.js"), "store and theme are precached for offline tabs");
+
   const app = read("pwa/app.js");
+  assert.ok(app.includes("SKIP_WAITING"), "Reload button activates the waiting worker");
+  assert.ok(app.includes('from "./store.js"'), "app uses the local case store");
+  assert.ok(app.includes("saveCaseFromReport"), "finished reports are saved as cases");
+  assert.ok(app.includes('showTab("tHome")'), "app lands on Home, camera only on demand");
+  assert.ok(app.includes('addEventListener("offline"'), "offline banner is wired to connectivity events");
+  assert.ok(app.includes('id="camFile"') || app.includes('$("camFile")'), "upload fallback is wired");
   assert.ok(app.includes("serviceWorker"), "PWA registers the service worker");
   assert.ok(app.includes("/v1/transcribe"), "voice posts to the transcribe proxy");
   assert.ok(app.includes("OfflineAudioContext"), "clip is resampled on-device");
