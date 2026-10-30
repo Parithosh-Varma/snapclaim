@@ -94,7 +94,7 @@ function NumOverlay({ s }: { s: Session }) {
           y={y + tagH / 2}
           textAnchor="middle"
           dominantBaseline="central"
-          fontFamily="Archivo, system-ui, sans-serif"
+          fontFamily="Archivo, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
           fontWeight={700}
           fontSize={fs}
           fill="#0b1e46"
@@ -220,7 +220,7 @@ export default function Numbers() {
             type="button"
             style={{ width: "100%" }}
             onClick={() => {
-              ctx.setChecks({ skeptic: "idle", xcheck: "idle" });
+              // The auto checks already ran once for this report; going forward only shows them.
               go("sCheck");
             }}
           >

@@ -251,3 +251,16 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 - 175 tests green, `tsc` clean, eval 7 pass. `npm run bench` still UNRUN until live runs are archived.
 
 **Spend:** $0.00.
+
+## 2026-10-30 — Trust + error-handling hardening (uncommitted batch)
+
+**Shipped**
+
+- Strict backend allowlist: `https` only for the default Worker host, `http` only loopback. CSP `connect-src` in both HTML shells mirrors the same host; `tests/pwa-csp-allowlist.test.ts` fails if they drift. Self-host procedure in README.
+- Single backend URL source of truth (`snapclaim.backendUrl` in localStorage, one Settings input, Report panel shows value only). Covered by `tests/pwa-backend-input.test.ts`.
+- Skeptic/cross-check never send empty requests: missing measurement is a UI guard, not a 422. `/v1/skeptic` re-measures server-side from the same measure inputs (no overlay spray), rejects findings that do not match recomputation, one automatic retry on gate failure only. 4xx states named (Skeptic/Cross-check unavailable) with status logged, still continuable.
+- Coin correction: manual tap wins over the gate, taped-coin lenient outline, dark/auto theme contrast fixes, offline honesty (saved cases + capture work offline, measuring needs connection, on-device models need one online load). Covered by `tests/pwa-offline-copy.test.ts`.
+- `src/vision/coin-detect.js` moved out of the shipped PWA folder (algorithm harness only); SW cache bumps v9/v6 with stale-deploy fingerprint on Worker 404. Covered by `tests/sw-version.test.ts`.
+- 214 tests green, `tsc` clean, eval 7 pass, `bench` UNRUN ×4 (strict exit 1, honest). Smoke green on alternate port (local :8787 is macOS msgsrvr).
+
+**Spend:** $0.00.

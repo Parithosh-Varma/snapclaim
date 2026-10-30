@@ -1,7 +1,7 @@
 import { strict as assert } from "node:assert";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { findCoins } from "../pwa/coin-detect.js";
+import { findCoins } from "../src/vision/coin-detect.js";
 
 type Paint = (x: number, y: number) => number | undefined;
 
@@ -56,6 +56,6 @@ test("the coin beats a square when both are in the photo", () => {
 });
 
 test("the detector is plain browser JS with no imports", () => {
-  const source = readFileSync(new URL("../pwa/coin-detect.js", import.meta.url), "utf8");
+  const source = readFileSync(new URL("../src/vision/coin-detect.js", import.meta.url), "utf8");
   assert.doesNotMatch(source, /^\s*import\s/m);
 });

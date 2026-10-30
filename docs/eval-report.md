@@ -1,6 +1,6 @@
 # Eval report
 
-Updated 2026-10-28. Weak rows stay in; nothing is buried.
+Updated 2026-10-30. Weak rows stay in; nothing is buried.
 
 ## Setup
 
@@ -52,6 +52,7 @@ Scored by `scoreDisputes` in `bench/score.ts`, with DISPUTED as the positive cla
 | Date | Bench | Disputes | Notes |
 |---|---|---|---|
 | 2026-10-28 | 2 pass, 0 skip, 0 fail | scorer unit-tested, no live runs yet | wall-crack: 5.17% / 85.9 mm / 2.6 mm wide / 2.19 cm² (significant); stain: 1.29% percent-only (moderate) |
+| 2026-10-30 | 7 pass, 0 skip, 0 fail | dev fixtures grown (door-peel, facade-crack, tilted-wall, noscale); held-out still 0 archived runs (UNRUN ×4, strict exit 1) | tilted-wall: 0.27% / 66.8 mm cosmetic; facade-crack: 0.74% percent-only significant |
 
 ## Failures and misses
 

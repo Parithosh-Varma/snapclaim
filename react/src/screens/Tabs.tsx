@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useApp } from "../App";
 import { loadSample } from "../lib/sample";
-import { DEFAULT_BASE, apiGet } from "../lib/api";
+import { DEFAULT_BASE, POLICY_BACKEND_MESSAGE, apiGet } from "../lib/api";
 import type { SnapCase } from "../lib/store";
 import { Badge, downloadFile } from "../lib/ui";
 
@@ -51,7 +51,7 @@ function StatusPill({ online }: { online: boolean }) {
         type="button"
         className={`status-pill ${online ? "is-on" : "is-off"}`}
         aria-expanded={open}
-        title="Cases stay on this device. Capture works offline; measuring needs a connection."
+        title="Cases stay on this device. Saved cases and capture work offline; measuring needs a connection. On-device outlining and voice need one online load first to download their models."
         onClick={() => setOpen((v) => !v)}
       >
         <i className="status-dot" aria-hidden="true" />
@@ -59,7 +59,7 @@ function StatusPill({ online }: { online: boolean }) {
       </button>
       {open && (
         <span className="status-tip" role="status">
-          Cases never leave this phone. Capture works offline; measuring needs a connection.
+          Cases never leave this phone. Saved cases and capture work offline; measuring needs a connection. On-device outlining and voice need one online load first to download their models.
         </span>
       )}
     </span>
@@ -327,13 +327,22 @@ function validBackendUrl(v: string): string {
   if (!/^https?:\/\//i.test(t)) return "URL must start with https:// (or http:// for localhost).";
   try {
     const u = new URL(t);
-    if (u.protocol === "http:" && u.hostname !== "localhost" && u.hostname !== "127.0.0.1") {
-      return "Plain http is only allowed for localhost.";
+    if (u.username !== "" || u.password !== "") return POLICY_BACKEND_MESSAGE;
+    if (u.protocol === "https:") {
+      if (u.hostname.toLowerCase() !== "snapclaim-backend.parithosh.workers.dev") return POLICY_BACKEND_MESSAGE;
+      return "";
     }
+    if (u.protocol === "http:") {
+      const h = u.hostname.toLowerCase();
+      if (h !== "localhost" && h !== "127.0.0.1" && h !== "[::1]" && h !== "::1" && !h.endsWith(".localhost")) {
+        return POLICY_BACKEND_MESSAGE;
+      }
+      return "";
+    }
+    return POLICY_BACKEND_MESSAGE;
   } catch {
     return "That URL does not parse — check for typos.";
   }
-  return "";
 }
 
 function Section({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
@@ -549,7 +558,7 @@ export function Settings() {
           >
             <i id="sc-store-meter" style={{ width: `${Math.max(pct, bytes > 0 ? 1.5 : 0)}%` }} />
           </div>
-          <p className="fineprint">Tapping damage sends the photo to the backend for outlining (falls back to on-device); Cross-check and report attach also upload.</p>
+          <p className="fineprint">Saved cases and capture work offline; measuring and reports need a connection. Tapping damage sends the photo to the backend for outlining (falls back to on-device once its model has downloaded); cross-check and report attach also upload. First use contacts Google Fonts, jsDelivr and Hugging Face for fonts and on-device models.</p>
         </Section>
 
         <Section

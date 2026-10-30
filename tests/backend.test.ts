@@ -145,6 +145,35 @@ test("segment in mock mode requires a fixture and invents no masks", async () =>
   assert.equal(ok.status, 200);
 });
 
+test("skeptic without measure inputs fails with the empty-request reason, not the gate", async () => {
+  const measured = await handleRequest({ method: "POST", path: "/v1/measure", body: payload(), env: {} });
+  const result = (measured.body as { result: { findings: unknown[]; receipts: unknown[] } }).result;
+  const res = await handleRequest({
+    method: "POST",
+    path: "/v1/skeptic",
+    body: { transcript: "x", findings: result.findings, receipts: result.receipts },
+    env: {},
+  });
+  assert.equal(res.status, 422);
+  assert.match((res.body as { error: string }).error, /component and masks are required/);
+});
+
+test("skeptic rejects findings that do not match server recomputation", async () => {
+  const p = payload();
+  const measured = await handleRequest({ method: "POST", path: "/v1/measure", body: p, env: {} });
+  const result = (measured.body as { result: { findings: unknown[]; receipts: unknown[] } }).result;
+  const tampered = JSON.parse(JSON.stringify(result.findings)) as Array<Record<string, unknown>>;
+  tampered[0] = { ...(tampered[0] as Record<string, unknown>), percent: 99.99 };
+  const res = await handleRequest({
+    method: "POST",
+    path: "/v1/skeptic",
+    body: { ...p, transcript: "x", findings: tampered, receipts: result.receipts },
+    env: {},
+  });
+  assert.equal(res.status, 422);
+  assert.match((res.body as { error: string }).error, /do not match server recomputation/);
+});
+
 test("segment in live mode without a key fails closed with 503", async () => {
   const f = loadWallFixture();
   const res = await handleRequest({

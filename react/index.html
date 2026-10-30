@@ -8,6 +8,10 @@
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
 <script src="./theme.js"></script>
 <meta name="description" content="SnapClaim — photo + one line in, measured damage report out." />
+<!-- frame-ancestors is ignored inside a <meta> CSP by browsers (it only takes
+  effect as an HTTP response header). It is kept here as documentation of
+  intent; the static host must send `Content-Security-Policy: frame-ancestors 'self'`
+  (or equivalent X-Frame-Options) itself. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; connect-src 'self' https://snapclaim-backend.parithosh.workers.dev http://127.0.0.1:8787 http://localhost:8787 https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; worker-src 'self' blob:; media-src blob: data:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'" />
 <link rel="manifest" href="./manifest.webmanifest" />
 <meta name="mobile-web-app-capable" content="yes" />

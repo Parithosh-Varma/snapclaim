@@ -51,6 +51,20 @@ test("React port keeps backend, worker and privacy contracts", () => {
   assert.ok(sw.includes("SKIP_WAITING"), "updates wait for Reload");
   assert.ok(sw.includes("/v1/"), "API bypass is explicit");
 
+  const check = read("react/src/screens/Check.tsx");
+  assert.ok(check.includes("Run the measurement first"), "React skeptic guards a missing measurement");
+  assert.ok(check.includes("Evidence gate failed") && check.includes("retried"), "React retries gate failures once");
+  assert.ok(check.includes("console.error"), "React logs backend errors with status");
+  assert.ok(check.includes("Skeptic unavailable") && check.includes("Cross-check unavailable"), "React names 4xx states");
+  assert.ok(check.includes("unavailable in mock mode"), "React surfaces the segment-mock reason");
+  assert.ok(check.includes("minReferenceConfidence"), "React skeptic sends the same measure inputs as report");
+  assert.ok(!check.includes("...(s.payload ?? {})"), "React skeptic no longer sprays the overlay at the backend");
+  const api = read("react/src/lib/api.ts");
+  assert.ok(api.includes("backendError"), "shared status + details error helper");
+  for (const w of ["react/public/sam-worker.js", "react/public/voice-worker.js"]) {
+    assert.ok(read(w).includes('tf.env.logLevel = "error"'), `${w} quiets ONNX Runtime warnings`);
+  }
+
   const html = read("react/index.html");
   assert.ok(html.includes("Content-Security-Policy"), "CSP kept");
   for (const host of ["https://cdn.jsdelivr.net", "https://huggingface.co"]) {

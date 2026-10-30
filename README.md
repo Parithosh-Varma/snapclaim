@@ -2,7 +2,7 @@
 
 > Point your phone at damage, speak one line about it — get a claim-ready report where every number is measured, cited, and checked before it ships. **Computed, not generated.**
 
-[![tests](https://img.shields.io/badge/tests-106%20passing-brightgreen)](./tests)
+[![tests](https://img.shields.io/badge/tests-214%20passing-brightgreen)](./tests)
 [![node](https://img.shields.io/badge/node-%3E%3D22.18-339933)](./package.json)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](./LICENSE)
 
@@ -147,6 +147,10 @@ npx wrangler secret put BASETEN_API_KEY   # when Baseten access is granted
 
 **PWA** — any static host serves `pwa/` (no build step). Point the Backend URL box at the Worker. Installable via `manifest.webmanifest`; the service worker caches the shell and never caches `/v1`.
 
+### Self-hosted backend
+
+The app keeps one strict backend policy in two places that must stay in sync: the `<meta>` CSP `connect-src` in `pwa/index.html` (and `react/index.html`) and the `isAllowedBackendUrl()` allowlist in `pwa/app.js` (and `react/src/lib/api.ts`). Only `https://snapclaim-backend.parithosh.workers.dev` and loopback `http` (`localhost`, `127.0.0.1`, `[::1]`) are allowed; anything else shows "This backend isn't allowed by the app's security policy". To point at your own Worker: add its `https://host` to `connect-src` in both HTML files **and** to `DEFAULT_BACKEND_HOST`/`isAllowedBackendUrl` in both JS/TS files. `tests/pwa-csp-allowlist.test.ts` fails if the two drift apart.
+
 ## Cost and limits
 
 Per-claim live cost at current pricing: SAM 3.1 ≈ $0.0025/image, voice ≈ $0.0005 per 10 s line, skeptic per Baseten token rates, Spark findings metered at $0 until Meta publishes pricing. The default $5 cap covers well over a thousand full live claims.
@@ -158,6 +162,7 @@ Hard limits: 50 masks per call (chunk above), 1–16 point prompts per segment c
 - The photo stays on the phone: only COCO RLE masks travel to `/v1/observe`. Two explicit exceptions, both your tap: **Cross-check masks** sends the photo once to SAM 3.1 via the backend, and **Render** attaches it to the annexure. Only `data:`/`https:` URLs are accepted.
 - Keys live in server env / Worker secrets, never in the PWA. Fail-closed 503 without them.
 - All model output rendered in the PWA is HTML-escaped; the page ships a Content-Security-Policy.
+- Note: `frame-ancestors` in the `<meta>` CSP is ignored by browsers — it only works as an HTTP response header, so the static host must send it (e.g. `Content-Security-Policy: frame-ancestors 'self'`). No meta-tag change can fix that; the directive is kept in the markup as documented intent.
 - EXIF/XMP metadata is stripped from photos on intake.
 
 ## Evaluation
@@ -182,7 +187,7 @@ pwa/            capture app: photo, tap-to-mask, hold-to-speak, report, skeptic,
 eval/           bench + replay CLI
 bench/          held-out split + dispute scorer
 fixtures/       masks, expected outputs, scale references (photos gitignored)
-tests/          106 tests, mock by default, live paths with stubbed fetch
+tests/          214 tests, mock by default, live paths with stubbed fetch
 ```
 
 ## Development

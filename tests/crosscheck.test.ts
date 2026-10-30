@@ -60,6 +60,10 @@ test("worker rejects oversized bodies and routes unknown paths", async () => {
   assert.equal(big.status, 400);
   const unknown = await worker.fetch(new Request("https://x/v1/nope", { method: "GET" }), {});
   assert.equal(unknown.status, 404);
+  // The Worker's own 404 envelope fingerprints a stale deploy: method + path included.
+  const unknownBody = (await unknown.json()) as { ok: boolean; error: string; details: unknown };
+  assert.equal(unknownBody.error, "not found");
+  assert.deepEqual(unknownBody.details, { method: "GET", path: "/v1/nope" });
   const health = await worker.fetch(new Request("https://x/v1/health", { method: "GET" }), {});
   assert.equal(health.status, 200);
 });

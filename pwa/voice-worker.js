@@ -12,6 +12,9 @@ let transcriber = null;
 async function loadModel() {
   if (transcriber) return transcriber;
   const tf = await import(TF_URL);
+  // Note: transformers.js may still log "Unable to determine content-length"
+  // while fetching model files. That CDN omits Content-Length; progress still
+  // works and the transcript is unaffected, so it is harmless.
   try { tf.env.logLevel = "error"; } catch { /* older transformers build */ }
   transcriber = await tf.pipeline("automatic-speech-recognition", MODEL_ID, {
     dtype: "q8",
