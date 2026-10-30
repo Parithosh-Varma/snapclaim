@@ -9,6 +9,8 @@ export interface HeldOutCase {
   hasScaleReference: boolean;
   /** Hand labels for the skeptic's calls on this case, when the case has any. */
   disputeLabels?: { maskId: string; expected: SkepticVerdict; reason?: string }[];
+  /** Tape-measured length of the main crack, scaled cases only. Scored by bench/gap.ts. */
+  groundTruth?: { maskId: string; crackLengthMm: number };
 }
 
 /** Where an archived run came from, so a number can be traced back to code and prompt. */
