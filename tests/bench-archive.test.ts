@@ -16,6 +16,14 @@ test("a skeptic that restates a finding confirms it, one that says DISPUTED disp
   assert.equal(confirmed.get(findings[0]!.maskId), "CONFIRMED");
   const disputed = verdictsFromSkeptic(findings, drafts.map((d) => ({ ...d, statement: `DISPUTED: ${d.statement}` })));
   assert.equal(disputed.get(findings[0]!.maskId), "DISPUTED");
+  const shortDisputed = verdictsFromSkeptic(
+    findings,
+    drafts.map((d) => ({
+      statement: `Disputed: ${d.statement}`,
+      citations: d.citations.map((c) => c.toLowerCase().replace(/^r0*(\d+)$/, "r$1")),
+    })),
+  );
+  assert.equal(shortDisputed.get(findings[0]!.maskId), "DISPUTED");
 });
 
 test("a finding the skeptic never cited gets no verdict", () => {
