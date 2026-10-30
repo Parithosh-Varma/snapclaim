@@ -53,13 +53,14 @@ export async function transcribeWithMuse(input: {
   form.append(
     "audio",
     new Blob([bytes as unknown as BlobPart], { type: "audio/wav" }),
-    input.audio.filename ?? "audio.wav",
+    sanitizeFilename(input.audio.filename),
   );
 
-  const res = await fetchFn(`${input.base}/asr/transcribe`, {
+  const res = await (fetchFn as typeof fetch)(`${input.base}/asr/transcribe`, {
     method: "POST",
     headers: { authorization: `Bearer ${input.apiKey}` },
     body: form,
+    signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) throw new HttpError(502, `Muse transcribe failed: HTTP ${res.status}`);
   const data = (await res.json()) as {
@@ -86,6 +87,26 @@ export async function transcribeWithMuse(input: {
 export const DEFAULT_LANGUAGE_BIAS = ["Hindi", "Telugu", "English"];
 export const DEFAULT_KEYWORDS = ["crack", "seepage", "deposit", "damp", "leakage", "plaster"];
 
+export const MAX_KEYWORDS = 20;
+export const MAX_KEYWORD_CHARS = 64;
+
+function sanitizeList(values: unknown, fallback: string[]): string[] {
+  if (!Array.isArray(values)) return fallback;
+  return values
+    .map((v) => String(v).replace(/[\r\n"]/g, "").trim().slice(0, MAX_KEYWORD_CHARS))
+    .filter((v) => v !== "")
+    .slice(0, MAX_KEYWORDS);
+}
+
+/** Basename for the multipart audio part: strip paths, CRLF and quotes. */
+export function sanitizeFilename(name: string | undefined): string {
+  const base = String(name ?? "audio.wav").split(/[\\/]/).pop() ?? "audio.wav";
+  const clean = base.replace(/[\r\n"]/g, "").trim().slice(0, 128);
+  return clean !== "" ? clean : "audio.wav";
+}
+
 export function isMockEnv(env: Env): boolean {
   return configFromEnv(env).mockMode;
 }
+
+export { sanitizeList };

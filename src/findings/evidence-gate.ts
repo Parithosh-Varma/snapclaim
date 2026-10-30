@@ -10,6 +10,13 @@ export interface GateResult {
   failures: string[];
 }
 
+/** Request-size caps: the gate does tokens×receipts work per finding, so a
+ * 1 MB statement would be ~500k tokens → tens of millions of comparisons
+ * synchronously. Reject oversized input with 400 before measuring. */
+export const MAX_DRAFTS = 64;
+export const MAX_STATEMENT_CHARS = 2000;
+export const MAX_CITATIONS_PER_FINDING = 32;
+
 export class EvidenceError extends Error {
   readonly failures: string[];
 
@@ -165,7 +172,7 @@ function validateFinding(
   if (/\bcm(?:2|²)(?![a-z0-9])/i.test(draft.statement) && tokens.length > 0 && cm2Outputs.length > 0) {
     const backedByCm2 = tokens.some((token) => cm2Outputs.some((value) => matchesReceipt(token, value)));
     if (!backedByCm2) {
-      failures.push(`${label}: square-centimetre value does not match any cited calibrated-area receipt`);
+      failures.push(`${label}: cm² value does not match any cited calibrated-area receipt`);
     }
   }
 
@@ -197,12 +204,31 @@ function validateFinding(
 }
 
 export function validateFindings(drafts: FindingDraft[], receipts: Receipt[]): GateResult {
+  const list = Array.isArray(drafts) ? drafts : [];
+  if (list.length > MAX_DRAFTS) {
+    return { ok: false, failures: [`too many findings: ${list.length} > ${MAX_DRAFTS}`] };
+  }
+  const preflight: string[] = [];
+  for (let i = 0; i < list.length; i++) {
+    const draft = list[i] as FindingDraft;
+    if (typeof draft?.statement !== "string" || !Array.isArray((draft as FindingDraft)?.citations)) {
+      preflight.push(`finding[${i}]: must be {statement: string, citations: string[]}`);
+      continue;
+    }
+    if (draft.statement.length > MAX_STATEMENT_CHARS) {
+      preflight.push(`finding[${i}]: statement is ${draft.statement.length} chars, capped at ${MAX_STATEMENT_CHARS}`);
+    }
+    if (draft.citations.length > MAX_CITATIONS_PER_FINDING) {
+      preflight.push(`finding[${i}]: citations capped at ${MAX_CITATIONS_PER_FINDING}`);
+    }
+  }
+  if (preflight.length > 0) return { ok: false, failures: preflight };
   const byId = new Map<string, Receipt>();
   for (const receipt of receipts) {
     byId.set(receipt.id, receipt);
     byId.set(normalizeReceiptId(receipt.id), receipt);
   }
-  const failures = drafts.flatMap((draft, index) => validateFinding(draft, byId, index));
+  const failures = list.flatMap((draft, index) => validateFinding(draft, byId, index));
   return { ok: failures.length === 0, failures };
 }
 

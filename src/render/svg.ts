@@ -38,14 +38,54 @@ function r2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-/** Only inline images and https URLs may be embedded as the photo. */
+/** Only inline raster images and https URLs may be embedded as the photo.
+ * svg+xml is rejected: an opened annexure would run embedded scripts. */
+const ALLOWED_DATA_MIMES = new Set(["image/png", "image/jpeg", "image/webp"]);
+export const MAX_PHOTO_HREF_CHARS = 200_000;
+
 function safeHref(href: string | undefined): string | null {
   if (href === undefined) return null;
-  return href.startsWith("data:image/") || href.startsWith("https://") ? href : null;
+  if (typeof href !== "string" || href.length > MAX_PHOTO_HREF_CHARS) return null;
+  if (href.startsWith("data:")) {
+    const comma = href.indexOf(",");
+    if (comma < 0 || comma > 64) return null;
+    const mime = href.slice(5, href.indexOf(";"));
+    if (!ALLOWED_DATA_MIMES.has(mime)) return null;
+    return href;
+  }
+  if (href.startsWith("https://") && !href.includes("\\") && !href.includes('"') && !href.includes("'")) {
+    return href;
+  }
+  return null;
+}
+
+/** Capitalise the first letter of a mask label. */
+function cap(label: string): string {
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+/**
+ * Legend rows under the photo panel: one per outlined damage mask that has a
+ * measured finding, so the colour on the photo maps to its own numbers.
+ */
+function renderOverlayLegend(overlay: AnnexureOverlay, findings: MeasuredFinding[], top: number): { svg: string; height: number } {
+  const rows: string[] = [];
+  for (const m of overlay.masks) {
+    const f = findings.find((finding) => String(finding.label) === m.label);
+    if (f === undefined) continue;
+    const color = OVERLAY_COLORS.get(m.label) ?? "#7f8c8d";
+    const mm = f.crackLengthMm === null ? "" : ` · ${f.crackLengthMm} mm`;
+    const y = top + rows.length * 18;
+    rows.push(
+      `<rect x="24" y="${y - 9}" width="10" height="10" fill="${color}"/>` +
+        `<text x="40" y="${y}" font-size="11" font-family="monospace" fill="#333">${esc(cap(m.label))} ${esc(f.percent)}%${esc(mm)}</text>`,
+    );
+  }
+  return { svg: rows.join(""), height: rows.length === 0 ? 0 : rows.length * 18 + 6 };
 }
 
 /** Render the photo panel; returns the svg fragment and the vertical space it takes. */
-function renderOverlay(overlay: AnnexureOverlay): { svg: string; shift: number } {
+function renderOverlay(overlay: AnnexureOverlay, findings: MeasuredFinding[]): { svg: string; shift: number } {
   if (!(overlay.width > 0) || !(overlay.height > 0) || !Number.isFinite(overlay.width) || !Number.isFinite(overlay.height)) {
     throw new MeasurementError("overlay width and height must be positive numbers");
   }
@@ -64,11 +104,13 @@ function renderOverlay(overlay: AnnexureOverlay): { svg: string; shift: number }
       );
     })
     .join("");
+  const legend = renderOverlayLegend(overlay, findings, OVERLAY_TOP + h + 20);
   const svg =
     `<rect x="24" y="${OVERLAY_TOP}" width="${w}" height="${h}" fill="#eeeeee"/>` +
     (href === null ? "" : `<image x="24" y="${OVERLAY_TOP}" width="${w}" height="${h}" href="${esc(href)}" preserveAspectRatio="none"/>`) +
-    masks;
-  return { svg, shift: r2(h + 16) };
+    masks +
+    legend.svg;
+  return { svg, shift: r2(h + 16 + legend.height) };
 }
 
 function esc(value: string | number): string {
@@ -93,7 +135,7 @@ export function renderAnnexureSvg(input: AnnexureInput): string {
   const findings = input.findings;
   const receipts = input.receipts;
 
-  const overlay = input.overlay === undefined ? null : renderOverlay(input.overlay);
+  const overlay = input.overlay === undefined ? null : renderOverlay(input.overlay, findings);
   const shift = overlay === null ? 0 : overlay.shift;
 
   const findingRows = findings
