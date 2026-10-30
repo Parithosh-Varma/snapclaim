@@ -274,4 +274,12 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 - `pwa/sw.js` CACHE v9 → v10 (shell changed).
 - Full audit: no TODOs, no secrets in tree, `.env` untracked, XSS paths escaped (`esc` + `escSeverity` allowlist), caps (50 masks, 1MB both servers, RLE runs, statement chars), CORS allowlist + rate limit on both servers, allowlist/CSP/offline-copy/skeptic-payload parity PWA↔React (React lacks manual coin correction — PWA-only, noted not ported).
 
+## 2026-10-30 — React coin-correction port + stale-tap fix
+
+**Shipped**
+
+- React `Mark.tsx` now mirrors the PWA: tap-coin-to-correct (red ring, wins in `measure()` at 0.9 confidence), tape-halo checkbox with the lenient trace margins, shared `manualCoinRadius()` so the ring shows what gets measured. `session.ts` carries `coinManualPt` (cleared on a new photo) + `coinTaped`.
+- Real bug fixed in both apps: a manual coin tap is pixel coords of its photo. The PWA never cleared it — retaking the photo kept the old tap and measured the wrong reference. `setupMarkPhoto` (PWA) and the Mark photo build (React) now clear it; back-nav from Say keeps it.
+- `pwa/sw.js` CACHE v11 (shell changed). 214 tests green, `tsc` clean, eval 7 pass, React build clean.
+
 **Spend:** $0.00.

@@ -69,6 +69,10 @@ export interface Session {
   gateCoin: GateCoin | null;
   coinLabel: string;
   coinKindMm: number;
+  /** Manual coin-center tap in marking-photo pixels (correction for a missed gate). Cleared on a new photo. */
+  coinManualPt: [number, number] | null;
+  /** Coin has tape: the outline check allows a tape-halo margin. */
+  coinTaped: boolean;
   noScaleMode: boolean;
   dmg: DmgState;
   dmgLabel: string;
@@ -91,6 +95,8 @@ export function createSession(): Session {
     gateCoin: null,
     coinLabel: "",
     coinKindMm: 27,
+    coinManualPt: null,
+    coinTaped: false,
     noScaleMode: false,
     dmg: { points: [], pointMasks: [], mask: null, iou: 0, source: null },
     dmgLabel: "crack",

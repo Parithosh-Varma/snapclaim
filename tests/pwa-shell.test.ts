@@ -92,6 +92,7 @@ test("service worker caches the shell, never the API", () => {
   assert.ok(app.includes("function backendErr"), "status + details ride on a shared error helper");
   assert.ok(app.includes("manualCoinRadius"), "manual coin ring shares its radius with the measured reference");
   assert.ok(!app.includes("coinSrc"), "no dead coin-radius variable with its own math");
+  assert.ok(/setupMarkPhoto\(\) \{[\s\S]{0,800}coinManualPt = null/.test(app), "a new photo clears the previous manual coin tap");
 });
 
 test("PWA scripts load as the right module type", () => {
