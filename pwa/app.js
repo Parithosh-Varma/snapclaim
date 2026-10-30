@@ -1011,6 +1011,13 @@ async function runReport() {
         `<p style="margin-top:8px"><span class="chip ok">Every number cited</span></p>`
       : `<p class="muted">No written summary came back. The measurements above stand on their own.</p>`;
     fillReportDoc();
+    if (lastMeasurement) {
+      fetch(base() + "/v1/sessions", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ findings: lastMeasurement.findings.length, mode: lastMeasurement.mode }),
+      }).catch(() => {});
+    }
   }
   runChecksAuto();
 }
