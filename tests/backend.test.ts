@@ -174,6 +174,22 @@ test("skeptic rejects findings that do not match server recomputation", async ()
   assert.match((res.body as { error: string }).error, /do not match server recomputation/);
 });
 
+test("an upstream timeout surfaces as 502, not a 400 input error", async () => {
+  const p = payload();
+  const measured = await handleRequest({ method: "POST", path: "/v1/measure", body: p, env: {} });
+  const result = (measured.body as { result: { findings: unknown[]; receipts: unknown[] } }).result;
+  const hangingFetch = (() => Promise.reject(new DOMException("The operation was aborted due to timeout", "TimeoutError"))) as typeof fetch;
+  const res = await handleRequest({
+    method: "POST",
+    path: "/v1/skeptic",
+    body: { ...p, transcript: "x", findings: result.findings, receipts: result.receipts },
+    env: LIVE_ENV,
+    fetchFn: hangingFetch,
+  });
+  assert.equal(res.status, 502);
+  assert.match((res.body as { error: string }).error, /aborted due to timeout/);
+});
+
 test("segment in live mode without a key fails closed with 503", async () => {
   const f = loadWallFixture();
   const res = await handleRequest({
