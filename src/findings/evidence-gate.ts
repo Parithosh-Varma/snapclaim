@@ -172,7 +172,7 @@ function validateFinding(
   if (/\bcm(?:2|²)(?![a-z0-9])/i.test(draft.statement) && tokens.length > 0 && cm2Outputs.length > 0) {
     const backedByCm2 = tokens.some((token) => cm2Outputs.some((value) => matchesReceipt(token, value)));
     if (!backedByCm2) {
-      failures.push(`${label}: square-centimetre value does not match any cited calibrated-area receipt`);
+      failures.push(`${label}: cm² value does not match any cited calibrated-area receipt`);
     }
   }
 
