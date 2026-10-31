@@ -59,6 +59,55 @@ export class SamClient {
     );
   }
 
+  private embedCache = new Map<HTMLCanvasElement, Promise<boolean>>();
+  private settleStale: ((v: boolean) => void) | null = null;
+
+  /**
+   * Embed the photo for on-device outlining, once per photo. Resolves true
+   * when the model is ready, false when it fails or a newer photo supersedes
+   * it. Damage taps go to cloud SAM first, so this is only awaited for the
+   * coin outline, the offline fallback and the cross-check — never on entry.
+   */
+  ensureEmbedded(photo: HTMLCanvasElement, quiet = false): Promise<boolean> {
+    const hit = this.embedCache.get(photo);
+    if (hit) return hit;
+    // A newer photo supersedes any in-flight embed: settle it instead of hanging.
+    this.settleStale?.(false);
+    this.settleStale = null;
+    const p = new Promise<boolean>((resolve) => {
+      this.settleStale = (v: boolean) => {
+        this.settleStale = null;
+        resolve(v);
+      };
+      const prevReady = this.onReady;
+      const prevError = this.onError;
+      const prevProgress = this.onProgress;
+      const done = (v: boolean) => {
+        this.settleStale = null;
+        this.onReady = prevReady;
+        this.onError = prevError;
+        this.onProgress = prevProgress;
+        resolve(v);
+      };
+      this.onReady = (device, ms) => {
+        prevReady?.(device, ms);
+        done(true);
+      };
+      this.onError = (message) => {
+        prevError?.(message);
+        done(false);
+      };
+      if (quiet) this.onProgress = null;
+      this.embed(photo);
+    });
+    this.embedCache.set(photo, p);
+    if (this.embedCache.size > 3) {
+      const oldest = this.embedCache.keys().next();
+      if (!oldest.done && oldest.value !== photo) this.embedCache.delete(oldest.value);
+    }
+    return p;
+  }
+
   decode(point: [number, number], preferSmallest: boolean): Promise<SamMask | null> {
     const id = this.decodeId++;
     return new Promise((resolve, reject) => {

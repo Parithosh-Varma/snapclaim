@@ -131,7 +131,8 @@ export default function Mark() {
     setTapCount(s.dmg.points.length);
   }, [s]);
 
-  /* build the marking photo + start the SlimSAM embed for this photo */
+  /* build the marking photo; the on-device model embeds only on demand
+     (coin outline, cloud fallback, cross-check) — never on entry */
   useEffect(() => {
     sam.onProgress = ({ percent }) => setTfState(`Downloading the outlining model… ${percent}%`);
     sam.onReady = (device, embedMs) => {
@@ -164,7 +165,6 @@ export default function Mark() {
       embeddings.current = false;
       setReady(true);
       drawMark();
-      sam.embed(photo);
     };
     img.src = s.stillDataUrl;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -292,8 +292,19 @@ export default function Mark() {
       setMarkBusy(true);
       drawMark();
       // Same mechanism as the crack: trace now so the green fill shown is
-      // exactly what gets measured. Falls back to the estimated circle when
-      // the model is still loading (measure() traces again then).
+      // exactly what gets measured. The model downloads on this first need,
+      // not on entry. Falls back to the estimated circle when it fails.
+      setCoinFixHint("Loading the coin model…");
+      if (s.photo) {
+        const ok = await sam.ensureEmbedded(s.photo);
+        if (!ok) {
+          embeddings.current = false;
+          setCoinFixHint("Coin model failed to load — using the circle; pick its size");
+          setMarkBusy(false);
+          drawMark();
+          return;
+        }
+      }
       if (embeddings.current && s.photo) {
         const w = s.photo.width;
         const h = s.photo.height;
@@ -329,13 +340,17 @@ export default function Mark() {
       console.info("[sam] API failed, using on-device", e);
       source = "device";
       if (!embeddings.current) {
-        s.dmg.points.pop();
-        setStatus(navigator.onLine === false
-          ? "On-device outlining model not available offline yet — reconnect once to download it, then it works offline."
-          : "Outlining model still loading…");
-        setMarkBusy(false);
-        drawMark();
-        return;
+        setStatus("Loading the on-device outlining model…");
+        const ready = s.photo ? await sam.ensureEmbedded(s.photo) : false;
+        if (!ready) {
+          s.dmg.points.pop();
+          setStatus(navigator.onLine === false
+            ? "On-device outlining model not available offline yet — reconnect once to download it, then it works offline."
+            : "Outlining model failed to load — check the connection and retry.");
+          setMarkBusy(false);
+          drawMark();
+          return;
+        }
       }
       try {
         out = await segmentOnDevice(sam, s);
@@ -350,6 +365,8 @@ export default function Mark() {
       s.dmg.iou = out.iou;
       s.dmg.source = source;
       setStatus(`Outlined (${Math.round(out.iou * 100)}% sure) via ${source === "api" ? "SAM 3.1 API" : "on-device"}.`);
+      // Warm the on-device model quietly for the coin outline and cross-check.
+      if (source === "api" && s.photo && !embeddings.current) void sam.ensureEmbedded(s.photo, true);
     } else {
       s.dmg.mask = null;
       s.dmg.source = null;

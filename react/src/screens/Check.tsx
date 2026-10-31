@@ -136,9 +136,15 @@ export default function Check() {
       // Cross-check against the model that did NOT draw the mask.
       let other;
       if (s.dmg.source === "api") {
-        if (!embeddings.current) throw new Error(navigator.onLine === false
-          ? "On-device outlining model not available offline yet — reconnect once to download it, then it works offline."
-          : "On-device model still loading — retry in a moment.");
+        if (!embeddings.current) {
+          if (!s.photo) throw new Error("Mark the damage first.");
+          setXNote("Loading the on-device model…");
+          const ready = await sam.ensureEmbedded(s.photo);
+          setXNote("");
+          if (!ready) throw new Error(navigator.onLine === false
+            ? "On-device outlining model not available offline yet — reconnect once to download it, then it works offline."
+            : "On-device model failed to load — retry in a moment.");
+        }
         const dev = await segmentOnDevice(sam, s);
         if (!dev) throw new Error("The on-device model found nothing at those taps.");
         other = encodeRle(dev.mask, s.photo.width, s.photo.height);
