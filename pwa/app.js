@@ -491,12 +491,16 @@ function circleRle(cx, cy, r, w, h) {
 // SlimSAM runs in sam-worker.js (WebGPU when the phone has it, CPU otherwise), so the
 // ~30 s embedding never freezes the page. A worker that fails only disables outlining.
 let samWorker = null, samPhotoId = 0, samDecodeId = 0;
+// iPhone/iPad Safari kills the tab (a silent reload back to Home) when SlimSAM embeds right
+// after the camera. There the on-device model only loads when the SAM API fails, on the CPU.
+const LOW_MEM = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+let pendingEmbed = null; // the current photo's pixels, held until the on-device model is needed
 const samPending = new Map();
 function sam() {
   if (samWorker) return samWorker;
   // ?device=wasm|webgpu on the page URL forces the worker's backend, for comparisons.
   const url = new URL("./sam-worker.js", import.meta.url);
-  const device = new URLSearchParams(location.search).get("device");
+  const device = new URLSearchParams(location.search).get("device") ?? (LOW_MEM ? "wasm" : null);
   if (device) url.searchParams.set("device", device);
   samWorker = new Worker(url, { type: "module" });
   samWorker.onmessage = ({ data }) => {
@@ -533,10 +537,17 @@ function setupMarkPhoto() {
     $("status").textContent = "Tap the crack, then Measure.";
     embeddings = null;
     samPhotoId++;
-    const image = photo.getContext("2d").getImageData(0, 0, photo.width, photo.height);
-    sam().postMessage({ type: "embed", photoId: samPhotoId, image: { data: image.data, width: image.width, height: image.height } }, [image.data.buffer]);
+    pendingEmbed = photo.getContext("2d").getImageData(0, 0, photo.width, photo.height);
+    if (!LOW_MEM) startEmbed();
   };
   img.src = stillDataUrl;
+}
+/** Hands the current photo to the on-device model, once per photo. */
+function startEmbed() {
+  if (!pendingEmbed) return;
+  const image = pendingEmbed;
+  pendingEmbed = null;
+  sam().postMessage({ type: "embed", photoId: samPhotoId, image: { data: image.data, width: image.width, height: image.height } }, [image.data.buffer]);
 }
 // Cracks are thin, so the worker takes SAM's smallest confident candidate, not the wall
 // around it. Coins are compact, so they keep SAM's best-scoring candidate.
@@ -620,6 +631,7 @@ $("markCanvas").addEventListener("pointerdown", async (ev) => {
   try {
     out = await segmentViaApi(dmg.points);
   } catch (e) {
+    startEmbed(); // iPhone: the on-device model only now, when the API failed
     console.info("[sam] API failed, using on-device", e);
     source = "device";
     if (!embeddings) { dmg.points.pop(); $("status").textContent = "Outlining model still loading…"; return; }
@@ -1188,6 +1200,7 @@ async function runXcheck(auto) {
     // Cross-check against the model that did NOT draw the mask: API mask vs on-device, or the reverse.
     let other;
     if (dmg.source === "api") {
+      if (!embeddings && pendingEmbed) throw new Error("The on-device check is off on this phone to save memory.");
       if (!embeddings) throw new Error("On-device model still loading — retry in a moment.");
       const dev = await segmentOnDevice();
       if (!dev) throw new Error("The on-device model found nothing at those taps.");
