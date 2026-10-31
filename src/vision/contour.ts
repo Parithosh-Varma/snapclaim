@@ -37,6 +37,12 @@ export function traceContours(mask: BinaryMask): Point[][] {
   }
   const used = new Uint8Array(edges.length);
 
+  // Every directed edge is consumed once, so total walk steps are bounded by
+  // 4× the vertex count. Budget it explicitly: without this a crafted mask
+  // (e.g. a full checkerboard) burns seconds, and a missing successor
+  // (nd === -1) would wrap into NaN and loop forever.
+  const maxSteps = edges.length * 4 + 16;
+  let steps = 0;
   const loops: Point[][] = [];
   for (let start = 0; start < edges.length; start++) {
     for (;;) {
@@ -48,6 +54,9 @@ export function traceContours(mask: BinaryMask): Point[][] {
       let v = start;
       let dir = startDir;
       for (;;) {
+        if (++steps > maxSteps) {
+          throw new MeasurementError("contour walk exceeded its step budget — mask too adversarial to outline");
+        }
         used[v]! |= 1 << dir;
         const next = v + DY[dir]! * stride + DX[dir]!;
         // Successor edge is a pure function of the incoming one (TURN_ORDER).
@@ -58,6 +67,9 @@ export function traceContours(mask: BinaryMask): Point[][] {
             nd = d;
             break;
           }
+        }
+        if (nd < 0) {
+          throw new MeasurementError("contour walk reached a dead end — malformed edge graph");
         }
         if (next === start && nd === startDir) break;
         if (nd !== dir) loop.push([next % stride, Math.floor(next / stride)]);

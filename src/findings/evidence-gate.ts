@@ -27,16 +27,55 @@ export class EvidenceError extends Error {
   }
 }
 
-const NUMBER_PATTERN = /(?<![A-Za-z])\d+(?:\.\d+)?/g;
-const ISO_DATE_PATTERN = /\b\d{4}-\d{1,2}-\d{1,2}\b/g;
-const TIME_PATTERN = /\b\d{1,2}:\d{2}(?::\d{2})?\b/g;
+const NUMBER_PATTERN = /(?<![A-Za-z0-9_])[-+]?\d+(?:\.\d+)?/g;
+const ISO_DATE_PATTERN = /\b(\d{4})-(\d{1,2})-(\d{1,2})\b/g;
+const TIME_PATTERN = /\b(\d{1,2}):(\d{2})(?::(\d{2}))?\b/g;
 
 function stripDates(statement: string): string {
-  return statement.replace(ISO_DATE_PATTERN, " ").replace(TIME_PATTERN, " ");
+  // Only strip calendar-valid dates/times so hallucinations like 99:99 or
+  // 9999-99-99 stay visible and must be backed by a receipt.
+  return statement
+    .replace(ISO_DATE_PATTERN, (m, y, mo, d) => {
+      const month = Number(mo);
+      const day = Number(d);
+      void y;
+      return month >= 1 && month <= 12 && day >= 1 && day <= 31 ? " " : m;
+    })
+    .replace(TIME_PATTERN, (m, h, mi, s) => {
+      const hour = Number(h);
+      const min = Number(mi);
+      const sec = s === undefined ? 0 : Number(s);
+      return hour <= 23 && min <= 59 && sec <= 59 ? " " : m;
+    });
 }
 
-function numbersIn(statement: string): number[] {
-  return [...stripDates(statement).matchAll(NUMBER_PATTERN)].map((match) => Number(match[0]));
+function normalized(statement: string): string {
+  // NFKC folds fullwidth / Arabic-Indic digits to ASCII so they cannot
+  // slip past NUMBER_PATTERN invisible to the gate.
+  return statement.normalize("NFKC");
+}
+
+type TokenUnit = "percent" | "mm" | "cm2" | "bare";
+
+interface TypedToken {
+  value: number;
+  unit: TokenUnit;
+}
+
+function typedTokens(statement: string): TypedToken[] {
+  const text = normalized(stripDates(statement));
+  const out: TypedToken[] = [];
+  for (const match of text.matchAll(NUMBER_PATTERN)) {
+    const value = Number(match[0]);
+    if (!Number.isFinite(value)) continue;
+    const after = text.slice((match.index ?? 0) + match[0].length, (match.index ?? 0) + match[0].length + 24).toLowerCase();
+    let unit: TokenUnit = "bare";
+    if (/^\s*(?:cm\s*2|cm2|cm²|square\s*centimet(er|re)s?)/.test(after)) unit = "cm2";
+    else if (/^\s*(?:mm\b|millimet(er|re)s?)/.test(after)) unit = "mm";
+    else if (/^\s*(?:%|percent\b|percentage\b)/.test(after)) unit = "percent";
+    out.push({ value, unit });
+  }
+  return out;
 }
 
 /** A number is backed when it matches a cited receipt output within rounding tolerance. */
@@ -52,6 +91,14 @@ function severityWords(statement: string): string[] {
   }
   return found;
 }
+
+/**
+ * Severity-adjacent language the engine never emits. Without this, "total
+ * loss, replace the whole wall" ships with zero severity evidence while the
+ * gate advertises severity agreement — the canonical bands are the only
+ * verifiable severity vocabulary.
+ */
+const UNVERIFIABLE_SEVERITY = /\b(severe|severely|critical|catastrophic|destroyed|total\s+loss|write-?off|minor|major|negligible|extensive|serious|badly\s+damaged)\b/i;
 
 function maskIdsOf(cited: Receipt[]): string[] {
   const ids: string[] = [];
@@ -72,14 +119,15 @@ export function normalizeReceiptId(id: string): string {
 function unitFailures(statement: string, cited: Receipt[]): string[] {
   const failures: string[] = [];
   const units = new Set(cited.map((receipt) => receipt.output.unit));
+  const text = normalized(statement);
 
-  if (/(?:\d\s*)%|percent\b/i.test(statement) && !units.has("percent")) {
+  if (/(?:\d\s*)%|percent\b/i.test(text) && !units.has("percent")) {
     failures.push(`statement cites a percentage without a cited percent receipt: "${statement}"`);
   }
-  if (/mm\b/i.test(statement) && !units.has("mm")) {
+  if (/mm\b|millimet(er|re)s?/i.test(text) && !units.has("mm")) {
     failures.push(`statement cites millimetres without a cited calibrated-length receipt: "${statement}"`);
   }
-  if (/\bcm(?:2|²)(?![a-z0-9])/i.test(statement) && !units.has("cm2")) {
+  if (/\bcm(?:2|²)(?![a-z0-9])|square\s*centimet(er|re)s?/i.test(text) && !units.has("cm2")) {
     failures.push(`statement cites square centimetres without a cited calibrated-area receipt: "${statement}"`);
   }
   if (/(?<![a-z])m2\b|m²\b/i.test(statement)) {
@@ -109,6 +157,10 @@ function validateFinding(
 
   const cited: Receipt[] = [];
   for (const id of draft.citations) {
+    if (typeof id !== "string") {
+      failures.push(`${label}: cites non-string receipt id`);
+      continue;
+    }
     const receipt = receipts.get(id) ?? receipts.get(normalizeReceiptId(id));
     if (receipt === undefined) {
       failures.push(`${label}: cites unknown receipt "${id}"`);
@@ -121,32 +173,32 @@ function validateFinding(
     return failures;
   }
 
-  const numericOutputs = cited
-    .map((receipt) => receipt.output.value)
-    .filter((value): value is number => typeof value === "number");
-  const percentOutputs = cited
-    .filter((receipt) => receipt.output.unit === "percent")
-    .map((receipt) => receipt.output.value)
-    .filter((value): value is number => typeof value === "number");
-  const mmOutputs = cited
-    .filter((receipt) => receipt.output.unit === "mm")
-    .map((receipt) => receipt.output.value)
-    .filter((value): value is number => typeof value === "number");
-  const cm2Outputs = cited
-    .filter((receipt) => receipt.output.unit === "cm2")
-    .map((receipt) => receipt.output.value)
-    .filter((value): value is number => typeof value === "number");
+  // Only measured value pools back numbers. Count (region_count), scale
+  // (mm_per_px) and band (severity) outputs never back a bare number, so a
+  // region count of 1 cannot launder "1 building" into verified scope.
+  const poolOf = (unit: Receipt["output"]["unit"]): number[] =>
+    cited
+      .filter((receipt) => receipt.output.unit === unit)
+      .map((receipt) => receipt.output.value)
+      .filter((value): value is number => typeof value === "number");
+  const percentOutputs = poolOf("percent");
+  const mmOutputs = poolOf("mm");
+  const cm2Outputs = poolOf("cm2");
+  const numericOutputs = [...percentOutputs, ...mmOutputs, ...cm2Outputs];
 
-  const tokens = numbersIn(draft.statement);
+  const tokens = typedTokens(draft.statement);
   // Every finding must cite at least one measured number. Qualitative-only
   // sentences ("the crack is serious") pass no evidence, so they fail.
   if (tokens.length === 0) {
     failures.push(`${label}: no measured number cited — every finding must cite a receipt value`);
   }
   for (const token of tokens) {
-    const backed = numericOutputs.some((value) => matchesReceipt(token, value));
+    // A typed number must match a receipt of the same unit: 85.9% can only
+    // be backed by a percent receipt, never by an 85.9 mm receipt.
+    const pool = token.unit === "percent" ? percentOutputs : token.unit === "mm" ? mmOutputs : token.unit === "cm2" ? cm2Outputs : numericOutputs;
+    const backed = pool.some((value) => matchesReceipt(token.value, value));
     if (!backed) {
-      failures.push(`${label}: number ${token} is not backed by any cited receipt`);
+      failures.push(`${label}: number ${token.value} is not backed by any cited receipt`);
     }
   }
 
@@ -154,27 +206,9 @@ function validateFinding(
     failures.push(`${label}: ${failure}`);
   }
 
-  // Per-unit backing: a % number must match a cited percent receipt,
-  // an mm number must match a cited calibrated-length receipt,
-  // and a cm2/cm² number must match a cited calibrated-area receipt.
-  if (/(?:\d\s*)%|percent\b/i.test(draft.statement) && tokens.length > 0 && percentOutputs.length > 0) {
-    const backedByPercent = tokens.some((token) => percentOutputs.some((value) => matchesReceipt(token, value)));
-    if (!backedByPercent) {
-      failures.push(`${label}: percentage has no matching cited percent receipt`);
-    }
-  }
-  if (/mm\b/i.test(draft.statement) && tokens.length > 0 && mmOutputs.length > 0) {
-    const backedByMm = tokens.some((token) => mmOutputs.some((value) => matchesReceipt(token, value)));
-    if (!backedByMm) {
-      failures.push(`${label}: millimetre value does not match any cited calibrated-length receipt`);
-    }
-  }
-  if (/\bcm(?:2|²)(?![a-z0-9])/i.test(draft.statement) && tokens.length > 0 && cm2Outputs.length > 0) {
-    const backedByCm2 = tokens.some((token) => cm2Outputs.some((value) => matchesReceipt(token, value)));
-    if (!backedByCm2) {
-      failures.push(`${label}: cm² value does not match any cited calibrated-area receipt`);
-    }
-  }
+  // Per-unit completeness is now enforced per token above (every % token
+  // needs a matching percent receipt, and so on); the legacy existential
+  // `.some` checks were removed because they let swapped units pass.
 
   // One finding, one mask: citing receipts from two different masks mixes evidence.
   const maskIds = maskIdsOf(cited);
@@ -184,6 +218,12 @@ function validateFinding(
 
   // Severity words must agree with the cited severity receipt.
   const words = severityWords(draft.statement);
+  const unverifiable = draft.statement.match(UNVERIFIABLE_SEVERITY);
+  if (unverifiable) {
+    failures.push(
+      `${label}: unverifiable severity language "${unverifiable[0]}" — restate severity with its measured number using cosmetic, moderate or significant`,
+    );
+  }
   if (words.length > 0) {
     const severityReceipts = cited.filter((receipt) => receipt.method === "severity_classification");
     if (severityReceipts.length === 0) {
@@ -205,6 +245,9 @@ function validateFinding(
 
 export function validateFindings(drafts: FindingDraft[], receipts: Receipt[]): GateResult {
   const list = Array.isArray(drafts) ? drafts : [];
+  if (list.length === 0) {
+    return { ok: false, failures: ["no findings: an empty report verifies nothing — the model must cite at least one measured number"] };
+  }
   if (list.length > MAX_DRAFTS) {
     return { ok: false, failures: [`too many findings: ${list.length} > ${MAX_DRAFTS}`] };
   }

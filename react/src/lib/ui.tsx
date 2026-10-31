@@ -1,6 +1,12 @@
 import type { ReactNode } from "react";
 import type { Finding, Receipt } from "./session";
 
+/** Severity allowlist (mirrors escSeverity in pwa/app.js): attacker-shaped
+ * values degrade to a junk-free default instead of a junk class. */
+export function escSeverity(s: string): string {
+  return s === "significant" || s === "moderate" || s === "cosmetic" ? s : "cosmetic";
+}
+
 /** Step progress: "02 / 06" tag + dashes, one component for all six steps. */
 export function Stepper({ step }: { step: number }) {
   return (
@@ -70,7 +76,7 @@ export function MetricCards({ f }: { f: Finding }) {
           </div>
         )}
       </div>
-      <div className={`sevbar sev-${String(f.severity)}`}>
+      <div className={`sevbar sev-${escSeverity(String(f.severity))}`}>
         <span>{String(f.severity).toUpperCase()}</span>
         <small>severity band</small>
       </div>

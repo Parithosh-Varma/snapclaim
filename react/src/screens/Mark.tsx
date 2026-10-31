@@ -5,7 +5,7 @@ import { checkPhoto } from "../lib/photo-check";
 import { circleRle, encodeRle } from "../lib/rle";
 import { closeMask } from "../lib/mask";
 import { segmentViaApi, type SamClient } from "../lib/sam";
-import { COIN_OPTIONS, resetDmg, type SamMask, type Session } from "../lib/session";
+import { COIN_GROUPS, COIN_OPTIONS, resetDmg, type SamMask, type Session } from "../lib/session";
 import { BackButton, Stepper } from "../lib/ui";
 
 const MAX_SIDE = 512;
@@ -37,7 +37,10 @@ export default function Mark() {
   const [photoNotes, setPhotoNotes] = useState("");
   const [label, setLabel] = useState(s.dmgLabel);
   const [coinKind, setCoinKind] = useState(s.coinKindMm);
+  const [coinCustom, setCoinCustom] = useState("");
   const [hasMask, setHasMask] = useState(!!s.dmg.mask);
+  const [tapCount, setTapCount] = useState(s.dmg.points.length);
+  const [markBusy, setMarkBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const [coinCorrect, setCoinCorrect] = useState(false);
   const [coinFixHint, setCoinFixHint] = useState("");
@@ -106,6 +109,7 @@ export default function Mark() {
       g.stroke();
     }
     setHasMask(!!s.dmg.mask);
+    setTapCount(s.dmg.points.length);
   }, [s]);
 
   /* build the marking photo + start the SlimSAM embed for this photo */
@@ -250,7 +254,7 @@ export default function Mark() {
   }, [ctx.measureRef, measure]);
 
   const onTap = async (ev: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!s.photo || !ready) return;
+    if (!s.photo || !ready || markBusy) return;
     const c = canvasRef.current;
     if (!c) return;
     const r = c.getBoundingClientRect();
@@ -265,6 +269,7 @@ export default function Mark() {
     }
     s.dmg.points.push([x, y]);
     setStatus("Outlining…");
+    setMarkBusy(true);
     // SAM 3.1 API first; the on-device model only when the API call fails.
     let out: SamMask | null = null;
     let source: "api" | "device" = "api";
@@ -278,6 +283,7 @@ export default function Mark() {
         setStatus(navigator.onLine === false
           ? "On-device outlining model not available offline yet — reconnect once to download it, then it works offline."
           : "Outlining model still loading…");
+        setMarkBusy(false);
         drawMark();
         return;
       }
@@ -299,8 +305,74 @@ export default function Mark() {
       s.dmg.source = null;
       setStatus("No mask there. Tap the middle of it.");
     }
+    setMarkBusy(false);
     drawMark();
   };
+
+  const undo = useCallback(async () => {
+    if (!s.photo || markBusy) return;
+    if (coinCorrect) {
+      setCoinCorrect(false);
+      setCoinFixHint("");
+      drawMark();
+      return;
+    }
+    if (s.dmg.points.length) {
+      s.dmg.points.pop();
+      s.dmg.pointMasks.pop();
+      if (!s.dmg.points.length) {
+        s.dmg.mask = null;
+        s.dmg.iou = 0;
+        s.dmg.source = null;
+        setStatus("Tap the crack, then Measure.");
+        drawMark();
+        return;
+      }
+      setMarkBusy(true);
+      setStatus("Outlining… (undo)");
+      let out: SamMask | null = null;
+      const source = s.dmg.source ?? "api";
+      if (source === "device") {
+        const found = s.dmg.pointMasks.filter((m): m is SamMask => !!m);
+        if (found.length) {
+          const union = new Uint8Array((found[0] as SamMask).mask.length);
+          for (const { mask } of found) for (let i = 0; i < union.length; i++) union[i] = (union[i] ?? 0) | (mask[i] ?? 0);
+          out = { mask: union, iou: Math.min(...found.map((f) => f.iou)) } as SamMask;
+        }
+      } else {
+        try {
+          out = await segmentViaApi(base, s.photo, s.dmg.points);
+        } catch (e) {
+          console.info("[sam] undo re-segment failed, trying on-device", e);
+          if (embeddings.current) {
+            s.dmg.pointMasks = [];
+            try {
+              out = await segmentOnDevice(sam, s);
+            } catch {
+              out = null;
+            }
+          }
+        }
+      }
+      if (out) {
+        s.dmg.mask = closeMask(out.mask, s.photo.width, s.photo.height, 2);
+        s.dmg.iou = out.iou;
+        setStatus(`Outlined (${Math.round(s.dmg.iou * 100)}% sure). ${s.dmg.points.length} tap${s.dmg.points.length > 1 ? "s" : ""} left.`);
+      } else {
+        s.dmg.mask = null;
+        s.dmg.source = null;
+        setStatus("Undo done — remaining taps found nothing. Tap again.");
+      }
+      setMarkBusy(false);
+      drawMark();
+      return;
+    }
+    if (s.coinManualPt) {
+      s.coinManualPt = null;
+      setCoinFixHint("");
+      drawMark();
+    }
+  }, [base, coinCorrect, drawMark, embeddings, markBusy, s, sam]);
 
   return (
     <section className="screen on" aria-labelledby="h-mark">
@@ -311,6 +383,18 @@ export default function Mark() {
         <p className="sub">One tap on the crack. The coin is already outlined from the gate.</p>
         <div className="card">
           <canvas id="markCanvas" ref={canvasRef} onPointerDown={onTap} />
+          <div style={{ display: "flex", gap: 8, margin: "8px 0 2px" }}>
+            <button
+              id="undoBtn"
+              className="btn-ghostline"
+              type="button"
+              style={{ flex: 1, minHeight: 44 }}
+              disabled={markBusy || (tapCount === 0 && !s.coinManualPt && !coinCorrect)}
+              onClick={undo}
+            >
+              ↩ Undo last tap
+            </button>
+          </div>
           <div className="seg" role="group" aria-label="Damage type">
             {CHIPS.slice(0, 2).map((chip) => (
               <button
@@ -347,26 +431,63 @@ export default function Mark() {
             Scale reference (auto-detected — confirm)
             <select
               id="coinKind"
-              value={coinKind}
+              value={coinCustom ? 0 : coinKind}
               onChange={(e) => {
                 const v = Number(e.target.value);
+                const text = e.target.selectedOptions[0]?.text ?? "";
                 setCoinKind(v);
+                setCoinCustom("");
                 s.coinKindMm = v;
+                s.coinLabel = v > 0 ? text.replace(/ · (\d+(?:\.\d+)?) mm$/, " · Ø$1 mm") : "";
               }}
             >
-              {[
-                ...(s.coinKindMm > 0 && !COIN_OPTIONS.some((o) => o.value === s.coinKindMm)
-                  ? [{ value: s.coinKindMm, label: s.coinLabel || `${s.coinKindMm} mm reference` }]
-                  : []),
-                ...COIN_OPTIONS,
-              ].map((o) => (
-                <option key={o.label} value={o.value}>{o.label}</option>
+              <option value={0}>Choose the reference size…</option>
+              {s.coinKindMm > 0 && !COIN_OPTIONS.some((o) => o.value === s.coinKindMm) && !coinCustom ? (
+                <option value={s.coinKindMm}>{s.coinLabel || `${s.coinKindMm} mm reference`}</option>
+              ) : null}
+              {COIN_GROUPS.map((g) => (
+                <optgroup key={g.name} label={g.name}>
+                  {g.options.map((o) => (
+                    <option key={o.label} value={o.value}>{o.label}</option>
+                  ))}
+                </optgroup>
               ))}
             </select>
+          </label>
+          <label className="field" style={{ marginTop: 6 }}>
+            Or type the diameter (any coin, ruler, card)
+            <input
+              id="coinCustomMm"
+              className="field-input"
+              type="number"
+              inputMode="decimal"
+              min={5}
+              max={100}
+              step="0.01"
+              placeholder="e.g. 24.26"
+              value={coinCustom}
+              onChange={(e) => {
+                const raw = e.target.value;
+                setCoinCustom(raw);
+                const mm = Number(raw);
+                if (mm > 0) {
+                  setCoinKind(0);
+                  s.coinKindMm = mm;
+                  s.coinLabel = `Custom · Ø${mm} mm`;
+                } else {
+                  s.coinKindMm = coinKind;
+                  s.coinLabel = "";
+                }
+              }}
+            />
           </label>
           {(s.gateCoin || s.coinManualPt) && s.coinKindMm <= 0 ? (
             <div className="hint" style={{ fontSize: 13, color: "#5b6b8c" }}>
               Choose the reference size so the scale is known.
+            </div>
+          ) : !s.gateCoin && !s.coinManualPt ? (
+            <div className="hint" style={{ fontSize: 13, color: "#5b6b8c" }}>
+              No coin yet — tap “Tap coin to correct” to add one, or measure percent-only.
             </div>
           ) : null}
           <div style={{ display: "flex", gap: 8, margin: "6px 0 10px" }}>

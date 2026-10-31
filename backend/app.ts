@@ -1,6 +1,7 @@
 import { measureSession } from "../src/engine/measure.ts";
+import { assertDamageLabel } from "../src/engine/measure.ts";
 import { type ReferenceDiagnostics, circularReference, observeMask, tiltStretch } from "../src/vision/observe.ts";
-import { MAX_MASK_DIMENSION, MAX_MASK_PIXELS, MAX_RLE_RUNS, decodeRle, intersectMasks, type BinaryMask, type CocoRle } from "../src/vision/mask.ts";
+import { MAX_MASK_DIMENSION, MAX_MASK_PIXELS, MAX_RLE_RUNS, MAX_TOTAL_MASK_PIXELS, decodeRle, intersectMasks, type BinaryMask, type CocoRle } from "../src/vision/mask.ts";
 import { agreementVerdict, maskAgreement } from "../src/vision/agreement.ts";
 import type { MeasureSessionInput } from "../src/engine/types.ts";
 import { MAX_CITATIONS_PER_FINDING, MAX_DRAFTS, MAX_STATEMENT_CHARS, validateFindings, type FindingDraft } from "../src/findings/evidence-gate.ts";
@@ -15,7 +16,7 @@ import { configFromEnv, findingsProvider, requireLiveKeys, skepticProvider, visi
 import {
   DEFAULT_KEYWORDS,
   DEFAULT_LANGUAGE_BIAS,
-  estimateAudioUsd,
+  TRANSCRIBE_COST_CEILING_USD,
   sanitizeList,
   transcribeWithMuse,
   type TranscribeResult,
@@ -187,6 +188,9 @@ export function crosscheckBody(body: unknown, requestId = newRequestId()): Envel
   const threshold = body.threshold === undefined ? 0.5 : requireNumber(body.threshold, "threshold");
   const a = parseRle(body.a, "a");
   const b = parseRle(body.b, "b");
+  if (a.width * a.height + b.width * b.height > MAX_TOTAL_MASK_PIXELS) {
+    throw new HttpError(400, `masks exceed the per-request ${MAX_TOTAL_MASK_PIXELS}-pixel budget; chunk the request`);
+  }
   if (a.width !== b.width || a.height !== b.height) {
     throw new HttpError(422, `masks differ in size: ${a.width}x${a.height} vs ${b.width}x${b.height}`);
   }
@@ -206,6 +210,9 @@ export function observeBody(body: unknown, requestId = newRequestId()): Envelope
     if (!isRecord(raw)) throw new HttpError(400, `masks[${i}] must be an object`);
     return { raw, mask: parseRle(raw.rle, `masks[${i}]`) };
   });
+  // Aggregate pixel budget: each mask is individually capped by parseRle,
+  // but fifty 4096² masks (~20 RLE bytes each) would still expand to ~800MB.
+  // Sum before any pixel visiting (outline/skeletonize) happens below.
   const first = decoded[0]!.mask;
   const sameSize = (m: BinaryMask, name: string) => {
     if (m.width !== first.width || m.height !== first.height) {
@@ -213,6 +220,7 @@ export function observeBody(body: unknown, requestId = newRequestId()): Envelope
     }
   };
   decoded.forEach((d, i) => sameSize(d.mask, `masks[${i}]`));
+  let totalPixels = decoded.length * first.width * first.height;
 
   let componentMask: BinaryMask | undefined;
   let componentObs: { id: string; areaPx: number; confidence: number };
@@ -222,6 +230,7 @@ export function observeBody(body: unknown, requestId = newRequestId()): Envelope
     if (!isRecord(component)) throw new HttpError(400, "component must be an object");
     componentMask = parseRle(component.rle, "component");
     sameSize(componentMask, "component");
+    totalPixels += componentMask.width * componentMask.height;
     let areaPx = 0;
     for (const v of componentMask.data) if (v !== 0) areaPx++;
     componentObs = {
@@ -238,6 +247,7 @@ export function observeBody(body: unknown, requestId = newRequestId()): Envelope
     if (!isRecord(reference)) throw new HttpError(400, "reference must be an object");
     refMask = parseRle(reference.rle, "reference");
     sameSize(refMask, "reference");
+    totalPixels += refMask.width * refMask.height;
     try {
       measuredReference = circularReference(refMask, {
         id: requireId(reference.id, "reference.id"),
@@ -248,11 +258,19 @@ export function observeBody(body: unknown, requestId = newRequestId()): Envelope
       throw new HttpError(422, `reference: ${error instanceof Error ? error.message : "cannot measure"}`);
     }
   }
+  if (totalPixels > MAX_TOTAL_MASK_PIXELS) {
+    throw new HttpError(400, `masks exceed the per-request ${MAX_TOTAL_MASK_PIXELS}-pixel budget; chunk the request`);
+  }
   const stretch = measuredReference && tiltStretch(measuredReference.diagnostics);
 
   const observed = decoded.map(({ raw, mask }, i) => {
     const label = raw.label;
     if (typeof label !== "string") throw new HttpError(400, `masks[${i}].label must be a string`);
+    try {
+      assertDamageLabel(label);
+    } catch {
+      throw new HttpError(400, `masks[${i}].label must be one of crack, stain, peel, dent`);
+    }
     return observeMask(mask, {
       id: requireId(raw.id, `masks[${i}].id`),
       label: label as never,
@@ -279,7 +297,13 @@ export function observeBody(body: unknown, requestId = newRequestId()): Envelope
     },
   };
   if (measuredReference && refMask) {
-    result.scaleReference = measuredReference.reference;
+    // A refused coin (covered, tilted past the limit) carries confidence 0
+    // and must never become a scaleReference: with MIN_REFERENCE_CONFIDENCE=0
+    // a conf-0 reference would otherwise upgrade junk to absolute millimetres.
+    // The diagnostics still ship so the PWA can explain the refusal.
+    if (measuredReference.diagnostics.rejected === undefined) {
+      result.scaleReference = measuredReference.reference;
+    }
     result.referenceCheck = measuredReference.diagnostics;
     result.overlay.masks.push({ id: measuredReference.reference.id, label: "coin", path: maskOutlinePath(refMask, { tolerance: OUTLINE_TOLERANCE_PX }) });
   }
@@ -350,19 +374,34 @@ export async function segmentBody(body: unknown, env: Env, requestId = newReques
     return { x: requireNumber(point.x, `points[${i}].x`), y: requireNumber(point.y, `points[${i}].y`) };
   });
   const spend = guardFor(env);
-  if (spend.remainingUsd <= 0) throw new HttpError(429, `spend guard: $0 remaining of $${spend.limitUsd} limit`);
+  // Reserve the fixed SAM price BEFORE the upstream call: concurrent callers
+  // then serialize on the budget instead of each passing a stale
+  // $0-remaining check and billing after the fact.
+  let samHold: ReturnType<typeof spend.reserve> | undefined;
+  try {
+    samHold = spend.reserve("sam segment ceiling", SAM_IMAGE_USD);
+  } catch (error) {
+    if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
+    throw error;
+  }
   // Best-effort archival: inline inputs are stored in the Supabase bucket so
   // the exact measured pixels stay re-runnable. Never blocks measurement.
   const archivedImageUrl = await archiveSegmentImage(env, imageUrl, requestId, fetchFn);
-  const sam = await segmentWithSam({
-    fetchFn,
-    base: config.endpoints.meta,
-    apiKey: metaKey,
-    model: config.models.sam,
-    request: { imageUrl, size: { width: Math.round(width), height: Math.round(height) }, points },
-  });
+  let sam: Awaited<ReturnType<typeof segmentWithSam>>;
   try {
-    spend.charge(`sam segment ${sam.records.length} objects`, SAM_IMAGE_USD);
+    sam = await segmentWithSam({
+      fetchFn,
+      base: config.endpoints.meta,
+      apiKey: metaKey,
+      model: config.models.sam,
+      request: { imageUrl, size: { width: Math.round(width), height: Math.round(height) }, points },
+    });
+  } catch (error) {
+    samHold.release();
+    throw error;
+  }
+  try {
+    samHold.settle(`sam segment ${sam.records.length} objects`, SAM_IMAGE_USD);
   } catch (error) {
     if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
     throw error;
@@ -405,8 +444,19 @@ export function assertSafeImageUrl(imageUrl: string): void {
   if (url.protocol !== "https:") throw new HttpError(400, "live /v1/segment imageUrl must be https:// or data:image/");
   if (url.username !== "" || url.password !== "") throw new HttpError(400, "live /v1/segment imageUrl must not embed credentials");
   if (url.port !== "") throw new HttpError(400, "live /v1/segment imageUrl must use the default https port");
-  const host = url.hostname.toLowerCase();
-  if (host === "localhost" || host.endsWith(".localhost") || host === "[::1]" || host === "::1") {
+  const host = url.hostname.toLowerCase().replace(/\.+$/, "");
+  if (host === "localhost" || host.endsWith(".localhost") || host === "[::1]" || host === "::1" || host === "") {
+    throw new HttpError(400, "live /v1/segment imageUrl must be a public host");
+  }
+  // Numeric-literal block: dotted quads miss decimal ("https://2130706433/"),
+  // octal ("https://0177.0.0.1/"), hex and short-form ("https://127.1/")
+  // spellings of the same loopback/private addresses. Any host made only of
+  // numeric labels is an IP-literal attempt — real public image hosts never
+  // look like that — so fail closed without trying to emulate the WHATWG
+  // parser branch by branch.
+  const labels = host.split(".");
+  const numericish = /^(0x[0-9a-f]+|0[0-9]+|[0-9]+)$/i;
+  if (labels.length >= 1 && labels.length <= 4 && labels.every((part) => numericish.test(part))) {
     throw new HttpError(400, "live /v1/segment imageUrl must be a public host");
   }
   // Literal-IP block: loopback, private, link-local, multicast, reserved.
@@ -424,6 +474,10 @@ export function assertSafeImageUrl(imageUrl: string): void {
   if (host.includes(":") || host === "0.0.0.0") {
     throw new HttpError(400, "live /v1/segment imageUrl must be a public host");
   }
+  // Residual: DNS rebinding and redirects cannot be ruled out by a string
+  // check. Impact stays limited because the backend never fetches this URL
+  // itself — it only forwards it to Meta's Responses API (segmentWithSam) —
+  // so there is no victim-VPC metadata fetch from our network.
 }
 
 function base64ToBytes(value: unknown): Uint8Array {
@@ -461,22 +515,36 @@ export async function transcribeBody(body: unknown, env: Env, requestId = newReq
   const languageBias = sanitizeList(body.languageBias, DEFAULT_LANGUAGE_BIAS);
   const keywords = sanitizeList(body.keywords, DEFAULT_KEYWORDS);
   const spend = guardFor(env);
-  if (spend.remainingUsd <= 0) throw new HttpError(429, `spend guard: $0 remaining of $${spend.limitUsd} limit`);
-  const result = await transcribeWithMuse({
-    fetchFn,
-    base: config.endpoints.meta,
-    apiKey: metaKey,
-    model: config.models.transcribe,
-    audio: { audio, languageBias: languageBias.length > 0 ? languageBias : undefined, keywords },
-    charge: (label, usd) => {
-      try {
-        spend.charge(label, usd);
-      } catch (error) {
-        if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
-        throw error;
-      }
-    },
-  });
+  // 4MB of audio ≈ 125s ≈ $0.006 at $0.18/hr: hold a ceiling first so
+  // concurrent callers cannot all pass the check and bill after the fact.
+  let voiceHold: ReturnType<typeof spend.reserve> | undefined;
+  try {
+    voiceHold = spend.reserve("transcribe ceiling", TRANSCRIBE_COST_CEILING_USD);
+  } catch (error) {
+    if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
+    throw error;
+  }
+  let result: TranscribeResult;
+  try {
+    result = await transcribeWithMuse({
+      fetchFn,
+      base: config.endpoints.meta,
+      apiKey: metaKey,
+      model: config.models.transcribe,
+      audio: { audio, languageBias: languageBias.length > 0 ? languageBias : undefined, keywords },
+      charge: (label, usd) => {
+        try {
+          voiceHold?.settle(label, usd);
+        } catch (error) {
+          if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
+          throw error;
+        }
+      },
+    });
+  } catch (error) {
+    voiceHold?.release();
+    throw error;
+  }
   return envelope(requestId, started, result);
 }
 
@@ -650,13 +718,16 @@ export function toSavedSession(body: unknown): SavedSession {
 }
 
 const CORS_METHODS = "GET, POST, OPTIONS";
-const CORS_HEADERS = "content-type";
+const CORS_HEADERS = "content-type, authorization";
 
 export function corsHeaders(): Record<string, string> {
   return {
     "access-control-allow-origin": "*",
     "access-control-allow-methods": CORS_METHODS,
     "access-control-allow-headers": CORS_HEADERS,
+    // Echoed-origin responses vary by Origin: without this a shared cache
+    // could serve one origin's ACAO header to another.
+    vary: "Origin",
   };
 }
 
@@ -676,11 +747,12 @@ export function corsHeadersFor(origin: string | null, env: Env = {}): Record<str
     .map((entry) => entry.trim())
     .filter((entry) => entry !== "");
   if (allowed.length === 0) {
-    const mockMode = (env.MOCK_MODE ?? "1") !== "0";
+    const mockMode = effectiveMockMode(env);
     if (mockMode) return corsHeaders();
     return {
       "access-control-allow-methods": CORS_METHODS,
       "access-control-allow-headers": CORS_HEADERS,
+      vary: "Origin",
     };
   }
   if (origin !== null && allowed.includes(origin)) {
@@ -690,6 +762,7 @@ export function corsHeadersFor(origin: string | null, env: Env = {}): Record<str
   return {
     "access-control-allow-methods": CORS_METHODS,
     "access-control-allow-headers": CORS_HEADERS,
+    vary: "Origin",
   };
 }
 

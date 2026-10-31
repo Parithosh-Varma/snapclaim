@@ -72,6 +72,27 @@ function base() {
   if (!isAllowedBackendUrl(backendUrl)) throw new Error(POLICY_BACKEND_MESSAGE);
   return backendUrl;
 }
+/* Backend mode cache: one /v1/health per minute. In mock mode the PWA skips
+ * the live-only API attempts (/v1/segment point prompts, server transcribe)
+ * and goes straight to the on-device models — no pointless 400s, no log noise,
+ * faster taps. Unknown mode (offline/unreachable) keeps the old try-API-first
+ * behaviour so live backends behind a flaky first fetch still work. */
+let backendModeCache = null, backendModeAt = 0;
+async function getBackendMode() {
+  if (backendModeCache && Date.now() - backendModeAt < 60_000) return backendModeCache;
+  try {
+    const r = await fetch(base() + "/v1/health");
+    const j = await r.json().catch(() => ({}));
+    if (typeof j.mode === "string") { backendModeCache = j.mode; backendModeAt = Date.now(); return j.mode; }
+  } catch { /* unreachable: caller falls back to try-API-first */ }
+  return null;
+}
+/* Low-memory phones default the outlining worker to CPU (see sam-worker.js):
+ * name that state on the Mark screen so "slower but stable" reads as intent. */
+function isLowMemDevice() {
+  const gb = Number(navigator.deviceMemory) || 0;
+  return gb > 0 && gb <= 4;
+}
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
 /* Offline honesty: the service worker never caches cross-origin responses, so
  * the jsDelivr/Hugging Face bytes behind sam-worker.js and voice-worker.js
@@ -85,6 +106,20 @@ function offlineModelMessage(kind) {
 function escSeverity(s) {
   const v = String(s);
   return v === "significant" || v === "moderate" || v === "cosmetic" ? v : "cosmetic";
+}
+
+/* Annexure download hardening: the preview renders in <img> (script-inert),
+ * but the downloaded .svg opens as a document and would run embedded scripts
+ * or follow javascript:/data:text/html links on click. Strip scriptable
+ * content — including self-closing <foreignObject/> and href-based vectors
+ * the old regexes missed — before creating the Blob. */
+function sanitizeSvg(svg) {
+  return String(svg)
+    .replace(/<script[\s\S]*?<\/script\s*>/gi, "")
+    .replace(/<foreignObject[\s\S]*?<\/foreignObject\s*>/gi, "")
+    .replace(/<foreignObject\b[^>]*\/>/gi, "")
+    .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/\s(?:xlink:href|href)\s*=\s*("\s*(?:javascript|data\s*:\s*text\/html)[^"]*"|'\s*(?:javascript|data\s*:\s*text\/html)[^']*'|(?:javascript|data\s*:)[^\s>]*)/gi, "");
 }
 
 /* ---------- navigation ---------- */
@@ -226,17 +261,36 @@ function placeRing(det, fw, fh) {
   ring.style.left = cx - r + "px"; ring.style.top = cy - r + "px";
   ring.style.width = r * 2 + "px"; ring.style.height = r * 2 + "px";
 }
+/** Diameter in mm from the custom field (wins) or the preset select. */
+function getCoinSizeMm() {
+  const custom = Number($("coinCustomMm")?.value);
+  if (custom > 0 && custom <= 200) return custom;
+  return Number($("coinKind")?.value) || 0;
+}
+/** Hint under the coin picker: what the user must do next for scale. */
+function updateCoinHintMark() {
+  const el = $("coinHintMark");
+  if (!el) return;
+  const hasCoin = !!(gateCoin || coinManualPt);
+  const mm = getCoinSizeMm();
+  if (hasCoin && !(mm > 0)) el.textContent = "Choose the reference size so the scale is known.";
+  else if (!hasCoin) el.textContent = "No coin yet — tap “Tap coin to correct” to add one, or measure percent-only.";
+  else el.textContent = "";
+}
 /** Select a known diameter, adding a one-off option when the coin is outside the preset list. */
 function setCoinSize(mm, label) {
   const sel = $("coinKind");
   if (!sel) return;
-  if (!(mm > 0)) { sel.value = "0"; return; }
+  const custom = $("coinCustomMm");
+  if (custom) custom.value = "";
+  if (!(mm > 0)) { sel.value = "0"; updateCoinHintMark(); return; }
   let opt = [...sel.options].find((o) => Number(o.value) === mm);
   if (!opt) {
     opt = new Option(label ? `${label} · ${mm} mm` : `${mm} mm reference`, String(mm));
     sel.add(opt);
   }
   sel.value = String(mm);
+  updateCoinHintMark();
 }
 function identifyCoin(det, fw, fh) {
   try {
@@ -598,7 +652,7 @@ function setupMarkPhoto() {
     photo.getContext("2d", { willReadFrequently: true }).drawImage(img, 0, 0, photo.width, photo.height);
     dmg = { points: [], pointMasks: [], mask: null, iou: 0, source: null };
     // A manual coin tap is pixel coords of the previous photo — never reuse it.
-    coinManualPt = null; coinCorrectMode = false;
+    coinManualPt = null; coinCorrectMode = false; markBusy = false;
     const fixBtn = $("coinFixBtn");
     if (fixBtn) { fixBtn.textContent = "Tap coin to correct"; fixBtn.classList.remove("on"); }
     const fixHint = $("coinFixHint");
@@ -608,10 +662,46 @@ function setupMarkPhoto() {
     $("status").textContent = "Tap the crack, then Measure.";
     embeddings = null;
     samPhotoId++;
-    const image = photo.getContext("2d").getImageData(0, 0, photo.width, photo.height);
-    sam().postMessage({ type: "embed", photoId: samPhotoId, image: { data: image.data, width: image.width, height: image.height } }, [image.data.buffer]);
+    samEmbedStartedFor = -1;
+    samArmed = false;
+    // Low-memory phones (<=4 GB): the on-device model OOM-kills the whole
+    // browser (LMK took Chrome at 2.2 GB GPU / WASM alike on a Galaxy A32).
+    // Never auto-load it there — the API path is tried first, and on-device
+    // only starts after an explicit second tap (see the tap handler).
+    if (isLowMemDevice()) {
+      samDeferred = true;
+      $("tfState").textContent = "Low-memory phone — automatic outlining first, on-device only if you retry.";
+    } else {
+      samDeferred = false;
+      startSamEmbed();
+    }
   };
   img.src = stillDataUrl;
+}
+let samDeferred = false, samArmed = false, samEmbedStartedFor = -1;
+function startSamEmbed() {
+  if (!photo || samEmbedStartedFor === samPhotoId) return;
+  samEmbedStartedFor = samPhotoId;
+  const image = photo.getContext("2d").getImageData(0, 0, photo.width, photo.height);
+  sam().postMessage({ type: "embed", photoId: samPhotoId, image: { data: image.data, width: image.width, height: image.height } }, [image.data.buffer]);
+}
+/** Low-mem second-tap gate: returns true when the caller may proceed on-device
+ * (worker already loading/ready, or user just armed the retry). Pops the point
+ * and names the state otherwise. */
+function gateLowMemOnDevice() {
+  if (!samDeferred) return true;
+  if (samEmbedStartedFor === samPhotoId) return true; // loading or ready
+  if (!samArmed) {
+    samArmed = true;
+    dmg.points.pop();
+    $("status").textContent = "This phone is low on memory — close other tabs/apps, then tap again to load the slower on-device model.";
+    return false;
+  }
+  $("tfState").textContent = "Loading the on-device outlining model (one-time download)…";
+  $("status").textContent = "Loading on-device model…";
+  startSamEmbed();
+  dmg.points.pop();
+  return false;
 }
 // Cracks are thin, so the worker takes SAM's smallest confident candidate, not the wall
 // around it. Coins are compact, so they keep SAM's best-scoring candidate.
@@ -693,9 +783,72 @@ function drawMark() {
     ctx.beginPath(); ctx.arc(x, y, Math.max(5, c.width / 120), 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   }
   $("measureBtn").disabled = !dmg.mask;
+  const undo = $("undoBtn");
+  if (undo) undo.disabled = markBusy || (dmg.points.length === 0 && !coinManualPt && !coinCorrectMode);
+  updateCoinHintMark();
 }
+let markBusy = false;
+$("undoBtn")?.addEventListener("click", async () => {
+  if (!photo || markBusy) return;
+  // Cancel a coin-correction armed tap first — cheapest undo.
+  if (coinCorrectMode) {
+    coinCorrectMode = false;
+    $("coinFixHint").textContent = "";
+    $("coinFixBtn").textContent = "Tap coin to correct";
+    $("coinFixBtn").classList.remove("on");
+    drawMark();
+    return;
+  }
+  // Undo the last damage tap, recomputing the union from what remains.
+  if (dmg.points.length) {
+    dmg.points.pop();
+    dmg.pointMasks.pop();
+    if (!dmg.points.length) {
+      dmg.mask = null; dmg.iou = 0; dmg.source = null;
+      $("status").textContent = "Tap the crack, then Measure.";
+      drawMark();
+      return;
+    }
+    markBusy = true;
+    drawMark();
+    $("status").textContent = "Outlining… (undo)";
+    let out = null;
+    const source = dmg.source || "api";
+    if (source === "device") {
+      // On-device masks are already decoded: reunion locally, no new SAM call.
+      const found = dmg.pointMasks.filter(Boolean);
+      if (found.length) {
+        const union = new Uint8Array(found[0].mask.length);
+        for (const { mask } of found) for (let i = 0; i < union.length; i++) union[i] |= mask[i];
+        out = { mask: union, iou: Math.min(...found.map((f) => f.iou)) };
+      }
+    } else if (await getBackendMode() !== "mock") {
+      try { out = await segmentViaApi(dmg.points); }
+      catch (e) {
+        console.info("[sam] undo re-segment failed, trying on-device", e);
+        if (embeddings) { dmg.pointMasks = []; try { out = await segmentOnDevice(); } catch { out = null; } }
+      }
+    } else if (embeddings) {
+      dmg.pointMasks = [];
+      try { out = await segmentOnDevice(); } catch { out = null; }
+    }
+    if (out) {
+      dmg.mask = closeMask(out.mask, photo.width, photo.height, 2); dmg.iou = out.iou;
+      $("status").textContent = `Outlined (${Math.round(dmg.iou * 100)}% sure). ${dmg.points.length} tap${dmg.points.length > 1 ? "s" : ""} left.`;
+    } else { dmg.mask = null; dmg.source = null; $("status").textContent = "Undo done — remaining taps found nothing. Tap again."; }
+    markBusy = false;
+    drawMark();
+    return;
+  }
+  // Nothing else left: clear the manual coin tap.
+  if (coinManualPt) {
+    coinManualPt = null;
+    $("coinFixHint").textContent = "";
+    drawMark();
+  }
+});
 $("markCanvas").addEventListener("pointerdown", async (ev) => {
-  if (!photo) return;
+  if (!photo || markBusy) return;
   const c = $("markCanvas"), rc = c.getBoundingClientRect();
   const x = Math.round((ev.clientX - rc.left) * (c.width / rc.width));
   const y = Math.round((ev.clientY - rc.top) * (c.height / rc.height));
@@ -710,15 +863,25 @@ $("markCanvas").addEventListener("pointerdown", async (ev) => {
   }
   dmg.points.push([x, y]);
   $("status").textContent = "Outlining…";
+  markBusy = true;
+  drawMark();
   // SAM 3.1 API first; the on-device model only when the API call fails.
+  // In mock mode the API path is unwired by design (backend invents no masks),
+  // so skip the doomed request and go straight on-device.
   let out = null, source = "api";
+  if (await getBackendMode() === "mock") {
+    source = "device";
+    if (!embeddings) { if (!gateLowMemOnDevice()) { markBusy = false; drawMark(); return; } dmg.points.pop(); $("status").textContent = isOfflineNow() ? offlineModelMessage("outlining") : "Outlining model still loading…"; markBusy = false; drawMark(); return; }
+    try { out = await segmentOnDevice(); } catch { out = null; }
+  } else {
   try {
     out = await segmentViaApi(dmg.points);
   } catch (e) {
     console.info("[sam] API failed, using on-device", e);
     source = "device";
-    if (!embeddings) { dmg.points.pop(); $("status").textContent = isOfflineNow() ? offlineModelMessage("outlining") : "Outlining model still loading…"; return; }
+    if (!embeddings) { if (!gateLowMemOnDevice()) { markBusy = false; drawMark(); return; } dmg.points.pop(); $("status").textContent = isOfflineNow() ? offlineModelMessage("outlining") : "Outlining model still loading…"; markBusy = false; drawMark(); return; }
     try { out = await segmentOnDevice(); } catch { out = null; }
+  }
   }
   if (out) {
     // Bridge hairline gaps (≤4 px) so one crack reads as one region, not
@@ -726,13 +889,27 @@ $("markCanvas").addEventListener("pointerdown", async (ev) => {
     dmg.mask = closeMask(out.mask, photo.width, photo.height, 2); dmg.iou = out.iou; dmg.source = source;
     $("status").textContent = `Outlined (${Math.round(dmg.iou * 100)}% sure) via ${source === "api" ? "SAM 3.1 API" : "on-device"}.`;
   } else { dmg.mask = null; dmg.source = null; $("status").textContent = "No mask there. Tap the middle of it."; }
+  markBusy = false;
   drawMark();
 });
 $("coinKind").addEventListener("change", () => {
   const opt = $("coinKind").selectedOptions[0];
+  const custom = $("coinCustomMm");
+  if (custom && Number(opt?.value) > 0) custom.value = "";
   // The user's confirmation wins over the gate's size guess (it can name a
   // coin outside this list, e.g. a nickel, while the scale uses this value).
   coinLabel = opt && Number(opt.value) > 0 ? opt.textContent.replace(/ · (\d+(?:\.\d+)?) mm$/, " · Ø$1 mm") : "";
+  updateCoinHintMark();
+});
+$("coinCustomMm")?.addEventListener("input", () => {
+  const mm = Number($("coinCustomMm").value);
+  if (mm > 0) {
+    $("coinKind").value = "0";
+    coinLabel = `Custom · Ø${mm} mm`;
+  } else {
+    coinLabel = "";
+  }
+  updateCoinHintMark();
 });
 for (const [id, label] of [["chipCrack", "crack"], ["chipStain", "stain"], ["chipPeel", "peel"], ["chipDent", "dent"]]) {
   $(id).onclick = () => {
@@ -777,8 +954,8 @@ $("measureBtn").onclick = async () => {
   })();
   if (coinCxCyR) {
     const { cx, cy, r } = coinCxCyR;
-    const knownMm = Number($("coinKind").value);
-    if (!(knownMm > 0)) { $("status").textContent = "Choose the reference size first."; return; }
+    const knownMm = getCoinSizeMm();
+    if (!(knownMm > 0)) { setNumLoading(false); show("sMark"); $("status").textContent = "Choose the reference size first."; updateCoinHintMark(); return; }
     circleRef = { id: "coin", rle: circleRle(cx, cy, r, w, h), knownMm, confidence: coinManualPt ? 0.9 : 0.85 };
     // The coin's real outline, not the gate's circle: a tilted wall shows the coin as an
     // ellipse, and the backend uses that ellipse to correct the crack lengths.
@@ -820,6 +997,7 @@ $("coinFixBtn")?.addEventListener("click", () => {
   $("coinFixHint").textContent = coinCorrectMode ? "Tap the coin center on the photo" : "";
   $("coinFixBtn").textContent = coinCorrectMode ? "Cancel" : "Tap coin to correct";
   $("coinFixBtn").classList.toggle("on", coinCorrectMode);
+  drawMark();
 });
 /** SAM's outline of the coin at the gate's circle, or null when it doesn't look like that coin. */
 async function traceCoin(cx, cy, r, w, h) {
@@ -1204,8 +1382,9 @@ async function finishListening(landed) {
     // Server transcriber first when online (Muse auto-detects any language);
     // on-device Whisper is the fallback for offline use or a keyless /
     // erroring backend. Either side returning no words falls through to the
-    // other before giving up.
-    if (!isOfflineNow()) {
+    // other before giving up. Mock backends invent no transcripts (they 400
+    // without fixtureTranscript), so skip the doomed request there.
+    if (!isOfflineNow() && (await getBackendMode()) !== "mock") {
       try {
         const wav = encodeWav(rendered.getChannelData(0), 16000);
         const b64 = await new Promise((res, rej) => {
@@ -1410,11 +1589,16 @@ async function runXcheck(auto) {
     // Cross-check against the model that did NOT draw the mask: API mask vs on-device, or the reverse.
     let other;
     if (dmg.source === "api") {
-      if (!embeddings) throw new Error(isOfflineNow() ? offlineModelMessage("outlining") : "On-device model still loading — retry in a moment.");
+      if (!embeddings) {
+        if (samDeferred && samEmbedStartedFor !== samPhotoId) throw new Error("On-device comparison needs more free memory — close other tabs/apps, tap the damage to load it, then retry.");
+        throw new Error(isOfflineNow() ? offlineModelMessage("outlining") : "On-device model still loading — retry in a moment.");
+      }
       const dev = await segmentOnDevice();
       if (!dev) throw new Error("The on-device model found nothing at those taps.");
       other = encodeRle(dev.mask, photo.width, photo.height);
     } else {
+      // Mock backend has no SAM to check against — say so without a doomed fetch.
+      if (await getBackendMode() === "mock") throw new Error("mock segment unavailable — SAM 3.1 is unwired in mock mode");
       other = (await segmentViaApi(dmg.points)).rle;
     }
     const ccRes = await fetch(base() + "/v1/crosscheck", {
@@ -1580,10 +1764,7 @@ $("renderBtn").onclick = async () => {
     if (!res.ok || !j.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
     // Preview renders in <img> (script-inert), but the downloaded .svg opens
     // as a document and would run embedded scripts. Strip scriptable content.
-    const cleanSvg = String(j.result.svg)
-      .replace(/<script[\s\S]*?<\/script\s*>/gi, "")
-      .replace(/<foreignObject[\s\S]*?<\/foreignObject\s*>/gi, "")
-      .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+    const cleanSvg = sanitizeSvg(j.result.svg);
     const blob = new Blob([cleanSvg], { type: "image/svg+xml" });
     const url = URL.createObjectURL(blob);
     const img = document.getElementById("annexImg");

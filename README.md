@@ -2,7 +2,7 @@
 
 > Point your phone at damage, speak one line about it — get a claim-ready report where every number is measured, cited, and checked before it ships. **Computed, not generated.**
 
-[![tests](https://img.shields.io/badge/tests-244%20passing-brightgreen)](./tests)
+[![tests](https://img.shields.io/badge/tests-258%20passing-brightgreen)](./tests)
 [![node](https://img.shields.io/badge/node-%3E%3D22.18-339933)](./package.json)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](./LICENSE)
 
@@ -188,6 +188,7 @@ Hard limits: 50 masks per call (chunk above), 1–16 point prompts per segment c
 
 - The photo stays on the phone: only COCO RLE masks travel to `/v1/observe`. Two explicit exceptions, both your tap: **Cross-check masks** sends the photo once to SAM 3.1 via the backend, and **Render** attaches it to the annexure. Only `data:`/`https:` URLs are accepted.
 - Keys live in server env / Worker secrets, never in the PWA. Fail-closed 503 without them.
+- Billable live routes are anonymous by design (public demo), so abuse is throttled in depth: per-IP rate limit keyed on the unspoofable socket address / `cf-connecting-ip` (never `X-Forwarded-For`), a pre-billing spend hold per in-flight call, the hard `SPEND_GUARD_USD` cap, and CORS deny-by-default in live mode without `ALLOWED_ORIGINS`.
 - All model output rendered in the PWA is HTML-escaped; the page ships a Content-Security-Policy.
 - `frame-ancestors` only works as an HTTP response header, so it is sent from `_headers` (`frame-ancestors 'self'` + `X-Frame-Options: SAMEORIGIN`) and deliberately left out of the `<meta>` CSP, where browsers ignore it and log "The Content Security Policy directive 'frame-ancestors' is ignored when delivered via a <meta> element." `tests/csp-headers.test.ts` keeps the header and meta copies of the policy in sync.
 - EXIF/XMP metadata is stripped from photos on intake.
@@ -214,7 +215,7 @@ pwa/            capture app: photo, tap-to-mask, hold-to-speak, report, skeptic,
 eval/           bench + replay CLI
 bench/          held-out split + dispute scorer
 fixtures/       masks, expected outputs, scale references (photos gitignored)
-tests/          244 tests, mock by default, live paths with stubbed fetch
+tests/          258 tests, mock by default, live paths with stubbed fetch
 ```
 
 ## Development

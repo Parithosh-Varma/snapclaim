@@ -4,6 +4,18 @@ import { apiGet, apiPost } from "../lib/api";
 import { createSession } from "../lib/session";
 import { BackButton, Badge, Stepper, downloadFile } from "../lib/ui";
 
+/** Mirror of sanitizeSvg in pwa/app.js: the downloaded .svg opens as a
+ * document, so strip scripts, foreign objects (incl. self-closing) and
+ * href-based script vectors before creating the Blob. */
+export function sanitizeSvg(svg: string): string {
+  return String(svg)
+    .replace(/<script[\s\S]*?<\/script\s*>/gi, "")
+    .replace(/<foreignObject[\s\S]*?<\/foreignObject\s*>/gi, "")
+    .replace(/<foreignObject\b[^>]*\/>/gi, "")
+    .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/\s(?:xlink:href|href)\s*=\s*("\s*(?:javascript|data\s*:\s*text\/html)[^"]*"|'\s*(?:javascript|data\s*:\s*text\/html)[^']*'|(?:javascript|data\s*:)[^\s>]*)/gi, "");
+}
+
 export default function Report() {
   const ctx = useApp();
   const { session: s, go, base, store, toast, bumpCases } = ctx;
@@ -70,10 +82,7 @@ export default function Report() {
       // The annexure preview renders in <img> (script-inert), but the
       // downloaded .svg opens as a document and would run embedded scripts.
       // Strip scriptable content before creating the Blob.
-      const svg = rawSvg
-        .replace(/<script[\s\S]*?<\/script\s*>/gi, "")
-        .replace(/<foreignObject[\s\S]*?<\/foreignObject\s*>/gi, "")
-        .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+      const svg = sanitizeSvg(rawSvg);
       const blob = new Blob([svg], { type: "image/svg+xml" });
       const url = URL.createObjectURL(blob);
       if (s.annexUrl) URL.revokeObjectURL(s.annexUrl);

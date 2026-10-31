@@ -11,6 +11,8 @@ import { configFromEnv } from "./providers.ts";
  */
 export const TRANSCRIBE_MODEL = "muse-voice-transcribe-1.0";
 export const TRANSCRIBE_USD_PER_HOUR = 0.18;
+/** Cost ceiling held before the upstream call (4MB ≈ 125s ≈ $0.006, rounded up). */
+export const TRANSCRIBE_COST_CEILING_USD = 0.01;
 
 export interface TranscribeInput {
   /** Raw WAV bytes. */

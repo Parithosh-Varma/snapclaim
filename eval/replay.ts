@@ -9,6 +9,8 @@
  *   rejected — store the full measurement).
  *
  * Re-runs `measureSession` and checks findings, receipts and mode match.
+ * Receipts bind the request identity (component id/confidence sit in the
+ * ratio receipt inputs), so swapping component.id/confidence reads as DRIFT.
  * Exit 0 on match, 1 on any drift. No keys, no network, no models.
  */
 import { readFileSync } from "node:fs";

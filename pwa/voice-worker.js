@@ -16,6 +16,8 @@ async function loadModel() {
   // while fetching model files. That CDN omits Content-Length; progress still
   // works and the transcript is unaffected, so it is harmless.
   try { tf.env.logLevel = "error"; } catch { /* older transformers build */ }
+  try { tf.env.backends.onnx.logLevel = "error"; } catch { /* no onnx backend knob */ }
+  try { tf.env.backends.onnx.verbose = false; } catch { /* no verbose knob */ }
   transcriber = await tf.pipeline("automatic-speech-recognition", MODEL_ID, {
     dtype: "q8",
     progress_callback: (p) => {

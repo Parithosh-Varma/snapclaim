@@ -123,15 +123,51 @@ export const MASK_COLORS: Record<string, string> = {
   coin: "#0f7a36",
 };
 
-export const COIN_OPTIONS: { value: number; label: string }[] = [
-  { value: 0, label: "Choose the reference size…" },
-  { value: 24.26, label: "US quarter · 24.26 mm" },
-  { value: 23.88, label: "Canadian quarter · 23.88 mm" },
-  { value: 24.5, label: "UK 10p · 24.5 mm" },
-  { value: 23.25, label: "1 euro · 23.25 mm" },
-  { value: 22.6, label: "Japanese ¥100 · 22.6 mm" },
-  { value: 27, label: "India ₹10 · 27 mm" },
-  { value: 25, label: "India ₹5 · 25 mm" },
-  { value: 23, label: "India ₹2 · 23 mm" },
-  { value: 22, label: "India ₹1 · 22 mm" },
+export interface CoinOption {
+  value: number;
+  label: string;
+  group: string;
+}
+
+export const COIN_OPTIONS: CoinOption[] = [
+  { value: 0, label: "Choose the reference size…", group: "" },
+  { value: 24.26, label: "US quarter · 24.26 mm", group: "USA" },
+  { value: 21.21, label: "US nickel · 21.21 mm", group: "USA" },
+  { value: 19.05, label: "US penny · 19.05 mm", group: "USA" },
+  { value: 17.91, label: "US dime · 17.91 mm", group: "USA" },
+  { value: 23.88, label: "Canadian quarter · 23.88 mm", group: "Canada" },
+  { value: 25.75, label: "€2 · 25.75 mm", group: "Eurozone" },
+  { value: 24.25, label: "€ 50 cent · 24.25 mm", group: "Eurozone" },
+  { value: 23.25, label: "1 euro · 23.25 mm", group: "Eurozone" },
+  { value: 22.25, label: "€ 20 cent · 22.25 mm", group: "Eurozone" },
+  { value: 21.25, label: "€ 5 cent · 21.25 mm", group: "Eurozone" },
+  { value: 19.75, label: "€ 10 cent · 19.75 mm", group: "Eurozone" },
+  { value: 18.75, label: "€ 2 cent · 18.75 mm", group: "Eurozone" },
+  { value: 16.25, label: "€ 1 cent · 16.25 mm", group: "Eurozone" },
+  { value: 28.4, label: "UK £2 · 28.4 mm", group: "UK" },
+  { value: 27.3, label: "UK 50p · 27.3 mm", group: "UK" },
+  { value: 25.9, label: "UK 2p · 25.9 mm", group: "UK" },
+  { value: 24.5, label: "UK 10p · 24.5 mm", group: "UK" },
+  { value: 23.03, label: "UK £1 · 23.03 mm", group: "UK" },
+  { value: 21.4, label: "UK 20p · 21.4 mm", group: "UK" },
+  { value: 20.3, label: "UK 1p · 20.3 mm", group: "UK" },
+  { value: 18, label: "UK 5p · 18 mm", group: "UK" },
+  { value: 27, label: "India ₹10 · 27 mm", group: "India" },
+  { value: 25, label: "India ₹5 · 25 mm", group: "India" },
+  { value: 23, label: "India ₹2 · 23 mm", group: "India" },
+  { value: 22, label: "India ₹1 · 22 mm", group: "India" },
+  { value: 26.5, label: "Japanese ¥500 · 26.5 mm", group: "Japan" },
+  { value: 23.5, label: "Japanese ¥10 · 23.5 mm", group: "Japan" },
+  { value: 22.6, label: "Japanese ¥100 · 22.6 mm", group: "Japan" },
+  { value: 22, label: "Japanese ¥5 · 22 mm", group: "Japan" },
+  { value: 21, label: "Japanese ¥50 · 21 mm", group: "Japan" },
+  { value: 20, label: "Japanese ¥1 · 20 mm", group: "Japan" },
 ];
+
+/** Grouped presets for the <optgroup> picker (stable region order, USA first). */
+export const COIN_GROUPS: { name: string; options: CoinOption[] }[] = (() => {
+  const order = ["USA", "Canada", "Eurozone", "UK", "India", "Japan"];
+  return order
+    .map((name) => ({ name, options: COIN_OPTIONS.filter((o) => o.group === name) }))
+    .filter((g) => g.options.length);
+})();
