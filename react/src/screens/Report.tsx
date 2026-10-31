@@ -155,7 +155,7 @@ export default function Report() {
   return (
     <section className="screen on" aria-labelledby="h-send">
       <div className="wrap">
-        <BackButton label="Checked" onClick={() => go("sCheck")} />
+        <BackButton label="Checks" onClick={() => go("sCheck")} />
         <Stepper step={6} />
         <h1 id="h-send">Send the report.</h1>
         <p className="sub">To your landlord or insurer, in one tap.</p>

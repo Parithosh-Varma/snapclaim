@@ -170,7 +170,7 @@ export default function Say() {
   return (
     <section className="screen on" aria-labelledby="h-say">
       <div className="wrap">
-        <BackButton label="Mark" onClick={() => go("sMark")} />
+        <BackButton label="Mark damage" onClick={() => go("sMark")} />
         <Stepper step={3} />
         <h1 id="h-say">Describe what happened.</h1>
         <p className="sub">Type a line, or dictate it with the mic.</p>

@@ -173,7 +173,7 @@ export default function Admin() {
   return (
     <section className="screen on" aria-labelledby="h-admin">
       <div className="wrap">
-        <BackButton label="App" onClick={() => window.location.assign("/")} />
+        <BackButton label="Home" onClick={() => window.location.assign("/")} />
         <h1 id="h-admin">Admin panel.</h1>
         <p className="sub">Mock vs live, backend, and spend — on this device only. Live mode spends real API budget.</p>
 

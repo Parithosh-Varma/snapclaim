@@ -124,7 +124,7 @@ export default function Numbers() {
   return (
     <section className="screen on" aria-labelledby="h-num">
       <div className="wrap">
-        <BackButton label="Say" onClick={() => go("sSay")} />
+        <BackButton label="Describe" onClick={() => go("sSay")} />
         <Stepper step={4} />
         <h1 id="h-num">Get the numbers.</h1>
         <p className="sub">Outlined and measured, not guessed.</p>

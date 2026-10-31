@@ -201,7 +201,7 @@ export default function Check() {
   return (
     <section className="screen on" aria-labelledby="h-check">
       <div className="wrap">
-        <BackButton label="Numbers" onClick={() => go("sNum")} />
+        <BackButton label="Measurements" onClick={() => go("sNum")} />
         <Stepper step={5} />
         <h1 id="h-check">Checked twice.</h1>
         <p className="sub">A second check has to agree. Disagreements print red, never hidden.</p>
