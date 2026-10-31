@@ -238,17 +238,6 @@
   .brand-name{font-weight:800;font-size:17px;letter-spacing:-.01em}
   .home #h-home{font-size:clamp(28px,7.5vw,34px);line-height:1.12;margin:0}
   .home-sub{margin:4px 0 16px}
-  .status-wrap{position:relative;display:flex;justify-content:flex-end}
-  .status-pill{display:inline-flex;align-items:center;gap:7px;min-height:44px;border-radius:999px;
-    border:1px solid var(--line);background:var(--card);color:var(--ink);
-    font-size:12.5px;font-weight:700;padding:8px 14px;box-shadow:var(--shadow-1);
-    transition:transform .12s ease}
-  .status-pill:active{transform:scale(.96)}
-  .status-dot{width:9px;height:9px;border-radius:50%;background:var(--coin-strong);flex:none}
-  .status-pill.is-off .status-dot{background:#b7791f}
-  .status-tip{position:absolute;top:calc(100% + 6px);right:0;width:min(260px,70vw);z-index:5;
-    background:var(--ink);color:#fff;font-size:12.5px;font-weight:600;line-height:1.45;
-    border-radius:12px;padding:10px 12px;box-shadow:var(--shadow-2)}
   .hero-tap{display:block;width:100%;text-align:left;border:1px solid var(--line);border-radius:var(--r-lg);
     background:var(--card);color:var(--ink);font:inherit;padding:0;overflow:hidden;cursor:pointer;
     box-shadow:var(--shadow-1);transition:transform .12s ease,box-shadow .15s ease}
@@ -524,8 +513,6 @@
   html[data-theme="dark"] .empty-sub,html[data-theme="dark"] .case-date{color:#ada595}
   html[data-theme="dark"] .empty-state{border-color:#4a4438;background:#1d1b17}
   html[data-theme="dark"] .empty-icon{background:#173524;color:#52d18a}
-  html[data-theme="dark"] .status-pill{background:#1d1b17;border-color:#4a4438;color:#ece7dc}
-  html[data-theme="dark"] .status-tip{background:#ece7dc;color:#141310}
   html[data-theme="dark"] .casecard{background:#1d1b17;border-color:#34302a;color:#ece7dc}
   html[data-theme="dark"] .case-thumb--ph{background:#27241e;border-color:#4a4438;color:#ada595}
   html[data-theme="dark"] .case-size{color:#ece7dc}
@@ -595,8 +582,6 @@
     html[data-theme="auto"] .empty-sub,html[data-theme="auto"] .case-date{color:#ada595}
     html[data-theme="auto"] .empty-state{border-color:#4a4438;background:#1d1b17}
     html[data-theme="auto"] .empty-icon{background:#173524;color:#52d18a}
-    html[data-theme="auto"] .status-pill{background:#1d1b17;border-color:#4a4438;color:#ece7dc}
-    html[data-theme="auto"] .status-tip{background:#ece7dc;color:#141310}
     html[data-theme="auto"] .casecard{background:#1d1b17;border-color:#34302a;color:#ece7dc}
     html[data-theme="auto"] .case-thumb--ph{background:#27241e;border-color:#4a4438;color:#ada595}
     html[data-theme="auto"] .case-size{color:#ece7dc}

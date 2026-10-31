@@ -44,32 +44,9 @@ function CaseItem({ c, onOpen }: { c: SnapCase; onOpen: (id: string) => void }) 
   );
 }
 
-function StatusPill({ online }: { online: boolean }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <span className="status-wrap" id="netPill">
-      <button
-        type="button"
-        className={`status-pill ${online ? "is-on" : "is-off"}`}
-        aria-expanded={open}
-        title="Cases stay on this device. Saved cases and capture work offline; measuring needs a connection. On-device outlining and voice need one online load first to download their models."
-        onClick={() => setOpen((v) => !v)}
-      >
-        <i className="status-dot" aria-hidden="true" />
-        {online ? "Saved on device" : "Offline · saved on device"}
-      </button>
-      {open && (
-        <span className="status-tip" role="status">
-          Cases never leave this phone. Saved cases and capture work offline; measuring needs a connection. On-device outlining and voice need one online load first to download their models.
-        </span>
-      )}
-    </span>
-  );
-}
-
 export function Home() {
   const ctx = useApp();
-  const { store, casesVersion, startCapture, online, go } = ctx;
+  const { store, casesVersion, startCapture, go } = ctx;
   const cases = store.list();
   void casesVersion;
   const [sampleErr, setSampleErr] = useState("");
@@ -94,7 +71,6 @@ export function Home() {
             </span>
             <span className="brand-name">SnapClaim</span>
           </span>
-          <StatusPill online={online} />
         </header>
         <h1 id="h-home">Damage, measured.</h1>
         <p className="sub home-sub">Coin for scale, photo for proof — a report in minutes.</p>
