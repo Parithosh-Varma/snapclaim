@@ -23,7 +23,7 @@ import {
 } from "./transcribe.ts";
 import { encodeRle as encodeMaskRle } from "../src/vision/mask.ts";
 import { MemoryStore, type SavedSession, type Store } from "./store.ts";
-import { segmentWithSam, type SamPoint } from "../src/vision/sam.ts";
+import { segmentWithSam, type SamBoxPrompt, type SamPoint } from "../src/vision/sam.ts";
 import { archiveSegmentImage } from "./storage.ts";
 import { DEFAULT_CONFIG } from "../src/config/config.ts";
 
@@ -373,6 +373,26 @@ export async function segmentBody(body: unknown, env: Env, requestId = newReques
     if (!isRecord(point)) throw new HttpError(400, `points[${i}] must be an object`);
     return { x: requireNumber(point.x, `points[${i}].x`), y: requireNumber(point.y, `points[${i}].y`) };
   });
+  // Optional box prompt: constrains SAM to the damage region so a thin-crack
+  // tap can't come back as the whole wall. The cross-check derives it from
+  // the measured mask (dilated bounding box, same photo pixels as points).
+  let box: SamBoxPrompt | undefined;
+  if ((body as Record<string, unknown>).box !== undefined) {
+    const rawBox = (body as Record<string, unknown>).box;
+    if (!isRecord(rawBox)) throw new HttpError(400, "live /v1/segment box must be an object");
+    const w = Math.round(width);
+    const h = Math.round(height);
+    const sides = (["left", "top", "right", "bottom"] as const).map((k) => {
+      const v = requireNumber((rawBox as Record<string, unknown>)[k], `box.${k}`);
+      if (!Number.isInteger(v)) throw new HttpError(400, `box.${k} must be an integer, got ${v}`);
+      return v;
+    });
+    const [left, top, right, bottom] = sides as [number, number, number, number];
+    if (left < 0 || top < 0 || right > w || bottom > h || left >= right || top >= bottom) {
+      throw new HttpError(400, `box [${left},${top},${right},${bottom}] is outside the ${w}x${h} frame`);
+    }
+    box = { left, top, right, bottom };
+  }
   const spend = guardFor(env);
   // Reserve the fixed SAM price BEFORE the upstream call: concurrent callers
   // then serialize on the budget instead of each passing a stale
@@ -394,7 +414,7 @@ export async function segmentBody(body: unknown, env: Env, requestId = newReques
       base: config.endpoints.meta,
       apiKey: metaKey,
       model: config.models.sam,
-      request: { imageUrl, size: { width: Math.round(width), height: Math.round(height) }, points },
+      request: { imageUrl, size: { width: Math.round(width), height: Math.round(height) }, points, ...(box ? { box } : {}) },
     });
   } catch (error) {
     samHold.release();

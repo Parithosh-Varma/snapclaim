@@ -200,3 +200,17 @@ test("segment in live mode without a key fails closed with 503", async () => {
   });
   assert.equal(res.status, 503);
 });
+
+test("segment rejects out-of-frame and non-integer boxes with 400", async () => {
+  const img = { imageUrl: "data:image/jpeg;base64,AAA", width: 100, height: 100, points: [{ x: 50, y: 50 }] };
+  for (const box of [
+    { left: -1, top: 0, right: 60, bottom: 70 },
+    { left: 10, top: 10, right: 200, bottom: 70 },
+    { left: 60, top: 10, right: 60, bottom: 70 },
+    { left: 10.5, top: 10, right: 60, bottom: 70 },
+    "box",
+  ]) {
+    const res = await handleRequest({ method: "POST", path: "/v1/segment", body: { ...img, box }, env: LIVE_ENV });
+    assert.equal(res.status, 400);
+  }
+});

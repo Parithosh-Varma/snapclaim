@@ -279,6 +279,7 @@ export interface SamFetchRequest {
   imageUrl: string;
   size: SamSize;
   points: SamPoint[];
+  box?: SamBoxPrompt;
   objectId?: number;
 }
 
@@ -305,7 +306,7 @@ export async function segmentWithSam(input: {
   const { imageUrl, size, points } = input.request;
   assertSize(size);
   if (points.length === 0) throw new MeasurementError("at least one point prompt is required");
-  const prompt = buildObjectPrompt(size, [{ id: input.request.objectId ?? 1, points }]);
+  const prompt = buildObjectPrompt(size, [{ id: input.request.objectId ?? 1, points, ...(input.request.box ? { box: input.request.box } : {}) }]);
 
   const res = await (fetchFn as typeof fetch)(`${input.base}/responses`, {
     method: "POST",

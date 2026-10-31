@@ -2,7 +2,7 @@
 // Version the cache; network-only for /v1 (never cache measurements),
 // cache-first for the same-origin shell. No photo bytes are cached.
 // Updates wait: the page shows #updateBar and posts SKIP_WAITING on Reload.
-const CACHE = "snapclaim-shell-v20";
+const CACHE = "snapclaim-shell-v21";
 const SHELL = ["./", "./index.html", "./app.js", "./coin-model.js", "./photo-check.js", "./rle.js", "./store.js", "./theme.js", "./mask-ops.js", "./manifest.webmanifest",
   "./sam-worker.js", "./voice-worker.js", "./tilt-meter.js",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/maskable-512.png", "./icons/apple-touch-icon.png"];
