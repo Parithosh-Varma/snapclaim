@@ -37,7 +37,7 @@ export default function Mark() {
   const ctx = useApp();
   const { session: s, go, base, sam, embeddings } = ctx;
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [status, setStatus] = useState("Tap the crack, then Measure.");
+  const [status, setStatus] = useState("Select crack to continue.");
   const [tfState, setTfState] = useState("");
   const [photoNotes, setPhotoNotes] = useState("");
   const [label, setLabel] = useState(s.dmgLabel);
@@ -166,12 +166,14 @@ export default function Mark() {
 
   /** Auto coin hunt: Hough proposes centres, SAM disposes. The first verified
       outline becomes the coin tap, same as a manual one — the user only picks
-      the size. Runs only when the gate missed the coin entirely. */
+      the size. Runs only when the gate missed the coin entirely, and only
+      after a crack is selected — never a download before first tap. */
   const huntCoin = useCallback(async (
     found: { x: number; y: number; r: number }[],
     photo: HTMLCanvasElement,
   ) => {
     const still = s.stillDataUrl;
+    huntRef.current = null;
     setCoinFixHint("Looking for the coin…");
     const ready = await sam.ensureEmbedded(photo);
     if (!ready || s.photoFor !== still || s.gateCoin || s.coinManualPt) {
@@ -197,6 +199,8 @@ export default function Mark() {
     }
     if (s.photoFor === still && !s.coinManualPt) setCoinFixHint("");
   }, [drawMark, s, sam, traceCoin]);
+
+  const huntRef = useRef<{ points: { x: number; y: number; r: number }[]; photo: HTMLCanvasElement } | null>(null);
 
   /* build the marking photo; the on-device model embeds only on demand
      (coin outline, cloud fallback, cross-check) — never on entry */
@@ -229,7 +233,9 @@ export default function Mark() {
     setHasMask(false);
     setTapCount(0);
     setTfState("");
-    setStatus("Tap the crack, then Measure.");
+    setCoinFixHint("");
+    huntRef.current = null;
+    setStatus("Select crack to continue.");
     drawMark();
     const img = new Image();
     img.onload = () => {
@@ -248,14 +254,15 @@ export default function Mark() {
       embeddings.current = false;
       setReady(true);
       drawMark();
-      // The gate missed the coin: hunt it on the still. Hough proposes
-      // centres (contrast-stretched, so dull rims count), SAM verifies.
+      // The gate missed the coin: propose centres now (free, same thread),
+      // verify with SAM only after a crack is selected — never a download
+      // before first tap.
       if (!s.gateCoin && !s.coinManualPt) {
         try {
           const px = photo.getContext("2d", { willReadFrequently: true })?.getImageData(0, 0, photo.width, photo.height);
           const found = px ? findCoins({ data: px.data, width: px.width, height: px.height }) : [];
-          if (found.length) void huntCoin(found, photo);
-        } catch { /* hunt is best-effort; the tap button remains */ }
+          huntRef.current = found.length ? { points: found.slice(0, 3), photo } : null;
+        } catch { huntRef.current = null; /* hunt is best-effort; the tap button remains */ }
       }
     };
     img.onerror = () => {
@@ -438,8 +445,15 @@ export default function Mark() {
       s.dmg.iou = out.iou;
       s.dmg.source = source;
       setStatus(`Outlined (${Math.round(out.iou * 100)}% sure) via ${source === "api" ? "SAM 3.1 API" : "on-device"}.`);
-      // Warm the on-device model quietly for the coin outline and cross-check.
-      if (source === "api" && s.photo && !embeddings.current) void sam.ensureEmbedded(s.photo, true);
+      // Crack selected: now verify the stashed coin candidates (if any) —
+      // the first download happens here, never before first tap. Otherwise
+      // warm the model quietly for the coin outline and cross-check.
+      const pending = huntRef.current;
+      if (pending && pending.photo === s.photo && !s.gateCoin && !s.coinManualPt) {
+        void huntCoin(pending.points, pending.photo);
+      } else if (source === "api" && s.photo && !embeddings.current) {
+        void sam.ensureEmbedded(s.photo, true);
+      }
     } else {
       s.dmg.mask = null;
       s.dmg.source = null;
@@ -464,7 +478,7 @@ export default function Mark() {
         s.dmg.mask = null;
         s.dmg.iou = 0;
         s.dmg.source = null;
-        setStatus("Tap the crack, then Measure.");
+        setStatus("Select crack to continue.");
         drawMark();
         return;
       }

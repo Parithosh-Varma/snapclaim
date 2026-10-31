@@ -47,6 +47,13 @@ test("Capture has one primary action and camera-free paths", () => {
   }
 });
 
+test("Mark gates on crack selection; no model download before first tap", () => {
+  const mark = read("react/src/screens/Mark.tsx");
+  assert.ok(mark.includes("Select crack to continue."), "empty state names the required action");
+  assert.ok(mark.includes("Crack selected: now verify"), "coin verify waits for a crack selection");
+  assert.ok(mark.includes("there is nothing outlined to measure"), "measure refuses an empty mask even if forced");
+});
+
 test("React port keeps backend, worker and privacy contracts", () => {
   const all = [
     "react/src/App.tsx", "react/src/screens/Capture.tsx", "react/src/screens/Mark.tsx",
