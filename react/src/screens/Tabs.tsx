@@ -90,14 +90,8 @@ export function Home() {
 
         <button id="ctaNew" className="hero-tap" type="button" onClick={startCapture} aria-describedby="heroSteps">
           <span className="hero-art" aria-hidden="true">
-            <svg viewBox="0 0 220 150" fill="none" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="14" y="10" width="192" height="130" rx="16" fill="#fff" stroke="#0b1e46" strokeWidth="3" />
-              <path d="M40 96 L78 74 L96 82 L128 52 L150 60 L178 34" stroke="#c81e2b" strokeWidth="5" />
-              <circle cx="150" cy="104" r="24" fill="#ffd964" stroke="#0b1e46" strokeWidth="3" />
-              <circle cx="150" cy="104" r="17" stroke="#0b1e46" strokeWidth="1.6" strokeDasharray="3 3" />
-              <text x="150" y="110" textAnchor="middle" fontSize="14" fontWeight="800" fill="#0b1e46" stroke="none" fontFamily="inherit">10</text>
-              <path d="M30 26 v-8 h8 M190 18 h8 v8 M30 124 v8 h8 M190 132 h8 v-8" stroke="#0e8a4d" strokeWidth="4" />
-            </svg>
+            <img className="hero-photo" src="./hero-crack.jpg" alt="" />
+            <span className="hero-corners"><i className="hc tl" /><i className="hc tr" /><i className="hc bl" /><i className="hc br" /></span>
             <span className="hero-frame-tag">Damage + coin in frame</span>
           </span>
           <span className="hero-body">
