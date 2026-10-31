@@ -77,6 +77,10 @@ export class SamClient {
     this.settleStale?.(false);
     this.settleStale = null;
     const p = new Promise<boolean>((resolve) => {
+      let timer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+        this.lastError = "model download timed out";
+        done(false);
+      }, 180_000);
       this.settleStale = (v: boolean) => {
         this.settleStale = null;
         resolve(v);
@@ -85,6 +89,7 @@ export class SamClient {
       const prevError = this.onError;
       const prevProgress = this.onProgress;
       const done = (v: boolean) => {
+        if (timer) { clearTimeout(timer); timer = null; }
         this.settleStale = null;
         this.onReady = prevReady;
         this.onError = prevError;
