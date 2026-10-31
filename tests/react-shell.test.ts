@@ -43,7 +43,7 @@ test("React port keeps backend, worker and privacy contracts", () => {
   }
   assert.ok(all.includes("sam-worker.js"), "SlimSAM worker reused");
   assert.ok(all.includes("voice-worker.js"), "Whisper worker reused");
-  assert.ok(all.includes("On the device first") || all.includes("on-device"), "voice stays on-device first");
+  assert.ok(all.includes("Server transcriber first"), "voice tries the server transcriber before on-device");
   assert.ok(!all.includes('innerHTML ='), "no raw HTML injection in the React port");
 
   const sw = read("react/public/sw.js");

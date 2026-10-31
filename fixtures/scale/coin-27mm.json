@@ -1,0 +1,7 @@
+{
+  "id": "coin-27mm",
+  "note": "27 mm coin used as the scale reference. Length measured in the same image plane.",
+  "knownMm": 27,
+  "lengthPx": 287,
+  "confidence": 0.88
+}

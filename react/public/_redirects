@@ -1,0 +1,6 @@
+# Cloudflare Pages rewrites.
+# The admin panel lives at /admin so Cloudflare Access can gate that path only;
+# everything else is served publicly. 200 = rewrite, the browser URL stays.
+# Rewrite to `/`, not `/index.html` — Pages canonicalises /index.html to /.
+/admin    /   200
+/admin/*  /   200

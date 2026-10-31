@@ -22,11 +22,13 @@ npm run replay -- request.json measurement.json
 | `POST /v1/report` | mock default | measure → findings draft → Evidence Gate. Uncited numbers return `422` with `details[]`. Client may pass `drafts[]` to test the gate. |
 | `POST /v1/segment` | mock/live | Mock requires `body.fixture {component, masks}` — the backend invents no masks. Live calls SAM 3.1 point prompts (`imageUrl` + `width/height` + `points[1..16]`), parses the Responses output text and decodes masks with `@meta-sam/parser`; returns `{records: [{objectId, box, confidence, rle}]}` with full-frame RLE, `$0.0025`/image metered. Empty output throws, never fakes. |
 | `POST /v1/crosscheck` | any | `{a, b}` COCO RLE masks of one frame, `threshold?` — IoU + Dice agreement with AGREED/DISPUTED verdict. Keyless, deterministic. |
-| `POST /v1/transcribe` | mock/live | Spoken line to text via Muse Voice Transcribe (`/asr/transcribe`, multipart, `PUSH_TO_TALK`, Hindi/Telugu/English bias + claim keywords). Mock requires `body.fixtureTranscript`. Audio priced at $0.18/hr on the ledger. |
+| `POST /v1/transcribe` | mock/live | Spoken line to text via Muse Voice Transcribe (`/asr/transcribe`, multipart, `PUSH_TO_TALK`, optional caller-supplied `languageBias` + claim keywords). Mock requires `body.fixtureTranscript`. Audio priced at $0.18/hr on the ledger. |
 | `POST /v1/findings` | mock/live | Drafts findings from measured facts, then gates them. Live path records token usage to the spend ledger. |
 | `POST /v1/skeptic` | mock/live | Independent re-check via Spark Open on Baseten, gated. Real per-token pricing charged to the ledger. `503` without `BASETEN_API_KEY`. |
 | `POST /v1/render` | mock/live | Gated report → code-drawn SVG annexure `{svg, gate}`. |
 | `GET /v1/spend` | any | `{spentUsd, remainingUsd, limitUsd, entries}`. Mock runs stay `$0`. |
+| `GET /v1/admin/status` | any | Public, key-free: `{mockMode, mockSource, mode, adminEnabled, spend, models, endpoints}` for the in-app Admin panel. |
+| `POST /v1/admin/mode` | admin | Runtime mock/live switch `{mode: 'mock'|'live'}`, `{mockMode: bool}`, or `{reset: true}`. Requires `Authorization: Bearer <ADMIN_TOKEN>`; `403` when `ADMIN_TOKEN` is unset. In-memory only — a restart returns to the `MOCK_MODE` env default. |
 | `POST /v1/sessions` / `GET /v1/sessions` | any | Save `{findings, mode, id?, at?}` (counts only, never photo bytes); list the latest 50, newest first. |
 
 Sessions live in memory unless the Worker has a D1 binding named `DB`. To enable it: `wrangler d1 create snapclaim-sessions`, uncomment the `[[d1_databases]]` block in `wrangler.toml` with the returned id, then `wrangler d1 migrations apply snapclaim-sessions --local` (or `--remote`). The schema is `migrations/0001_sessions.sql`.
@@ -48,7 +50,7 @@ All replies are enveloped `{ok, requestId, durationMs, result}`; errors are verb
 ## Not yet (verified live, honestly blocked)
 
 - SAM 3.1 masks: live and verified 2026-10-29 (`200`, 1 record + full-frame RLE on a 1024x1024 photo, `$0.0025` ledgered). PWA tries `/v1/segment` first, on-device SlimSAM on any failure. Wire lesson: the official parser wants the mask payload WITH its `!`/`~` marker.
-- Voice transcribe: endpoint verified live 2026-10-29 (`POST /v1/asr/transcribe`, multipart WAV, `200`, ~$0.0001). The `/v1/transcribe` proxy is implemented and stub-tested; the first Hindi/Telugu clip through the proxy is still pending.
+- Voice transcribe: endpoint verified live 2026-10-29 (`POST /v1/asr/transcribe`, multipart WAV, `200`, ~$0.0001). The `/v1/transcribe` proxy is implemented and stub-tested; the first non-English clip through the proxy is still pending.
 - Skeptic inference: `403` until the Baseten form/access is granted. Code complete with real pricing.
 
 ## Deploy (Worker)

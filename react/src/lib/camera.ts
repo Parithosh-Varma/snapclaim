@@ -16,7 +16,7 @@ export interface GateCoinRaw extends RingDet {
 
 interface CoinModelGlobal {
   Classifier: new () => {
-    predict(fv: unknown, opts: { countries: string[] }): { label: string; confidence: number }[];
+    predict(fv: unknown, opts?: { countries?: string[] }): { label: string; confidence: number }[];
   };
   extractFeatures(
     data: Uint8ClampedArray, w: number, h: number,
@@ -30,7 +30,6 @@ function coinModel(): CoinModelGlobal {
 }
 
 const SW = 224; // detection width: cheaper beats sticking to 256
-const COUNTRIES = ["INR", "USA", "EUR", "GBP"];
 
 function grayEdges(img: Uint8ClampedArray, w: number, h: number): Uint8Array {
   const g = new Float32Array(w * h);
@@ -105,7 +104,7 @@ export interface GateCallbacks {
   /** Ring overlay in CSS px, or null to hide it. Locked = shutter disabled. */
   onRing(r: { left: number; top: number; size: number } | null, locked: boolean): void;
   onCount(n: number | null): void;
-  onCoinIdentified(label: string): void;
+  onCoinIdentified(label: string, diamMm: number): void;
   onAutoCapture(): void;
   onCameraError(errName: string): void;
 }
@@ -121,6 +120,8 @@ export class CoinGate {
   coinSeen = false;
   smooth: RingDet | null = null;
   coinLabel = "";
+  /** Diameter of the identified coin in mm; 0 until a known coin is confirmed. */
+  coinMm = 0;
   private assistPt: { x: number; y: number } | null = null;
   private assistScan = 0;
   private scanCount = 0;
@@ -197,6 +198,7 @@ export class CoinGate {
     this.coinSeen = false;
     this.smooth = null;
     this.coinLabel = "";
+    this.coinMm = 0;
     this.history.length = 0;
     this.assistPt = null;
     this.setLocked(true, "Add a coin for scale");
@@ -269,14 +271,17 @@ export class CoinGate {
       const ky = (this.full.height / fh) * det.cy;
       const kr = (this.full.width / fw) * det.rr;
       const fv = CM.extractFeatures(img.data, this.full.width, this.full.height, { x: kx, y: ky, r: kr });
-      const best = this.clf.predict(fv, { countries: COUNTRIES })[0];
+      const best = this.clf.predict(fv)[0];
       if (best && best.label !== "unknown") {
         const def = CM.DB.find((d) => d.id === best.label);
         this.coinLabel = def ? `${def.label} · Ø${def.diam} mm` : best.label;
-        this.cb.onCoinIdentified(this.coinLabel);
+        this.coinMm = def?.diam ?? 0;
+        this.cb.onCoinIdentified(this.coinLabel, this.coinMm);
         this.cb.onHint(`${this.coinLabel} (${Math.round(best.confidence * 100)}%) — hold steady…`);
       } else {
         this.coinLabel = "";
+        this.coinMm = 0;
+        this.cb.onCoinIdentified("", 0);
         this.cb.onHint("Coin found — hold steady…");
       }
     } catch { /* ID is advisory; the gate stands on geometry */ }
@@ -390,7 +395,8 @@ export class CoinGate {
       this.coinSeen = false;
       this.smooth = null;
       this.coinLabel = "";
-      this.cb.onCoinIdentified("");
+      this.coinMm = 0;
+      this.cb.onCoinIdentified("", 0);
       this.assistPt = null;
       this.setLocked(true, "Add a coin for scale");
     }

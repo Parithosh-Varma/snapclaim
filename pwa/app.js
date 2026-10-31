@@ -142,7 +142,6 @@ let assistPt = null, assistAt = 0, scanCount = 0, lastDetAt = 0;
 let captureTimer = null, countdownTimer = null;
 const countEl = $("count");
 const clf = new CoinModel.Classifier();
-const COUNTRIES = ["INR", "USA", "EUR", "GBP"];
 let coinLabel = "";
 let gateCoin = null; // {cx, cy, rr} in capture-still pixels + still size
 let photo = null;    // downscaled capture canvas for marking
@@ -175,6 +174,7 @@ function stopCamera() {
   feed.srcObject = null;
 }
 function acquireCamera() {
+  stopCamera(); // retakes must never stack a second detector loop
   if (!navigator.mediaDevices?.getUserMedia) { explainCam({ name: "unsupported" }); return; }
   const backCam = { video: { facingMode: { exact: "environment" } }, audio: false };
   const anyCam = { video: { facingMode: "environment" }, audio: false };
@@ -226,6 +226,18 @@ function placeRing(det, fw, fh) {
   ring.style.left = cx - r + "px"; ring.style.top = cy - r + "px";
   ring.style.width = r * 2 + "px"; ring.style.height = r * 2 + "px";
 }
+/** Select a known diameter, adding a one-off option when the coin is outside the preset list. */
+function setCoinSize(mm, label) {
+  const sel = $("coinKind");
+  if (!sel) return;
+  if (!(mm > 0)) { sel.value = "0"; return; }
+  let opt = [...sel.options].find((o) => Number(o.value) === mm);
+  if (!opt) {
+    opt = new Option(label ? `${label} · ${mm} mm` : `${mm} mm reference`, String(mm));
+    sel.add(opt);
+  }
+  sel.value = String(mm);
+}
 function identifyCoin(det, fw, fh) {
   try {
     const vw = feed.videoWidth, vh = feed.videoHeight;
@@ -236,15 +248,18 @@ function identifyCoin(det, fw, fh) {
     const img = fctx.getImageData(0, 0, full.width, full.height);
     const kx = (full.width / fw) * det.cx, ky = (full.height / fh) * det.cy, kr = (full.width / fw) * det.rr;
     const fv = CoinModel.extractFeatures(img.data, full.width, full.height, { x: kx, y: ky, r: kr });
-    const best = clf.predict(fv, { countries: COUNTRIES })[0];
+    const best = clf.predict(fv)[0];
     if (best && best.label !== "unknown") {
       const def = CoinModel.DB.find((d) => d.id === best.label);
       coinLabel = def ? `${def.label} · Ø${def.diam} mm` : best.label;
+      if (def) setCoinSize(def.diam, def.label);
       hint.textContent = `${coinLabel} (${Math.round(best.confidence * 100)}%) — hold steady…`;
     } else { coinLabel = ""; hint.textContent = "Coin found — hold steady…"; }
   } catch { /* ID is advisory; the gate stands on geometry */ }
 }
 function scan() {
+  if (!camStream) return; // camera left: never spin the detector in the background
+  if (document.hidden) { setTimeout(scan, 1000); return; } // background tab: idle, no edge-detect
   if (!feed.videoWidth) { setTimeout(scan, 500); return; }
   try {
     scanFrame();
@@ -469,6 +484,7 @@ fab.addEventListener("click", () => {
 $("retake").onclick = () => {
   backToCam();
   coinSeen = false; smooth = null; coinLabel = ""; gateCoin = null; stillDataUrl = ""; noScaleMode = false;
+  setCoinSize(0);
   history.length = 0;
   setLocked(true, "Add a coin for scale");
   acquireCamera();
@@ -508,6 +524,7 @@ $("camFile").addEventListener("change", () => {
     stillDataUrl = cap.toDataURL("image/jpeg", 0.85); // canvas redraw strips EXIF
     $("shotFull").src = stillDataUrl;
     gateCoin = null; noScaleMode = true; coinLabel = "";
+    setCoinSize(0);
     stopCamera();
     show("sReview");
   };
@@ -715,7 +732,7 @@ $("coinKind").addEventListener("change", () => {
   const opt = $("coinKind").selectedOptions[0];
   // The user's confirmation wins over the gate's size guess (it can name a
   // coin outside this list, e.g. a nickel, while the scale uses this value).
-  if (opt) coinLabel = opt.textContent.replace(/ · (\d+(?:\.\d+)?) mm$/, " · Ø$1 mm");
+  coinLabel = opt && Number(opt.value) > 0 ? opt.textContent.replace(/ · (\d+(?:\.\d+)?) mm$/, " · Ø$1 mm") : "";
 });
 for (const [id, label] of [["chipCrack", "crack"], ["chipStain", "stain"], ["chipPeel", "peel"], ["chipDent", "dent"]]) {
   $(id).onclick = () => {
@@ -760,7 +777,9 @@ $("measureBtn").onclick = async () => {
   })();
   if (coinCxCyR) {
     const { cx, cy, r } = coinCxCyR;
-    circleRef = { id: "coin", rle: circleRle(cx, cy, r, w, h), knownMm: Number($("coinKind").value), confidence: coinManualPt ? 0.9 : 0.85 };
+    const knownMm = Number($("coinKind").value);
+    if (!(knownMm > 0)) { $("status").textContent = "Choose the reference size first."; return; }
+    circleRef = { id: "coin", rle: circleRle(cx, cy, r, w, h), knownMm, confidence: coinManualPt ? 0.9 : 0.85 };
     // The coin's real outline, not the gate's circle: a tilted wall shows the coin as an
     // ellipse, and the backend uses that ellipse to correct the crack lengths.
     const traced = await traceCoin(cx, cy, r, w, h);
@@ -945,11 +964,11 @@ function drawNumOverlay() {
   if (line) svg.appendChild(el("line", { ...line, stroke: color, "stroke-width": 1.5, "vector-effect": "non-scaling-stroke" }));
   svg.appendChild(el("rect", {
     x, y, width: tagW, height: tagH, rx: tagH / 2,
-    fill: "#fffdf8", stroke: color, "stroke-width": 2, "vector-effect": "non-scaling-stroke",
+    fill: "#ffffff", stroke: color, "stroke-width": 2, "vector-effect": "non-scaling-stroke",
   }));
   const tag = el("text", {
     x: x + tagW / 2, y: y + tagH / 2, "text-anchor": "middle", "dominant-baseline": "central",
-    "font-family": "Archivo, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif", "font-weight": 700, "font-size": fs, fill: "#0b1e46",
+    "font-family": "'Space Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif", "font-weight": 700, "font-size": fs, fill: "#122540",
   });
   tag.textContent = text;
   svg.appendChild(tag);
@@ -1013,9 +1032,33 @@ function drawScheme(findings) {
 
 /* ---------- mic + transcribe ---------- */
 const mic = $("micBtn"), micState = $("micState"), heard = $("heard"), wave = $("wave");
+const micClock = $("micClock"), sttCount = $("sttCount"), voiceCard = $("voiceCard"),
+  voiceTitle = $("voiceTitle"), voiceErr = $("voiceErr"), sendBtn = $("sendBtn"),
+  transcriptBox = $("transcriptBox");
+const LISTEN_MS = 8000, RING_LEN = 578;
+function setPill(mode, text) { micState.className = "stt-pill " + mode; micState.textContent = text; }
+function ringProgress(frac) {
+  const f = document.querySelector("#micRing .fill");
+  if (f) f.style.strokeDashoffset = String(RING_LEN * (1 - Math.min(1, Math.max(0, frac))));
+}
+function tickClock() {
+  const s = Math.min(LISTEN_MS / 1000, (Date.now() - listenStarted) / 1000);
+  if (micClock) micClock.textContent = `0:${String(Math.floor(s)).padStart(2, "0")} / 0:08`;
+  ringProgress(s / (LISTEN_MS / 1000));
+}
+function showVoiceError(title, msg) { voiceTitle.textContent = title; voiceErr.textContent = msg; voiceCard.hidden = false; }
+function hideVoiceError() { voiceCard.hidden = true; }
+function syncSend() {
+  const n = transcriptBox.value.length;
+  sttCount.textContent = `${n} / 280`;
+  const has = transcriptBox.value.trim().length > 0;
+  sendBtn.disabled = !has;
+  sendBtn.textContent = has ? "See measurements →" : "See measurements";
+}
 const NBARS = 28, barEls = [];
 for (let i = 0; i < NBARS; i++) { const b = document.createElement("i"); wave.appendChild(b); barEls.push(b); }
 let micTimer = null, micStream = null, micReady = false, listening = false, analyser = null, analyserData = null;
+let micClockTimer = null, listenStarted = 0;
 function paintWave() {
   if (analyser) {
     analyser.getByteFrequencyData(analyserData);
@@ -1031,10 +1074,23 @@ function paintWave() {
     }
   }
 }
-setInterval(() => { if ($("sSay").classList.contains("on")) paintWave(); }, 90);
+let lastWavePaint = 0;
+setInterval(() => {
+  if (!$("sSay").classList.contains("on")) return;
+  const now = Date.now();
+  if (!listening && now - lastWavePaint < 500) return; // idle shimmer at 2 fps, live levels full rate
+  lastWavePaint = now;
+  paintWave();
+}, 90);
 async function ensureMic() {
   if (micReady) return true;
-  if (!navigator.mediaDevices?.getUserMedia) { heard.textContent = "No microphone on this device."; return false; }
+  if (!navigator.mediaDevices?.getUserMedia) {
+    setPill("idle", "No mic");
+    heard.classList.remove("idle");
+    heard.textContent = "No microphone on this device — type the line below.";
+    showVoiceError("No microphone", "This device has no microphone. Type the line below instead.");
+    return false;
+  }
   try {
     micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     micReady = true;
@@ -1047,7 +1103,13 @@ async function ensureMic() {
       src.connect(analyser);
     } catch { /* levels stay simulated */ }
     return true;
-  } catch { heard.textContent = "Mic blocked — allow access or type below."; return false; }
+  } catch {
+    setPill("idle", "Mic blocked");
+    heard.classList.remove("idle");
+    heard.textContent = "Mic blocked — allow access or type the line below.";
+    showVoiceError("Mic blocked", "The browser blocked the microphone. Allow access and try again, or type the line below.");
+    return false;
+  }
 }
 function stopMicTracks() {
   try { micStream?.getTracks()?.forEach((t) => t.stop()); } catch { /* noop */ }
@@ -1056,22 +1118,39 @@ function stopMicTracks() {
 }
 function stopListening(landed, text) {
   clearTimeout(micTimer); micTimer = null; listening = false;
+  clearInterval(micClockTimer); micClockTimer = null;
+  if (micClock) micClock.textContent = "";
+  ringProgress(0);
   document.getElementById("micwrap").classList.remove("live");
-  micState.textContent = landed ? "Heard" : "Listening";
-  heard.textContent = landed ? (text ?? "") : "";
+  mic.classList.remove("stop");
+  if (landed) {
+    setPill("done", "Heard");
+    heard.classList.remove("idle");
+    heard.textContent = text ?? "";
+  } else {
+    setPill("idle", "Idle");
+  }
   // The OS mic indicator must not linger after leaving the Say step.
   if (!landed) stopMicTracks();
 }
 async function startListening() {
   if (listening) return;
-  heard.textContent = "Asking for the mic…";
+  hideVoiceError();
+  setPill("busy", "Requesting mic");
+  heard.classList.add("idle");
+  heard.textContent = "Speak now…";
+  syncSend();
   if (!(await ensureMic())) return;
   listening = true;
   document.getElementById("micwrap").classList.add("live");
-  micState.textContent = "Listening";
-  heard.textContent = "";
+  mic.classList.add("stop");
+  setPill("live", "Listening");
   recorderStart();
-  micTimer = setTimeout(() => finishListening(true), 8000);
+  listenStarted = Date.now();
+  tickClock();
+  clearInterval(micClockTimer);
+  micClockTimer = setInterval(tickClock, 250);
+  micTimer = setTimeout(() => finishListening(true), LISTEN_MS);
 }
 let recChunks = [], recorder = null, recStream = null;
 async function recorderStart() {
@@ -1104,8 +1183,16 @@ async function finishListening(landed) {
   }
   await new Promise((r) => setTimeout(r, 300));
   const clip = new Blob(recChunks, { type: recorder?.mimeType || "audio/webm" });
-  if (!landed || clip.size === 0) { if (landed) heard.textContent = "Didn't catch anything — type the line."; return; }
-  micState.textContent = "Transcribing…";
+  if (!landed || clip.size === 0) {
+    setPill("idle", "Idle");
+    if (landed) {
+      heard.classList.remove("idle");
+      heard.textContent = "Didn't catch anything — type the line below.";
+      showVoiceError("Didn't hear anything", "The recording came back empty. Tap Try again or type the line below.");
+    }
+    return;
+  }
+  setPill("busy", "Transcribing");
   try {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     const ctx = new Ctx();
@@ -1114,38 +1201,57 @@ async function finishListening(landed) {
     const src = off.createBufferSource(); src.buffer = decoded; src.connect(off.destination); src.start(0, 0, Math.min(decoded.duration, 10));
     const rendered = await off.startRendering();
     ctx.close().catch(() => {});
-    // On the device first (Whisper in voice-worker.js): the voice never leaves the phone
-    // and it works without the backend key. The server transcriber is the fallback.
+    // Server transcriber first when online (Muse auto-detects any language);
+    // on-device Whisper is the fallback for offline use or a keyless /
+    // erroring backend. Either side returning no words falls through to the
+    // other before giving up.
+    if (!isOfflineNow()) {
+      try {
+        const wav = encodeWav(rendered.getChannelData(0), 16000);
+        const b64 = await new Promise((res, rej) => {
+          const fr = new FileReader();
+          fr.onload = () => res(String(fr.result).split(",").pop());
+          fr.onerror = () => rej(new Error("read failed"));
+          fr.readAsDataURL(wav);
+        });
+        const res = await fetch(base() + "/v1/transcribe", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ audioBase64: b64 }),
+        });
+        const j = await res.json().catch(() => ({}));
+        const text = res.ok && j.ok ? String(j.result?.transcript ?? "").trim() : "";
+        if (text) { landTranscript(text); return; }
+        console.info(`[voice] server returned no words (HTTP ${res.status}), trying on-device`);
+      } catch (e) { console.info(`[voice] server transcribe failed, trying on-device: ${e.message ?? e}`); }
+    }
+    setPill("busy", "Transcribing");
     try {
       // Whisper writes non-speech as tags like [Music] or (wind blowing); those are not words.
       const local = (await transcribeOnDevice(rendered.getChannelData(0).slice())).replace(/\[[^\]]*\]|\([^)]*\)/g, "").trim();
-      if (local) landTranscript(local); else heard.textContent = "Didn't catch anything — type the line.";
+      if (local) { landTranscript(local); return; }
+      setPill("idle", "Idle");
+      heard.classList.remove("idle");
+      heard.textContent = "Didn't catch anything — type the line below.";
+      showVoiceError("Didn't hear anything", "Nothing recognizable in that recording. Tap Try again or type the line below.");
       return;
-    } catch (e) { console.info(`[voice] on-device failed, trying the server: ${e.message ?? e}`); }
-    micState.textContent = "Transcribing…";
-    const wav = encodeWav(rendered.getChannelData(0), 16000);
-    const b64 = await new Promise((res, rej) => {
-      const fr = new FileReader();
-      fr.onload = () => res(String(fr.result).split(",").pop());
-      fr.onerror = () => rej(new Error("read failed"));
-      fr.readAsDataURL(wav);
-    });
-    const res = await fetch(base() + "/v1/transcribe", {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ audioBase64: b64 }),
-    });
-    const j = await res.json().catch(() => ({}));
-    if (res.status === 503) { $("voiceErr").textContent = "Voice needs the backend API key — type the line."; $("transcriptBox").value = ""; return; }
-    if (!res.ok || !j.ok) throw new Error(j.error ?? res.status);
-    const text = String(j.result?.transcript ?? "").trim();
-    if (!text) { heard.textContent = "Didn't catch anything — type the line."; return; }
-    landTranscript(text);
-  } catch (e) { $("voiceErr").textContent = isOfflineNow() ? `${offlineModelMessage("speech")} Or type the line.` : `Transcription failed — type the line. (${e.message ?? e})`; }
+    } catch (e) {
+      setPill("idle", "Idle");
+      showVoiceError("Transcription failed", isOfflineNow() ? `${offlineModelMessage("speech")} Or type the line below.` : `Transcription failed — type the line below. (${e.message ?? e})`);
+      return;
+    }
+  } catch (e) {
+    setPill("idle", "Idle");
+    showVoiceError("Transcription failed", isOfflineNow() ? `${offlineModelMessage("speech")} Or type the line below.` : `Transcription failed — type the line below. (${e.message ?? e})`);
+  }
 }
 function landTranscript(text) {
-  $("transcriptBox").value = text;
+  hideVoiceError();
+  transcriptBox.value = text;
+  heard.classList.remove("idle");
   heard.textContent = `“${text}”`;
-  micState.textContent = "Heard";
+  setPill("done", "Heard");
+  try { navigator.vibrate?.(15); } catch { /* haptics are best-effort */ }
+  syncSend();
 }
 let voiceWorker = null, voiceId = 0;
 /** Mono 16 kHz samples → text, on the device. Empty string means nothing heard. */
@@ -1154,7 +1260,7 @@ function transcribeOnDevice(audio) {
   const id = voiceId++;
   return new Promise((resolve, reject) => {
     voiceWorker.onmessage = ({ data }) => {
-      if (data.type === "progress") micState.textContent = `Downloading speech model… ${data.percent}%`;
+      if (data.type === "progress") setPill("busy", `Getting speech model… ${data.percent}%`);
       else if (data.type === "transcribed" && data.id === id) data.error ? reject(new Error(data.error)) : resolve(data.text);
     };
     voiceWorker.onerror = (e) => reject(new Error(e.message ?? "speech worker failed to start"));
@@ -1162,7 +1268,11 @@ function transcribeOnDevice(audio) {
   });
 }
 mic.onclick = () => { if (listening) finishListening(true); else startListening(); };
-$("sendBtn").onclick = () => runReport();
+sendBtn.onclick = () => runReport();
+transcriptBox.addEventListener("input", syncSend);
+$("voiceRetry").onclick = () => { hideVoiceError(); startListening(); };
+$("voiceType").onclick = () => transcriptBox.focus();
+syncSend();
 $("backMark").onclick = () => show("sReview");
 $("backSay").onclick = () => show("sMark");
 
@@ -1427,6 +1537,7 @@ $("newClaimBtn").onclick = () => {
   payloadObj = null; lastMeasurement = null;
   dmg = { points: [], pointMasks: [], mask: null, iou: 0, source: null };
   gateCoin = null; stillDataUrl = ""; noScaleMode = false; coinLabel = "";
+  setCoinSize(0);
   history.length = 0; smooth = null; coinSeen = false;
   $("transcriptBox").value = ""; $("heard").textContent = "";
   $("voiceErr").textContent = ""; $("raw").textContent = "{}";
@@ -1505,7 +1616,7 @@ async function loadSample() {
       { id: "crack-1", label: "crack", areaPx: 24800, skeletonPx: 913, regionCount: 1, confidence: 0.88 },
       { id: "stain-1", label: "stain", areaPx: 6200, regionCount: 2, confidence: 0.71 },
     ],
-    scaleReference: { id: "coin-10inr", knownMm: 27, lengthPx: 287, confidence: 0.88 },
+    scaleReference: { id: "coin-27mm", knownMm: 27, lengthPx: 287, confidence: 0.88 },
   };
   try {
     const mres = await fetch(base() + "/v1/measure", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(sample) });

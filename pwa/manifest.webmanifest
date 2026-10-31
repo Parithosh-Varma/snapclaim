@@ -3,15 +3,35 @@
   "short_name": "SnapClaim",
   "id": "./index.html",
   "description": "Photo + one line in, measured damage report out. Computed, not generated.",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["utilities", "productivity", "business"],
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f4f1ea",
-  "theme_color": "#0b1e46",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "orientation": "portrait",
+  "background_color": "#E9EEF4",
+  "theme_color": "#122540",
   "icons": [
     { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "./icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
     { "src": "./icons/apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any" }
-  ]
+  ],
+  "shortcuts": [
+    {
+      "name": "New claim",
+      "short_name": "New",
+      "description": "Point the camera at the damage with a coin beside it for scale.",
+      "url": "./index.html#new",
+      "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "share_target": {
+    "action": "./index.html",
+    "method": "GET",
+    "params": { "title": "title", "text": "text", "url": "url" },
+    "enctype": "application/x-www-form-urlencoded"
+  }
 }

@@ -44,7 +44,9 @@ test("PWA shell is installable and honest", () => {
   }
   assert.ok(html.includes('id="xcheckBtn"') || html.includes("Cross-check"), "cross-check exists");
   assert.ok(html.includes('id="coinKind"'), "coin options exist");
-  assert.ok(html.includes("India"), "Indian coin options exist");
+  assert.ok(html.includes("Choose the reference size"), "reference size is chosen, not assumed");
+  assert.ok(html.includes("US quarter") && html.includes("1 euro"), "reference presets span regions");
+  assert.ok(html.indexOf("US quarter") < html.indexOf("India ₹10"), "presets are not India-first");
   for (const id of ["tHome","netPill","nextTitle","nextSub","ctaNew","ctaSample","recentList","recentEmpty",
     "tCases","caseList","caseEmpty","tSettings","sc-theme-light","sc-theme-auto","sc-theme-dark","donateSetting",
     "installHint","updateBtn","storeInfo","sc-store-meter","exportAllBtn","wipeBtn","baseUrl2","setCheck","setHealth",

@@ -4,8 +4,8 @@
 // while the model downloads, then {type:"transcribed", id, text} or
 // {type:"transcribed", id, error}.
 const TF_URL = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2";
-// English-only tiny model: ~40 MB at 8-bit, fast enough on a phone CPU for one line.
-const MODEL_ID = "Xenova/whisper-tiny.en";
+// Multilingual tiny model: ~40 MB at 8-bit, ~99 languages, fast enough on a phone CPU for one line.
+const MODEL_ID = "Xenova/whisper-tiny";
 
 let transcriber = null;
 

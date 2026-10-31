@@ -365,7 +365,7 @@ type BackendState =
 
 export function Settings() {
   const ctx = useApp();
-  const { store, casesVersion, bumpCases, toast, base, setBase, checkForUpdates, swUpdateReady, applyUpdate } = ctx;
+  const { store, casesVersion, bumpCases, toast, base, setBase, checkForUpdates, swUpdateReady, applyUpdate, go } = ctx;
   const cases = store.list();
   void casesVersion;
   const [theme, setTheme] = useState(() => String(store.getSettings().theme ?? document.documentElement.dataset.theme ?? "auto"));
@@ -649,6 +649,22 @@ export function Settings() {
               {backend.kind === "ok" ? `Connected in ${backend.ms} milliseconds, ${backend.version}` : backend.kind === "error" ? backend.detail : ""}
             </span>
           </details>
+        </Section>
+
+        <Section
+          label="Developer"
+          icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3M13 5l-2 14" /></svg>}
+        >
+          <button
+            id="openAdminBtn"
+            className="btn-secondary"
+            type="button"
+            onClick={() => window.location.assign("/admin")}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 8h9M19 8h1M4 16h3M13 16h7" /><circle cx="16" cy="8" r="2.2" /><circle cx="10" cy="16" r="2.2" /></svg>
+            Open admin panel
+          </button>
+          <p className="fineprint">Mock vs live switch, backend presets, spend meter, and diagnostics — one screen.</p>
         </Section>
 
         <Section

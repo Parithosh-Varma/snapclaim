@@ -83,8 +83,11 @@ export async function transcribeWithMuse(input: {
   return { transcript: data.transcript, audioDurationMs, turns };
 }
 
-/** Default language hints for the claim intake: Hindi + Telugu + English with code-switching. */
-export const DEFAULT_LANGUAGE_BIAS = ["Hindi", "Telugu", "English"];
+/**
+ * No default language hints: Muse auto-detects the spoken language. A caller
+ * that knows the language can still send `languageBias` explicitly.
+ */
+export const DEFAULT_LANGUAGE_BIAS: string[] = [];
 export const DEFAULT_KEYWORDS = ["crack", "seepage", "deposit", "damp", "leakage", "plaster"];
 
 export const MAX_KEYWORDS = 20;

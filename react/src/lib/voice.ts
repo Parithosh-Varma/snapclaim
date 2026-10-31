@@ -1,7 +1,8 @@
-// Voice intake, ported from pwa/app.js. On-device Whisper first
-// (public/voice-worker.js): the voice never leaves the phone and it works
-// without the backend key. The server transcriber (/v1/transcribe) is the
-// fallback. Clips are resampled to mono 16 kHz WAV on the device.
+// Voice intake, ported from pwa/app.js. The server transcriber
+// (/v1/transcribe → Muse, which auto-detects any language) goes first when
+// online; on-device Whisper (public/voice-worker.js) is the fallback for
+// offline use or when the backend has no key. Clips are resampled to mono
+// 16 kHz WAV on the device.
 
 let voiceWorker: Worker | null = null;
 let voiceId = 0;

@@ -115,7 +115,7 @@ test("observeMask clips to the component, drops speckle and measures cracks", ()
 
 test("a coin seen straight on calibrates to its diameter", () => {
   const { reference, diagnostics } = circularReference(disc(200, 100, 100, 60), {
-    id: "coin-10inr",
+    id: "coin-27mm",
     knownMm: 27,
     confidence: 0.95,
   });
@@ -133,7 +133,7 @@ test("a half-covered coin loses confidence and the report drops to percent-only"
     if (Math.floor(i / 200) > 100) halfCoin.data[i] = 0;
   }
   const { reference, diagnostics } = circularReference(halfCoin, {
-    id: "coin-10inr",
+    id: "coin-27mm",
     knownMm: 27,
     confidence: 0.95,
   });

@@ -3,6 +3,7 @@ import type { FindingsProvider, FindingsRequest, VisionProvider, VisionRequest, 
 import { BudgetExceededError, estimateCostUsd, type SpendGuard } from "../src/config/spend-guard.ts";
 import { loadConfig, type AppConfig } from "../src/config/config.ts";
 import type { FindingDraft } from "../src/findings/evidence-gate.ts";
+import { getMockOverride } from "./admin.ts";
 
 export class HttpError extends Error {
   readonly status: number;
@@ -17,7 +18,12 @@ export type Env = Record<string, string | undefined>;
 export type FetchFn = typeof fetch;
 
 export function configFromEnv(env: Env): AppConfig {
-  return loadConfig(env);
+  const config = loadConfig(env);
+  // Dev-panel runtime override (POST /v1/admin/mode): in-memory only, the
+  // env default returns as soon as the override is reset or the process restarts.
+  const override = getMockOverride();
+  if (override !== null) return { ...config, mockMode: override };
+  return config;
 }
 
 /** Live routes fail closed: no key, no call. In mock mode nothing reaches a network. */
