@@ -201,6 +201,16 @@ export default function Check() {
 
   const done = (p: CheckPhase) => p === "ok" || p === "error";
   const canReport = done(checks.skeptic) && done(checks.xcheck);
+  const skepticHead = checks.skeptic === "loading"
+    ? <Badge kind="wait">Checking…</Badge>
+    : skError ? <Badge kind="fail">Failed</Badge>
+    : skRows ? (skRows.some((r) => r.disputed) ? <Badge kind="fail">Disputed</Badge> : <Badge kind="ok">Agreed</Badge>)
+    : <Badge kind="wait">Pending</Badge>;
+  const xHead = checks.xcheck === "loading"
+    ? <Badge kind="wait">Checking…</Badge>
+    : xError ? <Badge kind="fail">Failed</Badge>
+    : xBadge ? verdictBadge(xBadge.verdict)
+    : <Badge kind="wait">Pending</Badge>;
 
   return (
     <section className="screen on" aria-labelledby="h-check">
@@ -211,7 +221,10 @@ export default function Check() {
         <p className="sub">A second check has to agree. Disagreements print red, never hidden.</p>
 
         <div className="checkcard">
-          <h3>Independent skeptic</h3>
+          <div className="checkhead">
+            <h3>Independent skeptic</h3>
+            {skepticHead}
+          </div>
           <p>Spark Open re-derives every number from the receipts. Anything it cannot reproduce is marked disputed.</p>
           <button
             id="skepticBtn"
@@ -259,7 +272,10 @@ export default function Check() {
         </div>
 
         <div className="checkcard">
-          <h3>Mask cross-check</h3>
+          <div className="checkhead">
+            <h3>Mask cross-check</h3>
+            {xHead}
+          </div>
           <p>Sends this photo once to SAM 3.1 and compares its outline with the one measured on this device.</p>
           <button
             id="xcheckBtn"
@@ -275,7 +291,7 @@ export default function Check() {
           </button>
           <span id="xStatus" role="status" style={{ display: "block", fontSize: 13, color: "#5b6b8c", marginTop: 8, minHeight: "1.2em" }}>
             {checks.xcheck === "loading" ? "Asking SAM 3.1…" : xNote}
-            {xBadge && (
+            {xBadge && !xError && (
               <span className={`badge ${xBadge.verdict === "AGREED" ? "ok" : "fail"}`}>
                 {xBadge.verdict} · IoU {String(xBadge.iou)}
               </span>
