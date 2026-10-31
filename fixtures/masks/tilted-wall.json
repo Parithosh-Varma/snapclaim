@@ -13,6 +13,7 @@
       "areaPx": 426,
       "regionCount": 1,
       "confidence": 0.9,
+      "planeAreaPx": 652.6,
       "skeletonPx": 219.9,
       "straightRegionCount": 1,
       "straightAreaPx": 426

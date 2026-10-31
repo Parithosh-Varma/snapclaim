@@ -125,18 +125,23 @@ function measureMask(
   let crackWidthValue: number | null = null;
   let widthReceiptId: string | null = null;
 
+  // Area on the wall: photo pixels, or the tilt-corrected area when there is one.
+  const plane: Record<string, number> = mask.planeAreaPx === undefined ? { damageAreaPx: mask.areaPx } : { planeAreaPx: mask.planeAreaPx };
+  const planeName = mask.planeAreaPx === undefined ? "damageAreaPx" : "planeAreaPx";
+  const planeAreaPx = mask.planeAreaPx ?? mask.areaPx;
+
   if (scale !== null) {
-    areaCm2Value = areaCm2(mask.areaPx, scale.mmPerPx);
+    areaCm2Value = areaCm2(planeAreaPx, scale.mmPerPx);
     const areaReceipt = ledger.add({
       method: "calibrated_area",
       inputs: {
         maskId: mask.id,
-        damageAreaPx: mask.areaPx,
+        ...plane,
         mmPerPx: round(scale.mmPerPx, 6),
         scaleReceiptId: scale.receiptId,
       },
       output: { value: areaCm2Value, unit: "cm2" },
-      formula: "damageAreaPx * mmPerPx^2 / 100",
+      formula: `${planeName} * mmPerPx^2 / 100`,
       confidence: round(mask.confidence * scale.reference.confidence, 3),
       notes: [],
     });
@@ -162,19 +167,19 @@ function measureMask(
       lengthReceiptId = lengthReceipt.id;
     }
     if (mask.skeletonPx > 0) {
-      crackWidthValue = crackWidthMm(mask.areaPx, mask.skeletonPx, scale.mmPerPx);
+      crackWidthValue = crackWidthMm(planeAreaPx, mask.skeletonPx, scale.mmPerPx);
       if (crackWidthValue !== null) {
         const widthReceipt = ledger.add({
           method: "calibrated_width",
           inputs: {
             maskId: mask.id,
-            damageAreaPx: mask.areaPx,
+            ...plane,
             skeletonPx: mask.skeletonPx,
             mmPerPx: round(scale.mmPerPx, 6),
             scaleReceiptId: scale.receiptId,
           },
           output: { value: crackWidthValue, unit: "mm" },
-          formula: "damageAreaPx / skeletonPx * mmPerPx",
+          formula: `${planeName} / skeletonPx * mmPerPx`,
           confidence: round(mask.confidence * scale.reference.confidence, 3),
           notes: [],
         });
