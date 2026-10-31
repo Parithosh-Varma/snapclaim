@@ -119,10 +119,10 @@ export function Home() {
               <li>Flat light — no flash glare</li>
             </ul>
           </div>
-          <details className="how">
-            <summary>How accuracy works</summary>
-            <p>The coin sets the millimetres. Tilt is corrected from its ellipse — no coin, percent-only report.</p>
-          </details>
+          <div className="tipcard">
+            <p className="tipcard-title">How accuracy works</p>
+            <p className="tipcard-copy">The coin sets the millimetres. Tilt is corrected from its ellipse — no coin, percent-only report.</p>
+          </div>
         </div>
 
         <div className="recent-head">

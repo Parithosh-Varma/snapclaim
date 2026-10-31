@@ -285,9 +285,7 @@
   .tipcard{background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);padding:14px 14px 12px}
   .tipcard-title{font-size:13px;font-weight:800;margin:0 0 8px;text-transform:uppercase;letter-spacing:.05em;color:var(--coin-strong)}
   .tipcard ul{margin:0;padding-left:18px;color:var(--slate);font-size:13.5px;line-height:1.55}
-  .how{background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);padding:14px}
-  .how summary{cursor:pointer;font-weight:800;font-size:14.5px;min-height:44px;display:flex;align-items:center}
-  .how p{margin:6px 0 2px;color:var(--slate);font-size:13.5px;line-height:1.55}
+  .tipcard-copy{margin:0;color:var(--slate);font-size:13.5px;line-height:1.55}
   .recent-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:18px 0 8px;min-height:44px}
   .recent-head h2{font-size:17px;margin:0}
   .recent-list{display:grid;gap:8px}
@@ -509,7 +507,7 @@
   html[data-theme="dark"] .hero-steps b{background:#ece7dc;color:#141310}
   html[data-theme="dark"] .hero-frame-tag{background:#ece7dc;color:#141310}
   html[data-theme="dark"] .tipcard-title{color:#52d18a}
-  html[data-theme="dark"] .tipcard ul,html[data-theme="dark"] .how p,html[data-theme="dark"] .hero-desc,
+  html[data-theme="dark"] .tipcard ul,html[data-theme="dark"] .tipcard-copy,html[data-theme="dark"] .hero-desc,
   html[data-theme="dark"] .empty-sub,html[data-theme="dark"] .case-date{color:#ada595}
   html[data-theme="dark"] .empty-state{border-color:#4a4438;background:#1d1b17}
   html[data-theme="dark"] .empty-icon{background:#173524;color:#52d18a}
@@ -578,7 +576,7 @@
     html[data-theme="auto"] .hero-steps b{background:#ece7dc;color:#141310}
     html[data-theme="auto"] .hero-frame-tag{background:#ece7dc;color:#141310}
     html[data-theme="auto"] .tipcard-title{color:#52d18a}
-    html[data-theme="auto"] .tipcard ul,html[data-theme="auto"] .how p,html[data-theme="auto"] .hero-desc,
+    html[data-theme="auto"] .tipcard ul,html[data-theme="auto"] .tipcard-copy,html[data-theme="auto"] .hero-desc,
     html[data-theme="auto"] .empty-sub,html[data-theme="auto"] .case-date{color:#ada595}
     html[data-theme="auto"] .empty-state{border-color:#4a4438;background:#1d1b17}
     html[data-theme="auto"] .empty-icon{background:#173524;color:#52d18a}
