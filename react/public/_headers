@@ -5,5 +5,5 @@
 # index.html deliberately omits it. Keep the two policies identical apart from
 # frame-ancestors; tests/csp-headers.test.ts fails if they drift.
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; connect-src 'self' https://snapclaim-backend.parithosh.workers.dev http://127.0.0.1:8787 http://localhost:8787 https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; worker-src 'self' blob:; media-src blob: data:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; connect-src 'self' https://snapclaim-backend.parithosh.workers.dev http://127.0.0.1:8787 http://localhost:8787 https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://*.hf.co; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; worker-src 'self' blob:; media-src blob: data:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'
   X-Frame-Options: SAMEORIGIN
