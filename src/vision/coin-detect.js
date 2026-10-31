@@ -112,6 +112,20 @@ function downscaleGray(image, scale) {
   }
   const gray = new Float32Array(width * height);
   for (let i = 0; i < gray.length; i++) gray[i] = count[i] ? sum[i] / count[i] : 0;
+  // Percentile contrast stretch: on a dull or hazy photo the coin rim would
+  // never reach the top gradient share, so spread p2–p98 over the full
+  // range first. Skipped when the photo already spans 200+ levels, where the
+  // rim is strong and stretching would only amplify noise.
+  const sorted = Float32Array.from(gray).sort();
+  const lo = sorted[Math.floor(0.02 * (sorted.length - 1))] ?? 0;
+  const hi = sorted[Math.floor(0.98 * (sorted.length - 1))] ?? 255;
+  if (hi - lo > 1 && hi - lo < 200) {
+    const gain = 255 / (hi - lo);
+    for (let i = 0; i < gray.length; i++) {
+      const v = (gray[i] - lo) * gain;
+      gray[i] = v < 0 ? 0 : v > 255 ? 255 : v;
+    }
+  }
   return { gray, width, height };
 }
 
