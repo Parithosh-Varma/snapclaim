@@ -557,7 +557,7 @@ export default function Mark() {
                 setCoinKind(v);
                 setCoinCustom("");
                 s.coinKindMm = v;
-                s.coinLabel = v > 0 ? text.replace(/ · (\d+(?:\.\d+)?) mm$/, " · Ø$1 mm") : "";
+                s.coinLabel = v > 0 ? text.replace(/ · (\d+(?:\.\d+)?) mm$/, " · $1 mm dia") : "";
               }}
             >
               <option value={0}>Choose the reference size…</option>
@@ -592,7 +592,7 @@ export default function Mark() {
                 if (mm > 0) {
                   setCoinKind(0);
                   s.coinKindMm = mm;
-                  s.coinLabel = `Custom · Ø${mm} mm`;
+                  s.coinLabel = `Custom · ${mm} mm dia`;
                 } else {
                   s.coinKindMm = coinKind;
                   s.coinLabel = "";
