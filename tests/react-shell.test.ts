@@ -31,6 +31,22 @@ test("React app exists with the full screen set", () => {
   }
 });
 
+test("Capture has one primary action and camera-free paths", () => {
+  const cap = read("react/src/screens/Capture.tsx");
+  for (const id of ["shutter", "uploadBtn", "altEntry", "noCoin", "enableCam", "tipsBtn", "tipsGotIt", "tipsClose"]) {
+    assert.ok(cap.includes(`id="${id}"`), `capture keeps #${id}`);
+  }
+  for (const copy of [
+    "Place a coin to unlock",
+    "Percentages only — no millimetres",
+    "Place a coin next to the damage",
+    "Coin found – fit damage + coin in frame",
+    "snapclaim.tipsSeen",
+  ]) {
+    assert.ok(cap.includes(copy), `capture copy: ${copy}`);
+  }
+});
+
 test("React port keeps backend, worker and privacy contracts", () => {
   const all = [
     "react/src/App.tsx", "react/src/screens/Capture.tsx", "react/src/screens/Mark.tsx",
@@ -72,6 +88,11 @@ test("React port keeps backend, worker and privacy contracts", () => {
   for (const w of ["react/public/sam-worker.js", "react/public/voice-worker.js"]) {
     assert.ok(read(w).includes('tf.env.logLevel = "error"'), `${w} quiets ONNX Runtime warnings`);
   }
+  for (const w of ["react/public/sam-worker.js", "pwa/sam-worker.js"]) {
+    assert.ok(read(w).includes("photoId: progressPhotoId"), `${w} tags progress with the photo so stale downloads never paint the bar`);
+  }
+  assert.ok(mark.includes("That photo could not be read"), "unreadable photo fails closed instead of keeping a stale mask");
+  assert.ok(mark.includes("there is nothing outlined to measure"), "measure refuses an empty mask even if the button is forced");
 
   const html = read("react/index.html");
   assert.ok(html.includes("Content-Security-Policy"), "CSP kept");

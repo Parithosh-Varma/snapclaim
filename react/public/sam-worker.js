@@ -20,6 +20,7 @@ const WALL_FRACTION = 0.5;
 let tf = null, model = null, processor = null, device = null;
 let rawImage = null, embeddings = null, currentPhoto = -1;
 let forcedCpu = false; // set after a GPU run fails, for the rest of the session
+let progressPhotoId = -1; // embed that triggered the download: tags progress so stale photos drop it
 
 // WebGPU first (full-precision weights, which every adapter can run), else the
 // 8-bit CPU build. ?device=wasm or ?device=webgpu on the worker URL forces one.
@@ -40,7 +41,7 @@ async function loadModel() {
   // Harmless (shape ops pinned to CPU on purpose) but noisy, so drop to errors only.
   try { tf.env.logLevel = "error"; } catch { /* older transformers build */ }
   const progress_callback = (p) => {
-    if (p.status === "progress") postMessage({ type: "progress", percent: Math.round(p.progress) });
+    if (p.status === "progress") postMessage({ type: "progress", photoId: progressPhotoId, percent: Math.round(p.progress) });
   };
   processor ??= await tf.AutoProcessor.from_pretrained(MODEL_ID, { progress_callback });
   if (!forcedCpu && forced !== "wasm" && (forced === "webgpu" || (await hasWebGpu()))) {
@@ -67,6 +68,7 @@ function fallBackToCpu() {
 
 async function embed({ photoId, image }) {
   currentPhoto = photoId;
+  progressPhotoId = photoId;
   embeddings = null;
   try {
     await loadModel();
