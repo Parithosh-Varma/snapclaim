@@ -279,8 +279,9 @@
   .sample-row{display:flex;justify-content:center;margin-top:2px}
 
   /* sample picker: real field photos, never a blank frame */
-  .sampledlg{border:1px solid var(--line);border-radius:20px;padding:20px;width:min(560px,94vw);
-    max-height:86vh;overflow-y:auto;background:var(--card);color:var(--ink)}
+  .sampledlg{position:fixed;inset:0;margin:auto;width:min(560px,calc(100vw - 24px));
+    max-height:86vh;overflow-y:auto;border:1px solid var(--line);border-radius:20px;padding:20px;
+    background:var(--card);color:var(--ink);box-sizing:border-box}
   .sampledlg::backdrop{background:rgba(11,30,70,.5)}
   .sampledlg h2{font-size:20px;margin:0 0 4px}
   .samplegrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0 16px}
