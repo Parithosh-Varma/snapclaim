@@ -415,6 +415,9 @@
     <p class="sub">One tap on the crack. The coin is already outlined from the gate.</p>
     <div class="card">
       <canvas id="markCanvas"></canvas>
+      <div style="display:flex;gap:8px;margin:8px 0 2px">
+        <button id="undoBtn" class="btn-ghostline" type="button" style="flex:1;min-height:44px" disabled>↩ Undo last tap</button>
+      </div>
       <div class="seg" role="group" aria-label="Damage type">
         <button id="chipCrack" type="button" class="on">Crack</button>
         <button id="chipStain" type="button">Stain</button>
@@ -426,17 +429,55 @@
       <label class="field">Scale reference (auto-detected — confirm)
         <select id="coinKind">
           <option value="0">Choose the reference size…</option>
-          <option value="24.26">US quarter · 24.26 mm</option>
-          <option value="23.88">Canadian quarter · 23.88 mm</option>
-          <option value="24.5">UK 10p · 24.5 mm</option>
-          <option value="23.25">1 euro · 23.25 mm</option>
-          <option value="22.6">Japanese ¥100 · 22.6 mm</option>
-          <option value="27">India ₹10 · 27 mm</option>
-          <option value="25">India ₹5 · 25 mm</option>
-          <option value="23">India ₹2 · 23 mm</option>
-          <option value="22">India ₹1 · 22 mm</option>
+          <optgroup label="USA">
+            <option value="24.26">US quarter · 24.26 mm</option>
+            <option value="21.21">US nickel · 21.21 mm</option>
+            <option value="19.05">US penny · 19.05 mm</option>
+            <option value="17.91">US dime · 17.91 mm</option>
+          </optgroup>
+          <optgroup label="Canada">
+            <option value="23.88">Canadian quarter · 23.88 mm</option>
+          </optgroup>
+          <optgroup label="Eurozone">
+            <option value="25.75">€2 · 25.75 mm</option>
+            <option value="24.25">€ 50 cent · 24.25 mm</option>
+            <option value="23.25">1 euro · 23.25 mm</option>
+            <option value="22.25">€ 20 cent · 22.25 mm</option>
+            <option value="21.25">€ 5 cent · 21.25 mm</option>
+            <option value="19.75">€ 10 cent · 19.75 mm</option>
+            <option value="18.75">€ 2 cent · 18.75 mm</option>
+            <option value="16.25">€ 1 cent · 16.25 mm</option>
+          </optgroup>
+          <optgroup label="UK">
+            <option value="28.4">UK £2 · 28.4 mm</option>
+            <option value="27.3">UK 50p · 27.3 mm</option>
+            <option value="25.9">UK 2p · 25.9 mm</option>
+            <option value="24.5">UK 10p · 24.5 mm</option>
+            <option value="23.03">UK £1 · 23.03 mm</option>
+            <option value="21.4">UK 20p · 21.4 mm</option>
+            <option value="20.3">UK 1p · 20.3 mm</option>
+            <option value="18">UK 5p · 18 mm</option>
+          </optgroup>
+          <optgroup label="India">
+            <option value="27">India ₹10 · 27 mm</option>
+            <option value="25">India ₹5 · 25 mm</option>
+            <option value="23">India ₹2 · 23 mm</option>
+            <option value="22">India ₹1 · 22 mm</option>
+          </optgroup>
+          <optgroup label="Japan">
+            <option value="26.5">Japanese ¥500 · 26.5 mm</option>
+            <option value="23.5">Japanese ¥10 · 23.5 mm</option>
+            <option value="22.6">Japanese ¥100 · 22.6 mm</option>
+            <option value="22">Japanese ¥5 · 22 mm</option>
+            <option value="21">Japanese ¥50 · 21 mm</option>
+            <option value="20">Japanese ¥1 · 20 mm</option>
+          </optgroup>
         </select>
       </label>
+      <label class="field" style="margin-top:6px">Or type the diameter (any coin, ruler, card)
+        <input id="coinCustomMm" class="field-input" type="number" inputmode="decimal" min="5" max="100" step="0.01" placeholder="e.g. 24.26" />
+      </label>
+      <div id="coinHintMark" class="hint" style="font-size:13px;color:var(--slate);margin:4px 0 6px"></div>
       <label class="switchrow" style="margin:8px 0 4px"><input id="coinTaped" type="checkbox" /> Coin has tape — use lenient outline (allows tape halo)</label>
       <div style="display:flex;gap:8px;margin:6px 0 10px"><button id="coinFixBtn" class="btn-ghostline" type="button" style="flex:1;min-height:44px">Tap coin to correct</button><span id="coinFixHint" style="font-size:12px;color:var(--slate);align-self:center"></span></div>
       <div id="photoNotes" class="hint" style="font-size:13px;color:var(--slate)"></div>

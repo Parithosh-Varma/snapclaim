@@ -17,7 +17,13 @@ let forcedCpu = false; // set after a GPU run fails, for the rest of the session
 
 // WebGPU first (full-precision weights, which every adapter can run), else the
 // 8-bit CPU build. ?device=wasm or ?device=webgpu on the worker URL forces one.
+// Low-memory phones (deviceMemory <= 4 GB, e.g. Samsung A32) OOM under WebGPU
+// fp32: the GPU process ballooned to 2.2 GB and LMK killed Chrome (real-phone
+// stress, Oct 2026). On those devices default to the smaller WASM build unless
+// ?device=webgpu explicitly forces the GPU path.
 const forced = new URL(self.location.href).searchParams.get("device");
+const deviceMemGB = typeof navigator !== "undefined" ? Number(navigator.deviceMemory) || 0 : 0;
+const lowMemDevice = deviceMemGB > 0 && deviceMemGB <= 4;
 
 async function hasWebGpu() {
   try {
@@ -33,11 +39,16 @@ async function loadModel() {
   // ORT prints "Some nodes were not assigned..." warnings per session.
   // Harmless (shape ops pinned to CPU on purpose) but noisy, so drop to errors only.
   try { tf.env.logLevel = "error"; } catch { /* older transformers build */ }
+  // Native ORT EP warnings ("Some nodes were not assigned...") bypass logLevel
+  // and spam console.error. Harmless (shape ops pinned to CPU on purpose) — try
+  // the backend knob too; unknown keys are ignored inside try/catch.
+  try { tf.env.backends.onnx.logLevel = "error"; } catch { /* no onnx backend knob */ }
+  try { tf.env.backends.onnx.verbose = false; } catch { /* no verbose knob */ }
   const progress_callback = (p) => {
     if (p.status === "progress") postMessage({ type: "progress", percent: Math.round(p.progress) });
   };
   processor ??= await tf.AutoProcessor.from_pretrained(MODEL_ID, { progress_callback });
-  if (!forcedCpu && forced !== "wasm" && (forced === "webgpu" || (await hasWebGpu()))) {
+  if (!lowMemDevice && !forcedCpu && forced !== "wasm" && (forced === "webgpu" || (await hasWebGpu()))) {
     try {
       model = await tf.SamModel.from_pretrained(MODEL_ID, { device: "webgpu", dtype: "fp32", progress_callback });
       device = "webgpu";

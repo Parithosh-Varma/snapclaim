@@ -1,4 +1,5 @@
 import type {
+  ComponentObservation,
   MaskObservation,
   MeasuredFinding,
   MeasureSessionInput,
@@ -17,7 +18,19 @@ import {
   round,
 } from "./math.ts";
 import { DEFAULT_SEVERITY_THRESHOLDS, classifySeverity, validateThresholds } from "./severity.ts";
+import type { DamageLabel } from "./types.ts";
 import { ReceiptLedger } from "../receipts/ledger.ts";
+
+const DAMAGE_LABELS: ReadonlySet<string> = new Set(["crack", "stain", "peel", "dent"]);
+
+/** Fail closed on taxonomy pollution: only the engine's labels measure. */
+export function assertDamageLabel(label: unknown): asserts label is DamageLabel {
+  if (typeof label !== "string" || !DAMAGE_LABELS.has(label)) {
+    throw new MeasurementError(
+      `mask label must be one of ${[...DAMAGE_LABELS].join(", ")}, got ${JSON.stringify(label)}`,
+    );
+  }
+}
 
 /**
  * Deterministic measurement session.
@@ -29,6 +42,18 @@ export function measureSession(input: MeasureSessionInput): MeasureSessionResult
   const { component, masks } = input;
   if (!Number.isFinite(component.areaPx) || component.areaPx <= 0) {
     throw new MeasurementError("component.areaPx must be a positive number");
+  }
+  if (typeof component.id !== "string" || component.id === "") {
+    throw new MeasurementError("component.id must be a non-empty string");
+  }
+  if (!Number.isFinite(component.confidence)) {
+    throw new MeasurementError(`component.confidence must be a finite number, got ${component.confidence}`);
+  }
+  for (const mask of masks) {
+    assertDamageLabel(mask.label);
+    if (!Number.isFinite(mask.confidence)) {
+      throw new MeasurementError(`mask ${mask.id} confidence must be a finite number, got ${mask.confidence}`);
+    }
   }
 
   const thresholds = input.thresholds ?? DEFAULT_SEVERITY_THRESHOLDS;
@@ -73,7 +98,7 @@ export function measureSession(input: MeasureSessionInput): MeasureSessionResult
     }
   }
 
-  const findings: MeasuredFinding[] = masks.map((mask) => measureMask(mask, component.areaPx, ledger, scale, thresholds, minConfidence));
+  const findings: MeasuredFinding[] = masks.map((mask) => measureMask(mask, component, ledger, scale, thresholds, minConfidence));
 
   return {
     findings,
@@ -84,13 +109,13 @@ export function measureSession(input: MeasureSessionInput): MeasureSessionResult
 
 function measureMask(
   mask: MaskObservation,
-  componentAreaPx: number,
+  component: ComponentObservation,
   ledger: ReceiptLedger,
   scale: { receiptId: string; mmPerPx: number; reference: ScaleReference } | null,
   thresholds: typeof DEFAULT_SEVERITY_THRESHOLDS,
   minConfidence: number,
 ): MeasuredFinding {
-  const ratio = areaRatio(mask.areaPx, componentAreaPx);
+  const ratio = areaRatio(mask.areaPx, component.areaPx);
   const percent = ratioToPercent(ratio);
   const regionCount = mask.regionCount ?? 1;
 
@@ -99,8 +124,10 @@ function measureMask(
     inputs: {
       maskId: mask.id,
       label: mask.label,
+      componentId: component.id,
+      componentConfidence: component.confidence,
       damageAreaPx: mask.areaPx,
-      componentAreaPx,
+      componentAreaPx: component.areaPx,
       ratioRaw: ratio,
     },
     output: { value: percent, unit: "percent" },

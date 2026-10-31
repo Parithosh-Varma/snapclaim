@@ -49,8 +49,14 @@ const JPEG_METADATA_MARKERS = new Map<number, string>([
 ]);
 // Kept on purpose: APP0 (JFIF), APP2 (ICC colour profile), APP14 (Adobe colour transform).
 
-/** PNG ancillary chunks that carry text, EXIF or timestamps. */
-const PNG_METADATA_CHUNKS = new Set(["eXIf", "tEXt", "zTXt", "iTXt", "tIME"]);
+/** PNG chunks kept verbatim: critical chunks plus colourimetry/geometry ancillaries.
+ * Everything else (text, EXIF, timestamps, ICC profiles, histograms and any
+ * unknown private chunks) is dropped — a denylist cannot cover custom
+ * ancillary chunks that may carry location or device identifiers. */
+const PNG_KEPT_CHUNKS = new Set([
+  "IHDR", "PLTE", "IDAT", "IEND",
+  "cHRM", "gAMA", "sRGB", "bKGD", "pHYs",
+]);
 
 export function detectFormat(bytes: Uint8Array): ImageFormat {
   if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "jpeg";
@@ -60,6 +66,31 @@ export function detectFormat(bytes: Uint8Array): ImageFormat {
 
 export function stripMetadata(bytes: Uint8Array): StrippedImage {
   return detectFormat(bytes) === "jpeg" ? stripJpeg(bytes) : stripPng(bytes);
+}
+
+/** Offset just past the EOI marker closing the scan that starts at sosPos,
+ * or -1 when none is found (fall back to copying the tail untouched). */
+function findEoi(bytes: Uint8Array, sosPos: number): number {
+  if (sosPos + 4 > bytes.length) return -1;
+  const sosLen = ((bytes[sosPos + 2] as number) << 8) | (bytes[sosPos + 3] as number);
+  let i = sosPos + 2 + sosLen;
+  while (i + 1 < bytes.length) {
+    if (bytes[i] !== 0xff) {
+      i++;
+      continue;
+    }
+    const next = bytes[i + 1] as number;
+    if (next === 0x00) {
+      i += 2; // stuffed literal 0xFF inside entropy-coded data
+    } else if (next === 0xff) {
+      i += 1; // fill byte
+    } else if (next === 0xd9) {
+      return i + 2;
+    } else {
+      i += 2; // RSTn or resync marker: standalone, keep scanning
+    }
+  }
+  return -1;
 }
 
 function stripJpeg(bytes: Uint8Array): StrippedImage {
@@ -77,8 +108,18 @@ function stripJpeg(bytes: Uint8Array): StrippedImage {
       continue;
     }
     if (marker === 0xda || marker === 0xd9) {
-      // Start of scan (or a bare end of image): the rest is image data, copied as is.
-      kept.push(bytes.subarray(p));
+      // Start of scan (or a bare end of image): copy through the end of image
+      // marker, then drop anything trailing it. Bytes after EOI are not image
+      // data — metadata smuggled past SOS (a second APP1 in the tail) is cut
+      // here instead of being copied verbatim.
+      const eoi = findEoi(bytes, p);
+      if (eoi < 0) {
+        kept.push(bytes.subarray(p));
+        return { format: "jpeg", bytes: concat(kept), orientation, removed };
+      }
+      kept.push(bytes.subarray(p, eoi));
+      const tail = bytes.subarray(eoi);
+      if (tail.length > 0) removed.push({ kind: "trailing data after EOI", bytes: tail.length });
       return { format: "jpeg", bytes: concat(kept), orientation, removed };
     }
     if (p + 4 > bytes.length) throw new ImageIntakeError("malformed JPEG: truncated segment header");
@@ -136,10 +177,10 @@ function stripPng(bytes: Uint8Array): StrippedImage {
     const end = p + 12 + length;
     if (end > bytes.length) throw new ImageIntakeError(`malformed PNG: chunk ${type} overruns the file`);
 
-    if (PNG_METADATA_CHUNKS.has(type)) {
-      removed.push({ kind: type, bytes: end - p });
-    } else {
+    if (PNG_KEPT_CHUNKS.has(type)) {
       kept.push(bytes.subarray(p, end));
+    } else {
+      removed.push({ kind: type, bytes: end - p });
     }
     p = end;
     if (type === "IEND") {

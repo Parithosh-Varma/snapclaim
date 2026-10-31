@@ -24,6 +24,15 @@ export interface CocoRle {
 export const MAX_MASK_DIMENSION = 4096;
 export const MAX_MASK_PIXELS = 16_777_216;
 export const MAX_RLE_RUNS = 1_000_000;
+/**
+ * Aggregate pixel budget per request: one 4096² mask is ~20 bytes of RLE
+ * but 16.7M decoded bytes, so 50 individually-legal masks would expand to
+ * ~800MB. Callers decoding several masks (observe/crosscheck) must stay
+ * under this total. 64M pixels ≈ 64MB of Uint8Array + headroom.
+ */
+export const MAX_TOTAL_MASK_PIXELS = 67_108_864;
+/** Skeletonize is O(area) per iteration: refuse masks above this before thinning. */
+export const SKELETON_MAX_PIXELS = 4_194_304;
 
 export function assertMaskSize(width: number, height: number): void {
   if (
@@ -197,18 +206,21 @@ export function connectedRegions(mask: BinaryMask): Region[] {
   const { width, height, data } = mask;
   const seen = new Uint8Array(data.length);
   const stack = new Int32Array(data.length);
+  // Reused scratch buffer: labelling writes indices straight into it instead
+  // of a per-pixel JS number[] (8 bytes each) plus an Int32Array.from copy.
+  const scratch = new Int32Array(data.length);
   const regions: Region[] = [];
 
   for (let start = 0; start < data.length; start++) {
     if (data[start] === 0 || seen[start] === 1) continue;
 
-    const members: number[] = [];
+    let count = 0;
     let top = 0;
     stack[top++] = start;
     seen[start] = 1;
     while (top > 0) {
       const i = stack[--top] as number;
-      members.push(i);
+      scratch[count++] = i;
       const x = i % width;
       const y = (i - x) / width;
       for (let dy = -1; dy <= 1; dy++) {
@@ -225,7 +237,7 @@ export function connectedRegions(mask: BinaryMask): Region[] {
         }
       }
     }
-    regions.push({ areaPx: members.length, pixels: Int32Array.from(members) });
+    regions.push({ areaPx: count, pixels: scratch.slice(0, count) });
   }
 
   return regions.sort((a, b) => b.areaPx - a.areaPx);
@@ -248,6 +260,17 @@ export function maskFromRegions(width: number, height: number, regions: Region[]
 export function skeletonize(mask: BinaryMask, maxIterations = 500): BinaryMask {
   assertMask(mask);
   const { width, height } = mask;
+  const area = width * height;
+  if (area > SKELETON_MAX_PIXELS) {
+    throw new MeasurementError(
+      `mask ${width}x${height} is too large to skeletonize (>${SKELETON_MAX_PIXELS} pixels); downscale or split the mask`,
+    );
+  }
+  // The iteration cap alone does not bound work: each iteration scans the
+  // whole image twice, so a 1M-pixel solid mask stalls the event loop for
+  // seconds from ~20 bytes of RLE. Cap total pixel visits instead.
+  let visits = 0;
+  const maxVisits = Math.max(50_000_000, area * 100);
   const img = Uint8Array.from(mask.data, (v) => (v !== 0 ? 1 : 0));
   const at = (x: number, y: number): number =>
     x < 0 || y < 0 || x >= width || y >= height ? 0 : (img[y * width + x] as number);
@@ -264,6 +287,9 @@ export function skeletonize(mask: BinaryMask, maxIterations = 500): BinaryMask {
       toClear.length = 0;
       for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
+          if (++visits > maxVisits) {
+            throw new MeasurementError(`skeletonize exceeded its work budget — mask too large or adversarial`);
+          }
           if (img[y * width + x] === 0) continue;
           // P2..P9 clockwise from north.
           const p = [
@@ -384,6 +410,9 @@ export interface PlaneStretch {
  */
 export function rectifyMask(mask: BinaryMask, stretch: PlaneStretch): BinaryMask {
   assertMask(mask);
+  if (!Number.isFinite(stretch.angle) || !Number.isFinite(stretch.factor) || !(stretch.factor > 0) || stretch.factor >= 64) {
+    throw new MeasurementError(`PlaneStretch factor must be finite in (0, 64), got ${stretch.factor}`);
+  }
   const nx = Math.cos(stretch.angle);
   const ny = Math.sin(stretch.angle);
   const forward = (x: number, y: number): [number, number] => {

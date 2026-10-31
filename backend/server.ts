@@ -5,9 +5,11 @@ import { checkRateLimit, corsHeadersFor, handleRequest } from "./app.ts";
 const PORT = Number(process.env.PORT ?? 8787);
 
 function clientIp(req: import("node:http").IncomingMessage): string {
-  const forwarded = req.headers["x-forwarded-for"];
-  const first = Array.isArray(forwarded) ? forwarded[0] : (forwarded ?? "").split(",")[0]?.trim();
-  return first !== "" ? String(first) : (req.socket.remoteAddress ?? "unknown");
+  // Never trust X-Forwarded-For from the open internet: anyone can send
+  // `X-Forwarded-For: <random>` per request and get a fresh rate-limit
+  // bucket each time. The direct socket address is the only unspoofable key
+  // (run behind a proxy that overwrites XFF if you need the real client IP).
+  return req.socket.remoteAddress ?? "unknown";
 }
 
 function sendJson(res: import("node:http").ServerResponse, status: number, value: unknown, origin: string | null, retryAfterSec?: number): void {

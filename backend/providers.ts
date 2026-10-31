@@ -102,6 +102,10 @@ interface MetaFindingsOptions {
   spend?: SpendGuard;
 }
 
+/** Cost ceiling held before each LLM call: bounded prompts (≈8k tokens in)
+ * plus the 8k completion cap at Spark Open rates ≈ $0.045, rounded up. */
+export const FINDINGS_COST_CEILING_USD = 0.05;
+
 /** Muse Spark via the OpenAI-compatible chat completions endpoint. */
 export class MetaFindingsProvider implements FindingsProvider {
   readonly #opts: MetaFindingsOptions;
@@ -111,7 +115,17 @@ export class MetaFindingsProvider implements FindingsProvider {
 
   async draftFindings(request: FindingsRequest): Promise<FindingDraft[]> {
     const spend = this.#opts.spend;
+    // Hold a cost ceiling BEFORE the upstream call so concurrent requests
+    // cannot each pass a stale $0-remaining check and bill after the fact.
+    let hold: ReturnType<NonNullable<typeof spend>["reserve"]> | undefined;
+    try {
+      hold = spend?.reserve("llm findings ceiling", FINDINGS_COST_CEILING_USD);
+    } catch (error) {
+      if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
+      throw error;
+    }
     if (spend && spend.remainingUsd <= 0) {
+      hold?.release();
       throw new HttpError(429, `spend guard: $0 remaining of $${spend.limitUsd} limit`);
     }
     // Prompt-injection + cost caps: attacker strings are concatenated into the
@@ -126,16 +140,21 @@ export class MetaFindingsProvider implements FindingsProvider {
     }));
     const receipts = request.receipts.slice(0, 256).map((r) => ({ id: (r as { id?: unknown }).id, output: (r as { output?: unknown }).output, formula: String((r as { formula?: unknown }).formula ?? "").slice(0, 500) }));
 
-    const res = await this.#opts.fetchFn(`${this.#opts.base}/chat/completions`, {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${this.#opts.apiKey}` },
-      body: JSON.stringify({
-        model: this.#opts.model,
-        messages: [
-          {
-            role: "system",
-            content:
-              "Write claim findings. Every number must exactly match a receipt output. Cite receipt ids. " +
+    let res: Awaited<ReturnType<FetchFn>>;
+    try {
+      res = await this.#opts.fetchFn(`${this.#opts.base}/chat/completions`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${this.#opts.apiKey}` },
+        body: JSON.stringify({
+          model: this.#opts.model,
+          messages: [
+            {
+              role: "system",
+              content:
+                "Write claim findings. Every finding must contain at least one number that exactly matches a cited receipt output — never write qualitative-only findings; restate severity together with its measured number. " +
+              "Every number must exactly match a cited receipt output. Cite only receipts from one mask per finding. " +
+              "Severity words (cosmetic, moderate, significant) must match the cited severity receipt. " +
+              "Use % or percent for ratios, mm for lengths and widths, cm2 for areas — never write square cm, sq cm, centimetres, square metres or m2. " +
               'Reply with JSON only: [{"statement":"...","citations":["receipt-id"]}]',
           },
           {
@@ -145,8 +164,16 @@ export class MetaFindingsProvider implements FindingsProvider {
         ],
       }),
       signal: AbortSignal.timeout(30_000),
-    });
-    if (!res.ok) throw new HttpError(502, `Meta findings failed: HTTP ${res.status}`);
+      });
+    } catch (error) {
+      // Network/timeout failure: nothing was billed upstream, drop the hold.
+      hold?.release();
+      throw error;
+    }
+    if (!res.ok) {
+      hold?.release();
+      throw new HttpError(502, `Meta findings failed: HTTP ${res.status}`);
+    }
     const data = (await res.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
       usage?: { prompt_tokens?: number; completion_tokens?: number };
@@ -157,20 +184,34 @@ export class MetaFindingsProvider implements FindingsProvider {
         SPARK_PRICE,
       );
       try {
-        spend.charge(`spark findings in=${data.usage?.prompt_tokens ?? 0} out=${data.usage?.completion_tokens ?? 0}`, usd);
+        hold?.settle(`spark findings in=${data.usage?.prompt_tokens ?? 0} out=${data.usage?.completion_tokens ?? 0}`, usd);
       } catch (error) {
         if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
         throw error;
       }
     }
     const content = data.choices?.[0]?.message?.content;
-    if (!content) throw new HttpError(502, "Meta findings returned no content");
-    const drafts = parseFindingDrafts(content);
-    for (const d of drafts) {
-      if (d.statement.length > 2000) throw new HttpError(502, "Meta findings returned an overlong statement");
-      if (d.citations.length > 32) throw new HttpError(502, "Meta findings returned too many citations");
+    if (!content) {
+      hold?.release();
+      throw new HttpError(502, "Meta findings returned no content");
     }
-    if (drafts.length > 64) throw new HttpError(502, "Meta findings returned too many drafts");
+    let drafts: FindingDraft[];
+    try {
+      drafts = parseFindingDrafts(content);
+    } catch (error) {
+      hold?.release();
+      throw error;
+    }
+    for (const d of drafts) {
+      if (d.statement.length > 2000 || d.citations.length > 32) {
+        hold?.release();
+        throw new HttpError(502, "Meta findings returned an oversized draft");
+      }
+    }
+    if (drafts.length > 64) {
+      hold?.release();
+      throw new HttpError(502, "Meta findings returned too many drafts");
+    }
     return drafts;
   }
 }
@@ -184,7 +225,17 @@ export class BasetenSkepticProvider implements FindingsProvider {
 
   async draftFindings(request: FindingsRequest): Promise<FindingDraft[]> {
     const spend = this.#opts.spend;
+    // Hold a cost ceiling BEFORE the upstream call so concurrent requests
+    // cannot each pass a stale $0-remaining check and bill after the fact.
+    let hold: ReturnType<NonNullable<typeof spend>["reserve"]> | undefined;
+    try {
+      hold = spend?.reserve("llm findings ceiling", FINDINGS_COST_CEILING_USD);
+    } catch (error) {
+      if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
+      throw error;
+    }
     if (spend && spend.remainingUsd <= 0) {
+      hold?.release();
       throw new HttpError(429, `spend guard: $0 remaining of $${spend.limitUsd} limit`);
     }
     const transcript = String(request.transcript ?? "").slice(0, 2000);
@@ -197,31 +248,43 @@ export class BasetenSkepticProvider implements FindingsProvider {
     }));
     const receipts = request.receipts.slice(0, 256).map((r) => ({ id: (r as { id?: unknown }).id, output: (r as { output?: unknown }).output, formula: String((r as { formula?: unknown }).formula ?? "").slice(0, 500) }));
 
-    const res = await this.#opts.fetchFn(`${this.#opts.base}/chat/completions`, {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${this.#opts.apiKey}` },
-      body: JSON.stringify({
-        model: this.#opts.model,
-        // Reasoning model: ~95% of completion tokens are reasoning (measured 2026-10-29).
-        // Without a ceiling a spiral is unbounded, so cap it.
-        max_tokens: 8192,
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are an independent skeptic. Re-derive every number from the receipts only — never invent or round from memory. " +
-              "For each fact, either restate it exactly with its receipt citations, or mark it DISPUTED with the reason. " +
-              'Reply with JSON only: [{"statement":"...","citations":["receipt-id"]}]',
-          },
-          {
-            role: "user",
-            content: JSON.stringify({ transcript, facts, receipts }),
-          },
-        ],
-      }),
-      signal: AbortSignal.timeout(30_000),
-    });
-    if (!res.ok) throw new HttpError(502, `Baseten skeptic failed: HTTP ${res.status}`);
+    let res: Awaited<ReturnType<FetchFn>>;
+    try {
+      res = await this.#opts.fetchFn(`${this.#opts.base}/chat/completions`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${this.#opts.apiKey}` },
+        body: JSON.stringify({
+          model: this.#opts.model,
+          // Reasoning model: ~95% of completion tokens are reasoning (measured 2026-10-29).
+          // Without a ceiling a spiral is unbounded, so cap it.
+          max_tokens: 8192,
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are an independent skeptic. Re-derive every number from the receipts only — never invent or round from memory. " +
+                "Every finding must contain at least one number that exactly matches a cited receipt output — never write qualitative-only findings; restate severity together with its measured number. " +
+                "For each fact, either restate it exactly with its receipt citations, or mark it DISPUTED with the reason (DISPUTED findings must still cite numbers). " +
+                "Use % or percent for ratios, mm for lengths and widths, cm2 for areas — never write square cm, sq cm, centimetres, square metres or m2. " +
+                'Reply with JSON only: [{"statement":"...","citations":["receipt-id"]}]',
+            },
+            {
+              role: "user",
+              content: JSON.stringify({ transcript, facts, receipts }),
+            },
+          ],
+        }),
+        signal: AbortSignal.timeout(30_000),
+      });
+    } catch (error) {
+      // Network/timeout failure: nothing was billed upstream, drop the hold.
+      hold?.release();
+      throw error;
+    }
+    if (!res.ok) {
+      hold?.release();
+      throw new HttpError(502, `Baseten skeptic failed: HTTP ${res.status}`);
+    }
     const data = (await res.json()) as {
       choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
       usage?: { prompt_tokens?: number; completion_tokens?: number };
@@ -232,7 +295,7 @@ export class BasetenSkepticProvider implements FindingsProvider {
         SPARK_OPEN_PRICE,
       );
       try {
-        spend.charge(`skeptic ${this.#opts.model}`, usd);
+        hold?.settle(`skeptic ${this.#opts.model}`, usd);
       } catch (error) {
         if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
         throw error;
@@ -240,10 +303,16 @@ export class BasetenSkepticProvider implements FindingsProvider {
     }
     const content = data.choices?.[0]?.message?.content;
     if (!content) {
+      hold?.release();
       const reason = data.choices?.[0]?.finish_reason ?? "unknown";
       throw new HttpError(502, `Baseten skeptic returned no content (finish_reason: ${reason})`);
     }
-    return parseFindingDrafts(content, "Baseten skeptic");
+    try {
+      return parseFindingDrafts(content, "Baseten skeptic");
+    } catch (error) {
+      hold?.release();
+      throw error;
+    }
   }
 }
 
@@ -257,10 +326,16 @@ export function parseFindingDrafts(content: string, source = "Meta findings"): F
     ? parsed
     : (parsed as { findings?: unknown })?.findings;
   if (!Array.isArray(list)) throw new HttpError(502, `${source} JSON must be an array`);
+  // Same caps as the evidence gate: an unbounded model reply must not become
+  // an unbounded JSON.parse + gate workload. Both providers share this.
+  if (list.length > 64) throw new HttpError(502, `${source} returned too many drafts`);
   return list.map((item, i) => {
     const draft = item as { statement?: unknown; citations?: unknown };
     if (typeof draft.statement !== "string" || !Array.isArray(draft.citations)) {
       throw new HttpError(502, `${source}[${i}] must be {statement: string, citations: string[]}`);
+    }
+    if (draft.statement.length > 2000 || draft.citations.length > 32) {
+      throw new HttpError(502, `${source}[${i}] returned an oversized draft`);
     }
     return { statement: draft.statement, citations: draft.citations.map(String) };
   });

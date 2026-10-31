@@ -56,9 +56,25 @@ export function requireAdmin(
   if (got === "") {
     throw new HttpError(401, "admin token required: send Authorization: Bearer <ADMIN_TOKEN>");
   }
-  if (got !== expected) {
+  if (!safeEqual(got, expected)) {
     throw new HttpError(403, "bad admin token");
   }
+}
+
+/**
+ * Constant-time string comparison: a plain !== lets an attacker measure
+ * rejection time byte-by-byte (public /v1/admin/status advertises when a
+ * token is set, and /v1/spend gives a spend-drain timing oracle).
+ */
+export function safeEqual(a: string, b: string): boolean {
+  const ab = new TextEncoder().encode(a);
+  const bb = new TextEncoder().encode(b);
+  const len = Math.max(ab.length, bb.length);
+  let diff = ab.length ^ bb.length;
+  for (let i = 0; i < len; i++) {
+    diff |= (ab[i] ?? 0) ^ (bb[i] ?? 0);
+  }
+  return diff === 0;
 }
 
 export type AdminModeInput =

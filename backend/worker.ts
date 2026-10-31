@@ -9,15 +9,30 @@ export interface Env {
 /** 1 MB cap mirrors backend/server.ts streaming cap. */
 const MAX_BODY_BYTES = 1_000_000;
 
+function concatBytes(parts: Uint8Array[]): Uint8Array {
+  const out = new Uint8Array(parts.reduce((sum, part) => sum + part.byteLength, 0));
+  let offset = 0;
+  for (const part of parts) {
+    out.set(part, offset);
+    offset += part.byteLength;
+  }
+  return out;
+}
+
 export default {
   async fetch(request: Request, workerEnv: Env): Promise<Response> {
     const { DB, ...rest } = workerEnv;
     const env: Record<string, string | undefined> = {};
     for (const [k, v] of Object.entries(rest)) if (typeof v === "string") env[k] = v;
-    const headers = { "content-type": "application/json", ...corsHeadersFor(request.headers.get("origin"), env) };
+    const headers = {
+      "content-type": "application/json",
+      "x-content-type-options": "nosniff",
+      ...corsHeadersFor(request.headers.get("origin"), env),
+    };
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
-    // Per-IP rate limit (per-isolate; see app.ts notes).
-    const ip = request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+    // cf-connecting-ip is set by Cloudflare's edge and cannot be spoofed by
+    // the client; X-Forwarded-For can, so it is ignored for rate limiting.
+    const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
     const limit = checkRateLimit(`worker:${ip}`);
     if (!limit.ok) {
       return Response.json(
@@ -35,26 +50,46 @@ export default {
     }
     let body: unknown;
     if (request.method === "POST") {
-      // No __parseError sentinel: a legitimate body could contain that key.
-      // Use an out-of-band flag instead, then enforce the post-parse size cap
-      // (chunked / lied content-length would otherwise bypass the early check).
+      // Stream the body through a reader and abort past the cap: request.text()
+      // would buffer an arbitrarily large chunked / lied-content-length body
+      // into memory before the length check below ever runs.
       let parseFailed = false;
-      const text = await request.text().catch(() => {
+      let tooLarge = false;
+      const chunks: Uint8Array[] = [];
+      let seen = 0;
+      try {
+        if (request.body !== null) {
+          const reader = request.body.getReader();
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            seen += value.byteLength;
+            if (seen > MAX_BODY_BYTES) {
+              tooLarge = true;
+              await reader.cancel().catch(() => {});
+              break;
+            }
+            chunks.push(value);
+          }
+        }
+      } catch {
         parseFailed = true;
-        return "";
-      });
+      }
+      if (tooLarge) {
+        return Response.json(
+          { ok: false, error: "body too large (1MB cap)", code: 400, requestId: "unknown" },
+          { status: 400, headers },
+        );
+      }
       if (parseFailed) {
         return Response.json(
           { ok: false, error: "invalid JSON", code: 400, requestId: "unknown" },
           { status: 400, headers },
         );
       }
-      if (new TextEncoder().encode(text).length > MAX_BODY_BYTES) {
-        return Response.json(
-          { ok: false, error: "body too large (1MB cap)", code: 400, requestId: "unknown" },
-          { status: 400, headers },
-        );
-      }
+      const text = chunks.length === 0 && seen === 0 && request.body === null
+        ? ""
+        : new TextDecoder().decode(concatBytes(chunks));
       try {
         body = text === "" ? {} : JSON.parse(text);
       } catch {

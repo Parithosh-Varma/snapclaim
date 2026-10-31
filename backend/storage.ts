@@ -1,4 +1,5 @@
 import type { Env, FetchFn } from "./providers.ts";
+import { stripMetadata } from "../src/vision/exif.ts";
 
 /**
  * Supabase Storage archival for segment inputs.
@@ -37,7 +38,22 @@ function decodeDataUrl(dataUrl: string): { bytes: Uint8Array; ext: string; mime:
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     if (bytes.length === 0) return null;
-    return { bytes, ext, mime };
+    return { bytes: scrubMetadata(bytes, mime) ?? bytes, ext, mime };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Strip identifying metadata (GPS, serials, timestamps) before the bytes are
+ * archived server-side and shared with landlords/insurers. WebP and unknown
+ * shapes pass through unchanged; stripping never throws (callers fall back
+ * to the original bytes).
+ */
+function scrubMetadata(bytes: Uint8Array, mime: string): Uint8Array | null {
+  if (mime !== "image/png" && mime !== "image/jpeg") return null;
+  try {
+    return stripMetadata(bytes).bytes;
   } catch {
     return null;
   }

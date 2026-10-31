@@ -8,7 +8,12 @@
 export function unionMasks(masks) {
   if (!masks.length) return null;
   const out = new Uint8Array(masks[0].length);
-  for (const m of masks) for (let i = 0; i < out.length; i++) out[i] |= m[i];
+  for (const m of masks) {
+    if (m.length !== out.length) {
+      throw new Error(`unionMasks: mask length ${m.length} differs from ${out.length}`);
+    }
+    for (let i = 0; i < out.length; i++) out[i] |= m[i];
+  }
   return out;
 }
 
