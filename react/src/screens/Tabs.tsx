@@ -4,7 +4,7 @@ import { loadSamplePhoto } from "../lib/sample";
 import { SamplePicker } from "./SamplePicker";
 import { DEFAULT_BASE, DEFAULT_BACKEND_HOST, POLICY_BACKEND_MESSAGE, apiGet } from "../lib/api";
 import type { SnapCase } from "../lib/store";
-import { Badge, downloadFile } from "../lib/ui";
+import { Badge, LoadImg, downloadFile } from "../lib/ui";
 
 function formatSize(c: SnapCase): string {
   const parts: string[] = [];
@@ -51,14 +51,18 @@ export function Home() {
   void casesVersion;
   const [sampleErr, setSampleErr] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [picking, setPicking] = useState<string | null>(null);
   const recent = cases.slice(0, 3);
   const pickSample = async (file: string) => {
-    setPickerOpen(false);
+    setPicking(file);
     try {
       await loadSamplePhoto(ctx.session, file);
+      setPickerOpen(false);
       ctx.go("sMark");
     } catch (e) {
       setSampleErr(`Sample photo failed (${e instanceof Error ? e.message : String(e)}). Is the backend reachable?`);
+    } finally {
+      setPicking(null);
     }
   };
   return (
@@ -77,7 +81,7 @@ export function Home() {
 
         <button id="ctaNew" className="hero-tap" type="button" onClick={startCapture} aria-describedby="heroSteps">
           <span className="hero-art" aria-hidden="true">
-            <img className="hero-photo" src="./hero-crack.jpg" alt="" />
+            <LoadImg className="hero-photo" src="./hero-crack.jpg" alt="" />
             <span className="hero-corners"><i className="hc tl" /><i className="hc tr" /><i className="hc bl" /><i className="hc br" /></span>
             <span className="hero-frame-tag">Damage + coin in frame</span>
           </span>
@@ -108,7 +112,7 @@ export function Home() {
           </button>
         </div>
         {sampleErr && <p role="alert" className="sample-err">{sampleErr}</p>}
-        <SamplePicker open={pickerOpen} onClose={() => setPickerOpen(false)} onPick={(f) => void pickSample(f)} />
+        <SamplePicker open={pickerOpen} picking={picking} onClose={() => setPickerOpen(false)} onPick={(f) => void pickSample(f)} />
 
         <div className="home-duo">
           <div className="tipcard">

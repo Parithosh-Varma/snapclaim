@@ -13,6 +13,7 @@ export default function Say() {
   const [transcript, setTranscript] = useState(s.transcript);
   const [voiceErr, setVoiceErr] = useState("");
   const [listening, setListening] = useState(false);
+  const [sending, setSending] = useState(false);
   const stateRef = useRef({
     micStream: null as MediaStream | null,
     micReady: false,
@@ -138,7 +139,8 @@ export default function Say() {
   }, []);
 
   const runReport = async () => {
-    if (!s.payload) return;
+    if (!s.payload || sending) return;
+    setSending(true);
     s.reportFail = null;
     s.reportStatement = null;
     const body = JSON.parse(JSON.stringify(s.payload)) as Record<string, unknown>;
@@ -157,6 +159,7 @@ export default function Say() {
       return;
     }
     const result = j.result as { measurement?: typeof s.measurement; findings?: { statement?: unknown }[] } | undefined;
+    setSending(false);
     s.measurement = result?.measurement ?? null;
     const f0 = result?.findings?.[0];
     s.reportStatement = f0 && typeof f0.statement === "string" ? f0.statement : null;
@@ -204,8 +207,8 @@ export default function Say() {
           </div>
           {voiceErr ? <p id="voiceErr" role="alert">{voiceErr}</p> : null}
         </div>
-        <button id="sendBtn" className="btn-primary" type="button" style={{ width: "100%" }} onClick={runReport}>
-          See measurements
+        <button id="sendBtn" className={`btn-primary${sending ? " busy" : ""}`} type="button" style={{ width: "100%" }} disabled={sending} aria-busy={sending} onClick={runReport}>
+          {sending ? "Seeing measurements…" : "See measurements"}
         </button>
       </div>
     </section>

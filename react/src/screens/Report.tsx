@@ -218,8 +218,8 @@ export default function Report() {
         <div id="reportState" aria-live="polite">{state}</div>
 
         <div className="card">
-          <button id="renderBtn" className="btn-primary" type="button" onClick={render} disabled={rendering}>
-            Generate report
+          <button id="renderBtn" className={`btn-primary${rendering ? " busy" : ""}`} type="button" onClick={render} disabled={rendering} aria-busy={rendering}>
+            {rendering ? "Generating…" : "Generate report"}
           </button>
           <div className="rowbtns">
             <button id="shareBtn" className="btn-ghostline" type="button" disabled={!gateOk} onClick={share}>Share</button>

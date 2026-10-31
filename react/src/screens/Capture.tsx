@@ -30,6 +30,7 @@ export default function Capture() {
     try { return !!localStorage.getItem("snapclaim.donatePhoto"); } catch { return false; }
   });
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [picking, setPicking] = useState<string | null>(null);
   const [tipsOpen, setTipsOpen] = useState(true);
   const [blocked, setBlocked] = useState(false);
   const [live, setLive] = useState(false);
@@ -138,6 +139,7 @@ export default function Capture() {
 
   const onUpload = (file: File | undefined) => {
     if (!file) return;
+    setHint("Reading photo…");
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
@@ -167,12 +169,15 @@ export default function Capture() {
   };
 
   const pickSample = async (file: string) => {
-    setPickerOpen(false);
+    setPicking(file);
     try {
       await loadSamplePhoto(session, file);
+      setPickerOpen(false);
       go("sMark");
     } catch (e) {
       setHint(`Sample photo failed (${e instanceof Error ? e.message : String(e)}).`);
+    } finally {
+      setPicking(null);
     }
   };
 
@@ -324,7 +329,7 @@ export default function Capture() {
         <div id="count" className="pop" style={{ display: "block" }} aria-hidden="true">{count}</div>
       )}
       <div className={`flash${flash ? " go" : ""}`} />
-      <SamplePicker open={pickerOpen} onClose={() => setPickerOpen(false)} onPick={(f) => void pickSample(f)} />
+      <SamplePicker open={pickerOpen} picking={picking} onClose={() => setPickerOpen(false)} onPick={(f) => void pickSample(f)} />
 
       {screen === "sReview" && (
         <section className="screen on" aria-label="Review photo">

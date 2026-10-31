@@ -174,6 +174,23 @@
   @keyframes modelslide{from{transform:translateX(-60%)}to{transform:translateX(180%)}}
   #tfState{font-family:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:12px}
   .ctahint{font-size:13px;color:var(--slate);margin:8px 2px 0;text-align:center}
+
+  /* loading: every async action shows state, no dead taps */
+  .btn-primary.busy,.btn-dark.busy{position:relative;color:transparent !important;pointer-events:none}
+  .btn-primary.busy::after,.btn-dark.busy::after{content:"";position:absolute;left:50%;top:50%;
+    width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;
+    border:3px solid rgba(255,255,255,.35);border-top-color:#fff;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .imgph{position:relative;overflow:hidden;background:#e8e2d2}
+  .imgph::before{content:"";position:absolute;inset:0;
+    background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.55) 50%,transparent 70%);
+    background-size:200% 100%;animation:shimmer 1.2s infinite}
+  .imgph img{position:relative;opacity:0;transition:opacity .25s ease}
+  .imgph.done::before{display:none}
+  .imgph.done img{opacity:1}
+  .cellbusy{position:relative;pointer-events:none}
+  .cellbusy::after{content:"";position:absolute;left:50%;top:38%;width:26px;height:26px;margin:-13px 0 0 -13px;
+    border-radius:50%;border:3px solid rgba(11,30,70,.2);border-top-color:var(--ink);animation:spin .7s linear infinite}
   .mono{font-family:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:.92em}
   .btn-primary{width:100%;min-height:56px;border:0;border-radius:0;background:var(--coin-strong);color:#fff;font-weight:800;font-size:17px;
     box-shadow:var(--shadow-1);transition:transform .12s ease,filter .15s ease}
@@ -309,6 +326,8 @@
     padding:0;display:flex;flex-direction:column;min-height:44px}
   .samplecell:active{transform:scale(.96)}
   .samplecell img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;background:#000}
+  .samplecell .imgph{display:block}
+  .hero-photo img{width:100%;height:100%;object-fit:cover;display:block;aspect-ratio:4/3}
   .samplecell small{padding:6px 4px;font-size:11.5px;font-weight:700;color:var(--ink);line-height:1.2}
   .sample-err{color:var(--damage);font-size:13px;margin:4px 0 0;text-align:center}
   .home-duo{display:grid;grid-template-columns:1fr;gap:8px;margin:14px 0 4px}
