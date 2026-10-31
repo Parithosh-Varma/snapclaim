@@ -388,9 +388,11 @@ export default function Mark() {
         const ready = s.photo ? await sam.ensureEmbedded(s.photo) : false;
         if (!ready) {
           s.dmg.points.pop();
-          setStatus(navigator.onLine === false
-            ? "On-device outlining model not available offline yet — reconnect once to download it, then it works offline."
-            : "Outlining model failed to load — check the connection and retry.");
+          setStatus(sam.lastError
+            ? `Outlining model failed to load (${sam.lastError}) — retry.`
+            : navigator.onLine === false
+              ? "On-device outlining model not available offline yet — reconnect once to download it, then it works offline."
+              : "Outlining model failed to load — check the connection and retry.");
           setMarkBusy(false);
           drawMark();
           return;

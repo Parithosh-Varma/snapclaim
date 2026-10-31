@@ -61,6 +61,8 @@ export class SamClient {
 
   private embedCache = new Map<HTMLCanvasElement, Promise<boolean>>();
   private settleStale: ((v: boolean) => void) | null = null;
+  /** Last on-device failure, for error messages that name the cause. */
+  lastError: string | null = null;
 
   /**
    * Embed the photo for on-device outlining, once per photo. Resolves true
@@ -87,17 +89,22 @@ export class SamClient {
         this.onReady = prevReady;
         this.onError = prevError;
         this.onProgress = prevProgress;
+        // Never cache a failure: retry must re-attempt the download.
+        if (!v) this.embedCache.delete(photo);
         resolve(v);
       };
       this.onReady = (device, ms) => {
+        this.lastError = null;
         prevReady?.(device, ms);
         done(true);
       };
       this.onError = (message) => {
+        this.lastError = message;
         prevError?.(message);
         done(false);
       };
       if (quiet) this.onProgress = null;
+      this.lastError = null;
       this.embed(photo);
     });
     this.embedCache.set(photo, p);
