@@ -681,7 +681,7 @@ export function Settings() {
               <summary>Licenses</summary>
               <p>SnapClaim · Apache-2.0. On-device models (SlimSAM, Whisper) ship under their own licenses — see the model cards on first download.</p>
             </details>
-            <a className="about-row about-link" href="mailto:feedback@snapclaim.app?subject=SnapClaim%20feedback">
+            <a className="about-row about-link" href="mailto:parithvrmo@gmail.com?subject=SnapClaim%20feedback">
               <span>Send feedback</span><b aria-hidden="true">→</b>
             </a>
           </div>
