@@ -40,3 +40,15 @@ npm run bench:truth
 ```
 
 54 crack scenes drawn in code (`bench/truth.ts`): three wall tilts, three lengths, three widths, straight and wavy, plus a coin of known size. Because the scene is drawn, the true length and width in mm are known exactly, and the masks go through the same vision and measurement code a photo does. Three more scenes have no coin or a coin tilted too far; those must come back with no millimetres. This checks the measuring, not SAM's masks, so it does not replace a taped photo.
+
+## Gap bench (model-only vs measured)
+
+```bash
+npm run bench:gap
+```
+
+Scores the two arms of the accuracy claim against the same tape measurement. The pipeline arm is the archived run in `bench/runs/<case>.json`, taking the finding whose `maskId` matches the case's `groundTruth.maskId`. The model-only arm is one file per case in `bench/model-only/<case>.json`: `{ caseId, provenance, crackLengthMm }`, where `crackLengthMm` is the single number Muse Spark gives when shown the photo with no measurement tools, or `null` when it declines to guess. A refusal is listed, not scored, so an arm cannot improve its numbers by answering only the easy photos.
+
+Only held-out cases with `hasScaleReference: true` and a `groundTruth` are scored; until one exists the command prints `UNSCORED` and exits 0. Per arm it prints the number of scored cases, the median absolute error in mm and the share within ±10%. Exit codes: 0 scored (or nothing to score), 1 a scored case has no run or no guess, 2 a run or guess file is unreadable.
+
+Ground truth is added to a case in `bench/split.json` as `groundTruth: { maskId, crackLengthMm }`. Adding it to a frozen case changes its hash, so it goes in together with the case or the freeze test is updated on purpose in the same PR.

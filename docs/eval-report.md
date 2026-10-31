@@ -1,6 +1,6 @@
 # Eval report
 
-Updated 2026-10-28. Weak rows stay in; nothing is buried.
+Updated 2026-10-30. Weak rows stay in; nothing is buried.
 
 ## Setup
 
@@ -40,6 +40,8 @@ that numbers change decisions; scored qualitatively, not hidden.
 
 Median absolute error (mm) and % within ±10% on calibrated cases, dev vs
 held-out separately. The demo table goes in the README when the photos land.
+
+Held-out side is scored by `npm run bench:gap` (`bench/gap.ts`): for every scaled held-out case with a `groundTruth` it compares the archived pipeline run and a model-only guess from `bench/model-only/` against the same tape measurement, and prints both arms side by side. Refusals and missing files are counted per arm, not dropped. As of 2026-10-30 no held-out case has a scale reference and a ground truth, so the command prints UNSCORED; the coin photos need a tape measurement before a row can go here. The dev side still comes from `npm run eval` and is not wired into the same table yet.
 
 ### Skeptic DISPUTED calls
 
