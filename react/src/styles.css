@@ -232,7 +232,8 @@
   .home-wrap{padding-bottom:calc(104px + env(safe-area-inset-bottom))}
   .home-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;min-height:44px}
   .brand{display:flex;align-items:center;gap:8px}
-  .brand-mark{width:32px;height:32px;border-radius:10px;background:var(--ink);color:#fff;display:grid;place-items:center}
+  .brand-mark{width:32px;height:32px;border-radius:10px;background:#ece7dc;color:var(--ink);
+    border:1px solid var(--line);display:grid;place-items:center}
   .brand-mark svg{width:20px;height:20px}
   .brand-name{font-weight:800;font-size:17px;letter-spacing:-.01em}
   .home #h-home{font-size:clamp(28px,7.5vw,34px);line-height:1.12;margin:0}
