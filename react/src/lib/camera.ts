@@ -274,7 +274,7 @@ export class CoinGate {
       const best = this.clf.predict(fv)[0];
       if (best && best.label !== "unknown") {
         const def = CM.DB.find((d) => d.id === best.label);
-        this.coinLabel = def ? `${def.label} · Ø${def.diam} mm` : best.label;
+        this.coinLabel = def ? `${def.label} · ${def.diam} mm dia` : best.label;
         this.coinMm = def?.diam ?? 0;
         this.cb.onCoinIdentified(this.coinLabel, this.coinMm);
         this.cb.onHint(`${this.coinLabel} (${Math.round(best.confidence * 100)}%) — hold steady…`);

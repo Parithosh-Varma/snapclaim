@@ -305,7 +305,7 @@ function identifyCoin(det, fw, fh) {
     const best = clf.predict(fv)[0];
     if (best && best.label !== "unknown") {
       const def = CoinModel.DB.find((d) => d.id === best.label);
-      coinLabel = def ? `${def.label} · Ø${def.diam} mm` : best.label;
+      coinLabel = def ? `${def.label} · ${def.diam} mm dia` : best.label;
       if (def) setCoinSize(def.diam, def.label);
       hint.textContent = `${coinLabel} (${Math.round(best.confidence * 100)}%) — hold steady…`;
     } else { coinLabel = ""; hint.textContent = "Coin found — hold steady…"; }
@@ -929,14 +929,14 @@ $("coinKind").addEventListener("change", () => {
   if (custom && Number(opt?.value) > 0) custom.value = "";
   // The user's confirmation wins over the gate's size guess (it can name a
   // coin outside this list, e.g. a nickel, while the scale uses this value).
-  coinLabel = opt && Number(opt.value) > 0 ? opt.textContent.replace(/ · (\d+(?:\.\d+)?) mm$/, " · Ø$1 mm") : "";
+  coinLabel = opt && Number(opt.value) > 0 ? opt.textContent.replace(/ · (\d+(?:\.\d+)?) mm$/, " · $1 mm dia") : "";
   updateCoinHintMark();
 });
 $("coinCustomMm")?.addEventListener("input", () => {
   const mm = Number($("coinCustomMm").value);
   if (mm > 0) {
     $("coinKind").value = "0";
-    coinLabel = `Custom · Ø${mm} mm`;
+    coinLabel = `Custom · ${mm} mm dia`;
   } else {
     coinLabel = "";
   }
