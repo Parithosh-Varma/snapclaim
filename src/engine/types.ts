@@ -6,6 +6,12 @@ export interface MaskObservation {
   id: string;
   label: DamageLabel;
   areaPx: number;
+  /**
+   * Damage area on the wall itself when the photo was tilt-corrected
+   * (areaPx times the stretch factor). Square millimetres and crack width use
+   * it; the percent stays in photo pixels, like the component it is a share of.
+   */
+  planeAreaPx?: number;
   /** Skeleton length in pixels. Required for calibrated length on cracks. */
   skeletonPx?: number;
   /** Disconnected regions of damage; defaults to 1 when the segmenter does not report it. */

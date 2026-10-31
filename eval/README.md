@@ -33,6 +33,14 @@ Exit codes: 0 clean, 1 failed or incomplete (invented millimetres, a run with no
 
 `frozenAt` is set once the split is final; a test hashes every held-out case, so editing one after the freeze fails `npm test`.
 
+## Known-truth bench
+
+```bash
+npm run bench:truth
+```
+
+54 crack scenes drawn in code (`bench/truth.ts`): three wall tilts, three lengths, three widths, straight and wavy, plus a coin of known size. Because the scene is drawn, the true length and width in mm are known exactly, and the masks go through the same vision and measurement code a photo does. Three more scenes have no coin or a coin tilted too far; those must come back with no millimetres. This checks the measuring, not SAM's masks, so it does not replace a taped photo.
+
 ## Gap bench (model-only vs measured)
 
 ```bash
