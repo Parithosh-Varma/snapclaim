@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { Finding, Receipt } from "./session";
 
 /** Severity allowlist (mirrors escSeverity in pwa/app.js): attacker-shaped
@@ -81,6 +81,16 @@ export function MetricCards({ f }: { f: Finding }) {
         <small>severity band</small>
       </div>
     </>
+  );
+}
+
+/** Image with a shimmer placeholder until it decodes — no empty boxes. */
+export function LoadImg({ src, alt, className }: { src: string; alt: string; className?: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <span className={`imgph${done ? " done" : ""}${className ? ` ${className}` : ""}`} aria-hidden={alt === "" ? true : undefined}>
+      <img src={src} alt={alt} loading="lazy" onLoad={() => setDone(true)} onError={() => setDone(true)} />
+    </span>
   );
 }
 
