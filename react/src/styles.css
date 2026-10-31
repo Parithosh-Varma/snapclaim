@@ -99,7 +99,7 @@
   .wrap{max-width:560px;margin:0 auto;padding:calc(20px + env(safe-area-inset-top)) 20px calc(28px + env(safe-area-inset-bottom))}
   .navrow{display:flex;align-items:center;gap:8px;margin-bottom:6px}
   .navrow button{border:0;background:none;color:var(--ink);font-weight:700;font-size:16px;padding:10px 6px}
-  .step-tag{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:var(--coin);font-weight:500}
+  .step-tag{font-family:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--coin)}
   h1{font-size:clamp(38px,10vw,52px);letter-spacing:-.03em;line-height:1.02;margin:0 0 6px}
   .sub{color:var(--slate);margin:0 0 16px;font-size:15px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);padding:16px;margin-bottom:12px}
@@ -152,9 +152,9 @@
   .modelbar i{display:block;height:100%;width:40%;border-radius:3px;background:var(--coin);
     animation:modelslide 1.1s ease-in-out infinite alternate}
   @keyframes modelslide{from{transform:translateX(-60%)}to{transform:translateX(180%)}}
-  #tfState{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px}
+  #tfState{font-family:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:12px}
   .ctahint{font-size:13px;color:var(--slate);margin:8px 2px 0;text-align:center}
-  .mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em}
+  .mono{font-family:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:.92em}
   .btn-primary{width:100%;min-height:56px;border:0;border-radius:16px;background:var(--coin-strong);color:#fff;font-weight:800;font-size:17px;
     box-shadow:var(--shadow-1);transition:transform .12s ease,filter .15s ease}
   .btn-primary:active{transform:scale(.97);filter:brightness(.96)}
@@ -171,7 +171,7 @@
   .rowbtns{display:flex;gap:8px;margin-top:10px}.rowbtns button{flex:1}
   label.field{display:block;font-size:13px;font-weight:600;margin:0 0 10px;color:var(--ink)}
   select{min-height:46px;border:1px solid #e2ddd0;border-radius:12px;background:#fff;width:100%;font:inherit;padding:0 10px;margin-top:6px}
-  #status,#xStatus,#skStatus{display:block;font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:var(--slate);margin-top:8px;min-height:1.2em}
+  #status,#xStatus,#skStatus{display:block;font-family:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:12px;color:var(--slate);margin-top:8px;min-height:1.2em}
 
   /* mic */
   /* say: type first, mic only dictates into the box */
@@ -185,7 +185,7 @@
   .micbtn.live{background:var(--damage);animation:micpulse 1.2s ease-in-out infinite}
   @keyframes micpulse{50%{filter:brightness(1.25)}}
   #micState{flex:1;font-size:13px;color:var(--slate);line-height:1.35}
-  .saycount{flex:none;font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:var(--slate)}
+  .saycount{flex:none;font-family:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:12px;font-weight:700;color:var(--slate)}
   #voiceErr{color:#c81e2b;font-size:13px;margin-top:8px;line-height:1.4}
 
   /* results */
@@ -208,13 +208,13 @@
   .sevbar small{font-weight:600;color:var(--slate)}
   .sev-significant{background:#fdecec;color:#8f1220}.sev-moderate{background:#fdf0e2;color:#8a4b12}.sev-cosmetic{background:#e4f3ea;color:#0b5c33}
   .receipts{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
-  .receipts code{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;background:#f1eee5;border:1px solid #e2ddd0;border-radius:999px;padding:4px 8px;color:#33415e}
+  .receipts code{font-family:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:12px;font-weight:600;background:#f1eee5;border:1px solid #e2ddd0;border-radius:999px;padding:4px 8px;color:#33415e}
   #measured ul,#skOut ul,#findings ul{margin:10px 0 0;padding:0;list-style:none}
   #measured li,#skOut li,#findings li{padding:12px;border:1px solid #e2ddd0;border-radius:14px;margin-bottom:8px;background:#fff;font-size:15px}
   #measured li small,#findings li small,#skOut li small{color:var(--slate)}
   .found{font-size:22px;font-weight:800;margin:0 0 8px}
-  .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;
-    font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.06em;text-transform:uppercase}
+  .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:800;
+    font-family:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase}
   .ok{background:var(--coin-tint);color:var(--coin-strong)}.fail{background:#fdecec;color:#c81e2b}.wait{background:#ece7db;color:var(--slate)}
   .checkcard{background:#fffdf8;border:1px solid #e2ddd0;border-radius:18px;padding:16px;margin-bottom:12px}
   .checkcard h3{font-size:17px;margin:0 0 4px}
@@ -233,7 +233,6 @@
   .doc blockquote{margin:0;padding:12px 16px;border-left:4px solid var(--coin);background:#fbfaf6;font-weight:600}
   #annexImg{width:100%;height:auto;display:block;background:#fff}
   #offlineBar{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:20;background:var(--ink);color:#fff;border-radius:14px;padding:12px 14px;font-size:13px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.3)}
-  svg.schematic{border:1px solid #e2ddd0;border-radius:12px;width:100%;height:auto;background:#fff;margin-top:12px}
   pre{background:var(--ink);color:#d7e5da;padding:14px;border-radius:12px;overflow:auto;font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px}
   details.dev{border:1px solid #e2ddd0;border-radius:16px;background:#fffdf8;padding:14px;margin-top:12px}
   details.dev summary{cursor:pointer;font-weight:700}
@@ -390,7 +389,7 @@
     padding:14px;box-shadow:var(--shadow-1)}
   .set-card > :last-child{margin-bottom:0}
   .fineprint{color:var(--slate);font-size:13px;line-height:1.55;margin:10px 0 0}
-  .fineprint.mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px}
+  .fineprint.mono{font-family:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:12px}
   .danger-text{color:var(--danger,#c81e2b)}
   p.danger-text{font-weight:600}
 
@@ -455,7 +454,7 @@
   .conn-row{display:flex;align-items:center;gap:12px;min-height:52px}
   .conn-text{flex:1;min-width:0}
   .conn-text b{display:block;font-size:15px}
-  .conn-text small{display:block;color:var(--slate);font-size:12.5px;font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  .conn-text small{display:block;color:var(--slate);font-size:12.5px;font-family:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
   .conn-chip{flex:none;display:inline-flex;align-items:center;min-height:44px;padding:6px 12px;border-radius:999px;
     font-size:12.5px;font-weight:800;border:1px solid var(--line)}
@@ -540,7 +539,6 @@
   html[data-theme="dark"] #tabs button{color:#ada595}
   html[data-theme="dark"] #tabs button[aria-current="page"]{color:#52d18a}
   html[data-theme="dark"] #tabs #tabNew .fabdot{border-color:#1d1b17}
-  html[data-theme="dark"] svg.schematic{background:#1d1b17}
   /* Warm graphite dark palette: bone text on warm charcoal, coin green accent.
      Token overrides catch any var()-based rule without an explicit dark rule. */
   html[data-theme="dark"]{color-scheme:dark;
@@ -609,7 +607,6 @@
     html[data-theme="auto"] #tabs button{color:#ada595}
     html[data-theme="auto"] #tabs button[aria-current="page"]{color:#52d18a}
     html[data-theme="auto"] #tabs #tabNew .fabdot{border-color:#1d1b17}
-    html[data-theme="auto"] svg.schematic{background:#1d1b17}
     html[data-theme="auto"]{color-scheme:dark;
       --ink:#ece7dc; --paper:#141310; --card:#1d1b17; --line:#34302a; --slate:#ada595;
       --coin-tint:#173524; --coin-strong:#52d18a; --danger:#ff9c9c}
