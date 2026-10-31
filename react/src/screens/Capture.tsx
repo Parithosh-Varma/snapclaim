@@ -33,6 +33,7 @@ export default function Capture() {
     try { return !!localStorage.getItem("snapclaim.donatePhoto"); } catch { return false; }
   });
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [tipsOpen, setTipsOpen] = useState(true);
 
   const captureStill = useCallback(() => {
     const gate = gateRef.current;
@@ -217,6 +218,24 @@ export default function Capture() {
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
+          <button
+            id="tipsBtn"
+            type="button"
+            onClick={() => setTipsOpen(true)}
+          >
+            Coin tips
+          </button>
+          {tipsOpen && (
+            <div id="tipsCard" role="dialog" aria-labelledby="tipsTitle">
+              <p id="tipsTitle">Coin tips</p>
+              <ul>
+                <li>Lay the coin flat, touching the damage</li>
+                <li>Keep coin + damage sharp, fill the frame</li>
+                <li>Flat light — no flash glare</li>
+              </ul>
+              <button type="button" id="tipsGotIt" onClick={() => setTipsOpen(false)}>Got it</button>
+            </div>
+          )}
           <button
             id="shutter"
             type="button"

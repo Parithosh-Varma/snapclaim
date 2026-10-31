@@ -56,6 +56,19 @@
     transition:transform .12s ease,background .15s ease}
   .cam-close:active{transform:scale(.92)}
   .cam-close svg{width:20px;height:20px}
+  #tipsBtn{position:absolute;z-index:5;right:14px;top:calc(14px + env(safe-area-inset-top));
+    min-height:44px;border:0;border-radius:999px;cursor:pointer;
+    background:rgba(5,10,25,.55);backdrop-filter:blur(6px);color:#fff;
+    font-size:13px;font-weight:700;padding:0 16px}
+  #tipsBtn:active{transform:scale(.96)}
+  #tipsCard{position:absolute;z-index:6;left:20px;right:20px;top:32%;
+    background:var(--card);color:var(--ink);border-radius:20px;padding:20px;
+    box-shadow:0 12px 40px rgba(0,0,0,.5)}
+  #tipsCard #tipsTitle{font-size:15px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;
+    color:var(--coin-strong);margin:0 0 10px}
+  #tipsCard ul{margin:0 0 14px;padding-left:20px;color:var(--ink);font-size:14.5px;line-height:1.65}
+  #tipsGotIt{width:100%;min-height:50px;border:0;border-radius:14px;background:var(--coin-strong);
+    color:#fff;font-weight:800;font-size:16px}
   .flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .3s ease;z-index:9}
   .flash.go{opacity:1;transition:none}
   #altEntry{position:absolute;z-index:3;left:50%;transform:translateX(-50%);
