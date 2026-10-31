@@ -71,6 +71,9 @@ export interface Session {
   coinKindMm: number;
   /** Manual coin-center tap in marking-photo pixels (correction for a missed gate). Cleared on a new photo. */
   coinManualPt: [number, number] | null;
+  /** SAM outline of the manual coin tap (same tap-to-outline as the crack). Cleared on a new photo. */
+  coinMask: Uint8Array | null;
+  coinIou: number;
   /** Coin has tape: the outline check allows a tape-halo margin. */
   coinTaped: boolean;
   noScaleMode: boolean;
@@ -96,6 +99,8 @@ export function createSession(): Session {
     coinLabel: "",
     coinKindMm: 0,
     coinManualPt: null,
+    coinMask: null,
+    coinIou: 0,
     coinTaped: false,
     noScaleMode: false,
     dmg: { points: [], pointMasks: [], mask: null, iou: 0, source: null },

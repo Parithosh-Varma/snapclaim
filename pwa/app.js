@@ -727,10 +727,23 @@ async function segmentViaApi(points) {
   const j = await res.json().catch(() => ({}));
   if (!res.ok || !j.ok) throw backendErr(res, j, "segment failed");
   // SAM may split one crack into several objects; all of them are the damage.
+  // But a tap on a thin crack often returns the wall itself (90%+ of the
+  // frame) — unioning that buries the crack. Drop wall-sized records; when
+  // nothing but wall remains, throw so the caller falls back on-device.
   const records = j.result?.records ?? [];
   if (!records.length) throw new Error("SAM found nothing there — tap the middle of the damage and retry.");
-  const mask = unionMasks(records.map((rec) => decodeRle(rec.rle)));
-  return { mask, iou: Math.min(...records.map((rec) => rec.confidence ?? 0)), rle: encodeRle(mask, photo.width, photo.height) };
+  const framePx = photo.width * photo.height;
+  const kept = records.filter((rec) => {
+    try {
+      const m = decodeRle(rec.rle);
+      let n = 0;
+      for (let i = 0; i < m.length; i++) if (m[i]) n++;
+      return n <= framePx * 0.5;
+    } catch { return false; }
+  });
+  if (!kept.length) throw new Error("SAM caught the wall, not the crack — trying on-device; fill the frame with the crack and tap its middle.");
+  const mask = unionMasks(kept.map((rec) => decodeRle(rec.rle)));
+  return { mask, iou: Math.min(...kept.map((rec) => rec.confidence ?? 0)), rle: encodeRle(mask, photo.width, photo.height) };
 }
 // On-device union of one SlimSAM mask per tap; null when no tap found anything.
 async function segmentOnDevice() {
@@ -739,6 +752,9 @@ async function segmentOnDevice() {
   if (!found.length) return null;
   const union = new Uint8Array(found[0].mask.length);
   for (const { mask } of found) for (let i = 0; i < union.length; i++) union[i] |= mask[i];
+  let n = 0;
+  for (let i = 0; i < union.length; i++) if (union[i]) n++;
+  if (n > union.length * 0.5) return null;
   return { mask: union, iou: Math.min(...found.map((f) => f.iou)) };
 }
 const decodeCoinPoint = (point) => samDecode(point, false);
@@ -774,8 +790,22 @@ function drawMark() {
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
   }
   if (hasManualCoin) {
-    ctx.strokeStyle = "#c81e2b"; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(coinManualPt[0], coinManualPt[1], manualCoinRadius(), 0, Math.PI * 2); ctx.stroke();
+    // Same tap-to-outline as the crack: the traced coin fills green.
+    // Before the trace lands fall back to the estimated circle.
+    if (coinMask) {
+      const img = ctx.getImageData(0, 0, c.width, c.height);
+      for (let i = 0; i < coinMask.length; i++) {
+        if (!coinMask[i]) continue;
+        const o = i * 4;
+        img.data[o] = img.data[o] * 0.55 + 14 * 0.45;
+        img.data[o + 1] = img.data[o + 1] * 0.55 + 138 * 0.45;
+        img.data[o + 2] = img.data[o + 2] * 0.55 + 77 * 0.45;
+      }
+      ctx.putImageData(img, 0, 0);
+    } else {
+      ctx.strokeStyle = "#c81e2b"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(coinManualPt[0], coinManualPt[1], manualCoinRadius(), 0, Math.PI * 2); ctx.stroke();
+    }
     ctx.fillStyle = "#c81e2b"; ctx.beginPath(); ctx.arc(coinManualPt[0], coinManualPt[1], 4, 0, Math.PI * 2); ctx.fill();
   }
   ctx.fillStyle = "#c81e2b"; ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;

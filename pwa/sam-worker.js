@@ -9,7 +9,13 @@ const MODEL_ID = "Xenova/slimsam-77-uniform";
 // Cracks are thin: SAM's highest-scoring candidate is often the wall the crack runs
 // through (71% of the photo on a real facade), so damage takes the smallest candidate
 // that still scores MIN_FINE_SCORE. Coins are compact, so they keep the best score.
-const MIN_FINE_SCORE = 0.5;
+// 0.3 (not 0.5): hairline cracks on phone photos score 0.3–0.5 on SlimSAM;
+// below 0.3 is speckle. MIN_FINE_AREA drops single-pixel noise.
+const MIN_FINE_SCORE = 0.3;
+const MIN_FINE_AREA = 20;
+// A damage mask covering more than half the frame is the wall, not the
+// damage — return null so the tap retries instead of measuring the room.
+const WALL_FRACTION = 0.5;
 
 let tf = null, model = null, processor = null, device = null;
 let rawImage = null, embeddings = null, currentPhoto = -1;
@@ -115,7 +121,7 @@ async function decodePoint(point, preferSmallest) {
     let fine = -1, fineArea = Infinity;
     for (let i = 0; i < scores.length; i++) {
       const a = areaOf(i);
-      if (scores[i] >= MIN_FINE_SCORE && a > 0 && a < fineArea) { fine = i; fineArea = a; }
+      if (scores[i] >= MIN_FINE_SCORE && a >= MIN_FINE_AREA && a < fineArea) { fine = i; fineArea = a; }
     }
     if (fine >= 0) best = fine;
   }
@@ -123,7 +129,9 @@ async function decodePoint(point, preferSmallest) {
   const out = new Uint8Array(h * w);
   let area = 0;
   for (let i = 0; i < out.length; i++) if (m[i]) { out[i] = 1; area++; }
-  return area ? { mask: out, iou: scores[best] } : null;
+  if (!area) return null;
+  if (preferSmallest && area > h * w * WALL_FRACTION) return null;
+  return { mask: out, iou: scores[best] };
 }
 
 async function decode({ id, photoId, point, preferSmallest }) {

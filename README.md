@@ -156,10 +156,11 @@ npm --prefix react run build
 npx wrangler pages deploy react/dist --project-name snapclaim
 ```
 
-Production is <https://snapclaim.pages.dev> — open to anyone. Only the dev panel at <https://snapclaim.pages.dev/admin> sits behind Cloudflare Access: anonymous requests there get a 302 to the team login, and only these two emails can get in (one-time PIN, no Cloudflare account or WARP client, 24-hour session):
+Production is <https://snapclaim.pages.dev> — open to anyone. Only the dev panel at <https://snapclaim.pages.dev/admin> sits behind Cloudflare Access: anonymous requests there get a 302 to the team login, and only these three emails can get in (one-time PIN, no Cloudflare account or WARP client, 24-hour session):
 
 - `parithvrmo@gmail.com`
 - `therealtariqkhalif@gmail.com`
+- `rizgarozan7@gmail.com`
 
 `react/public/_redirects` rewrites `/admin/*` to the app shell; `react/src/App.tsx` boots straight into the admin screen when the path starts with `/admin`, and Settings → Developer → *Open admin panel* navigates there as a real page load so Access can challenge it.
 

@@ -25,6 +25,10 @@ async function segmentOnDevice(sam: SamClient, s: Session): Promise<SamMask | nu
   if (!found.length) return null;
   const union = new Uint8Array((found[0] as SamMask).mask.length);
   for (const { mask } of found) for (let i = 0; i < union.length; i++) union[i] = (union[i] ?? 0) | (mask[i] ?? 0);
+  // Wall-sized union is the room, not the damage — reject so the tap retries.
+  let n = 0;
+  for (let i = 0; i < union.length; i++) if (union[i]) n++;
+  if (n > union.length * 0.5) return null;
   return { mask: union, iou: Math.min(...found.map((f) => f.iou)) } as SamMask;
 }
 
@@ -89,11 +93,26 @@ export default function Mark() {
       g.stroke();
     }
     if (s.coinManualPt) {
-      g.strokeStyle = "#c81e2b";
-      g.lineWidth = 3;
-      g.beginPath();
-      g.arc(s.coinManualPt[0], s.coinManualPt[1], manualCoinRadius(), 0, Math.PI * 2);
-      g.stroke();
+      // Same tap-to-outline as the crack: the traced coin fills green.
+      // Before the trace lands (model still loading) fall back to the
+      // estimated circle so the tap still shows something.
+      if (s.coinMask) {
+        const img = g.getImageData(0, 0, c.width, c.height);
+        for (let i = 0; i < s.coinMask.length; i++) {
+          if (!s.coinMask[i]) continue;
+          const o = i * 4;
+          img.data[o] = (img.data[o] ?? 0) * 0.55 + 14 * 0.45;
+          img.data[o + 1] = (img.data[o + 1] ?? 0) * 0.55 + 138 * 0.45;
+          img.data[o + 2] = (img.data[o + 2] ?? 0) * 0.55 + 77 * 0.45;
+        }
+        g.putImageData(img, 0, 0);
+      } else {
+        g.strokeStyle = "#c81e2b";
+        g.lineWidth = 3;
+        g.beginPath();
+        g.arc(s.coinManualPt[0], s.coinManualPt[1], manualCoinRadius(), 0, Math.PI * 2);
+        g.stroke();
+      }
       g.fillStyle = "#c81e2b";
       g.beginPath();
       g.arc(s.coinManualPt[0], s.coinManualPt[1], 4, 0, Math.PI * 2);
@@ -140,6 +159,8 @@ export default function Mark() {
       resetDmg(s);
       // A manual coin tap is pixel coords of the previous photo — never reuse it.
       s.coinManualPt = null;
+      s.coinMask = null;
+      s.coinIou = 0;
       embeddings.current = false;
       setReady(true);
       drawMark();
@@ -218,9 +239,11 @@ export default function Mark() {
     if (coinCxCyR) {
       const { cx, cy, r } = coinCxCyR;
       circleRef = { id: "coin", rle: circleRle(cx, cy, r, w, h), knownMm: s.coinKindMm, confidence: s.coinManualPt ? 0.9 : 0.85 };
-      // The coin's real outline, not the gate's circle: a tilted wall shows the
-      // coin as an ellipse, and the backend uses that to correct crack lengths.
-      const traced = await traceCoin(cx, cy, r, w, h);
+      // Tap-to-outline, same as the crack: the tap already traced the coin,
+      // so measure exactly the green fill shown. Otherwise trace now (gate
+      // circle or a tap that landed before the model loaded).
+      const stored = s.coinManualPt && s.coinMask ? { mask: s.coinMask, iou: s.coinIou } : null;
+      const traced = stored ?? await traceCoin(cx, cy, r, w, h);
       body.reference = traced ? { ...circleRef, rle: encodeRle(traced.mask, w, h), confidence: traced.iou } : circleRef;
     } else if (s.noScaleMode) body.note = "percent-only requested";
     setStatus("");
@@ -262,8 +285,35 @@ export default function Mark() {
     const y = Math.round((ev.clientY - r.top) * (c.height / r.height));
     if (coinCorrect) {
       s.coinManualPt = [x, y];
+      s.coinMask = null;
+      s.coinIou = 0;
       setCoinCorrect(false);
-      setCoinFixHint("Coin corrected — will use your tap");
+      setCoinFixHint("Outlining coin…");
+      setMarkBusy(true);
+      drawMark();
+      // Same mechanism as the crack: trace now so the green fill shown is
+      // exactly what gets measured. Falls back to the estimated circle when
+      // the model is still loading (measure() traces again then).
+      if (embeddings.current && s.photo) {
+        const w = s.photo.width;
+        const h = s.photo.height;
+        const rr = s.gateCoin ? Math.max(3, (s.gateCoin.rr / s.gateCoin.fw) * (w / s.gateCoin.sw)) : Math.max(10, w * 0.035);
+        try {
+          const traced = await traceCoin(x, y, rr, w, h);
+          if (traced) {
+            s.coinMask = traced.mask;
+            s.coinIou = traced.iou;
+            setCoinFixHint(`Coin outlined (${Math.round(traced.iou * 100)}% sure) — pick its size`);
+          } else {
+            setCoinFixHint("Coin outline unclear — using the circle; pick its size");
+          }
+        } catch {
+          setCoinFixHint("Coin outline unclear — using the circle; pick its size");
+        }
+      } else {
+        setCoinFixHint("Coin marked — outlines when the model loads; pick its size");
+      }
+      setMarkBusy(false);
       drawMark();
       return;
     }
@@ -369,10 +419,20 @@ export default function Mark() {
     }
     if (s.coinManualPt) {
       s.coinManualPt = null;
+      s.coinMask = null;
+      s.coinIou = 0;
       setCoinFixHint("");
       drawMark();
     }
   }, [base, coinCorrect, drawMark, embeddings, markBusy, s, sam]);
+
+  const coinState = s.coinManualPt ? (s.coinMask ? "manual-ok" : "manual") : s.gateCoin ? "auto" : "none";
+  const coinStateText =
+    coinState === "auto" ? "Coin auto-detected — confirm its size."
+    : coinState === "manual-ok" ? "Coin outlined from your tap — confirm its size."
+    : coinState === "manual" ? "Coin tap saved — confirm its size below."
+    : "No coin yet — add one, or measure percent-only.";
+  const needSize = Boolean(s.gateCoin || s.coinManualPt) && s.coinKindMm <= 0;
 
   return (
     <section className="screen on" aria-labelledby="h-mark">
@@ -381,22 +441,27 @@ export default function Mark() {
         <Stepper step={2} />
         <h1 id="h-mark">Tap the damage.</h1>
         <p className="sub">One tap on the crack. The coin is already outlined from the gate.</p>
-        <div className="card">
-          <canvas id="markCanvas" ref={canvasRef} onPointerDown={onTap} />
-          <div style={{ display: "flex", gap: 8, margin: "8px 0 2px" }}>
+        <div className="card evcard">
+          <div className="evframe">
+            <canvas id="markCanvas" ref={canvasRef} onPointerDown={onTap} />
+            {tapCount > 0 && (
+              <span className="evbadge" aria-hidden="true">{tapCount} tap{tapCount === 1 ? "" : "s"}</span>
+            )}
+          </div>
+          <div className="evrow">
             <button
               id="undoBtn"
-              className="btn-ghostline"
+              className="btn-quiet"
               type="button"
-              style={{ flex: 1, minHeight: 44 }}
               disabled={markBusy || (tapCount === 0 && !s.coinManualPt && !coinCorrect)}
               onClick={undo}
             >
-              ↩ Undo last tap
+              ↩ Undo
             </button>
+            <span id="status" className="evstatus" role="status">{status}</span>
           </div>
-          <div className="seg" role="group" aria-label="Damage type">
-            {CHIPS.slice(0, 2).map((chip) => (
+          <div className="seg seg-quad" role="group" aria-label="Damage type">
+            {CHIPS.map((chip) => (
               <button
                 key={chip.id}
                 id={chip.id}
@@ -411,24 +476,17 @@ export default function Mark() {
               </button>
             ))}
           </div>
-          <div className="seg" role="group" aria-label="More types">
-            {CHIPS.slice(2).map((chip) => (
-              <button
-                key={chip.id}
-                id={chip.id}
-                type="button"
-                className={label === chip.label ? "on" : undefined}
-                onClick={() => {
-                  setLabel(chip.label);
-                  s.dmgLabel = chip.label;
-                }}
-              >
-                {chip.text}
-              </button>
-            ))}
+        </div>
+        <div className="card scalecard">
+          <div className="scalehead">
+            <span className={`scaledot is-${coinState}`} aria-hidden="true" />
+            <div className="scalehead-tx">
+              <b>Scale reference</b>
+              <small>{coinStateText}</small>
+            </div>
           </div>
           <label className="field">
-            Scale reference (auto-detected — confirm)
+            Coin size
             <select
               id="coinKind"
               value={coinCustom ? 0 : coinKind}
@@ -454,8 +512,8 @@ export default function Mark() {
               ))}
             </select>
           </label>
-          <label className="field" style={{ marginTop: 6 }}>
-            Or type the diameter (any coin, ruler, card)
+          <label className="field">
+            Or type the diameter <small className="fieldex">any coin, ruler, card</small>
             <input
               id="coinCustomMm"
               className="field-input"
@@ -481,21 +539,11 @@ export default function Mark() {
               }}
             />
           </label>
-          {(s.gateCoin || s.coinManualPt) && s.coinKindMm <= 0 ? (
-            <div className="hint" style={{ fontSize: 13, color: "#5b6b8c" }}>
-              Choose the reference size so the scale is known.
-            </div>
-          ) : !s.gateCoin && !s.coinManualPt ? (
-            <div className="hint" style={{ fontSize: 13, color: "#5b6b8c" }}>
-              No coin yet — tap “Tap coin to correct” to add one, or measure percent-only.
-            </div>
-          ) : null}
-          <div style={{ display: "flex", gap: 8, margin: "6px 0 10px" }}>
+          <div className="coinrow">
             <button
               id="coinFixBtn"
-              className={coinCorrect ? "btn-dark" : "btn-ghostline"}
+              className={coinCorrect ? "btn-dark btn-sm" : "btn-quiet"}
               type="button"
-              style={{ flex: 1, minHeight: 44 }}
               onClick={() => {
                 if (!s.photo) return;
                 setCoinCorrect((v) => {
@@ -504,11 +552,11 @@ export default function Mark() {
                 });
               }}
             >
-              {coinCorrect ? "Cancel" : "Tap coin to correct"}
+              {coinCorrect ? "Cancel" : s.coinManualPt ? "Re-tap coin" : "Tap coin to correct"}
             </button>
-            <span id="coinFixHint" style={{ fontSize: 12, color: "#5b6b8c", alignSelf: "center" }}>{coinFixHint}</span>
+            <span id="coinFixHint" className="coinhint">{coinFixHint}</span>
           </div>
-          <label className="switchrow" style={{ margin: "8px 0 4px" }}>
+          <label className="switchcard">
             <input
               id="coinTaped"
               type="checkbox"
@@ -518,16 +566,25 @@ export default function Mark() {
                 s.coinTaped = e.target.checked;
                 drawMark();
               }}
-            />{" "}
-            Coin has tape — use lenient outline (allows tape halo)
+            />
+            <span>Coin has tape<small>Lenient outline — allows the tape halo</small></span>
           </label>
-          <div id="photoNotes" className="hint" style={{ fontSize: 13, color: "#5b6b8c" }}>{photoNotes}</div>
-          <div id="tfState" style={{ fontSize: 12, color: "#5b6b8c", fontFamily: "'IBM Plex Mono',monospace" }}>{tfState}</div>
-          <button id="measureBtn" className="btn-primary" type="button" disabled={!hasMask || (Boolean(s.gateCoin || s.coinManualPt) && s.coinKindMm <= 0)} onClick={measure}>
-            Measure damage
-          </button>
-          <span id="status">{status}</span>
         </div>
+        {photoNotes ? <div id="photoNotes" className="hint">{photoNotes}</div> : null}
+        {tfState ? (
+          <div className="modelline" role="status">
+            <span className="modelbar" aria-hidden="true"><i /></span>
+            <span id="tfState">{tfState}</span>
+          </div>
+        ) : null}
+        <button id="measureBtn" className="btn-primary" type="button" disabled={!hasMask || needSize} onClick={measure}>
+          Measure damage
+        </button>
+        {!hasMask ? (
+          <p className="ctahint">Tap the damage on the photo to enable measuring.</p>
+        ) : needSize ? (
+          <p className="ctahint">Pick the coin size above to enable measuring.</p>
+        ) : null}
       </div>
     </section>
   );
