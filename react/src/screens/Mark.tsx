@@ -218,6 +218,19 @@ export default function Mark() {
       drawMark();
       return;
     }
+    // New photo: drop the previous photo's taps and mask immediately, so a
+    // slow or failed load can never leave a stale outline behind the button.
+    // The button stays disabled until the new photo is outlined (hasMask).
+    resetDmg(s);
+    s.coinManualPt = null;
+    s.coinMask = null;
+    s.coinIou = 0;
+    embeddings.current = false;
+    setHasMask(false);
+    setTapCount(0);
+    setTfState("");
+    setStatus("Tap the crack, then Measure.");
+    drawMark();
     const img = new Image();
     img.onload = () => {
       const scale = Math.min(1, MAX_SIDE / Math.max(img.width, img.height));
@@ -245,12 +258,23 @@ export default function Mark() {
         } catch { /* hunt is best-effort; the tap button remains */ }
       }
     };
+    img.onerror = () => {
+      setReady(false);
+      setStatus("That photo could not be read — go back and take it again.");
+    };
     img.src = s.stillDataUrl;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const measure = useCallback(async () => {
+    // Belt and braces with the disabled button: no mask, no empty mask, no photo — no report.
     if (!s.dmg.mask || !s.photo) return;
+    let area = 0;
+    for (let i = 0; i < s.dmg.mask.length; i++) if (s.dmg.mask[i]) area++;
+    if (!area) {
+      setStatus("Tap the crack first — there is nothing outlined to measure.");
+      return;
+    }
     try {
       const px = s.photo.getContext("2d", { willReadFrequently: true })?.getImageData(0, 0, s.photo.width, s.photo.height);
       if (px) setPhotoNotes(checkPhoto({ width: px.width, height: px.height, data: px.data }, Math.max(s.photo.width, s.photo.height)).join(" "));
