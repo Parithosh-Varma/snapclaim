@@ -176,3 +176,35 @@ test("empty statements fail", () => {
   const error = expectEvidenceError(() => gateFindings([{ statement: "   ", citations: [finding.receiptIds.severity] }], receipts));
   assert.ok(error.failures.some((failure) => failure.includes("empty")));
 });
+
+test("shorthand receipt ids (r1, R1, r001) match canonical R001 receipts", () => {
+  const { finding, receipts } = setup();
+  const shortRatio = finding.receiptIds.ratio.toLowerCase().replace(/^r0*(\d+)$/, "r$1");
+  const shortSev = finding.receiptIds.severity.toLowerCase().replace(/^r0*(\d+)$/, "r$1");
+  const drafts: FindingDraft[] = [
+    {
+      statement: "crack covers 5.17% of the component; classified significant.",
+      citations: [shortRatio, shortSev],
+    },
+  ];
+  const result = validateFindings(drafts, receipts);
+  assert.equal(result.ok, true, result.failures.join("\n"));
+});
+
+test("square centimetres without a calibrated-area citation fail the gate", () => {
+  const { finding, receipts } = setup();
+  const error = expectEvidenceError(() =>
+    gateFindings(
+      [{ statement: "crack covers 2.19 cm2.", citations: [finding.receiptIds.ratio, finding.receiptIds.severity] }],
+      receipts,
+    ),
+  );
+  assert.ok(error.failures.some((failure) => failure.includes("square centimetres")));
+
+  assert.doesNotThrow(() =>
+    gateFindings(
+      [{ statement: "crack covers 2.19 cm².", citations: [finding.receiptIds.area ?? ""] }],
+      receipts,
+    ),
+  );
+});
