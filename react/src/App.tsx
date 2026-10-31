@@ -65,7 +65,9 @@ export default function App() {
   const waitingSw = useRef<ServiceWorker | null>(null);
   const swReg = useRef<ServiceWorkerRegistration | null>(null);
   const reloading = useRef(false);
+  const measuringRef = useRef(false);
 
+  /* a finished or abandoned claim unblocks a pending update */
   const [screen, setScreen] = useState<Screen>(() =>
     window.location.pathname.startsWith("/admin") ? "tAdmin" : "tHome",
   );
@@ -125,14 +127,30 @@ export default function App() {
     };
   }, []);
 
-  /* service worker: register, surface waiting updates, reload on activation */
+  measuringRef.current = measuring;
+
+  const tryAutoUpdate = useCallback(() => {
+    if (!waitingSw.current) return false;
+    if (sessionRef.current.stillDataUrl || measuringRef.current) return false;
+    waitingSw.current.postMessage("SKIP_WAITING");
+    return true;
+  }, []);
+
+  /* a finished or abandoned claim unblocks a pending update */
+  useEffect(() => {
+    tryAutoUpdate();
+  }, [screen, measuring, tryAutoUpdate]);
+
+  /* service worker: register, auto-apply waiting updates, reload on activation.
+     An update applies itself the moment it is safe: no photo taken yet and
+     no measurement running. Mid-claim the bar stays until the claim ends. */
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
     navigator.serviceWorker.register("./sw.js").then((reg) => {
       swReg.current = reg;
       if (reg.waiting && navigator.serviceWorker.controller) {
         waitingSw.current = reg.waiting;
-        setUpdateReady(true);
+        if (!tryAutoUpdate()) setUpdateReady(true);
       }
       reg.addEventListener("updatefound", () => {
         const sw = reg.installing;
@@ -140,7 +158,7 @@ export default function App() {
         sw.addEventListener("statechange", () => {
           if (sw.state === "installed" && navigator.serviceWorker.controller) {
             waitingSw.current = sw;
-            setUpdateReady(true);
+            if (!tryAutoUpdate()) setUpdateReady(true);
           }
         });
       });
@@ -160,8 +178,12 @@ export default function App() {
       return;
     }
     await swReg.current.update().catch(() => {});
-    toast(updateReady ? "Update ready — tap Reload at the top" : "You are on the latest version");
-  }, [toast, updateReady]);
+    if (waitingSw.current) {
+      toast(tryAutoUpdate() ? "Update found — applying…" : "Update ready — finishes your claim first");
+    } else {
+      toast(updateReady ? "Update ready — finishes your claim first" : "You are on the latest version");
+    }
+  }, [toast, updateReady, tryAutoUpdate]);
 
   const applyUpdate = useCallback(() => {
     waitingSw.current?.postMessage("SKIP_WAITING");
@@ -236,7 +258,7 @@ export default function App() {
       )}
       {updateReady && (
         <div id="updateBar" role="status">
-          <span>A new version of SnapClaim is ready.</span>
+          <span>A new version is ready — applies when this claim ends.</span>
           <button id="updateGo" type="button" onClick={applyUpdate}>Reload</button>
         </div>
       )}
