@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useApp } from "../App";
 import { MASK_COLORS, type Session } from "../lib/session";
-import { BackButton, Badge, MetricCards, Scheme, Stepper, receiptChips } from "../lib/ui";
+import { BackButton, Badge, MetricCards, Stepper, receiptChips } from "../lib/ui";
 
 /** Bounding box of the on pixels, or null when the mask is empty. */
 function maskBox(mask: Uint8Array, w: number, h: number) {
@@ -195,8 +195,6 @@ export default function Numbers() {
             <div className="skel" />
           </div>
         )}
-
-        <Scheme findings={m?.findings ?? []} />
 
         <div id="findings" aria-live="polite">
           {s.reportFail ? (

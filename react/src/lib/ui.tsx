@@ -84,27 +84,6 @@ export function MetricCards({ f }: { f: Finding }) {
   );
 }
 
-/** Schematic severity bars (the vanilla drawScheme, as JSX). */
-export function Scheme({ findings }: { findings: Finding[] }) {
-  const color = (s: string) => (s === "significant" ? "#c0392b" : s === "moderate" ? "#e67e22" : "#27ae60");
-  return (
-    <svg className="schematic" viewBox="0 0 400 140" role="img" aria-label="Schematic damage bars">
-      {findings.slice(0, 8).map((f, i) => {
-        const w = Math.max(4, Math.min(380, (f.percent ?? 0) * 12));
-        const y = 12 + i * 32;
-        return (
-          <g key={i}>
-            <rect x="110" y={y} width={w} height="18" fill={color(String(f.severity))} />
-            <text x="4" y={y + 14} fontSize="12">
-              {`${String(f.label)} ${String(f.percent)}%`}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
-
 export function downloadFile(name: string, data: string | Blob, type = "application/json"): void {
   const blob = typeof data === "string" ? new Blob([data], { type }) : data;
   const url = URL.createObjectURL(blob);
