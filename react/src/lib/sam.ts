@@ -83,6 +83,7 @@ export async function segmentViaApi(
   base: string,
   photo: HTMLCanvasElement,
   points: [number, number][],
+  box?: { left: number; top: number; right: number; bottom: number },
 ): Promise<SamMask> {
   const res = await fetch(base.replace(/\/$/, "") + "/v1/segment", {
     method: "POST",
@@ -92,6 +93,7 @@ export async function segmentViaApi(
       width: photo.width,
       height: photo.height,
       points: points.map(([x, y]) => ({ x, y })),
+      ...(box ? { box } : {}),
     }),
   });
   const j = (await res.json().catch(() => ({}))) as {

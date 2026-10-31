@@ -715,13 +715,14 @@ function samDecode(point, preferSmallest) {
 const decodePoint = (point) => samDecode(point, true);
 // SAM 3.1 via the backend: one call for all taps so far (one billed image), not one per tap.
 // Throws on any failure so the caller falls back to the on-device model.
-async function segmentViaApi(points) {
+async function segmentViaApi(points, box) {
   const res = await fetch(base() + "/v1/segment", {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({
       imageUrl: photo.toDataURL("image/jpeg", 0.85),
       width: photo.width, height: photo.height,
       points: points.map(([x, y]) => ({ x, y })),
+      ...(box ? { box } : {}),
     }),
   });
   const j = await res.json().catch(() => ({}));
@@ -1629,7 +1630,25 @@ async function runXcheck(auto) {
     } else {
       // Mock backend has no SAM to check against — say so without a doomed fetch.
       if (await getBackendMode() === "mock") throw new Error("mock segment unavailable — SAM 3.1 is unwired in mock mode");
-      other = (await segmentViaApi(dmg.points)).rle;
+      // The measured mask's own bounding box constrains the re-prompt, so a
+      // thin crack comes back as the crack — not the whole wall again.
+      let box;
+      if (dmg.mask) {
+        let minX = photo.width, minY = photo.height, maxX = -1, maxY = -1;
+        for (let i = 0; i < dmg.mask.length; i++) if (dmg.mask[i]) {
+          const x = i % photo.width, y = (i / photo.width) | 0;
+          if (x < minX) minX = x; if (x > maxX) maxX = x;
+          if (y < minY) minY = y; if (y > maxY) maxY = y;
+        }
+        if (maxX >= 0) {
+          const m = 24;
+          box = {
+            left: Math.max(0, minX - m), top: Math.max(0, minY - m),
+            right: Math.min(photo.width, maxX + 1 + m), bottom: Math.min(photo.height, maxY + 1 + m),
+          };
+        }
+      }
+      other = (await segmentViaApi(dmg.points, box)).rle;
     }
     const ccRes = await fetch(base() + "/v1/crosscheck", {
       method: "POST", headers: { "content-type": "application/json" },

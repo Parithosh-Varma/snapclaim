@@ -6,6 +6,31 @@ import { segmentViaApi, type SamClient } from "../lib/sam";
 import type { SamMask, Session } from "../lib/session";
 import { BackButton, Badge, Stepper } from "../lib/ui";
 
+/** Dilated bounding box of a mask (photo pixels): constrains a re-prompt to the damage region. */
+function damageBox(mask: Uint8Array, w: number, h: number): { left: number; top: number; right: number; bottom: number } | null {
+  let minX = w;
+  let minY = h;
+  let maxX = -1;
+  let maxY = -1;
+  for (let i = 0; i < mask.length; i++) {
+    if (!mask[i]) continue;
+    const x = i % w;
+    const y = (i / w) | 0;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  if (maxX < 0) return null;
+  const m = 24;
+  return {
+    left: Math.max(0, minX - m),
+    top: Math.max(0, minY - m),
+    right: Math.min(w, maxX + 1 + m),
+    bottom: Math.min(h, maxY + 1 + m),
+  };
+}
+
 async function segmentOnDevice(sam: SamClient, s: Session): Promise<SamMask | null> {
   while (s.dmg.pointMasks.length < s.dmg.points.length) {
     s.dmg.pointMasks.push(await sam.decodeDamage(s.dmg.points[s.dmg.pointMasks.length] as [number, number]));
@@ -118,7 +143,10 @@ export default function Check() {
         if (!dev) throw new Error("The on-device model found nothing at those taps.");
         other = encodeRle(dev.mask, s.photo.width, s.photo.height);
       } else {
-        other = (await segmentViaApi(base, s.photo, s.dmg.points)).rle;
+        // The measured mask's own bounding box constrains the re-prompt, so a
+        // thin crack comes back as the crack — not the whole wall again.
+        const box = s.dmg.mask ? damageBox(s.dmg.mask, s.photo.width, s.photo.height) : null;
+        other = (await segmentViaApi(base, s.photo, s.dmg.points, box ?? undefined)).rle;
       }
       const { res, j } = await apiPost(base, "/v1/crosscheck", {
         a: encodeRle(s.dmg.mask, s.photo.width, s.photo.height),

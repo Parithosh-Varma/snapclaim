@@ -54,6 +54,16 @@ test("negative points and boxes encode correctly, ids stay stable", () => {
   );
 });
 
+test("box and points combine in one object prompt", () => {
+  const prompt = buildObjectPrompt({ width: 512, height: 340 }, [
+    { id: 1, points: [{ x: 179, y: 187 }], box: { left: 150, top: 160, right: 210, bottom: 220 } },
+  ]);
+  assert.equal(
+    prompt,
+    "<0f>1<|box;x1=150;y1=160;x2=209;y2=219;w=512;h=340|><|point;x=179;y=187;w=512;h=340|>",
+  );
+});
+
 test("prompts outside the frame or over the object limit throw", () => {
   assert.throws(() => buildObjectPrompt({ width: 100, height: 100 }, [{ id: 1, points: [{ x: 200, y: 10 }] }]), MeasurementError);
   assert.throws(() => buildObjectPrompt({ width: 100, height: 100 }, []), MeasurementError);
@@ -152,6 +162,30 @@ test("live segment decodes a streamed SAM response to frame masks", async () => 
   // Box (10,20)-(15,23) inclusive covers 6x4; the diagonal raster lands on the frame.
   const on = result.records[0]?.frameMask.data.reduce((n, v) => n + (v !== 0 ? 1 : 0), 0) ?? 0;
   assert.ok(on > 0 && on <= 24);
+});
+
+test("live segment forwards a box prompt to SAM", async () => {
+  const token = makeMaskToken(4, 6, (x, y) => (x === y ? 1 : 0));
+  const line = `<0f>1<|box;x1=10;y1=20;x2=15;y2=23;w=100;h=100;c=0.9|><|mask;x=0;y=0;c=0.9;${token}|>`;
+  const sse = `event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":${JSON.stringify(line)}}\n\nevent: response.completed\ndata: {"type":"response.completed"}`;
+  let sent = "";
+  const fetchFn = (async (_url: unknown, init?: { body?: unknown }) => {
+    sent = String((init as { body?: unknown })?.body ?? "");
+    return { ok: true, status: 200, text: async () => sse };
+  }) as unknown as typeof fetch;
+  await segmentWithSam({
+    fetchFn,
+    base: "https://api.meta.ai/v1",
+    apiKey: "test",
+    request: {
+      imageUrl: "data:image/jpeg;base64,AAA",
+      size: { width: 100, height: 100 },
+      points: [{ x: 50, y: 50 }],
+      box: { left: 40, top: 30, right: 60, bottom: 70 },
+    },
+  });
+  assert.ok(sent.includes("<|box;x1=40;y1=30;x2=59;y2=69;w=100;h=100|>"), "box token reaches SAM");
+  assert.ok(sent.includes("<|point;x=50;y=50;w=100;h=100|>"), "point token still sent");
 });
 
 test("live segment fails closed on empty output or HTTP errors", async () => {
