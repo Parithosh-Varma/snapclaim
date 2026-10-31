@@ -215,12 +215,11 @@ export default function Report() {
           </table>
         </article>
 
-        <div id="reportState" aria-live="polite">{state}</div>
-
         <div className="card">
           <button id="renderBtn" className={`btn-primary${rendering ? " busy" : ""}`} type="button" onClick={render} disabled={rendering} aria-busy={rendering}>
             {rendering ? "Generating…" : "Generate report"}
           </button>
+          {state ? <div id="reportState" className="stateline" aria-live="polite">{state}</div> : null}
           <div className="rowbtns">
             <button id="shareBtn" className="btn-ghostline" type="button" disabled={!gateOk} onClick={share}>Share</button>
             <button id="copyBtn" className="btn-ghostline" type="button" disabled={!gateOk} onClick={copy}>Copy summary</button>
