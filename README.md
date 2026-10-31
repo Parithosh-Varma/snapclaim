@@ -2,7 +2,7 @@
 
 > Point your phone at damage, speak one line about it — get a claim-ready report where every number is measured, cited, and checked before it ships. **Computed, not generated.**
 
-[![tests](https://img.shields.io/badge/tests-214%20passing-brightgreen)](./tests)
+[![tests](https://img.shields.io/badge/tests-244%20passing-brightgreen)](./tests)
 [![node](https://img.shields.io/badge/node-%3E%3D22.18-339933)](./package.json)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](./LICENSE)
 
@@ -214,7 +214,7 @@ pwa/            capture app: photo, tap-to-mask, hold-to-speak, report, skeptic,
 eval/           bench + replay CLI
 bench/          held-out split + dispute scorer
 fixtures/       masks, expected outputs, scale references (photos gitignored)
-tests/          214 tests, mock by default, live paths with stubbed fetch
+tests/          244 tests, mock by default, live paths with stubbed fetch
 ```
 
 ## Development
