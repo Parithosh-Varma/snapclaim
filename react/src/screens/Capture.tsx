@@ -33,6 +33,7 @@ export default function Capture() {
   const [tipsOpen, setTipsOpen] = useState(true);
   const [blocked, setBlocked] = useState(false);
   const [live, setLive] = useState(false);
+  const noCam = typeof navigator !== "undefined" && !navigator.mediaDevices?.getUserMedia;
 
   const captureStill = useCallback(() => {
     const gate = gateRef.current;
@@ -212,28 +213,50 @@ export default function Capture() {
             </button>
           </div>
           <div id="coinHint" role="status">{hint}</div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(e) => {
+              onUpload(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
           {enableCam ? (
             <div className="permitcard" role="alertdialog" aria-labelledby="permitTitle" aria-describedby="permitDesc">
               <span className="permit-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="7" width="18" height="13" rx="3" /><circle cx="12" cy="13.5" r="3.4" /><circle cx="12" cy="13.5" r="0.6" fill="currentColor" /><path d="M8.5 7l1-2.2h5L15.5 7" /></svg>
               </span>
-              <p id="permitTitle">Camera is off</p>
-              <p id="permitDesc">We use your camera to measure your object. Photos stay on this device.</p>
-              <button
-                id="enableCam"
-                type="button"
-                className="btn-primary"
-                onClick={() => {
-                  setEnableCam(false);
-                  setBlocked(false);
-                  void gateRef.current?.acquire();
-                }}
-              >
-                Enable camera
-              </button>
-              {blocked && (
+              <p id="permitTitle">{noCam ? "No camera on this device" : "Camera is off"}</p>
+              <p id="permitDesc">{noCam ? "Upload a photo or pick a sample instead — measuring works the same." : "We use your camera to measure your object. Photos stay on this device."}</p>
+              {!noCam && (
+                <button
+                  id="enableCam"
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => {
+                    setEnableCam(false);
+                    setBlocked(false);
+                    void gateRef.current?.acquire();
+                  }}
+                >
+                  Enable camera
+                </button>
+              )}
+              {blocked && !noCam && (
                 <p className="permit-hint">Blocked in your browser? Click the lock icon in the address bar → Allow camera, then tap Enable camera.</p>
               )}
+              <div className="alt-row permit-alt">
+                <button id="uploadBtn" className="alt-btn" type="button" onClick={() => fileRef.current?.click()}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5" /><path d="M4 20h16" /></svg>
+                  Upload photo
+                </button>
+                <button id="altEntry" className="alt-btn" type="button" onClick={onSample}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="3" /><circle cx="12" cy="13.5" r="3.4" /></svg>
+                  Use a sample
+                </button>
+              </div>
             </div>
           ) : (
             <>
@@ -269,16 +292,6 @@ export default function Capture() {
                     Use a sample
                   </button>
                 </div>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/*"
-                  hidden
-                  onChange={(e) => {
-                    onUpload(e.target.files?.[0]);
-                    e.target.value = "";
-                  }}
-                />
                 <button
                   id="noCoin"
                   type="button"
