@@ -88,7 +88,7 @@ function NumOverlay({ s }: { s: Session }) {
       <>
         {paths}
         {line && <line {...line} stroke={color} strokeWidth={1.5} vectorEffect="non-scaling-stroke" />}
-        <rect x={x} y={y} width={tagW} height={tagH} rx={tagH / 2} fill="#fffdf8" stroke={color} strokeWidth={2} vectorEffect="non-scaling-stroke" />
+        <rect x={x} y={y} width={tagW} height={tagH} rx={0} fill="#fffdf8" stroke={color} strokeWidth={2} vectorEffect="non-scaling-stroke" />
         <text
           x={x + tagW / 2}
           y={y + tagH / 2}
