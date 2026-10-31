@@ -152,6 +152,7 @@ export class MetaFindingsProvider implements FindingsProvider {
               role: "system",
               content:
                 "Write claim findings. Every finding must contain at least one number that exactly matches a cited receipt output — never write qualitative-only findings; restate severity together with its measured number. " +
+              "Only percent (…%), mm length/width, and cm2 area outputs can back a number. Never write the mm_per_px scale factor, region counts, or bare severity-band numbers — no citation verifies them and the finding will be rejected. " +
               "Every number must exactly match a cited receipt output. Cite only receipts from one mask per finding. " +
               "Severity words (cosmetic, moderate, significant) must match the cited severity receipt. " +
               "Use % or percent for ratios, mm for lengths and widths, cm2 for areas — never write square cm, sq cm, centimetres, square metres or m2. " +
@@ -263,6 +264,7 @@ export class BasetenSkepticProvider implements FindingsProvider {
               role: "system",
               content:
                 "You are an independent skeptic. Re-derive every number from the receipts only — never invent or round from memory. " +
+                "Only percent (…%), mm length/width, and cm2 area outputs can back a number. Never write the mm_per_px scale factor, region counts, or bare severity-band numbers — no citation verifies them and the finding will be rejected. " +
                 "Every finding must contain at least one number that exactly matches a cited receipt output — never write qualitative-only findings; restate severity together with its measured number. " +
                 "For each fact, either restate it exactly with its receipt citations, or mark it DISPUTED with the reason (DISPUTED findings must still cite numbers). " +
                 "Use % or percent for ratios, mm for lengths and widths, cm2 for areas — never write square cm, sq cm, centimetres, square metres or m2. " +
