@@ -8,7 +8,7 @@
 
 SnapClaim turns a damage photo plus a one-line description into a replayable evidence package: calibrated measurements (% damaged, crack length/width, area in cm²), each backed by a machine-checkable receipt, with AI-written findings that the server refuses to ship unless every number cites its receipt.
 
-**Global by design:** the measurement engine assumes no currency, locale, or language — a scale reference is any known-size object (coin, ruler, bank card), and the transcript is free text in any language. The demo is shot in India; nothing in the pipeline is India-specific.
+**Global by design:** the measurement engine assumes no currency, country, or language — a scale reference is any known-size object (coin, ruler, bank card), and the transcript is free text in any language. Voice is auto-detected by default; callers can still send an optional `languageBias`.
 
 ## Contents
 
@@ -87,6 +87,8 @@ Three principles run through all of it:
 
 The health badge reports the mode: `GET /v1/health` → `{mode: "mock" | "live" | "config-error"}`.
 
+For local development, Settings → Developer → **Open admin panel** flips the running backend between mock and live without a restart. It calls `POST /v1/admin/mode` with `Authorization: Bearer $ADMIN_TOKEN`; the token is kept in `sessionStorage` only. The override lives in memory, so a restart or redeploy returns to the `MOCK_MODE` env default. Leave `ADMIN_TOKEN` unset on the public Worker — admin writes then return 403.
+
 ### Meta models used
 
 | Role | Model | Where |
@@ -94,7 +96,7 @@ The health badge reports the mode: `GET /v1/health` → `{mode: "mock" | "live" 
 | Perception — damage masks | **SAM 3.1** | `https://api.meta.ai/v1` |
 | Reasoning — evidence-gated findings | **Muse Spark 1.3** | `https://api.meta.ai/v1/chat/completions` |
 | Independent skeptic (open weights) | **Spark Open** | `https://inference.baseten.co/v1` · `meta-models/muse-spark-open-1026` |
-| Voice intake (any language; demoed in Hindi / Telugu / Hinglish) | **Muse Voice Transcribe** | `POST https://api.meta.ai/v1/asr/transcribe` (file) · `wss://api.meta.ai/v1/asr/realtime` (live) |
+| Voice intake (any language; auto-detected, optional `languageBias`) | **Muse Voice Transcribe** | `POST https://api.meta.ai/v1/asr/transcribe` (file) · `wss://api.meta.ai/v1/asr/realtime` (live) |
 
 No image generation anywhere: every visual is drawn in code from the masks and the math. (Muse Image is unavailable in our region under Meta's Geographic Use Policy — the receipts pattern turns that constraint into a design principle, not a product boundary.)
 
@@ -147,9 +149,34 @@ npx wrangler secret put BASETEN_API_KEY   # when Baseten access is granted
 
 **PWA** — any static host serves `pwa/` (no build step). Point the Backend URL box at the Worker. Installable via `manifest.webmanifest`; the service worker caches the shell and never caches `/v1`.
 
+**Pages site** (public app, gated admin):
+
+```bash
+npm --prefix react run build
+npx wrangler pages deploy react/dist --project-name snapclaim
+```
+
+Production is <https://snapclaim.pages.dev> — open to anyone. Only the dev panel at <https://snapclaim.pages.dev/admin> sits behind Cloudflare Access: anonymous requests there get a 302 to the team login, and only these two emails can get in (one-time PIN, no Cloudflare account or WARP client, 24-hour session):
+
+- `parithvrmo@gmail.com`
+- `therealtariqkhalif@gmail.com`
+
+`react/public/_redirects` rewrites `/admin/*` to the app shell; `react/src/App.tsx` boots straight into the admin screen when the path starts with `/admin`, and Settings → Developer → *Open admin panel* navigates there as a real page load so Access can challenge it.
+
+Manage it in Zero Trust → Access → Applications (`SnapClaim admin`); adding a person means adding one Email include to the allow policy, no redeploy. The login host (`parithosh-varma.cloudflareaccess.com`) is the account-wide team domain, shared with the other Access apps. Check enforcement with:
+
+```bash
+curl -s -o /dev/null -w '%{http_code} -> %{redirect_url}\n' https://snapclaim.pages.dev/admin
+# 302 -> https://parithosh-varma.cloudflareaccess.com/...
+curl -s -o /dev/null -w '%{http_code}\n' https://snapclaim.pages.dev/
+# 200
+```
+
+The backend Worker is a separate hostname and is **not** behind Access; it relies on `ALLOWED_ORIGINS`, the spend cap, and `ADMIN_TOKEN` (unset in production, so admin writes return 403). Preview/deployment URLs (`<hash>.snapclaim.pages.dev`) are public and not behind the `/admin` app.
+
 ### Self-hosted backend
 
-The app keeps one strict backend policy in two places that must stay in sync: the `<meta>` CSP `connect-src` in `pwa/index.html` (and `react/index.html`) and the `isAllowedBackendUrl()` allowlist in `pwa/app.js` (and `react/src/lib/api.ts`). Only `https://snapclaim-backend.parithosh.workers.dev` and loopback `http` (`localhost`, `127.0.0.1`, `[::1]`) are allowed; anything else shows "This backend isn't allowed by the app's security policy". To point at your own Worker: add its `https://host` to `connect-src` in both HTML files **and** to `DEFAULT_BACKEND_HOST`/`isAllowedBackendUrl` in both JS/TS files. `tests/pwa-csp-allowlist.test.ts` fails if the two drift apart.
+The app keeps one strict backend policy in places that must stay in sync: the `<meta>` CSP `connect-src` in `pwa/index.html` (and `react/index.html`), the matching `Content-Security-Policy` response header in `pwa/_headers` (and `react/public/_headers`), and the `isAllowedBackendUrl()` allowlist in `pwa/app.js` (and `react/src/lib/api.ts`). Only `https://snapclaim-backend.parithosh.workers.dev` and loopback `http` (`localhost`, `127.0.0.1`, `[::1]`) are allowed; anything else shows "This backend isn't allowed by the app's security policy". To point at your own Worker: add its `https://host` to `connect-src` in both HTML files and both `_headers` files **and** to `DEFAULT_BACKEND_HOST`/`isAllowedBackendUrl` in both JS/TS files. `tests/pwa-csp-allowlist.test.ts` and `tests/csp-headers.test.ts` fail if they drift apart.
 
 ## Cost and limits
 
@@ -162,7 +189,7 @@ Hard limits: 50 masks per call (chunk above), 1–16 point prompts per segment c
 - The photo stays on the phone: only COCO RLE masks travel to `/v1/observe`. Two explicit exceptions, both your tap: **Cross-check masks** sends the photo once to SAM 3.1 via the backend, and **Render** attaches it to the annexure. Only `data:`/`https:` URLs are accepted.
 - Keys live in server env / Worker secrets, never in the PWA. Fail-closed 503 without them.
 - All model output rendered in the PWA is HTML-escaped; the page ships a Content-Security-Policy.
-- Note: `frame-ancestors` in the `<meta>` CSP is ignored by browsers — it only works as an HTTP response header, so the static host must send it (e.g. `Content-Security-Policy: frame-ancestors 'self'`). No meta-tag change can fix that; the directive is kept in the markup as documented intent.
+- `frame-ancestors` only works as an HTTP response header, so it is sent from `_headers` (`frame-ancestors 'self'` + `X-Frame-Options: SAMEORIGIN`) and deliberately left out of the `<meta>` CSP, where browsers ignore it and log "The Content Security Policy directive 'frame-ancestors' is ignored when delivered via a <meta> element." `tests/csp-headers.test.ts` keeps the header and meta copies of the policy in sync.
 - EXIF/XMP metadata is stripped from photos on intake.
 
 ## Evaluation

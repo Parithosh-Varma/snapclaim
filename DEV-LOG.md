@@ -283,3 +283,25 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 - `pwa/sw.js` CACHE v11 (shell changed). 214 tests green, `tsc` clean, eval 7 pass, React build clean.
 
 **Spend:** $0.00.
+
+## 2026-10-31 — Global defaults (no India-shaped intake)
+
+**Shipped**
+
+- Voice: removed the Hindi/Telugu/English default bias; Muse auto-detects the spoken language and callers can still send `languageBias`. The on-device fallback is now multilingual `whisper-tiny` instead of English-only `whisper-tiny.en`.
+- Scale UI: no India-first coin default. The select starts unset, lists presets across regions, and adopts the diameter of the auto-detected coin; measuring waits for a confirmed size when a coin is in frame.
+- Coin matcher searches the whole on-device DB instead of an INR/USA/EUR/GBP filter.
+- Fixture id `coin-10inr` → `coin-27mm`; README, backend README, PRODUCT.md and the marketing site no longer name Hindi/Telugu/Hinglish or ₹10 as the product shape.
+- 244 tests green, both typechecks clean, React build clean.
+
+**Spend:** $0.00.
+
+## 2026-10-31 — Voice order: server first, on-device fallback
+
+**Shipped**
+
+- Both clients (React `Say.tsx`, `pwa/app.js`) now try `/v1/transcribe` (Muse, auto-detects any language) first when online, and fall back to on-device Whisper on error, non-OK status (503 no key, 400 mock without fixture), or empty transcript. Either side returning no words falls through to the other before the "type the line" message.
+- Offline still skips the server and goes straight to on-device. `tests/react-shell.test.ts` asserts the new server-first contract.
+- 244 tests green, both typechecks clean, React build clean.
+
+**Spend:** $0.00.

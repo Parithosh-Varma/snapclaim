@@ -94,7 +94,7 @@ export function createSession(): Session {
     autoListen: false,
     gateCoin: null,
     coinLabel: "",
-    coinKindMm: 27,
+    coinKindMm: 0,
     coinManualPt: null,
     coinTaped: false,
     noScaleMode: false,
@@ -124,12 +124,14 @@ export const MASK_COLORS: Record<string, string> = {
 };
 
 export const COIN_OPTIONS: { value: number; label: string }[] = [
-  { value: 27, label: "India ₹10 · 27 mm" },
-  { value: 25, label: "India ₹5 · 25 mm" },
-  { value: 23, label: "India ₹2 · 23 mm" },
-  { value: 22, label: "India ₹1 · 22 mm" },
+  { value: 0, label: "Choose the reference size…" },
   { value: 24.26, label: "US quarter · 24.26 mm" },
   { value: 23.88, label: "Canadian quarter · 23.88 mm" },
   { value: 24.5, label: "UK 10p · 24.5 mm" },
   { value: 23.25, label: "1 euro · 23.25 mm" },
+  { value: 22.6, label: "Japanese ¥100 · 22.6 mm" },
+  { value: 27, label: "India ₹10 · 27 mm" },
+  { value: 25, label: "India ₹5 · 25 mm" },
+  { value: 23, label: "India ₹2 · 23 mm" },
+  { value: 22, label: "India ₹1 · 22 mm" },
 ];

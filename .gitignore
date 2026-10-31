@@ -16,3 +16,6 @@ fixtures/photos/
 /site/
 /promo/
 /PRODUCT.md
+
+# Nested private marketing repo (has its own remote).
+/snapclaim-marketing/

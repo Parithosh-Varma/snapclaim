@@ -54,6 +54,7 @@ export default function Capture() {
         };
       }
       session.coinLabel = gate.coinLabel;
+      if (gate.coinMm > 0) session.coinKindMm = gate.coinMm;
     } catch { /* stills are best-effort */ }
     gate.stop();
     setFlash(true);
@@ -110,6 +111,7 @@ export default function Capture() {
     session.stillDataUrl = "";
     session.gateCoin = null;
     session.coinLabel = "";
+    session.coinKindMm = 0;
     session.noScaleMode = false;
     resetDmg(session);
     go("capture");
@@ -141,6 +143,7 @@ export default function Capture() {
       session.gateCoin = null;
       session.noScaleMode = true;
       session.coinLabel = "";
+      session.coinKindMm = 0;
       gateRef.current?.stop();
       go("sReview");
     };

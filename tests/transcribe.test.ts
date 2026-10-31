@@ -56,11 +56,11 @@ test("mock transcribe needs a fixture and invents nothing", async () => {
   const ok = await handleRequest({
     method: "POST",
     path: "/v1/transcribe",
-    body: { fixtureTranscript: "paani ka daag, coin for scale" },
+    body: { fixtureTranscript: "water stain, coin for scale" },
     env: {},
   });
   assert.equal(ok.status, 200);
-  assert.equal((ok.body as { result: { transcript: string } }).result.transcript, "paani ka daag, coin for scale");
+  assert.equal((ok.body as { result: { transcript: string } }).result.transcript, "water stain, coin for scale");
 });
 
 test("live transcribe without a key fails closed with 503", async () => {
@@ -86,6 +86,27 @@ test("live transcribe proxies multipart and returns the transcript", async () =>
   assert.equal(res.status, 200);
   assert.equal(seen.url, "https://api.meta.ai/v1/asr/transcribe");
   assert.equal((res.body as { result: { transcript: string } }).result.transcript, "seepage on the ceiling");
+});
+
+test("transcribe lets Muse auto-detect language and still honours an explicit bias", async () => {
+  const parts: Array<Record<string, unknown>> = [];
+  const fetchFn = (async (_url: unknown, init: unknown) => {
+    const form = (init as { body: FormData }).body;
+    parts.push(JSON.parse(await ((form.get("request") as Blob).text())));
+    return { ok: true, status: 200, json: async () => ({ transcript: "line", audioDurationMs: 1000, turns: [] }) };
+  }) as unknown as typeof fetch;
+
+  await handleRequest({ method: "POST", path: "/v1/transcribe", body: { audioBase64: toBase64(wavBytes(2)) }, env: LIVE_ENV, fetchFn });
+  await handleRequest({
+    method: "POST",
+    path: "/v1/transcribe",
+    body: { audioBase64: toBase64(wavBytes(2)), languageBias: ["Spanish"] },
+    env: LIVE_ENV,
+    fetchFn,
+  });
+
+  assert.equal("languageBias" in (parts[0] ?? {}), false, "no language is assumed by default");
+  assert.deepEqual(parts[1]?.languageBias, ["Spanish"], "an explicit bias is forwarded");
 });
 
 test("live segment without points or image fails fast, never fakes a mask", async () => {

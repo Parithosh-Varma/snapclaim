@@ -57,8 +57,28 @@ export default function Say() {
     setMicState("Transcribing…");
     try {
       const samples = await resampleTo16k(clip);
-      // On the device first (Whisper in voice-worker.js): the voice never
-      // leaves the phone. The server transcriber is the fallback.
+      // Server transcriber first when online (Muse auto-detects any
+      // language); on-device Whisper is the fallback for offline use or a
+      // keyless/erroring backend. Either side returning no words falls
+      // through to the other before giving up.
+      if (navigator.onLine !== false) {
+        try {
+          setMicState("Transcribing…");
+          const wav = encodeWav(samples, 16000);
+          const b64 = await blobToBase64(wav);
+          const { res, j } = await apiPost(base, "/v1/transcribe", { audioBase64: b64 });
+          const text = res.ok && j.ok
+            ? String((j.result as { transcript?: unknown } | undefined)?.transcript ?? "").trim()
+            : "";
+          if (text) {
+            landTranscript(text);
+            return;
+          }
+          console.info(`[voice] server returned no words (HTTP ${res.status}), trying on-device`);
+        } catch (e) {
+          console.info(`[voice] server transcribe failed, trying on-device: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
       try {
         const local = cleanTranscript(await transcribeOnDevice(samples.slice(), (p) =>
           setMicState(`Downloading speech model… ${p}%`)));
@@ -69,23 +89,11 @@ export default function Say() {
         setHeard("Didn't catch anything — type the line.");
         return;
       } catch (e) {
-        console.info(`[voice] on-device failed, trying the server: ${e instanceof Error ? e.message : String(e)}`);
+        const msg = e instanceof Error ? e.message : String(e);
+        setVoiceErr(navigator.onLine === false
+          ? "On-device speech model not available offline yet — reconnect once to download it, or type the line."
+          : `Transcription failed — type the line. (${msg})`);
       }
-      setMicState("Transcribing…");
-      const wav = encodeWav(samples, 16000);
-      const b64 = await blobToBase64(wav);
-      const { res, j } = await apiPost(base, "/v1/transcribe", { audioBase64: b64 });
-      if (res.status === 503) {
-        setVoiceErr("Voice needs the backend API key — type the line.");
-        return;
-      }
-      if (!res.ok || !j.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
-      const text = String((j.result as { transcript?: unknown } | undefined)?.transcript ?? "").trim();
-      if (!text) {
-        setHeard("Didn't catch anything — type the line.");
-        return;
-      }
-      landTranscript(text);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setVoiceErr(navigator.onLine === false

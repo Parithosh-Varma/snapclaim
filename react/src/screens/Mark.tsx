@@ -344,7 +344,7 @@ export default function Mark() {
             ))}
           </div>
           <label className="field">
-            Coin (auto-detected — confirm)
+            Scale reference (auto-detected — confirm)
             <select
               id="coinKind"
               value={coinKind}
@@ -354,11 +354,21 @@ export default function Mark() {
                 s.coinKindMm = v;
               }}
             >
-              {COIN_OPTIONS.map((o) => (
+              {[
+                ...(s.coinKindMm > 0 && !COIN_OPTIONS.some((o) => o.value === s.coinKindMm)
+                  ? [{ value: s.coinKindMm, label: s.coinLabel || `${s.coinKindMm} mm reference` }]
+                  : []),
+                ...COIN_OPTIONS,
+              ].map((o) => (
                 <option key={o.label} value={o.value}>{o.label}</option>
               ))}
             </select>
           </label>
+          {(s.gateCoin || s.coinManualPt) && s.coinKindMm <= 0 ? (
+            <div className="hint" style={{ fontSize: 13, color: "#5b6b8c" }}>
+              Choose the reference size so the scale is known.
+            </div>
+          ) : null}
           <div style={{ display: "flex", gap: 8, margin: "6px 0 10px" }}>
             <button
               id="coinFixBtn"
@@ -392,7 +402,7 @@ export default function Mark() {
           </label>
           <div id="photoNotes" className="hint" style={{ fontSize: 13, color: "#5b6b8c" }}>{photoNotes}</div>
           <div id="tfState" style={{ fontSize: 12, color: "#5b6b8c", fontFamily: "'IBM Plex Mono',monospace" }}>{tfState}</div>
-          <button id="measureBtn" className="btn-primary" type="button" disabled={!hasMask} onClick={measure}>
+          <button id="measureBtn" className="btn-primary" type="button" disabled={!hasMask || (Boolean(s.gateCoin || s.coinManualPt) && s.coinKindMm <= 0)} onClick={measure}>
             Measure damage
           </button>
           <span id="status">{status}</span>

@@ -70,7 +70,15 @@ export const server = createServer(async (req, res) => {
     }
   }
   const fetchFn: typeof fetch = (url, init) => fetch(url, init);
-  const handled = await handleRequest({ method: req.method ?? "GET", path, body, env: process.env, fetchFn });
+  const auth = req.headers.authorization;
+  const handled = await handleRequest({
+    method: req.method ?? "GET",
+    path,
+    body,
+    env: process.env,
+    fetchFn,
+    headers: typeof auth === "string" ? { authorization: auth } : {},
+  });
   sendJson(res, handled.status, handled.body, origin);
 });
 

@@ -9,6 +9,7 @@ import type { Receipt } from "../src/receipts/types.ts";
 import { MAX_PHOTO_HREF_CHARS, type AnnexureOverlay, renderAnnexureSvg } from "../src/render/svg.ts";
 import { maskOutlinePath } from "../src/vision/contour.ts";
 import { guardFor, spendStatus } from "./spend.ts";
+import { applyAdminMode, effectiveMockMode, isAdminEnabled, mockSource, parseAdminModeBody, requireAdmin } from "./admin.ts";
 import { BudgetExceededError } from "../src/config/spend-guard.ts";
 import { configFromEnv, findingsProvider, requireLiveKeys, skepticProvider, visionProvider, HttpError, SAM_IMAGE_USD, type Env, type FetchFn } from "./providers.ts";
 import {
@@ -22,6 +23,7 @@ import {
 import { encodeRle as encodeMaskRle } from "../src/vision/mask.ts";
 import { MemoryStore, type SavedSession, type Store } from "./store.ts";
 import { segmentWithSam, type SamPoint } from "../src/vision/sam.ts";
+import { archiveSegmentImage } from "./storage.ts";
 import { DEFAULT_CONFIG } from "../src/config/config.ts";
 
 export const VERSION = "0.3.0";
@@ -349,6 +351,9 @@ export async function segmentBody(body: unknown, env: Env, requestId = newReques
   });
   const spend = guardFor(env);
   if (spend.remainingUsd <= 0) throw new HttpError(429, `spend guard: $0 remaining of $${spend.limitUsd} limit`);
+  // Best-effort archival: inline inputs are stored in the Supabase bucket so
+  // the exact measured pixels stay re-runnable. Never blocks measurement.
+  const archivedImageUrl = await archiveSegmentImage(env, imageUrl, requestId, fetchFn);
   const sam = await segmentWithSam({
     fetchFn,
     base: config.endpoints.meta,
@@ -363,6 +368,7 @@ export async function segmentBody(body: unknown, env: Env, requestId = newReques
     throw error;
   }
   return envelope(requestId, started, {
+    archivedImageUrl,
     records: sam.records.map((record) => ({
       objectId: record.objectId,
       box: record.box,
@@ -461,7 +467,7 @@ export async function transcribeBody(body: unknown, env: Env, requestId = newReq
     base: config.endpoints.meta,
     apiKey: metaKey,
     model: config.models.transcribe,
-    audio: { audio, languageBias, keywords },
+    audio: { audio, languageBias: languageBias.length > 0 ? languageBias : undefined, keywords },
     charge: (label, usd) => {
       try {
         spend.charge(label, usd);
@@ -692,6 +698,48 @@ export interface HandledResponse {
   body: unknown;
 }
 
+export type RequestHeaders = Record<string, string | undefined>;
+
+/**
+ * GET /v1/admin/status — public, key-free: everything the dev panel needs in
+ * one call (mode + where it came from, spend, model/endpoint names, whether
+ * runtime switching is enabled). Never includes keys or tokens.
+ */
+export function adminStatusBody(env: Env = {}): Record<string, unknown> {
+  try {
+    const config = configFromEnv(env);
+    const spend = spendStatus(env);
+    const mode: "mock" | "live" | "config-error" = config.mockMode
+      ? "mock"
+      : env.META_API_KEY?.trim()
+        ? "live"
+        : "config-error";
+    return {
+      version: VERSION,
+      mockMode: effectiveMockMode(env),
+      mockSource: mockSource(),
+      mode,
+      adminEnabled: isAdminEnabled(env),
+      spend,
+      models: { ...config.models },
+      endpoints: { ...config.endpoints },
+      minReferenceConfidence: config.minReferenceConfidence,
+    };
+  } catch {
+    return {
+      version: VERSION,
+      mockMode: effectiveMockMode(env),
+      mockSource: mockSource(),
+      mode: "config-error",
+      adminEnabled: isAdminEnabled(env),
+      spend: null,
+      models: { ...DEFAULT_CONFIG.models },
+      endpoints: { ...DEFAULT_CONFIG.endpoints },
+      minReferenceConfidence: DEFAULT_CONFIG.minReferenceConfidence,
+    };
+  }
+}
+
 /** Minimal per-IP token bucket: 120 req/min per key. Both the Node server and
  * the Worker call it; each isolate keeps its own bucket (documented limit —
  * a global cap needs D1/Durable Objects, like the spend guard). */
@@ -733,13 +781,26 @@ export async function handleRequest(input: {
   env?: Env;
   fetchFn?: FetchFn;
   store?: Store;
+  headers?: RequestHeaders;
 }): Promise<HandledResponse> {
   const requestId = newRequestId();
   const store = input.store ?? defaultStore;
   const env = input.env ?? {};
+  const headers = input.headers ?? {};
   try {
     if (input.method === "GET" && input.path === "/v1/health") return { status: 200, body: healthBody(env) };
     if (input.method === "GET" && input.path === "/v1/spend") return { status: 200, body: spendStatus(env) };
+    if (input.method === "GET" && input.path === "/v1/admin/status") {
+      const started = Date.now();
+      return { status: 200, body: envelope(requestId, started, adminStatusBody(env)) };
+    }
+    if (input.method === "POST" && input.path === "/v1/admin/mode") {
+      requireAdmin(headers, env);
+      const started = Date.now();
+      const appliedMockMode = applyAdminMode(parseAdminModeBody(input.body));
+      quietLog("[admin-mode]", { requestId, appliedMockMode, source: mockSource() });
+      return { status: 200, body: envelope(requestId, started, { ...adminStatusBody(env), appliedMockMode }) };
+    }
     if (input.method === "POST" && input.path === "/v1/measure") return { status: 200, body: measureBody(input.body, requestId, env) };
     if (input.method === "POST" && input.path === "/v1/observe") return { status: 200, body: observeBody(input.body, requestId) };
     if (input.method === "POST" && input.path === "/v1/crosscheck") return { status: 200, body: crosscheckBody(input.body, requestId) };

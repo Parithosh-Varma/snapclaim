@@ -268,22 +268,32 @@ export default function Report() {
             <p className="fineprint" style={{ margin: "0 0 10px" }}>
               Backend: <span id="baseUrl">{base}</span> <span style={{ fontWeight: 400 }}>(change it in Settings → Connection → Advanced)</span>
             </p>
-            <button
-              id="healthBtn"
-              className="btn-ghostline"
-              type="button"
-              onClick={async () => {
-                try {
-                  const { j } = await apiGet(base, "/v1/health");
-                  setHealthOut(`ok v${String(j.version)} mode:${String(j.mode)}`);
-                } catch (e) {
-                  const msg = e instanceof Error ? e.message : String(e);
-                  setHealthOut(msg.includes("security policy") ? msg : "unreachable");
-                }
-              }}
-            >
-              Check backend
-            </button>
+            <div className="rowbtns" style={{ marginTop: 0 }}>
+              <button
+                id="openAdminBtn"
+                className="btn-ghostline"
+                type="button"
+                onClick={() => window.location.assign("/admin")}
+              >
+                Open admin panel
+              </button>
+              <button
+                id="healthBtn"
+                className="btn-ghostline"
+                type="button"
+                onClick={async () => {
+                  try {
+                    const { j } = await apiGet(base, "/v1/health");
+                    setHealthOut(`ok v${String(j.version)} mode:${String(j.mode)}`);
+                  } catch (e) {
+                    const msg = e instanceof Error ? e.message : String(e);
+                    setHealthOut(msg.includes("security policy") ? msg : "unreachable");
+                  }
+                }}
+              >
+                Check backend
+              </button>
+            </div>
             <span id="healthOut" style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12 }}>{healthOut}</span>
             <h3 style={{ margin: "12px 0 6px" }}>Raw report</h3>
             <pre id="raw">{s.raw}</pre>

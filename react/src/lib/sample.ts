@@ -9,7 +9,7 @@ export async function loadSample(base: string, session: Session): Promise<void> 
       { id: "crack-1", label: "crack", areaPx: 24800, skeletonPx: 913, regionCount: 1, confidence: 0.88 },
       { id: "stain-1", label: "stain", areaPx: 6200, regionCount: 2, confidence: 0.71 },
     ],
-    scaleReference: { id: "coin-10inr", knownMm: 27, lengthPx: 287, confidence: 0.88 },
+    scaleReference: { id: "coin-27mm", knownMm: 27, lengthPx: 287, confidence: 0.88 },
   };
   const { res, j } = await apiPost(base, "/v1/measure", sample);
   if (!res.ok || !j.ok) throw new Error(j.error ?? `HTTP ${res.status}`);

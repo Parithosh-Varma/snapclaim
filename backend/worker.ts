@@ -72,7 +72,16 @@ export default {
     }
     // Bound wrapper: a bare global fetch loses its `this` on Workers (illegal invocation).
     const fetchFn: typeof fetch = (url, init) => fetch(url, init);
-    const handled = await handleRequest({ method: request.method, path: url.pathname, body, env, fetchFn, store: DB ? new D1Store(DB) : undefined });
+    const auth = request.headers.get("authorization");
+    const handled = await handleRequest({
+      method: request.method,
+      path: url.pathname,
+      body,
+      env,
+      fetchFn,
+      store: DB ? new D1Store(DB) : undefined,
+      headers: auth ? { authorization: auth } : {},
+    });
     return Response.json(handled.body as never, { status: handled.status, headers });
   },
 };

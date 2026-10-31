@@ -11,10 +11,11 @@ import Say from "./screens/Say";
 import Numbers from "./screens/Numbers";
 import Check from "./screens/Check";
 import Report from "./screens/Report";
+import Admin from "./screens/Admin";
 import { Home, Cases, Settings } from "./screens/Tabs";
 
 export type Screen =
-  | "tHome" | "tCases" | "tSettings"
+  | "tHome" | "tCases" | "tSettings" | "tAdmin"
   | "capture" | "sReview" | "sMark" | "sSay" | "sNum" | "sCheck" | "sReport";
 
 export type CheckPhase = "idle" | "loading" | "ok" | "error";
@@ -65,7 +66,9 @@ export default function App() {
   const swReg = useRef<ServiceWorkerRegistration | null>(null);
   const reloading = useRef(false);
 
-  const [screen, setScreen] = useState<Screen>("tHome");
+  const [screen, setScreen] = useState<Screen>(() =>
+    window.location.pathname.startsWith("/admin") ? "tAdmin" : "tHome",
+  );
   const [base, setBaseState] = useState<string>(() => {
     const saved = String(store.getSettings().baseUrl ?? DEFAULT_BASE);
     return isAllowedBackendUrl(saved) ? saved : DEFAULT_BASE;
@@ -201,6 +204,7 @@ export default function App() {
       {screen === "tHome" && <Home />}
       {screen === "tCases" && <Cases />}
       {screen === "tSettings" && <Settings />}
+      {screen === "tAdmin" && <Admin />}
 
       {TAB_SCREENS.includes(screen) && (
         <nav id="tabs" aria-label="Main">
