@@ -6,7 +6,7 @@ Zero-dependency TypeScript. Same router (`app.ts:handleRequest`) runs on Node an
 
 ```bash
 npm install
-npm test         # 105 tests, mock mode, $0 spend
+npm test         # 184 tests, mock mode, $0 spend
 npm run typecheck
 npm run eval       # deterministic bench
 npm run replay -- request.json measurement.json
@@ -43,13 +43,13 @@ All replies are enveloped `{ok, requestId, durationMs, result}`; errors are verb
 ## Limits
 
 - 50 masks per measure call (chunk above that), 1 MB JSON body on Node, extra JSON fields ignored.
-- Stateless: replay comes from the request + receipts. `store.ts` defines the `Store` contract; `D1StoreStub` throws until a real D1 binding is wired in Day 3+.
+- Stateless: replay comes from the request + receipts. `store.ts` defines the `Store` contract with `MemoryStore` (Node default) and `D1Store` (Worker `DB` binding).
 
-## Not yet (verified live, honestly blocked)
+## Live status (verified 2026-10-29)
 
 - SAM 3.1 masks: live and verified 2026-10-29 (`200`, 1 record + full-frame RLE on a 1024x1024 photo, `$0.0025` ledgered). PWA tries `/v1/segment` first, on-device SlimSAM on any failure. Wire lesson: the official parser wants the mask payload WITH its `!`/`~` marker.
 - Voice transcribe: endpoint verified live 2026-10-29 (`POST /v1/asr/transcribe`, multipart WAV, `200`, ~$0.0001). The `/v1/transcribe` proxy is implemented and stub-tested; the first Hindi/Telugu clip through the proxy is still pending.
-- Skeptic inference: `403` until the Baseten form/access is granted. Code complete with real pricing.
+- Skeptic inference: live and verified 2026-10-29 on `meta-models/muse-spark-open-1026` (`200`, ~$0.0001 ledgered).
 
 ## Deploy (Worker)
 
