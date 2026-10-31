@@ -20,6 +20,12 @@ export interface FindingsRequest {
   transcript: string;
   findings: MeasuredFinding[];
   receipts: Receipt[];
+  /**
+   * Gate rejections from a previous draft on this same report. When set, the
+   * model gets one repair retry with the exact reasons appended — the common
+   * case is a draft citing scale/count numbers no citation can verify.
+   */
+  repairNote?: string;
 }
 
 export interface FindingsProvider {

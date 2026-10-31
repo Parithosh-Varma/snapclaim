@@ -25,9 +25,11 @@ for (const htmlPath of ["pwa/index.html", "react/index.html"]) {
     assert.ok(dir.includes("http://localhost:8787"), "CSP allows http://localhost:8787");
     assert.ok(dir.includes("http://127.0.0.1:8787"), "CSP allows http://127.0.0.1:8787");
     // No wildcard https: that would let validation pass what the CSP blocks (or vice versa).
+    // Exception: Hugging Face model weights resolve to its own CDN (*.hf.co),
+    // same vendor as the huggingface.co weights host.
     const sources = dir.replace(/^connect-src\s+/, "").split(/\s+/);
     assert.ok(!sources.includes("https:"), "no bare https: wildcard in connect-src");
-    assert.ok(!sources.some((s) => s.includes("*") && s.startsWith("https://") && !s.includes("huggingface")), "no https://* wildcard in connect-src");
+    assert.ok(!sources.some((s) => s.includes("*") && s.startsWith("https://") && !s.includes("huggingface") && !s.includes("hf.co")), "no https://* wildcard in connect-src");
   });
 }
 

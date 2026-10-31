@@ -3,8 +3,9 @@ import { assertDamageLabel } from "../src/engine/measure.ts";
 import { type ReferenceDiagnostics, circularReference, observeMask, tiltStretch } from "../src/vision/observe.ts";
 import { MAX_MASK_DIMENSION, MAX_MASK_PIXELS, MAX_RLE_RUNS, MAX_TOTAL_MASK_PIXELS, decodeRle, intersectMasks, type BinaryMask, type CocoRle } from "../src/vision/mask.ts";
 import { agreementVerdict, maskAgreement } from "../src/vision/agreement.ts";
+import type { FindingsProvider, FindingsRequest } from "../src/adapters/types.ts";
 import type { MeasureSessionInput } from "../src/engine/types.ts";
-import { MAX_CITATIONS_PER_FINDING, MAX_DRAFTS, MAX_STATEMENT_CHARS, validateFindings, type FindingDraft } from "../src/findings/evidence-gate.ts";
+import { MAX_CITATIONS_PER_FINDING, MAX_DRAFTS, MAX_STATEMENT_CHARS, validateFindings, type FindingDraft, type GateResult } from "../src/findings/evidence-gate.ts";
 import type { MeasuredFinding } from "../src/engine/types.ts";
 import type { Receipt } from "../src/receipts/types.ts";
 import { MAX_PHOTO_HREF_CHARS, type AnnexureOverlay, renderAnnexureSvg } from "../src/render/svg.ts";
@@ -311,6 +312,30 @@ export function observeBody(body: unknown, requestId = newRequestId()): Envelope
   return envelope(requestId, started, result);
 }
 
+/**
+ * Draft findings and gate them. A rejection gets one repair retry with the
+ * exact gate failures fed back to the model — the common miss is citing
+ * scale/count numbers no citation can verify.
+ */
+async function draftAndGate(
+  provider: FindingsProvider,
+  request: FindingsRequest,
+  receipts: Receipt[],
+): Promise<{ drafts: FindingDraft[]; gate: GateResult }> {
+  const first = await provider.draftFindings(request);
+  const gate = validateFindings(first, receipts);
+  if (gate.ok) return { drafts: first, gate };
+  const repairNote = gate.failures.slice(0, 8).join("\n");
+  const second = await provider.draftFindings({ ...request, repairNote });
+  const regate = validateFindings(second, receipts);
+  if (!regate.ok) {
+    const err = new HttpError(422, "Evidence gate failed");
+    (err as HttpError & { details?: unknown }).details = regate.failures;
+    throw err;
+  }
+  return { drafts: second, gate: regate };
+}
+
 export async function reportBody(body: unknown, env: Env, requestId = newRequestId(), fetchFn?: FetchFn): Promise<EnvelopedResult> {
   const started = Date.now();
   if (!isRecord(body)) throw new Error("body must be a JSON object");
@@ -333,7 +358,11 @@ export async function reportBody(body: unknown, env: Env, requestId = newRequest
     drafts = body.drafts as FindingDraft[];
   } else {
     const provider = findingsProvider(env, config, fetchFn, guardFor(env));
-    drafts = await provider.draftFindings({ transcript, findings: measurement.findings, receipts: measurement.receipts });
+    ({ drafts } = await draftAndGate(
+      provider,
+      { transcript, findings: measurement.findings, receipts: measurement.receipts },
+      measurement.receipts,
+    ));
   }
 
   const gate = validateFindings(drafts, measurement.receipts);
@@ -595,12 +624,15 @@ export async function findingsBody(body: unknown, env: Env, requestId = newReque
   assertFindingsShape(findings, receipts);
   crossCheckMeasurement(body, findings, receipts, env);
   const provider = findingsProvider(env, configFromEnv(env), fetchFn, guardFor(env));
-  const drafts = await provider.draftFindings({
-    transcript: typeof body.transcript === "string" ? body.transcript.slice(0, 2000) : "",
-    findings,
+  const { drafts, gate } = await draftAndGate(
+    provider,
+    {
+      transcript: typeof body.transcript === "string" ? body.transcript.slice(0, 2000) : "",
+      findings,
+      receipts,
+    },
     receipts,
-  });
-  const gate = validateFindings(drafts, receipts);
+  );
   if (!gate.ok) {
     const err = new HttpError(422, "Evidence gate failed");
     (err as HttpError & { details?: unknown }).details = gate.failures;
@@ -617,12 +649,15 @@ export async function skepticBody(body: unknown, env: Env, requestId = newReques
   assertFindingsShape(findings, receipts);
   crossCheckMeasurement(body, findings, receipts, env);
   const provider = skepticProvider(env, configFromEnv(env), fetchFn, guardFor(env));
-  const drafts = await provider.draftFindings({
-    transcript: typeof body.transcript === "string" ? body.transcript.slice(0, 2000) : "",
-    findings,
+  const { drafts, gate } = await draftAndGate(
+    provider,
+    {
+      transcript: typeof body.transcript === "string" ? body.transcript.slice(0, 2000) : "",
+      findings,
+      receipts,
+    },
     receipts,
-  });
-  const gate = validateFindings(drafts, receipts);
+  );
   if (!gate.ok) {
     const err = new HttpError(422, "Evidence gate failed");
     (err as HttpError & { details?: unknown }).details = gate.failures;

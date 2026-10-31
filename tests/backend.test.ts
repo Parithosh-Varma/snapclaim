@@ -201,6 +201,28 @@ test("segment in live mode without a key fails closed with 503", async () => {
   assert.equal(res.status, 503);
 });
 
+test("a gate rejection triggers one repair retry with the failures fed back", async () => {
+  const session = wallSession();
+  const good = citingDrafts(session.findings);
+  const bad = JSON.parse(JSON.stringify(good)) as typeof good;
+  (bad[0] as { statement: string }).statement += " (0.637119 mm_per_px)";
+  const calls: string[] = [];
+  let n = 0;
+  const fetchFn = (async (_url: unknown, init?: { body?: unknown }) => {
+    calls.push(String((init as { body?: unknown })?.body ?? ""));
+    const drafts = n++ === 0 ? bad : good;
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content: JSON.stringify(drafts) } }], usage: { prompt_tokens: 10, completion_tokens: 10 } }),
+    } as unknown as Response;
+  }) as unknown as typeof fetch;
+  const res = await handleRequest({ method: "POST", path: "/v1/report", body: payload(), env: LIVE_ENV, fetchFn });
+  assert.equal(res.status, 200);
+  assert.equal(calls.length, 2);
+  assert.ok(calls[1]!.includes("rejected by the evidence gate"), "repair retry names the rejection");
+});
+
 test("segment rejects out-of-frame and non-integer boxes with 400", async () => {
   const img = { imageUrl: "data:image/jpeg;base64,AAA", width: 100, height: 100, points: [{ x: 50, y: 50 }] };
   for (const box of [

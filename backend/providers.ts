@@ -162,6 +162,15 @@ export class MetaFindingsProvider implements FindingsProvider {
             role: "user",
             content: JSON.stringify({ transcript, facts, receipts }),
           },
+          ...(request.repairNote
+            ? [{
+              role: "user",
+              content:
+                "Your previous draft was rejected by the evidence gate for these reasons:\n" +
+                request.repairNote.slice(0, 2000) +
+                "\nRewrite every finding so each number exactly matches a cited receipt output (percent, mm or cm2 only — never the scale factor, counts or band numbers). Reply with JSON only.",
+            }]
+            : []),
         ],
       }),
       signal: AbortSignal.timeout(30_000),
@@ -274,6 +283,15 @@ export class BasetenSkepticProvider implements FindingsProvider {
               role: "user",
               content: JSON.stringify({ transcript, facts, receipts }),
             },
+            ...(request.repairNote
+              ? [{
+                role: "user",
+                content:
+                  "Your previous draft was rejected by the evidence gate for these reasons:\n" +
+                  request.repairNote.slice(0, 2000) +
+                  "\nRewrite every finding so each number exactly matches a cited receipt output (percent, mm or cm2 only — never the scale factor, counts or band numbers). Reply with JSON only.",
+              }]
+              : []),
           ],
         }),
         signal: AbortSignal.timeout(30_000),
