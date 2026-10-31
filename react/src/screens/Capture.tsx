@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "../App";
 import { CoinGate } from "../lib/camera";
-import { mountTiltMeter } from "../lib/tilt";
 import { loadSamplePhoto } from "../lib/sample";
 import { SamplePicker } from "./SamplePicker";
 import { resetDmg } from "../lib/session";
@@ -20,7 +19,6 @@ export default function Capture() {
   const { session, go, screen } = useApp();
   const videoRef = useRef<HTMLVideoElement>(null);
   const gateRef = useRef<CoinGate | null>(null);
-  const tiltRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [hint, setHint] = useState("Add a coin for scale");
   const [ring, setRing] = useState<{ left: number; top: number; size: number } | null>(null);
@@ -28,12 +26,13 @@ export default function Capture() {
   const [count, setCount] = useState<number | null>(null);
   const [flash, setFlash] = useState(false);
   const [enableCam, setEnableCam] = useState(false);
-  const [shutterHide, setShutterHide] = useState(false);
   const [donate, setDonate] = useState(() => {
     try { return !!localStorage.getItem("snapclaim.donatePhoto"); } catch { return false; }
   });
   const [pickerOpen, setPickerOpen] = useState(false);
   const [tipsOpen, setTipsOpen] = useState(true);
+  const [blocked, setBlocked] = useState(false);
+  const [live, setLive] = useState(false);
 
   const captureStill = useCallback(() => {
     const gate = gateRef.current;
@@ -83,7 +82,9 @@ export default function Capture() {
       onCoinIdentified: () => {},
       onAutoCapture: () => captureRef.current(),
       onCameraError: (name) => {
+        setLive(false);
         setEnableCam(true);
+        setBlocked(name === "NotAllowedError" || name === "SecurityError");
         setHint(CAM_ERRORS[name] ?? `Camera unavailable (${name}) — tap Enable camera`);
       },
     });
@@ -106,8 +107,10 @@ export default function Capture() {
   }, []);
 
   useEffect(() => {
-    if (tiltRef.current) return mountTiltMeter(tiltRef.current);
-  }, []);
+    if (screen === "capture") {
+      setLive(false);
+    }
+  }, [screen]);
 
   const retake = () => {
     session.stillDataUrl = "";
@@ -116,6 +119,8 @@ export default function Capture() {
     session.coinKindMm = 0;
     session.noScaleMode = false;
     resetDmg(session);
+    setEnableCam(false);
+    setBlocked(false);
     go("capture");
     // The Capture tree stays mounted for sReview, so re-acquire explicitly.
     gateRef.current?.reset();
@@ -178,54 +183,118 @@ export default function Capture() {
         aria-label="Live camera feed"
         onPointerDown={(e) => gateRef.current?.assistAt(e.clientX, e.clientY)}
       >
-        <video ref={videoRef} playsInline muted autoPlay />
-      </div>
-      <span className="corner tl" aria-hidden="true" />
-      <span className="corner tr" aria-hidden="true" />
-      <span className="corner bl" aria-hidden="true" />
-      <span className="corner br" aria-hidden="true" />
-      <div
-        className="coinring"
-        aria-hidden="true"
-        style={ring ? { display: "block", left: ring.left, top: ring.top, width: ring.size, height: ring.size } : { display: "none" }}
-      />
-      <div id="camStep" className="step-tag">01 / 06 · Capture</div>
-      <div id="coinHint">{hint}</div>
-      {enableCam && screen === "capture" && (
-        <button
-          id="enableCam"
-          type="button"
-          style={{ display: "block", position: "absolute", zIndex: 4, left: "50%", top: "55%", transform: "translateX(-50%)", border: "2px solid #fff", background: "rgba(5,10,25,.55)", backdropFilter: "blur(6px)", color: "#fff", font: "inherit", fontWeight: 800, fontSize: 17, padding: "14px 26px", borderRadius: 999, cursor: "pointer" }}
-          onClick={() => {
+        <video
+          ref={videoRef}
+          playsInline
+          muted
+          autoPlay
+          onPlaying={() => {
+            setLive(true);
             setEnableCam(false);
-            void gateRef.current?.acquire();
+            setBlocked(false);
           }}
-        >
-          Enable camera
-        </button>
-      )}
-      <div ref={tiltRef} style={{ position: "absolute", zIndex: 4, left: "50%", top: "max(14px, env(safe-area-inset-top))", transform: "translateX(-50%)", width: "min(340px, calc(100% - 28px))" }} />
-      {count !== null && (
-        <div id="count" className="pop" style={{ display: "block" }} aria-hidden="true">{count}</div>
-      )}
+        />
+      </div>
       {screen === "capture" && (
-        <>
-          <button
-            type="button"
-            className="cam-close"
-            aria-label="Close camera, back to home"
-            onClick={() => go("tHome")}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
-          </button>
-          <button
-            id="tipsBtn"
-            type="button"
-            onClick={() => setTipsOpen(true)}
-          >
-            Coin tips
-          </button>
-          {tipsOpen && (
+        <div className="cam-col">
+          <div className="cam-top">
+            <button
+              type="button"
+              className="cam-close"
+              aria-label="Close camera, back to home"
+              onClick={() => go("tHome")}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+            </button>
+            <div id="camStep" className="step-tag">01 / 06 · Capture</div>
+            <button id="tipsBtn" type="button" onClick={() => setTipsOpen(true)}>
+              Coin tips
+            </button>
+          </div>
+          <div id="coinHint" role="status">{hint}</div>
+          {enableCam ? (
+            <div className="permitcard" role="alertdialog" aria-labelledby="permitTitle" aria-describedby="permitDesc">
+              <span className="permit-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="7" width="18" height="13" rx="3" /><circle cx="12" cy="13.5" r="3.4" /><circle cx="12" cy="13.5" r="0.6" fill="currentColor" /><path d="M8.5 7l1-2.2h5L15.5 7" /></svg>
+              </span>
+              <p id="permitTitle">Camera is off</p>
+              <p id="permitDesc">We use your camera to measure your object. Photos stay on this device.</p>
+              <button
+                id="enableCam"
+                type="button"
+                className="btn-primary"
+                onClick={() => {
+                  setEnableCam(false);
+                  setBlocked(false);
+                  void gateRef.current?.acquire();
+                }}
+              >
+                Enable camera
+              </button>
+              {blocked && (
+                <p className="permit-hint">Blocked in your browser? Click the lock icon in the address bar → Allow camera, then tap Enable camera.</p>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="guide" aria-hidden="true">
+                <span className="guide-frame">
+                  <i className="g tl" /><i className="g tr" /><i className="g bl" /><i className="g br" />
+                </span>
+                <span className="guide-cap">Fit damage + coin inside</span>
+              </div>
+              <div className="shutter-block">
+                <button
+                  id="shutter"
+                  type="button"
+                  aria-label={locked || !live ? "Capture (waiting for camera)" : "Capture"}
+                  className={locked || !live ? "locked" : ""}
+                  disabled={!live}
+                  onClick={() => {
+                    if (locked) {
+                      setHint("Hold a coin in front of the camera");
+                      return;
+                    }
+                    captureStill();
+                  }}
+                />
+                <span className="shutter-label">{!live ? "Starting camera…" : locked ? "Add a coin for scale" : "Tap to capture"}</span>
+                <div className="alt-row">
+                  <button id="uploadBtn" className="alt-btn" type="button" onClick={() => fileRef.current?.click()}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5" /><path d="M4 20h16" /></svg>
+                    Upload photo
+                  </button>
+                  <button id="altEntry" className="alt-btn" type="button" onClick={onSample}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="3" /><circle cx="12" cy="13.5" r="3.4" /></svg>
+                    Use a sample
+                  </button>
+                </div>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={(e) => {
+                    onUpload(e.target.files?.[0]);
+                    e.target.value = "";
+                  }}
+                />
+                <button
+                  id="noCoin"
+                  type="button"
+                  className="noscale"
+                  onClick={() => {
+                    session.noScaleMode = true;
+                    session.gateCoin = null;
+                    gateRef.current?.unlockWithoutScale();
+                  }}
+                >
+                  No coin? Continue without scale →
+                </button>
+              </div>
+            </>
+          )}
+          {tipsOpen && !enableCam && (
             <div id="tipsCard" role="dialog" aria-labelledby="tipsTitle">
               <p id="tipsTitle">Coin tips</p>
               <ul>
@@ -236,47 +305,10 @@ export default function Capture() {
               <button type="button" id="tipsGotIt" onClick={() => setTipsOpen(false)}>Got it</button>
             </div>
           )}
-          <button
-            id="shutter"
-            type="button"
-            aria-label="Capture"
-            className={`${locked ? "locked" : ""}${shutterHide ? " hide" : ""}`}
-            onPointerDown={() => setShutterHide(true)}
-            onPointerUp={() => setShutterHide(false)}
-            onPointerCancel={() => setShutterHide(false)}
-            onPointerLeave={() => setShutterHide(false)}
-            onClick={() => {
-              if (locked) {
-                setHint("Hold a coin in front of the camera");
-                return;
-              }
-              captureStill();
-            }}
-          />
-          <button id="uploadBtn" type="button" onClick={() => fileRef.current?.click()}>have a photo? upload it</button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            hidden
-            onChange={(e) => {
-              onUpload(e.target.files?.[0]);
-              e.target.value = "";
-            }}
-          />
-          <button id="altEntry" type="button" onClick={onSample}>no camera? use a sample</button>
-          <button
-            id="noCoin"
-            type="button"
-            onClick={() => {
-              session.noScaleMode = true;
-              session.gateCoin = null;
-              gateRef.current?.unlockWithoutScale();
-            }}
-          >
-            no coin? continue without scale
-          </button>
-        </>
+        </div>
+      )}
+      {count !== null && (
+        <div id="count" className="pop" style={{ display: "block" }} aria-hidden="true">{count}</div>
       )}
       <div className={`flash${flash ? " go" : ""}`} />
       <SamplePicker open={pickerOpen} onClose={() => setPickerOpen(false)} onPick={(f) => void pickSample(f)} />

@@ -19,18 +19,54 @@
   button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid var(--coin);outline-offset:2px}
   @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
-  /* ---------- camera ---------- */
+  /* ---------- camera: the viewfinder is the instrument ---------- */
   #cam{position:fixed;inset:0;background:#111}
   #cam video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-  .corner{position:absolute;width:34px;height:34px;border:4px solid #fff;z-index:2;pointer-events:none}
-  .corner.tl{top:96px;left:26px;border-right:0;border-bottom:0;border-radius:10px 0 0 0}
-  .corner.tr{top:96px;right:26px;border-left:0;border-bottom:0;border-radius:0 10px 0 0}
-  .corner.bl{bottom:150px;left:26px;border-right:0;border-top:0;border-radius:0 0 0 10px}
-  .corner.br{bottom:150px;right:26px;border-left:0;border-top:0;border-radius:0 0 10px 0}
-  #coinHint{position:absolute;z-index:3;left:50%;transform:translateX(-50%);
-    top:calc(100px + env(safe-area-inset-top));max-width:88vw;
-    font-weight:700;font-size:15px;white-space:normal;text-align:center;
-    color:#fff;background:rgba(11,30,70,.88);padding:10px 18px;border-radius:999px}
+  /* Centered control column: video stays full-bleed, controls never stretch across desktop. */
+  .cam-col{position:absolute;inset:0;z-index:3;margin:0 auto;width:min(480px,100%);
+    display:flex;flex-direction:column;pointer-events:none;
+    padding:calc(14px + env(safe-area-inset-top)) 16px calc(20px + env(safe-area-inset-bottom))}
+  .cam-col button,.cam-col .permitcard,.cam-col #tipsCard{pointer-events:auto}
+  .cam-top{display:flex;align-items:center;gap:10px}
+  #camStep{flex:1;text-align:center}
+  .guide{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:0}
+  .guide-frame{position:relative;width:min(78%,320px);aspect-ratio:4/3}
+  .guide-frame .g{position:absolute;width:30px;height:30px;border:4px solid #fff;border-radius:8px;
+    box-shadow:0 1px 10px rgba(0,0,0,.5)}
+  .guide-frame .tl{left:0;top:0;border-right:0;border-bottom:0;border-radius:10px 0 0 0}
+  .guide-frame .tr{right:0;top:0;border-left:0;border-bottom:0;border-radius:0 10px 0 0}
+  .guide-frame .bl{left:0;bottom:0;border-right:0;border-top:0;border-radius:0 0 0 10px}
+  .guide-frame .br{right:0;bottom:0;border-left:0;border-top:0;border-radius:0 0 10px 0}
+  .guide-cap{font-size:13px;font-weight:700;color:#fff;background:rgba(5,10,25,.62);
+    padding:7px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.28)}
+  /* permission-off: one card, one action */
+  .permitcard{margin:auto 0;text-align:center;background:rgba(10,18,36,.92);border:1px solid rgba(255,255,255,.16);
+    border-radius:20px;padding:28px 22px;box-shadow:0 16px 48px rgba(0,0,0,.5)}
+  .permit-icon{display:inline-grid;place-items:center;width:56px;height:56px;border-radius:18px;
+    background:#ece7dc;color:#0b1e46;margin-bottom:12px}
+  .permit-icon svg{width:30px;height:30px}
+  .permitcard #permitTitle{font-size:20px;font-weight:800;color:#fff;margin:0 0 6px}
+  .permitcard #permitDesc{font-size:14.5px;line-height:1.55;color:rgba(255,255,255,.82);margin:0 0 18px}
+  .permitcard .btn-primary{width:100%}
+  .permit-hint{font-size:12.5px;line-height:1.5;color:rgba(255,255,255,.65);margin:12px 0 0}
+  /* shutter block: one primary action + grouped alternatives */
+  .shutter-block{display:flex;flex-direction:column;align-items:center;gap:8px}
+  #shutter{width:82px;height:82px;border-radius:50%;border:5px solid #fff;background:var(--tape);
+    box-shadow:0 8px 28px rgba(0,0,0,.5),inset 0 0 0 4px #122540;padding:0}
+  #shutter:active{transform:scale(.94)}
+  #shutter.locked{background:#8b93a3;box-shadow:0 8px 28px rgba(0,0,0,.45)}
+  #shutter:disabled{opacity:.75;cursor:wait}
+  #shutter{transition:opacity .18s ease, transform .12s ease, background .18s ease}
+  .shutter-label{font-size:13px;font-weight:700;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.6);min-height:1.2em}
+  .alt-row{display:flex;gap:8px;width:100%;margin-top:6px}
+  .alt-btn{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:50px;
+    border-radius:14px;border:1px solid rgba(255,255,255,.35);background:rgba(10,18,36,.62);
+    color:#fff;font-weight:700;font-size:14.5px;backdrop-filter:blur(6px)}
+  .alt-btn:active{transform:scale(.97)}
+  .alt-btn svg{width:19px;height:19px;flex:none}
+  .noscale{border:0;background:none;color:rgba(255,255,255,.75);font-size:13px;font-weight:600;
+    padding:10px 8px;text-decoration:underline;text-underline-offset:3px;min-height:44px}
+  .noscale:active{transform:scale(.97)}
   .coinring{position:absolute;z-index:2;border:4px solid var(--coin);border-radius:50%;
     box-shadow:0 0 0 2px rgba(255,255,255,.7),0 0 24px rgba(14,138,77,.8);
     display:none;pointer-events:none;
@@ -40,30 +76,18 @@
     text-shadow:0 4px 30px rgba(0,0,0,.5);pointer-events:none}
   #count.pop{animation:pop .3s ease}
   @keyframes pop{from{transform:translate(-50%,-50%) scale(1.35)}to{transform:translate(-50%,-50%) scale(1)}}
-  #shutter{position:absolute;z-index:3;left:50%;transform:translateX(-50%);
-    bottom:calc(34px + env(safe-area-inset-bottom));
-    width:78px;height:78px;border-radius:50%;border:5px solid #fff;
-    background:transparent;box-shadow:0 8px 28px rgba(0,0,0,.45);padding:0}
-  #shutter::after{content:"";display:block;width:100%;height:100%;border-radius:50%;background:#fff}
-  #shutter:active{transform:translateX(-50%) scale(.94)}
-  #shutter.locked{opacity:.35} #shutter.locked::after{background:#cfd4dc}
-  #shutter.hide{opacity:0;pointer-events:none}
-  #shutter{transition:opacity .18s ease, transform .12s ease}
-  .cam-close{position:absolute;z-index:5;left:14px;top:calc(14px + env(safe-area-inset-top));
-    width:44px;height:44px;border-radius:50%;border:0;cursor:pointer;
-    background:rgba(5,10,25,.55);backdrop-filter:blur(6px);color:#fff;
+  .cam-close{flex:none;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.4);cursor:pointer;
+    background:rgba(10,18,36,.72);backdrop-filter:blur(6px);color:#fff;
     display:grid;place-items:center;box-shadow:0 4px 16px rgba(0,0,0,.35);
     transition:transform .12s ease,background .15s ease}
   .cam-close:active{transform:scale(.92)}
   .cam-close svg{width:20px;height:20px}
-  #tipsBtn{position:absolute;z-index:5;right:14px;top:calc(14px + env(safe-area-inset-top));
-    min-height:44px;border:0;border-radius:999px;cursor:pointer;
-    background:rgba(5,10,25,.55);backdrop-filter:blur(6px);color:#fff;
+  #tipsBtn{flex:none;min-height:44px;border:1px solid rgba(255,255,255,.4);border-radius:999px;cursor:pointer;
+    background:rgba(10,18,36,.72);backdrop-filter:blur(6px);color:#fff;
     font-size:13px;font-weight:700;padding:0 16px}
   #tipsBtn:active{transform:scale(.96)}
-  #tipsCard{position:absolute;z-index:6;left:20px;right:20px;top:32%;
-    background:var(--card);color:var(--ink);border-radius:20px;padding:20px;
-    box-shadow:0 12px 40px rgba(0,0,0,.5)}
+  #tipsCard{margin:auto 0;background:var(--card);color:var(--ink);border-radius:20px;padding:20px;
+    box-shadow:0 12px 40px rgba(0,0,0,.5);max-height:46vh;overflow-y:auto}
   #tipsCard #tipsTitle{font-size:15px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;
     color:var(--coin-strong);margin:0 0 10px}
   #tipsCard ul{margin:0 0 14px;padding-left:20px;color:var(--ink);font-size:14.5px;line-height:1.65}
@@ -71,19 +95,14 @@
     color:#fff;font-weight:800;font-size:16px}
   .flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .3s ease;z-index:9}
   .flash.go{opacity:1;transition:none}
-  #altEntry{position:absolute;z-index:3;left:50%;transform:translateX(-50%);
-    bottom:calc(158px + env(safe-area-inset-bottom));border:0;background:none;
-    color:rgba(255,255,255,.85);font-size:13px;font-weight:600;text-decoration:underline;padding:8px;white-space:nowrap}
-  #noCoin{position:absolute;z-index:3;left:50%;transform:translateX(-50%);
-    bottom:calc(126px + env(safe-area-inset-bottom));border:0;background:none;
-    color:rgba(255,255,255,.85);font-size:13px;font-weight:600;text-decoration:underline;padding:8px;white-space:nowrap}
   body.reviewing #altEntry,body.reviewing #noCoin,body.reviewing #uploadBtn,
   body.step2 #altEntry,body.step2 #noCoin,body.step2 #uploadBtn{display:none}
-  #uploadBtn{position:absolute;z-index:3;left:50%;transform:translateX(-50%);
-    bottom:calc(190px + env(safe-area-inset-bottom));border:0;background:none;
-    color:rgba(255,255,255,.85);font-size:13px;font-weight:600;text-decoration:underline;padding:8px;white-space:nowrap}
-  #camStep{position:absolute;z-index:3;left:16px;top:calc(54px + env(safe-area-inset-top));
-    color:#fff;background:rgba(11,30,70,.88);padding:6px 12px;border-radius:999px}
+  #camStep{color:#8fe3b0;background:rgba(10,18,36,.72);padding:6px 12px;border-radius:999px;
+    border:1px solid rgba(255,255,255,.32);white-space:nowrap}
+  #coinHint{align-self:center;max-width:100%;margin-top:10px;
+    font-weight:700;font-size:14px;white-space:normal;text-align:center;
+    color:#fff;background:rgba(10,18,36,.78);padding:9px 16px;border-radius:999px;
+    border:1px solid rgba(255,255,255,.3)}
   #updateBar{position:fixed;left:12px;right:12px;top:calc(12px + env(safe-area-inset-top));z-index:21;
     background:var(--ink);color:#fff;border-radius:14px;padding:12px 14px;font-size:13px;font-weight:600;
     box-shadow:0 10px 30px rgba(0,0,0,.3);display:flex;align-items:center;gap:10px}
