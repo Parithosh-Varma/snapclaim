@@ -4,7 +4,7 @@
 // assets are immutable, so runtime cache-first is safe). No photo bytes
 // are cached. Updates wait: the page shows #updateBar and posts
 // SKIP_WAITING on Reload.
-const CACHE = "snapclaim-react-v9";
+const CACHE = "snapclaim-react-v10";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest",
   "./coin-model.js", "./theme.js", "./sam-worker.js", "./voice-worker.js",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/maskable-512.png", "./icons/apple-touch-icon.png"];

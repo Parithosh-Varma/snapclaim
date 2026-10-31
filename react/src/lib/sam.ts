@@ -100,8 +100,25 @@ export async function segmentViaApi(
   };
   if (!res.ok || !j.ok) throw new Error(j.error ?? `segment HTTP ${res.status}`);
   // SAM may split one crack into several objects; all of them are the damage.
+  // But a single tap on a thin crack often returns the wall itself (90%+ of
+  // the frame, high confidence) instead of the crack — unioning that buries
+  // the damage. Drop wall-sized records before the union; when nothing but
+  // wall remains, throw so the caller falls back to on-device SlimSAM, whose
+  // prefer-smallest decode picks the crack over the wall.
   const records = j.result?.records ?? [];
   if (!records.length) throw new Error("SAM found nothing there — tap the middle of the damage and retry.");
-  const mask = unionMasks(records.map((rec) => decodeRle(rec.rle))) as Uint8Array;
-  return { mask, iou: Math.min(...records.map((rec) => rec.confidence ?? 0)), rle: encodeRle(mask, photo.width, photo.height) };
+  const framePx = photo.width * photo.height;
+  const kept = records.filter((rec) => {
+    try {
+      const m = decodeRle(rec.rle);
+      let n = 0;
+      for (let i = 0; i < m.length; i++) if (m[i]) n++;
+      return n <= framePx * 0.5;
+    } catch {
+      return false;
+    }
+  });
+  if (!kept.length) throw new Error("SAM caught the wall, not the crack — trying on-device; fill the frame with the crack and tap its middle.");
+  const mask = unionMasks(kept.map((rec) => decodeRle(rec.rle))) as Uint8Array;
+  return { mask, iou: Math.min(...kept.map((rec) => rec.confidence ?? 0)), rle: encodeRle(mask, photo.width, photo.height) };
 }

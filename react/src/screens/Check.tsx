@@ -14,6 +14,9 @@ async function segmentOnDevice(sam: SamClient, s: Session): Promise<SamMask | nu
   if (!found.length) return null;
   const union = new Uint8Array((found[0] as SamMask).mask.length);
   for (const { mask } of found) for (let i = 0; i < union.length; i++) union[i] = (union[i] ?? 0) | (mask[i] ?? 0);
+  let n = 0;
+  for (let i = 0; i < union.length; i++) if (union[i]) n++;
+  if (n > union.length * 0.5) return null;
   return { mask: union, iou: Math.min(...found.map((f) => f.iou)) } as SamMask;
 }
 
