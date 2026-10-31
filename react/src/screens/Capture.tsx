@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "../App";
 import { CoinGate } from "../lib/camera";
 import { mountTiltMeter } from "../lib/tilt";
-import { loadSample } from "../lib/sample";
+import { loadSamplePhoto } from "../lib/sample";
+import { SamplePicker } from "./SamplePicker";
 import { resetDmg } from "../lib/session";
 
 const CAM_ERRORS: Record<string, string> = {
@@ -16,8 +17,7 @@ const CAM_ERRORS: Record<string, string> = {
 };
 
 export default function Capture() {
-  const ctx = useApp();
-  const { session, go, screen } = ctx;
+  const { session, go, screen } = useApp();
   const videoRef = useRef<HTMLVideoElement>(null);
   const gateRef = useRef<CoinGate | null>(null);
   const tiltRef = useRef<HTMLDivElement>(null);
@@ -32,6 +32,7 @@ export default function Capture() {
   const [donate, setDonate] = useState(() => {
     try { return !!localStorage.getItem("snapclaim.donatePhoto"); } catch { return false; }
   });
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const captureStill = useCallback(() => {
     const gate = gateRef.current;
@@ -155,11 +156,16 @@ export default function Capture() {
   };
 
   const onSample = async () => {
+    setPickerOpen(true);
+  };
+
+  const pickSample = async (file: string) => {
+    setPickerOpen(false);
     try {
-      await loadSample(ctx.base, session);
-      go("sSay");
+      await loadSamplePhoto(session, file);
+      go("sMark");
     } catch (e) {
-      setHint(`Sample failed (${e instanceof Error ? e.message : String(e)}). Is the backend reachable?`);
+      setHint(`Sample photo failed (${e instanceof Error ? e.message : String(e)}).`);
     }
   };
 
@@ -254,6 +260,7 @@ export default function Capture() {
         </>
       )}
       <div className={`flash${flash ? " go" : ""}`} />
+      <SamplePicker open={pickerOpen} onClose={() => setPickerOpen(false)} onPick={(f) => void pickSample(f)} />
 
       {screen === "sReview" && (
         <section className="screen on" aria-label="Review photo">

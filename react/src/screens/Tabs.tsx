@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useApp } from "../App";
-import { loadSample } from "../lib/sample";
+import { loadSamplePhoto } from "../lib/sample";
+import { SamplePicker } from "./SamplePicker";
 import { DEFAULT_BASE, DEFAULT_BACKEND_HOST, POLICY_BACKEND_MESSAGE, apiGet } from "../lib/api";
 import type { SnapCase } from "../lib/store";
 import { Badge, downloadFile } from "../lib/ui";
@@ -72,7 +73,17 @@ export function Home() {
   const cases = store.list();
   void casesVersion;
   const [sampleErr, setSampleErr] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
   const recent = cases.slice(0, 3);
+  const pickSample = async (file: string) => {
+    setPickerOpen(false);
+    try {
+      await loadSamplePhoto(ctx.session, file);
+      ctx.go("sMark");
+    } catch (e) {
+      setSampleErr(`Sample photo failed (${e instanceof Error ? e.message : String(e)}). Is the backend reachable?`);
+    }
+  };
   return (
     <section className="screen tab on home" aria-labelledby="h-home">
       <div className="wrap home-wrap">
@@ -115,19 +126,13 @@ export function Home() {
             id="ctaSample"
             className="link-btn"
             type="button"
-            onClick={async () => {
-              try {
-                await loadSample(ctx.base, ctx.session);
-                ctx.go("sSay");
-              } catch (e) {
-                setSampleErr(`Sample failed (${e instanceof Error ? e.message : String(e)}). Is the backend reachable?`);
-              }
-            }}
+            onClick={() => setPickerOpen(true)}
           >
             Try a sample instead
           </button>
         </div>
         {sampleErr && <p role="alert" className="sample-err">{sampleErr}</p>}
+        <SamplePicker open={pickerOpen} onClose={() => setPickerOpen(false)} onPick={(f) => void pickSample(f)} />
 
         <div className="home-duo">
           <div className="tipcard">
