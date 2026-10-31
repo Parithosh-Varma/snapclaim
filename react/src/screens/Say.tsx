@@ -4,22 +4,18 @@ import { apiPost } from "../lib/api";
 import { blobToBase64, cleanTranscript, encodeWav, resampleTo16k, transcribeOnDevice } from "../lib/voice";
 import { BackButton, Stepper } from "../lib/ui";
 
-const NBARS = 28;
+const MAXLEN = 280;
 
 export default function Say() {
   const ctx = useApp();
   const { session: s, go, base } = ctx;
-  const [micState, setMicState] = useState("Listening");
-  const [heard, setHeard] = useState("");
+  const [micState, setMicState] = useState("Tap Dictate, or just type.");
   const [transcript, setTranscript] = useState(s.transcript);
   const [voiceErr, setVoiceErr] = useState("");
   const [listening, setListening] = useState(false);
-  const barsRef = useRef<(HTMLElement | null)[]>([]);
   const stateRef = useRef({
     micStream: null as MediaStream | null,
     micReady: false,
-    analyser: null as AnalyserNode | null,
-    analyserData: null as Uint8Array | null,
     recorder: null as MediaRecorder | null,
     recChunks: [] as Blob[],
     timer: null as ReturnType<typeof setTimeout> | null,
@@ -28,8 +24,7 @@ export default function Say() {
   const landTranscript = useCallback((text: string) => {
     s.transcript = text;
     setTranscript(text);
-    setHeard(`“${text}”`);
-    setMicState("Heard");
+    setMicState("Heard — edit if needed.");
   }, [s]);
 
   const finishListening = useCallback(async (landed: boolean) => {
@@ -41,8 +36,6 @@ export default function Say() {
       try { st.micStream?.getTracks()?.forEach((t) => t.stop()); } catch { /* noop */ }
       st.micStream = null;
       st.micReady = false;
-      st.analyser = null;
-      st.analyserData = null;
     };
     try {
       if (st.recorder?.state === "recording") st.recorder.stop();
@@ -51,7 +44,7 @@ export default function Say() {
     if (!landed) stopTracks();
     const clip = new Blob(st.recChunks, { type: st.recorder?.mimeType || "audio/webm" });
     if (!landed || clip.size === 0) {
-      if (landed) setHeard("Didn't catch anything — type the line.");
+      if (landed) setMicState("Didn't catch anything — type the line.");
       return;
     }
     setMicState("Transcribing…");
@@ -63,7 +56,6 @@ export default function Say() {
       // through to the other before giving up.
       if (navigator.onLine !== false) {
         try {
-          setMicState("Transcribing…");
           const wav = encodeWav(samples, 16000);
           const b64 = await blobToBase64(wav);
           const { res, j } = await apiPost(base, "/v1/transcribe", { audioBase64: b64 });
@@ -86,7 +78,7 @@ export default function Say() {
           landTranscript(local);
           return;
         }
-        setHeard("Didn't catch anything — type the line.");
+        setMicState("Didn't catch anything — type the line.");
         return;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -104,32 +96,22 @@ export default function Say() {
 
   const startListening = useCallback(async () => {
     const st = stateRef.current;
-    setHeard("Asking for the mic…");
+    setVoiceErr("");
     if (!st.micReady) {
       if (!navigator.mediaDevices?.getUserMedia) {
-        setHeard("No microphone on this device.");
+        setVoiceErr("No microphone on this device — type the line.");
         return;
       }
       try {
         st.micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         st.micReady = true;
-        try {
-          const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-          const actx = new Ctx();
-          const src = actx.createMediaStreamSource(st.micStream);
-          st.analyser = actx.createAnalyser();
-          st.analyser.fftSize = 64;
-          st.analyserData = new Uint8Array(st.analyser.frequencyBinCount);
-          src.connect(st.analyser);
-        } catch { /* levels stay simulated */ }
       } catch {
-        setHeard("Mic blocked — allow access or type below.");
+        setVoiceErr("Mic blocked — allow access, or type the line.");
         return;
       }
     }
     setListening(true);
-    setMicState("Listening");
-    setHeard("");
+    setMicState("Listening… tap Stop when done.");
     try {
       st.recChunks = [];
       st.recorder = new MediaRecorder(st.micStream as MediaStream);
@@ -143,46 +125,17 @@ export default function Say() {
     st.timer = setTimeout(() => void finishListening(true), 8000);
   }, [finishListening]);
 
-  /* auto-listen on arrival, as in the vanilla flow */
-  const started = useRef(false);
-  useEffect(() => {
-    if (started.current) return;
-    started.current = true;
-    if (!s.autoListen) return;
-    s.autoListen = false;
-    void startListening();
-    return () => {
-      const st = stateRef.current;
-      if (st.timer) clearTimeout(st.timer);
-      try {
-        if (st.recorder?.state === "recording") st.recorder.stop();
-      } catch { /* noop */ }
-      try { st.micStream?.getTracks()?.forEach((t) => t.stop()); } catch { /* noop */ }
-      st.micStream = null;
-      st.micReady = false;
-    };
-  }, [startListening]);
-
-  /* waveform: real analyser levels when available, simulated otherwise */
-  useEffect(() => {
-    const id = setInterval(() => {
-      const st = stateRef.current;
-      for (let i = 0; i < NBARS; i++) {
-        const bar = barsRef.current[i];
-        if (!bar) continue;
-        let v: number;
-        if (st.analyser && st.analyserData) {
-          st.analyser.getByteFrequencyData(st.analyserData as Uint8Array<ArrayBuffer>);
-          v = (st.analyserData[Math.floor((i / NBARS) * st.analyserData.length)] ?? 0) / 255;
-        } else {
-          const t = Date.now() / 180;
-          v = listening ? 0.35 + 0.3 * Math.sin(t + i * 0.7) + 0.25 * Math.sin(t * 0.37 + i * 1.7) : 0.12;
-        }
-        bar.style.height = `${Math.max(6, Math.round(Math.abs(v) * 52))}px`;
-      }
-    }, 90);
-    return () => clearInterval(id);
-  }, [listening]);
+  /* stop any recording when leaving the screen */
+  useEffect(() => () => {
+    const st = stateRef.current;
+    if (st.timer) clearTimeout(st.timer);
+    try {
+      if (st.recorder?.state === "recording") st.recorder.stop();
+    } catch { /* noop */ }
+    try { st.micStream?.getTracks()?.forEach((t) => t.stop()); } catch { /* noop */ }
+    st.micStream = null;
+    st.micReady = false;
+  }, []);
 
   const runReport = async () => {
     if (!s.payload) return;
@@ -213,53 +166,46 @@ export default function Say() {
 
   return (
     <section className="screen on" aria-labelledby="h-say">
-      <div className="wrap" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
-        <div style={{ alignSelf: "stretch" }}>
-          <BackButton label="Mark" onClick={() => go("sMark")} />
-        </div>
-        <div style={{ alignSelf: "stretch" }}>
-          <Stepper step={3} />
-        </div>
-        <h1 id="h-say">Say what happened.</h1>
-        <p className="sub">It listens on its own. Tap the mic to finish early.</p>
-        <div className="voicemock">
-          <div className={`micwrap${listening ? " live" : ""}`} id="micwrap">
-            <span className="pring p1" />
-            <span className="pring p2" />
-            <button
-              id="micBtn"
-              type="button"
-              aria-label={listening ? "Stop listening" : "Start listening"}
-              onClick={() => (listening ? void finishListening(true) : void startListening())}
-            >
-              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <rect x="9" y="2.5" width="6" height="11" rx="3" fill="#fff" />
-                <path d="M6 11.5a6 6 0 0 0 12 0" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
-                <path d="M12 17.5V21M8.5 21h7" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            </button>
-          </div>
-          <p id="micState">{micState}</p>
-          <div className="wave" id="wave" aria-hidden="true">
-            {Array.from({ length: NBARS }, (_, i) => (
-              <i key={i} ref={(el) => { barsRef.current[i] = el; }} />
-            ))}
-          </div>
-          <p id="heard">{heard}</p>
-          <input
+      <div className="wrap">
+        <BackButton label="Mark" onClick={() => go("sMark")} />
+        <Stepper step={3} />
+        <h1 id="h-say">Describe what happened.</h1>
+        <p className="sub">Type a line, or dictate it with the mic.</p>
+        <div className="card saycard">
+          <label className="field" htmlFor="transcriptBox">What happened</label>
+          <textarea
             id="transcriptBox"
-            type="text"
-            placeholder="Or type the line…"
+            rows={3}
+            maxLength={MAXLEN}
+            placeholder="e.g. Crack above the window, noticed after the rain…"
             value={transcript}
             onChange={(e) => {
               setTranscript(e.target.value);
               s.transcript = e.target.value;
             }}
           />
-          <p id="voiceErr">{voiceErr}</p>
+          <div className="sayrow">
+            <button
+              id="micBtn"
+              type="button"
+              className={listening ? "micbtn live" : "micbtn"}
+              aria-pressed={listening}
+              onClick={() => (listening ? void finishListening(true) : void startListening())}
+            >
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="9" y="2.5" width="6" height="11" rx="3" fill="currentColor" />
+                <path d="M6 11.5a6 6 0 0 0 12 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <path d="M12 17.5V21M8.5 21h7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+              {listening ? "Stop" : "Dictate"}
+            </button>
+            <span id="micState" role="status">{micState}</span>
+            <span className="saycount" aria-hidden="true">{transcript.length} / {MAXLEN}</span>
+          </div>
+          {voiceErr ? <p id="voiceErr" role="alert">{voiceErr}</p> : null}
         </div>
-        <button id="sendBtn" className="btn-dark" type="button" style={{ width: "100%" }} onClick={runReport}>
-          Send to report
+        <button id="sendBtn" className="btn-primary" type="button" style={{ width: "100%" }} onClick={runReport}>
+          See measurements
         </button>
       </div>
     </section>

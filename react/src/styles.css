@@ -174,21 +174,19 @@
   #status,#xStatus,#skStatus{display:block;font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:var(--slate);margin-top:8px;min-height:1.2em}
 
   /* mic */
-  .voicemock{display:flex;flex-direction:column;align-items:center;gap:12px;padding:8px 0}
-  .micwrap{position:relative;width:210px;height:210px;display:grid;place-items:center}
-  .pring{position:absolute;border-radius:50%;border:3px solid rgba(14,138,77,.35);pointer-events:none}
-  .pring.p1{inset:14px}.pring.p2{inset:0}
-  .micwrap.live .pring{animation:ringpulse 1.8s ease-out infinite}
-  .micwrap.live .p2{animation-delay:.9s}
-  @keyframes ringpulse{from{transform:scale(.82);opacity:.9}to{transform:scale(1.08);opacity:0}}
-  #micBtn{width:124px;height:124px;border-radius:50%;border:0;background:var(--coin);color:#fff;display:grid;place-items:center;box-shadow:0 10px 30px rgba(14,138,77,.35)}
-  #micBtn svg{width:52px;height:52px}
-  #micState{font-size:15px;color:var(--slate)}
-  .wave{display:flex;align-items:center;gap:5px;height:52px}
-  .wave i{display:block;width:5px;border-radius:3px;background:var(--coin);height:6px;transition:height .09s linear}
-  #heard{font-size:20px;font-weight:800;letter-spacing:-.01em;max-width:22ch;text-align:center;min-height:2.6em}
-  #transcriptBox{width:100%;font:inherit;font-size:15px;padding:12px;border:1px solid #e2ddd0;border-radius:12px;background:#fff}
-  #voiceErr{color:#c81e2b;font-size:13px;min-height:1.2em}
+  /* say: type first, mic only dictates into the box */
+  .saycard{margin-bottom:12px}
+  #transcriptBox{width:100%;font:inherit;font-size:16px;line-height:1.5;padding:12px;
+    border:1px solid #e2ddd0;border-radius:12px;background:#fff;resize:vertical;min-height:88px;margin-top:6px}
+  .sayrow{display:flex;align-items:center;gap:10px;margin-top:10px}
+  .micbtn{flex:none;display:inline-flex;align-items:center;gap:8px;min-height:48px;border:0;border-radius:999px;
+    background:var(--ink);color:#fff;font-weight:800;font-size:15px;padding:0 18px}
+  .micbtn svg{width:18px;height:18px}
+  .micbtn.live{background:var(--damage);animation:micpulse 1.2s ease-in-out infinite}
+  @keyframes micpulse{50%{filter:brightness(1.25)}}
+  #micState{flex:1;font-size:13px;color:var(--slate);line-height:1.35}
+  .saycount{flex:none;font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:var(--slate)}
+  #voiceErr{color:#c81e2b;font-size:13px;margin-top:8px;line-height:1.4}
 
   /* results */
   #measured:empty,#findings:empty,#skOut:empty,#annexWrap:empty{display:none}
