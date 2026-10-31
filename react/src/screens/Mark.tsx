@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "../App";
 import { apiPost } from "../lib/api";
 import { checkPhoto } from "../lib/photo-check";
+import { findCoins } from "../../../src/vision/coin-detect.js";
 import { circleRle, encodeRle } from "../lib/rle";
 import { closeMask } from "../lib/mask";
 import { segmentViaApi, type SamClient } from "../lib/sam";
@@ -131,6 +132,72 @@ export default function Mark() {
     setTapCount(s.dmg.points.length);
   }, [s]);
 
+  /** SAM's outline of the coin at the gate's circle, or null when it doesn't look like that coin. */
+  const traceCoin = useCallback(
+    async (cx: number, cy: number, r: number, w: number, h: number): Promise<SamMask | null> => {
+      if (!embeddings.current) return null;
+      let out: SamMask | null;
+      try {
+        out = await sam.decodeCoin([Math.round(cx), Math.round(cy)]);
+      } catch {
+        return null;
+      }
+      if (!out) return null;
+      let area = 0;
+      let sx = 0;
+      let sy = 0;
+      for (let i = 0; i < out.mask.length; i++) {
+        if (out.mask[i]) {
+          area++;
+          sx += i % w;
+          sy += (i / w) | 0;
+        }
+      }
+      const circle = Math.PI * r * r;
+      // Tape halo inflates the mask (coin + tape strip) — allow 2.5× and a
+      // looser centroid when taped, matching the vanilla PWA.
+      const taped = s.coinTaped;
+      if (area < circle * 0.4 || area > circle * (taped ? 2.5 : 1.6)) return null;
+      if (Math.hypot(sx / area - cx, sy / area - cy) > r * (taped ? 0.75 : 0.5)) return null;
+      return out;
+    },
+    [embeddings, sam, s],
+  );
+
+  /** Auto coin hunt: Hough proposes centres, SAM disposes. The first verified
+      outline becomes the coin tap, same as a manual one — the user only picks
+      the size. Runs only when the gate missed the coin entirely. */
+  const huntCoin = useCallback(async (
+    found: { x: number; y: number; r: number }[],
+    photo: HTMLCanvasElement,
+  ) => {
+    const still = s.stillDataUrl;
+    setCoinFixHint("Looking for the coin…");
+    const ready = await sam.ensureEmbedded(photo);
+    if (!ready || s.photoFor !== still || s.gateCoin || s.coinManualPt) {
+      if (s.photoFor === still && !s.coinManualPt) setCoinFixHint("");
+      return;
+    }
+    for (const c of found.slice(0, 3)) {
+      if (s.photoFor !== still || s.coinManualPt) return;
+      let traced: SamMask | null = null;
+      try {
+        traced = await traceCoin(c.x, c.y, Math.max(3, Math.round(c.r)), photo.width, photo.height);
+      } catch {
+        traced = null;
+      }
+      if (traced) {
+        s.coinManualPt = [Math.round(c.x), Math.round(c.y)];
+        s.coinMask = traced.mask;
+        s.coinIou = traced.iou;
+        setCoinFixHint(`Coin found (${Math.round(traced.iou * 100)}% sure) — pick its size`);
+        drawMark();
+        return;
+      }
+    }
+    if (s.photoFor === still && !s.coinManualPt) setCoinFixHint("");
+  }, [drawMark, s, sam, traceCoin]);
+
   /* build the marking photo; the on-device model embeds only on demand
      (coin outline, cloud fallback, cross-check) — never on entry */
   useEffect(() => {
@@ -165,42 +232,19 @@ export default function Mark() {
       embeddings.current = false;
       setReady(true);
       drawMark();
+      // The gate missed the coin: hunt it on the still. Hough proposes
+      // centres (contrast-stretched, so dull rims count), SAM verifies.
+      if (!s.gateCoin && !s.coinManualPt) {
+        try {
+          const px = photo.getContext("2d", { willReadFrequently: true })?.getImageData(0, 0, photo.width, photo.height);
+          const found = px ? findCoins({ data: px.data, width: px.width, height: px.height }) : [];
+          if (found.length) void huntCoin(found, photo);
+        } catch { /* hunt is best-effort; the tap button remains */ }
+      }
     };
     img.src = s.stillDataUrl;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  /** SAM's outline of the coin at the gate's circle, or null when it doesn't look like that coin. */
-  const traceCoin = useCallback(
-    async (cx: number, cy: number, r: number, w: number, h: number): Promise<SamMask | null> => {
-      if (!embeddings.current) return null;
-      let out: SamMask | null;
-      try {
-        out = await sam.decodeCoin([Math.round(cx), Math.round(cy)]);
-      } catch {
-        return null;
-      }
-      if (!out) return null;
-      let area = 0;
-      let sx = 0;
-      let sy = 0;
-      for (let i = 0; i < out.mask.length; i++) {
-        if (out.mask[i]) {
-          area++;
-          sx += i % w;
-          sy += (i / w) | 0;
-        }
-      }
-      const circle = Math.PI * r * r;
-      // Tape halo inflates the mask (coin + tape strip) — allow 2.5× and a
-      // looser centroid when taped, matching the vanilla PWA.
-      const taped = s.coinTaped;
-      if (area < circle * 0.4 || area > circle * (taped ? 2.5 : 1.6)) return null;
-      if (Math.hypot(sx / area - cx, sy / area - cy) > r * (taped ? 0.75 : 0.5)) return null;
-      return out;
-    },
-    [embeddings, sam, s],
-  );
 
   const measure = useCallback(async () => {
     if (!s.dmg.mask || !s.photo) return;

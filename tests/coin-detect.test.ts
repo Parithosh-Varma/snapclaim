@@ -55,6 +55,24 @@ test("the coin beats a square when both are in the photo", () => {
   assert.ok(best && Math.hypot(best.x - 560, best.y - 420) <= 4, JSON.stringify(best));
 });
 
+test("finds a low-contrast coin on a dull photo", () => {
+  // Wall 170, coin 186: a 16-level rim a fixed threshold would miss entirely.
+  const best = findCoins(scene(800, 600, crack, disc(560, 420, 34, 186)))[0];
+  assert.ok(best && Math.hypot(best.x - 560, best.y - 420) <= 5, JSON.stringify(best));
+});
+
+test("finds the centre through a tape halo", () => {
+  // Taped coin: faint larger ring (the tape edge) around the true rim.
+  const halo = (x: number, y: number) => {
+    const d = Math.hypot(x - 560, y - 420);
+    if (d <= 34) return 225 + 10 * Math.sin((x + y) / 3);
+    if (d <= 52) return 190;
+    return undefined;
+  };
+  const best = findCoins(scene(800, 600, crack, halo))[0];
+  assert.ok(best && Math.hypot(best.x - 560, best.y - 420) <= 6, JSON.stringify(best));
+});
+
 test("the detector is plain browser JS with no imports", () => {
   const source = readFileSync(new URL("../src/vision/coin-detect.js", import.meta.url), "utf8");
   assert.doesNotMatch(source, /^\s*import\s/m);
