@@ -72,14 +72,21 @@ export const server = createServer(async (req, res) => {
     }
   }
   const fetchFn: typeof fetch = (url, init) => fetch(url, init);
-  const auth = req.headers.authorization;
+  const header = (name: string): string | undefined => {
+    const v = req.headers[name];
+    return typeof v === "string" ? v : undefined;
+  };
   const handled = await handleRequest({
     method: req.method ?? "GET",
     path,
     body,
     env: process.env,
     fetchFn,
-    headers: typeof auth === "string" ? { authorization: auth } : {},
+    headers: {
+      authorization: header("authorization"),
+      "x-meta-key": header("x-meta-key"),
+      "x-baseten-key": header("x-baseten-key"),
+    },
   });
   sendJson(res, handled.status, handled.body, origin);
 });

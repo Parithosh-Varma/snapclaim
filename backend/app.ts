@@ -773,7 +773,7 @@ export function toSavedSession(body: unknown): SavedSession {
 }
 
 const CORS_METHODS = "GET, POST, OPTIONS";
-const CORS_HEADERS = "content-type, authorization";
+const CORS_HEADERS = "content-type, authorization, x-meta-key, x-baseten-key";
 
 export function corsHeaders(): Record<string, string> {
   return {
@@ -901,6 +901,32 @@ export function resetRateLimits(): void {
   rateBuckets.clear();
 }
 
+/** Longest caller key we accept; real Meta/Baseten keys are far shorter. */
+const MAX_CALLER_KEY_CHARS = 512;
+
+/**
+ * Bring your own key: `x-meta-key` / `x-baseten-key` on a request replace the
+ * worker secrets for that request only, so a shared demo link spends the
+ * caller's credits, not ours. Keys are never logged or stored. Mock mode and
+ * the no-key routes (measure, observe, crosscheck) are unaffected.
+ */
+export function withCallerKeys(env: Env, headers: RequestHeaders): Env {
+  const pick = (name: string): string | undefined => {
+    const v = headers[name]?.trim();
+    if (!v) return undefined;
+    if (v.length > MAX_CALLER_KEY_CHARS) throw new HttpError(400, `${name} too long`);
+    return v;
+  };
+  const meta = pick("x-meta-key");
+  const baseten = pick("x-baseten-key");
+  if (!meta && !baseten) return env;
+  return {
+    ...env,
+    ...(meta ? { META_API_KEY: meta } : {}),
+    ...(baseten ? { BASETEN_API_KEY: baseten } : {}),
+  };
+}
+
 /** Single router used by both the Node server and the Cloudflare Worker. */
 export async function handleRequest(input: {
   method: string;
@@ -913,9 +939,10 @@ export async function handleRequest(input: {
 }): Promise<HandledResponse> {
   const requestId = newRequestId();
   const store = input.store ?? defaultStore;
-  const env = input.env ?? {};
   const headers = input.headers ?? {};
+  let env = input.env ?? {};
   try {
+    env = withCallerKeys(env, headers);
     if (input.method === "GET" && input.path === "/v1/health") return { status: 200, body: healthBody(env) };
     if (input.method === "GET" && input.path === "/v1/spend") return { status: 200, body: spendStatus(env) };
     if (input.method === "GET" && input.path === "/v1/admin/status") {
