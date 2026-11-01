@@ -128,6 +128,16 @@ export function toMeasureInput(body: unknown, serverMinConfidence?: number): Mea
   }
   if (!Array.isArray(input.masks)) throw new Error("masks must be an array");
   if (input.masks.length > MAX_MASKS) throw new Error(`masks capped at ${MAX_MASKS} per call; chunk the request`);
+  // Bound direct-path areas: observe derives areaPx from pixels (<=16.7M),
+  // but /v1/measure trusts caller numbers. Cap to block ratio dilution.
+  if (!Number.isFinite(input.component.areaPx) || input.component.areaPx <= 0 || input.component.areaPx > 100_000_000) {
+    throw new Error("component.areaPx must be in (0, 100000000]");
+  }
+  for (const m of input.masks) {
+    if (!Number.isFinite((m as { areaPx?: unknown }).areaPx) || (m as { areaPx: number }).areaPx < 0 || (m as { areaPx: number }).areaPx > 100_000_000) {
+      throw new Error("masks[].areaPx must be in [0, 100000000]");
+    }
+  }
   return input;
 }
 
@@ -210,7 +220,8 @@ export function crosscheckBody(body: unknown, requestId = newRequestId()): Envel
   const started = Date.now();
   if (!isRecord(body)) throw new Error("body must be a JSON object");
   if (!isRecord(body.a) || !isRecord(body.b)) throw new HttpError(400, "body needs {a, b} COCO RLE masks");
-  const threshold = body.threshold === undefined ? 0.5 : requireNumber(body.threshold, "threshold");
+  const threshold = body.threshold === undefined ? 0.5 : requireConfidence(body.threshold, "threshold");
+  if (threshold < 0.1) throw new HttpError(400, "threshold must be in [0.1, 1]");
   const a = parseRle(body.a, "a");
   const b = parseRle(body.b, "b");
   if (a.width * a.height + b.width * b.height > MAX_TOTAL_MASK_PIXELS) {
@@ -962,8 +973,8 @@ export function corsHeaders(): Record<string, string> {
     "access-control-allow-methods": CORS_METHODS,
     "access-control-allow-headers": CORS_HEADERS,
     // Echoed-origin responses vary by Origin: without this a shared cache
-    // could serve one origin's ACAO header to another.
-    vary: "Origin",
+    // could serve one origin's ACAO header to another. BYOK keys vary too.
+    vary: "Origin, x-meta-key, x-baseten-key",
   };
 }
 

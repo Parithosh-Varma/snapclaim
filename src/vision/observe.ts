@@ -102,6 +102,9 @@ export interface ReferenceDiagnostics {
   /** Major axis of the best-fit ellipse, in pixels. Used as the reference length. */
   majorPx: number;
   minorPx: number;
+  /** Fitted ellipse centre, in pixels. Used to draw the reference outline. */
+  cx: number;
+  cy: number;
   /** minor / major. 1 for a coin seen straight on; lower when tilted or occluded. */
   aspect: number;
   /** Mask area / ellipse area. Drops when part of the coin is hidden or bitten off. */
@@ -247,6 +250,8 @@ export function circularReference(
     diagnostics: {
       majorPx: round(majorPx, 2),
       minorPx: round(minorPx, 2),
+      cx: round(cx, 1),
+      cy: round(cy, 1),
       aspect: round(aspect, 3),
       fill: round(fill, 3),
       largestShare: round(largestShare, 3),
@@ -265,8 +270,12 @@ export function circularReference(
  */
 export function tiltStretch(diagnostics: ReferenceDiagnostics): PlaneStretch | undefined {
   if (diagnostics.rejected !== undefined || diagnostics.aspect >= STRAIGHT_ON_ASPECT) return undefined;
+  // Cap the fraud amplifier: aspect 0.5 -> factor 2.0 unbounded inflates
+  // non-coplanar cracks (60° coin + square wall). Bound to 1.7x (aspect 0.6
+  // bench still corrects, 0.5 abuse cut 15%).
+  const raw = diagnostics.majorPx / diagnostics.minorPx;
   return {
     angle: ((diagnostics.axisDeg + 90) * Math.PI) / 180,
-    factor: diagnostics.majorPx / diagnostics.minorPx,
+    factor: Math.min(raw, 1.7),
   };
 }

@@ -50,7 +50,7 @@ function readJson(req: import("node:http").IncomingMessage): Promise<unknown> {
 export const server = createServer(async (req, res) => {
   const origin = typeof req.headers.origin === "string" ? req.headers.origin : null;
   if (req.method === "OPTIONS") {
-    res.writeHead(204, corsHeadersFor(origin, process.env));
+    res.writeHead(204, { ...securityHeaders(), ...corsHeadersFor(origin, process.env) });
     res.end();
     return;
   }

@@ -6,10 +6,10 @@ export class ReceiptLedger {
   #nextId = 1;
 
   add(draft: ReceiptDraft): Receipt {
-    const receipt: Receipt = {
+    const receipt: Receipt = Object.freeze({
       id: `R${String(this.#nextId).padStart(3, "0")}`,
-      ...draft,
-    };
+      ...structuredClone(draft),
+    }) as Receipt;
     this.#nextId += 1;
     this.#receipts.push(receipt);
     return receipt;

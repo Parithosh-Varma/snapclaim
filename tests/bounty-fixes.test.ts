@@ -125,7 +125,7 @@ test("admin token comparison is constant-time and exact", () => {
 });
 
 test("CORS responses vary by Origin", () => {
-  assert.equal(corsHeadersFor(null, {} as never).vary, "Origin");
+  assert.equal(corsHeadersFor(null, {} as never).vary, "Origin, x-meta-key, x-baseten-key");
 });
 
 test("pwa rle decode refuses oversized and ragged inputs", () => {
