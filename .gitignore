@@ -8,6 +8,8 @@ coverage/
 *.log
 
 fixtures/photos/
+fixtures/*discord*.json
+fixtures/WhatsApp*.mp4
 *.mp4
 bench/runs/
 !bench/runs/.gitkeep

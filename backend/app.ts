@@ -1223,6 +1223,15 @@ export async function handleRequest(input: {
   }
   try {
     env = withCallerKeys(env, headers);
+    // Optional billing lockdown: operator sets REQUIRE_BILLING_AUTH=1 to force
+    // a bearer token on all billable routes (kills anonymous spend-drain).
+    if (env.REQUIRE_BILLING_AUTH === "1" && input.method === "POST" &&
+      ["/v1/report", "/v1/segment", "/v1/transcribe", "/v1/describe", "/v1/findings", "/v1/skeptic", "/v1/render"].includes(input.path)) {
+      const auth = headers["authorization"] ?? headers["Authorization"] ?? "";
+      if (!/^Bearer\s+.+$/i.test(auth.trim())) {
+        return { status: 401, body: errorBody("billing auth required", 401, requestId) };
+      }
+    }
     if (input.method === "GET" && input.path === "/v1/health") return { status: 200, body: healthBody(env) };
     if (input.method === "GET" && input.path === "/v1/spend") return { status: 200, body: spendStatus(env) };
     if (input.method === "GET" && input.path === "/v1/admin/status") {

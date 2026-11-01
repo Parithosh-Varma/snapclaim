@@ -23,6 +23,9 @@ export interface SnapCase {
   mode?: string;
   photo?: string | null;
   photoDropped?: boolean;
+  /** Optional wide context shot; same quota rules as the close-up photo. */
+  locationPhoto?: string | null;
+  locationDropped?: boolean;
   [key: string]: unknown;
 }
 
@@ -63,7 +66,17 @@ export function createCaseStore(
 
   function readCases(): SnapCase[] {
     const list = parse<unknown>(storage.getItem(CASES_KEY), []);
-    return Array.isArray(list) ? (list as SnapCase[]) : [];
+    if (!Array.isArray(list)) return [];
+    // 90-day TTL: drop stale device-only cases automatically.
+    const cutoff = Date.now() - 90 * 24 * 3600 * 1000;
+    const fresh = (list as SnapCase[]).filter((c) => {
+      const t = Date.parse(String((c as SnapCase).updatedAt ?? (c as SnapCase).createdAt ?? ""));
+      return Number.isNaN(t) || t >= cutoff;
+    });
+    if (fresh.length !== (list as SnapCase[]).length) {
+      try { writeCases(fresh); } catch { /* ignore */ }
+    }
+    return fresh;
   }
   function writeCases(list: SnapCase[]) {
     storage.setItem(CASES_KEY, JSON.stringify(list));
@@ -94,6 +107,16 @@ export function createCaseStore(
         record.photo = null;
         record.photoDropped = true;
       }
+      for (const key of ["locationPhoto"] as const) {
+        if (typeof record[key] === "string" && (record[key] as string).length > MAX_PHOTO_CHARS) {
+          record[key] = null;
+          record.locationDropped = true;
+        }
+        if (typeof record[key] === "string" && !/^data:image\/(png|jpeg|webp);base64,/.test(record[key] as string)) {
+          record[key] = null;
+          record.locationDropped = true;
+        }
+      }
       let next = list.filter((c) => c.id !== record.id);
       next.push(record);
       next = next.sort((a, b) => String(a.updatedAt).localeCompare(String(b.updatedAt))).slice(-MAX_CASES);
@@ -102,6 +125,8 @@ export function createCaseStore(
       } catch {
         record.photo = null;
         record.photoDropped = true;
+        record.locationPhoto = null;
+        record.locationDropped = true;
         writeCases(next.map((c) => (c.id === record.id ? record : c)));
       }
       return record;

@@ -17,6 +17,8 @@ export interface SharedReport {
   mode: "absolute" | "percent-only";
   transcript: string;
   checks: string;
+  /** Optional HMAC-SHA256 of the canonical payload (hex). Absent = UNVERIFIED. */
+  sig?: string;
   /** Full-frame figure (the generated annexure when present) as a data: URL. */
   img: string;
   /** Optional wider context shot as a data: URL. */
@@ -41,7 +43,9 @@ function isSharedReport(v: unknown): v is SharedReport {
   const SEVERITIES = new Set(["cosmetic", "moderate", "significant"]);
   const num = (x: unknown, min: number, max: number): boolean =>
     typeof x === "number" && Number.isFinite(x) && x >= min && x <= max;
+  const sigOk = r.sig === undefined || (typeof r.sig === "string" && /^[0-9a-f]{64}$/.test(r.sig));
   return (
+    sigOk &&
     r.v === 1 &&
     typeof r.ref === "string" && /^[A-Za-z0-9-_]{1,32}$/.test(r.ref) &&
     typeof r.date === "string" && r.date.length <= 64 &&
@@ -58,6 +62,31 @@ function isSharedReport(v: unknown): v is SharedReport {
     (r.locationImg === undefined || r.locationImg === null ||
       (typeof r.locationImg === "string" && r.locationImg.length <= MAX_SHARE_URL_CHARS && r.locationImg.startsWith("data:image/jpeg;base64,")))
   );
+}
+
+/** Canonical payload for HMAC (sig excluded). */
+export function shareCanonical(rep: SharedReport): string {
+  const { sig: _sig, ...rest } = rep;
+  return JSON.stringify(rest);
+}
+
+/** HMAC-SHA256 hex of the canonical payload with a caller passphrase. */
+export async function signShare(rep: SharedReport, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(shareCanonical(rep)));
+  return [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** Verify an optional sig; false when absent/invalid. */
+export async function verifyShare(rep: SharedReport, secret: string): Promise<boolean> {
+  if (typeof rep.sig !== "string") return false;
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+  const mac = Uint8Array.from((rep.sig.match(/../g) ?? []).map((h) => parseInt(h, 16)));
+  try {
+    return await crypto.subtle.verify("HMAC", key, mac, new TextEncoder().encode(shareCanonical(rep)));
+  } catch {
+    return false;
+  }
 }
 
 /** Encode a report into the `#/s/...` hash suffix. Throws when too large. */

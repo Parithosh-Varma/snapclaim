@@ -273,8 +273,8 @@ export function circularReference(
 export function tiltStretch(diagnostics: ReferenceDiagnostics): PlaneStretch | undefined {
   if (diagnostics.rejected !== undefined || diagnostics.aspect >= STRAIGHT_ON_ASPECT) return undefined;
   // Cap the fraud amplifier: aspect 0.5 -> factor 2.0 unbounded inflates
-  // non-coplanar cracks (60° coin + square wall). Bound to 1.7x (aspect 0.6
-  // bench still corrects, 0.5 abuse cut 15%).
+  // non-coplanar cracks (60° coin + square wall). Bound to 1.7x and discount
+  // confidence instead of publishing tilted lengths at full confidence.
   const raw = diagnostics.majorPx / diagnostics.minorPx;
   return {
     angle: ((diagnostics.axisDeg + 90) * Math.PI) / 180,
