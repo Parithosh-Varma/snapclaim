@@ -2,11 +2,25 @@
 
 > Point your phone at damage, speak one line about it — get a claim-ready report where every number is measured, cited, and checked before it ships. **Computed, not generated.**
 
-[![tests](https://img.shields.io/badge/tests-258%20passing-brightgreen)](./tests)
+[![tests](https://img.shields.io/badge/tests-292%20passing-brightgreen)](./tests)
 [![node](https://img.shields.io/badge/node-%3E%3D22.18-339933)](./package.json)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](./LICENSE)
 
 SnapClaim turns a damage photo plus a one-line description into a replayable evidence package: calibrated measurements (% damaged, crack length/width, area in cm²), each backed by a machine-checkable receipt, with AI-written findings that the server refuses to ship unless every number cites its receipt.
+
+**Try it:** <https://snapclaim.pages.dev> (no login needed).
+
+### What is measured today
+
+All three commands are free and deterministic; run them yourself.
+
+| Check | Command | Result on `main` |
+|---|---|---|
+| Measurement code vs known answers (54 scenes drawn in code, coin scale, some on tilted walls) | `npm run bench:truth` | length median error 1.4%, 100% within ±10%; width median error 4.0%, 96.3% within ±10%; 3/3 no-scale refusals held |
+| Regression on dev mask fixtures | `npm run eval` | 7 pass, 0 skip, 0 fail |
+| Live pipeline on held-out real photos | `npm run bench` | 11 cases, 0 archived runs yet (all UNRUN, so the command exits 1 on purpose) |
+
+What this does not show yet: how well SAM finds the crack on a real photo. `bench:truth` checks the maths given a mask, not the mask itself. No real crack has been tape-measured yet, so `npm run bench:gap` (pipeline vs model-only guess against a tape) still prints UNSCORED. We would rather show that gap than fill it with a number we cannot back.
 
 **Global by design:** the measurement engine assumes no currency, country, or language — a scale reference is any known-size object (coin, ruler, bank card), and the transcript is free text in any language. Voice is auto-detected by default; callers can still send an optional `languageBias`.
 
@@ -197,7 +211,8 @@ Hard limits: 50 masks per call (chunk above), 1–16 point prompts per segment c
 ## Evaluation
 
 - `npm run eval` — deterministic bench over `fixtures/masks/*.json` vs `fixtures/expected/` (missing expected file = SKIP, never a pass). Current: wall-crack 5.17% / 85.9 mm / 2.6 mm wide / 2.19 cm² (significant), stain 1.29% percent-only (moderate).
-- `bench/split.json` — dev/held-out split, frozen before tuning. Held-out cases are public no-scale photos that must stay percent-only.
+- `bench/split.json` — dev/held-out split, frozen before tuning. Held-out has 11 cases: 4 public no-scale photos that must stay percent-only, and 7 team photos with a 2 INR coin (no tape measurement yet, so they test detection and refusals).
+- `npm run bench:truth` (`bench/truth.ts`) — 54 scenes with exactly known crack length/width, run through the same measurement code a photo goes through. Tests the maths, not SAM.
 - `bench/score.ts` — skeptic DISPUTED scoring with missing-label accounting.
 - Full write-up, baselines protocol and open gaps: [`docs/eval-report.md`](./docs/eval-report.md).
 
@@ -216,7 +231,7 @@ pwa/            capture app: photo, tap-to-mask, hold-to-speak, report, skeptic,
 eval/           bench + replay CLI
 bench/          held-out split + dispute scorer
 fixtures/       masks, expected outputs, scale references (photos gitignored)
-tests/          258 tests, mock by default, live paths with stubbed fetch
+tests/          292 tests, mock by default, live paths with stubbed fetch
 ```
 
 ## Development
