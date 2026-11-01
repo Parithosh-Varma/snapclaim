@@ -1,0 +1,9 @@
+/*
+  SproutVision redirect headers: the meta-refresh page is framable without these.
+  Served alongside sproutvision/index.html. All traffic 301s to snapclaim.pages.dev.
+*/
+/*:
+  X-Frame-Options: DENY
+  Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline'; object-src 'none'; base-uri 'none'
+  Referrer-Policy: no-referrer
+  X-Content-Type-Options: nosniff
