@@ -20,6 +20,7 @@ import {
 import { DEFAULT_SEVERITY_THRESHOLDS, classifySeverity, validateThresholds } from "./severity.ts";
 import type { DamageLabel } from "./types.ts";
 import { ReceiptLedger } from "../receipts/ledger.ts";
+import { decodeRle } from "../vision/mask.ts";
 
 const DAMAGE_LABELS: ReadonlySet<string> = new Set(["crack", "stain", "peel", "dent"]);
 
@@ -53,6 +54,34 @@ export function measureSession(input: MeasureSessionInput): MeasureSessionResult
     assertDamageLabel(mask.label);
     if (!Number.isFinite(mask.confidence)) {
       throw new MeasurementError(`mask ${mask.id} confidence must be a finite number, got ${mask.confidence}`);
+    }
+  }
+  // Pixel binding: when a mask carries RLE, the claimed areaPx/skeletonPx
+  // must agree with the decoded pixels. Absent RLE = self-reported.
+  let verified = masks.length > 0;
+  for (const mask of masks) {
+    if (mask.rle === undefined) {
+      verified = false;
+      continue;
+    }
+    let counted: number;
+    try {
+      const decoded = decodeRle(mask.rle as never);
+      counted = 0;
+      for (const v of decoded.data) if (v !== 0) counted++;
+    } catch (error) {
+      throw new MeasurementError(`mask ${mask.id} rle invalid: ${error instanceof Error ? error.message : "cannot decode"}`);
+    }
+    const tol = Math.max(2, Math.round(counted * 0.01));
+    if (Math.abs(mask.areaPx - counted) > tol) {
+      throw new MeasurementError(
+        `mask ${mask.id} areaPx ${mask.areaPx} disagrees with decoded rle pixels ${counted} (tolerance ${tol}) - resubmit via /v1/observe`,
+      );
+    }
+    if (mask.skeletonPx !== undefined && mask.skeletonPx > counted * 2) {
+      throw new MeasurementError(
+        `mask ${mask.id} skeletonPx ${mask.skeletonPx} exceeds 2x decoded pixels ${counted} - resubmit via /v1/observe`,
+      );
     }
   }
 
@@ -104,6 +133,7 @@ export function measureSession(input: MeasureSessionInput): MeasureSessionResult
     findings,
     receipts: ledger.all(),
     mode: scale === null ? "percent-only" : "absolute",
+    provenance: verified ? "pixel-verified" : "self-reported",
   };
 }
 

@@ -11,6 +11,13 @@ export interface MaskObservation {
   /** Disconnected regions of damage; defaults to 1 when the segmenter does not report it. */
   regionCount?: number;
   /**
+   * Optional COCO RLE of the mask pixels. When present the server decodes it
+   * and rejects the request if the claimed areaPx/skeletonPx disagree with
+   * the pixels - this binds self-reported numbers to verifiable pixels.
+   * Absent = self-reported (see MeasureSessionResult.provenance).
+   */
+  rle?: { size: [number, number]; counts: number[] | string };
+  /**
    * Crack regions that are thick rather than long and thin, usually a tap that
    * caught a stone block or a patch of wall. Their area is still counted; the
    * flag lets the user undo the tap before it inflates the report.
@@ -85,4 +92,11 @@ export interface MeasureSessionResult {
   findings: MeasuredFinding[];
   receipts: Receipt[];
   mode: "absolute" | "percent-only";
+  /**
+   * "pixel-verified" only when EVERY mask carried an `rle` whose decoded
+   * pixels agree with the claimed areaPx (and skeletonPx, when present).
+   * Otherwise "self-reported" - numbers are caller-asserted, capped and
+   * gated but not pixel-bound. Absolute payouts should require verified.
+   */
+  provenance: "pixel-verified" | "self-reported";
 }

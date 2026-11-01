@@ -145,8 +145,24 @@ export function toMeasureInput(body: unknown, serverMinConfidence?: number): Mea
     if (rc !== undefined && (!Number.isInteger(rc) || (rc as number) < 1 || (rc as number) > 100000)) {
       throw new Error("masks[].regionCount must be an integer in [1, 100000]");
     }
+    // Optional pixel binding: light shape check here, exact pixel agreement
+    // enforced in measureSession (fail-closed on mismatch).
+    const rle = (m as { rle?: unknown }).rle;
+    if (rle !== undefined) {
+      const size = isRecord(rle) ? (rle as Record<string, unknown>).size : undefined;
+      if (!Array.isArray(size) || size.length !== 2) {
+        throw new Error("masks[].rle must be {size: [h, w], counts}");
+      }
+    }
   }
   return input;
+}
+
+/** Operator lockdown: REQUIRE_PIXEL_PROVENANCE=1 rejects absolute-millimetre
+ * claims whose masks are not pixel-bound via RLE. Default off (self-reported
+ * allowed but labeled); enable for payouts. */
+export function requirePixelProvenance(env: Env): boolean {
+  return env.REQUIRE_PIXEL_PROVENANCE === "1";
 }
 
 export function healthBody(env: Env = {}): { ok: true; version: string; time: string; mode: "mock" | "live" | "config-error" } {
@@ -423,6 +439,11 @@ export async function reportBody(body: unknown, env: Env, requestId = newRequest
   if (!isRecord(body)) throw new Error("body must be a JSON object");
   const config = configFromEnv(env);
   const measurement = measureSession(toMeasureInput(body, config.minReferenceConfidence));
+  // Pixel-provenance lockdown: absolute claims without RLE-bound masks are
+  // rejected when the operator enables REQUIRE_PIXEL_PROVENANCE=1.
+  if (requirePixelProvenance(env) && measurement.mode === "absolute" && measurement.provenance !== "pixel-verified") {
+    throw new HttpError(422, "pixel provenance required for absolute claims: resubmit masks with rle via /v1/observe");
+  }
   if (body.transcript !== undefined && typeof body.transcript !== "string") throw new HttpError(400, "transcript must be a string");
   const transcript = typeof body.transcript === "string" ? body.transcript.slice(0, 2000) : "";
 
@@ -446,7 +467,7 @@ export async function reportBody(body: unknown, env: Env, requestId = newRequest
     }
     drafts = body.drafts as FindingDraft[];
   } else {
-    const provider = findingsProvider(env, config, fetchFn, guardFor(env));
+    const provider = findingsProvider(env, config, fetchFn, operatorSpend(env, "meta"));
     ({ drafts } = await draftAndGate(
       provider,
       { transcript, findings: measurement.findings, receipts: measurement.receipts },
@@ -511,13 +532,14 @@ export async function segmentBody(body: unknown, env: Env, requestId = newReques
     }
     box = { left, top, right, bottom };
   }
-  const spend = guardFor(env);
+  const spend = operatorSpend(env, "meta");
   // Reserve the fixed SAM price BEFORE the upstream call: concurrent callers
   // then serialize on the budget instead of each passing a stale
   // $0-remaining check and billing after the fact.
-  let samHold: ReturnType<typeof spend.reserve> | undefined;
+  // BYOK (spend undefined): caller pays, no operator hold.
+  let samHold: ReturnType<NonNullable<typeof spend>["reserve"]> | undefined;
   try {
-    samHold = spend.reserve("sam segment ceiling", SAM_IMAGE_USD);
+    samHold = spend?.reserve("sam segment ceiling", SAM_IMAGE_USD);
   } catch (error) {
     if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
     throw error;
@@ -535,11 +557,11 @@ export async function segmentBody(body: unknown, env: Env, requestId = newReques
       request: { imageUrl, size: { width: Math.round(width), height: Math.round(height) }, points, ...(box ? { box } : {}) },
     });
   } catch (error) {
-    samHold.release();
+    samHold?.release();
     throw error;
   }
   try {
-    samHold.settle(`sam segment ${sam.records.length} objects`, SAM_IMAGE_USD);
+    samHold?.settle(`sam segment ${sam.records.length} objects`, SAM_IMAGE_USD);
   } catch (error) {
     if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
     throw error;
@@ -655,12 +677,13 @@ export async function transcribeBody(body: unknown, env: Env, requestId = newReq
   if (audio.length > 4_000_000) throw new HttpError(400, "audio over 4 MB; send a clip of 10 seconds or less");
   const languageBias = sanitizeList(body.languageBias, DEFAULT_LANGUAGE_BIAS);
   const keywords = sanitizeList(body.keywords, DEFAULT_KEYWORDS);
-  const spend = guardFor(env);
+  const spend = operatorSpend(env, "meta");
   // 4MB of audio ≈ 125s ≈ $0.006 at $0.18/hr: hold a ceiling first so
   // concurrent callers cannot all pass the check and bill after the fact.
-  let voiceHold: ReturnType<typeof spend.reserve> | undefined;
+  // BYOK (spend undefined): caller pays, no operator hold.
+  let voiceHold: ReturnType<NonNullable<typeof spend>["reserve"]> | undefined;
   try {
-    voiceHold = spend.reserve("transcribe ceiling", TRANSCRIBE_COST_CEILING_USD);
+    voiceHold = spend?.reserve("transcribe ceiling", TRANSCRIBE_COST_CEILING_USD);
   } catch (error) {
     if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
     throw error;
@@ -714,10 +737,10 @@ export async function describeBody(body: unknown, env: Env, requestId = newReque
   const imageUrl = typeof body.imageUrl === "string" ? body.imageUrl : "";
   assertSafeImageUrl(imageUrl);
   const note = typeof body.note === "string" ? body.note.trim().slice(0, 500) : "";
-  const spend = guardFor(env);
-  let hold: ReturnType<typeof spend.reserve> | undefined;
+  const spend = operatorSpend(env, "meta");
+  let hold: ReturnType<NonNullable<typeof spend>["reserve"]> | undefined;
   try {
-    hold = spend.reserve("describe ceiling", DESCRIBE_COST_CEILING_USD);
+    hold = spend?.reserve("describe ceiling", DESCRIBE_COST_CEILING_USD);
   } catch (error) {
     if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
     throw error;
@@ -778,11 +801,15 @@ export async function describeBody(body: unknown, env: Env, requestId = newReque
   }
   const description = content.trim().slice(0, 400);
   if (spend) {
+    // Clamp upstream usage like the findings/skeptic providers: a
+    // lying/compromised upstream must not bill unbounded and drain the guard.
+    const usageIn = Math.min(Math.max(0, j.usage?.prompt_tokens ?? 0), 32768);
+    const usageOut = Math.min(Math.max(0, j.usage?.completion_tokens ?? 0), 8192);
     try {
       hold?.settle(
-        `spark describe in=${j.usage?.prompt_tokens ?? 0} out=${j.usage?.completion_tokens ?? 0}`,
+        `spark describe in=${usageIn} out=${usageOut}`,
         estimateCostUsd(
-          { inputTokens: j.usage?.prompt_tokens ?? 0, outputTokens: j.usage?.completion_tokens ?? 0 },
+          { inputTokens: usageIn, outputTokens: usageOut },
           SPARK_PRICE,
         ),
       );
@@ -821,7 +848,7 @@ export async function findingsBody(body: unknown, env: Env, requestId = newReque
   const receipts = body.receipts as Receipt[];
   assertFindingsShape(findings, receipts);
   crossCheckMeasurement(body, findings, receipts, env);
-  const provider = findingsProvider(env, configFromEnv(env), fetchFn, guardFor(env));
+  const provider = findingsProvider(env, configFromEnv(env), fetchFn, operatorSpend(env, "meta"));
   const { drafts, gate } = await draftAndGate(
     provider,
     {
@@ -847,7 +874,7 @@ export async function skepticBody(body: unknown, env: Env, requestId = newReques
   const receipts = body.receipts as Receipt[];
   assertFindingsShape(findings, receipts);
   crossCheckMeasurement(body, findings, receipts, env);
-  const provider = skepticProvider(env, configFromEnv(env), fetchFn, guardFor(env));
+  const provider = skepticProvider(env, configFromEnv(env), fetchFn, operatorSpend(env, "baseten"));
   const { drafts, gate } = await draftAndGate(
     provider,
     {
@@ -953,6 +980,9 @@ export function crossCheckMeasurement(body: Record<string, unknown>, findings: u
   }
   const config = configFromEnv(env);
   const recomputed = measureSession(toMeasureInput(body, config.minReferenceConfidence));
+  if (requirePixelProvenance(env) && recomputed.mode === "absolute" && recomputed.provenance !== "pixel-verified") {
+    throw new HttpError(422, "pixel provenance required for absolute claims: resubmit masks with rle via /v1/observe");
+  }
   if (JSON.stringify(findings) !== JSON.stringify(recomputed.findings) || JSON.stringify(receipts) !== JSON.stringify(recomputed.receipts)) {
     const err = new HttpError(422, "supplied findings/receipts do not match server recomputation from component + masks");
     (err as HttpError & { details?: unknown }).details = ["re-measured server-side; resubmit via /v1/report or send matching receipts"];
@@ -1192,9 +1222,21 @@ export function withCallerKeys(env: Env, headers: RequestHeaders): Env {
   if (!meta && !baseten) return env;
   return {
     ...env,
-    ...(meta ? { META_API_KEY: meta } : {}),
-    ...(baseten ? { BASETEN_API_KEY: baseten } : {}),
+    ...(meta ? { META_API_KEY: meta, __BYOK_META: "1" } : {}),
+    ...(baseten ? { BASETEN_API_KEY: baseten, __BYOK_BASETEN: "1" } : {}),
   };
+}
+
+/**
+ * Operator ledger for a billable route. When the caller supplied their own
+ * key for that provider, the operator pays nothing, so skip the shared
+ * guard entirely (upstream enforces the caller's own quota). Otherwise the
+ * shared guard serializes concurrent callers on the operator budget.
+ */
+export function operatorSpend(env: Env, kind: "meta" | "baseten"): import("../src/config/spend-guard.ts").SpendGuard | undefined {
+  if (kind === "meta" && env.__BYOK_META === "1") return undefined;
+  if (kind === "baseten" && env.__BYOK_BASETEN === "1") return undefined;
+  return guardFor(env);
 }
 
 /** Single router used by both the Node server and the Cloudflare Worker. */
