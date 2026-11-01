@@ -1991,8 +1991,6 @@ $("ctaNew").onclick = startCapture;
 $("tabNew").onclick = startCapture;
 $("ctaSample").onclick = () => { backToCam(); loadSample(); };
 $("doneHome").onclick = () => showTab("tHome");
-$("settingsGearHome").onclick = () => showTab("tSettings");
-$("settingsGearCases").onclick = () => showTab("tSettings");
 function openCase(id) {
   const c = caseStore.get(id);
   if (!c) return;

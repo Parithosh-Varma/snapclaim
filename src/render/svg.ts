@@ -38,11 +38,9 @@ function r2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-/** Only inline raster images may be embedded as the photo.
- * svg+xml is rejected: an opened annexure would run embedded scripts.
- * Remote https: URLs are rejected too: a viewer opening the SVG would leak
- * its IP (tracking beacon) to the URL host. Callers send data: URLs. */
-const ALLOWED_DATA_MIMES = new Set(["image/png", "image/jpeg"]);
+/** Only inline raster images and https URLs may be embedded as the photo.
+ * svg+xml is rejected: an opened annexure would run embedded scripts. */
+const ALLOWED_DATA_MIMES = new Set(["image/png", "image/jpeg", "image/webp"]);
 export const MAX_PHOTO_HREF_CHARS = 200_000;
 
 function safeHref(href: string | undefined): string | null {
@@ -53,6 +51,9 @@ function safeHref(href: string | undefined): string | null {
     if (comma < 0 || comma > 64) return null;
     const mime = href.slice(5, href.indexOf(";"));
     if (!ALLOWED_DATA_MIMES.has(mime)) return null;
+    return href;
+  }
+  if (href.startsWith("https://") && !href.includes("\\") && !href.includes('"') && !href.includes("'")) {
     return href;
   }
   return null;
