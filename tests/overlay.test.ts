@@ -50,6 +50,9 @@ test("/v1/observe returns outlines of the measured masks and the coin", async ()
   assert.equal(result.overlay.height, H);
   assert.deepEqual(result.overlay.masks.map((m: { label: string }) => m.label), ["crack", "coin"]);
   for (const m of result.overlay.masks) assert.match(m.path, /^M [\d.]+ [\d.]+( L [\d.]+ [\d.]+)+ Z/);
+  const coin = result.overlay.masks.find((m: { label: string }) => m.label === "coin");
+  assert.ok(coin, "coin outline present");
+  assert.ok((coin.path.match(/ L /g) ?? []).length >= 32, "coin outline is a smooth fitted ellipse, not a jagged polygon");
 
   // /v1/measure ignores the extra keys and measures as before.
   const measured = await handleRequest({ method: "POST", path: "/v1/measure", body: result, env: LIVE_ENV });
@@ -64,7 +67,7 @@ test("/v1/render draws the photo and outlines in the annexure", async () => {
     method: "POST",
     path: "/v1/render",
     body: { ...result, overlay: { ...result.overlay, photoHref }, drafts: citingDrafts(session.findings), transcript: "crack by the window" },
-    env: LIVE_ENV,
+    env: {},
   });
   assert.equal(res.status, 200, JSON.stringify(res.body));
   const svg = (res.body as { result: { svg: string } }).result.svg;
@@ -81,7 +84,7 @@ test("/v1/render refuses an overlay path that is not plain path data", async () 
     method: "POST",
     path: "/v1/render",
     body: { ...result, overlay, drafts: citingDrafts(session.findings) },
-    env: LIVE_ENV,
+    env: {},
   });
   assert.equal(res.status, 400);
 });

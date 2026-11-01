@@ -11,13 +11,13 @@ let lastMeasurement = null;
 /** Backend URL allowlist, mirrored by the <meta> CSP connect-src in index.html.
  * Only the default Worker host (https) and loopback http for local dev are
  * allowed. Anything else is rejected so a pasted "debug URL" cannot exfiltrate
- * photos/voice to an attacker — and so validation never passes a URL the CSP
+ * photos/voice to an attacker - and so validation never passes a URL the CSP
  * would then block. To self-host: add the host to connect-src in
  * pwa/index.html (and react/index.html) AND to DEFAULT_BACKEND_HOST below.
  * See README "Self-hosted backend". */
 export const DEFAULT_BACKEND_HOST = "snapclaim-backend.parithosh.workers.dev";
 export const POLICY_BACKEND_MESSAGE =
-  "This backend isn't allowed by the app's security policy — use https://" +
+  "This backend isn't allowed by the app's security policy - use https://" +
   DEFAULT_BACKEND_HOST +
   " or http://localhost:8787 for local dev.";
 export function isAllowedBackendUrl(raw) {
@@ -74,7 +74,7 @@ function base() {
 }
 /* Backend mode cache: one /v1/health per minute. In mock mode the PWA skips
  * the live-only API attempts (/v1/segment point prompts, server transcribe)
- * and goes straight to the on-device models — no pointless 400s, no log noise,
+ * and goes straight to the on-device models - no pointless 400s, no log noise,
  * faster taps. Unknown mode (offline/unreachable) keeps the old try-API-first
  * behaviour so live backends behind a flaky first fetch still work. */
 let backendModeCache = null, backendModeAt = 0;
@@ -99,7 +99,7 @@ function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").
  * need one online load. Name that state instead of a raw import error. */
 function isOfflineNow() { return typeof navigator !== "undefined" && navigator.onLine === false; }
 function offlineModelMessage(kind) {
-  return `On-device ${kind} model not available offline yet — reconnect once to download it, then it works offline.`;
+  return `On-device ${kind} model not available offline yet - reconnect once to download it, then it works offline.`;
 }
 /** Severity comes from the backend: allowlist it so it can never break out of
  * the class attribute in metricCards (esc alone was not enough for attrs). */
@@ -111,15 +111,15 @@ function escSeverity(s) {
 /* Annexure download hardening: the preview renders in <img> (script-inert),
  * but the downloaded .svg opens as a document and would run embedded scripts
  * or follow javascript:/data:text/html links on click. Strip scriptable
- * content — including self-closing <foreignObject/> and href-based vectors
- * the old regexes missed — before creating the Blob. */
+ * tags (incl. self-closing) and event/src/data vectors before Blob. */
 function sanitizeSvg(svg) {
   return String(svg)
     .replace(/<script[\s\S]*?<\/script\s*>/gi, "")
     .replace(/<foreignObject[\s\S]*?<\/foreignObject\s*>/gi, "")
-    .replace(/<foreignObject\b[^>]*\/>/gi, "")
+    .replace(/<\s*(iframe|embed|object|link|style|meta|base|form|handler|set|animate|animateTransform)[\s>]/gi, "<!--$1-blocked-->")
+    .replace(/<\s*foreignObject\b[^>]*\/>/gi, "")
     .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-    .replace(/\s(?:xlink:href|href)\s*=\s*("\s*(?:javascript|data\s*:\s*text\/html)[^"]*"|'\s*(?:javascript|data\s*:\s*text\/html)[^']*'|(?:javascript|data\s*:)[^\s>]*)/gi, "");
+    .replace(/\s(?:xlink:href|href|src|data|background|poster|srcdoc|action|formaction)\s*=\s*("\s*(?:javascript|data\s*:\s*text\/html)[^"]*"|'\s*(?:javascript|data\s*:\s*text\/html)[^']*'|(?:javascript|data\s*:)[^\s>]*)/gi, "");
 }
 
 /* ---------- navigation ---------- */
@@ -235,15 +235,15 @@ function explainCam(err) {
   const btn = $("enableCam");
   if (btn) btn.style.display = "block";
   if (name === "NotAllowedError" || name === "SecurityError") {
-    hint.textContent = "Camera permission is off — tap Enable camera";
+    hint.textContent = "Camera permission is off - tap Enable camera";
   } else if (name === "NotFoundError" || name === "OverconstrainedError") {
-    hint.textContent = "No back camera found — tap Enable camera to retry";
+    hint.textContent = "No back camera found - tap Enable camera to retry";
   } else if (name === "NotReadableError") {
-    hint.textContent = "Camera busy in another app — close it, then tap Enable camera";
+    hint.textContent = "Camera busy in another app - close it, then tap Enable camera";
   } else if (name === "stopped") {
-    hint.textContent = "Camera stopped — tap Enable camera";
+    hint.textContent = "Camera stopped - tap Enable camera";
   } else {
-    hint.textContent = `Camera unavailable (${name}) — tap Enable camera`;
+    hint.textContent = `Camera unavailable (${name}) - tap Enable camera`;
   }
   setLocked(false);
 }
@@ -274,7 +274,7 @@ function updateCoinHintMark() {
   const hasCoin = !!(gateCoin || coinManualPt);
   const mm = getCoinSizeMm();
   if (hasCoin && !(mm > 0)) el.textContent = "Choose the reference size so the scale is known.";
-  else if (!hasCoin) el.textContent = "No coin yet — tap “Tap coin to correct” to add one, or measure percent-only.";
+  else if (!hasCoin) el.textContent = "No coin yet - tap “Tap coin to correct” to add one, or measure percent-only.";
   else el.textContent = "";
 }
 /** Select a known diameter, adding a one-off option when the coin is outside the preset list. */
@@ -307,8 +307,8 @@ function identifyCoin(det, fw, fh) {
       const def = CoinModel.DB.find((d) => d.id === best.label);
       coinLabel = def ? `${def.label} · ${def.diam} mm dia` : best.label;
       if (def) setCoinSize(def.diam, def.label);
-      hint.textContent = `${coinLabel} (${Math.round(best.confidence * 100)}%) — hold steady…`;
-    } else { coinLabel = ""; hint.textContent = "Coin found — hold steady…"; }
+      hint.textContent = `${coinLabel} (${Math.round(best.confidence * 100)}%) - hold steady…`;
+    } else { coinLabel = ""; hint.textContent = "Coin found - hold steady…"; }
   } catch { /* ID is advisory; the gate stands on geometry */ }
 }
 function scan() {
@@ -445,7 +445,7 @@ function scanFrame() {
     history.push(null);
     if (history.length > 10) history.shift();
     cancelCapture();
-    if (coinSeen) hint.textContent = "A bit too close — move back a little";
+    if (coinSeen) hint.textContent = "A bit too close - move back a little";
     return;
   }
   history.push(det);
@@ -454,7 +454,7 @@ function scanFrame() {
   if (det) lastDetAt = scanCount;
   // Nudge: after ~5 s of nothing, invite a tap instead of staying silent.
   if (!coinSeen && !assistPt && scanCount > 25 && scanCount - lastDetAt > 25) {
-    hint.textContent = "No coin yet — tap it to point";
+    hint.textContent = "No coin yet - tap it to point";
   }
   const recent = history.filter(Boolean);
   // Steady = recent detections agree with each other. With a tap assist
@@ -483,7 +483,7 @@ function scanFrame() {
   }
 }
 // Tap-to-assist: tapping the viewfinder narrows the search to that spot.
-// The ring must still be detected there — a tap alone never unlocks.
+// The ring must still be detected there - a tap alone never unlocks.
 document.getElementById("cam").addEventListener("pointerdown", (ev) => {
   if (coinSeen || !feed.videoWidth) return;
   const r = feed.getBoundingClientRect();
@@ -557,7 +557,7 @@ $("altEntry").onclick = () => { loadSample(); };
 $("noCoin").onclick = () => {
   noScaleMode = true;
   gateCoin = null;
-  setLocked(false, "Percent-only — no scale. Tap to snap.");
+  setLocked(false, "Percent-only - no scale. Tap to snap.");
   cancelCapture();
 };
 /* Upload fallback: an existing photo skips the coin gate, so it measures
@@ -582,7 +582,7 @@ $("camFile").addEventListener("change", () => {
     stopCamera();
     show("sReview");
   };
-  img.onerror = () => { URL.revokeObjectURL(url); hint.textContent = "That photo could not be read — try another."; };
+  img.onerror = () => { URL.revokeObjectURL(url); hint.textContent = "That photo could not be read - try another."; };
   img.src = url;
 });
 
@@ -651,7 +651,7 @@ function setupMarkPhoto() {
     photo.height = Math.round(img.height * scale);
     photo.getContext("2d", { willReadFrequently: true }).drawImage(img, 0, 0, photo.width, photo.height);
     dmg = { points: [], pointMasks: [], mask: null, iou: 0, source: null };
-    // A manual coin tap is pixel coords of the previous photo — never reuse it.
+    // A manual coin tap is pixel coords of the previous photo - never reuse it.
     coinManualPt = null; coinCorrectMode = false; markBusy = false;
     const fixBtn = $("coinFixBtn");
     if (fixBtn) { fixBtn.textContent = "Tap coin to correct"; fixBtn.classList.remove("on"); }
@@ -666,11 +666,11 @@ function setupMarkPhoto() {
     samArmed = false;
     // Low-memory phones (<=4 GB): the on-device model OOM-kills the whole
     // browser (LMK took Chrome at 2.2 GB GPU / WASM alike on a Galaxy A32).
-    // Never auto-load it there — the API path is tried first, and on-device
+    // Never auto-load it there - the API path is tried first, and on-device
     // only starts after an explicit second tap (see the tap handler).
     if (isLowMemDevice()) {
       samDeferred = true;
-      $("tfState").textContent = "Low-memory phone — automatic outlining first, on-device only if you retry.";
+      $("tfState").textContent = "Low-memory phone - automatic outlining first, on-device only if you retry.";
     } else {
       samDeferred = false;
       startSamEmbed();
@@ -694,7 +694,7 @@ function gateLowMemOnDevice() {
   if (!samArmed) {
     samArmed = true;
     dmg.points.pop();
-    $("status").textContent = "This phone is low on memory — close other tabs/apps, then tap again to load the slower on-device model.";
+    $("status").textContent = "This phone is low on memory - close other tabs/apps, then tap again to load the slower on-device model.";
     return false;
   }
   $("tfState").textContent = "Loading the on-device outlining model (one-time download)…";
@@ -729,10 +729,10 @@ async function segmentViaApi(points, box) {
   if (!res.ok || !j.ok) throw backendErr(res, j, "segment failed");
   // SAM may split one crack into several objects; all of them are the damage.
   // But a tap on a thin crack often returns the wall itself (90%+ of the
-  // frame) — unioning that buries the crack. Drop wall-sized records; when
+  // frame) - unioning that buries the crack. Drop wall-sized records; when
   // nothing but wall remains, throw so the caller falls back on-device.
   const records = j.result?.records ?? [];
-  if (!records.length) throw new Error("SAM found nothing there — tap the middle of the damage and retry.");
+  if (!records.length) throw new Error("SAM found nothing there - tap the middle of the damage and retry.");
   const framePx = photo.width * photo.height;
   const kept = records.filter((rec) => {
     try {
@@ -742,7 +742,7 @@ async function segmentViaApi(points, box) {
       return n <= framePx * 0.5;
     } catch { return false; }
   });
-  if (!kept.length) throw new Error("SAM caught the wall, not the crack — trying on-device; fill the frame with the crack and tap its middle.");
+  if (!kept.length) throw new Error("SAM caught the wall, not the crack - trying on-device; fill the frame with the crack and tap its middle.");
   const mask = unionMasks(kept.map((rec) => decodeRle(rec.rle)));
   return { mask, iou: Math.min(...kept.map((rec) => rec.confidence ?? 0)), rle: encodeRle(mask, photo.width, photo.height) };
 }
@@ -821,7 +821,7 @@ function drawMark() {
 let markBusy = false;
 $("undoBtn")?.addEventListener("click", async () => {
   if (!photo || markBusy) return;
-  // Cancel a coin-correction armed tap first — cheapest undo.
+  // Cancel a coin-correction armed tap first - cheapest undo.
   if (coinCorrectMode) {
     coinCorrectMode = false;
     $("coinFixHint").textContent = "";
@@ -866,7 +866,7 @@ $("undoBtn")?.addEventListener("click", async () => {
     if (out) {
       dmg.mask = closeMask(out.mask, photo.width, photo.height, 2); dmg.iou = out.iou;
       $("status").textContent = `Outlined (${Math.round(dmg.iou * 100)}% sure). ${dmg.points.length} tap${dmg.points.length > 1 ? "s" : ""} left.`;
-    } else { dmg.mask = null; dmg.source = null; $("status").textContent = "Undo done — remaining taps found nothing. Tap again."; }
+    } else { dmg.mask = null; dmg.source = null; $("status").textContent = "Undo done - remaining taps found nothing. Tap again."; }
     markBusy = false;
     drawMark();
     return;
@@ -886,7 +886,7 @@ $("markCanvas").addEventListener("pointerdown", async (ev) => {
   if (coinCorrectMode) {
     coinManualPt = [x, y];
     coinCorrectMode = false;
-    $("coinFixHint").textContent = "Coin corrected — will use your tap";
+    $("coinFixHint").textContent = "Coin corrected - will use your tap";
     $("coinFixBtn").textContent = "Tap coin to correct";
     $("coinFixBtn").classList.remove("on");
     drawMark();
@@ -973,7 +973,7 @@ $("measureBtn").onclick = async () => {
   drawScheme([]);
   const body = { masks: [{ id: "damage-1", label: dmgLabel, rle: encodeRle(dmg.mask, w, h), confidence: dmg.iou || 0.8 }] };
   let circleRef = null;
-  // Manual coin tap wins over the gate — taped coin or missed detection.
+  // Manual coin tap wins over the gate - taped coin or missed detection.
   const coinCxCyR = (() => {
     if (coinManualPt) {
       const estR = Math.max(10, w * 0.035);
@@ -1041,11 +1041,11 @@ async function traceCoin(cx, cy, r, w, h) {
   // An ellipse seen at up to ~60° keeps half its area; much more means SAM took the wall.
   const circle = Math.PI * r * r;
   const taped = !!$("coinTaped")?.checked;
-  // Tape halo inflates the mask (coin + tape strip) — allow 2.5× and a looser centroid when checked.
+  // Tape halo inflates the mask (coin + tape strip) - allow 2.5× and a looser centroid when checked.
   const lo = 0.4, hi = taped ? 2.5 : 1.6, drift = taped ? 0.75 : 0.5;
   if (area < circle * lo || area > circle * hi) {
     if (!taped) return null;
-    // Taped: try to peel tape — keep the strongest inner circular rim instead of the blob.
+    // Taped: try to peel tape - keep the strongest inner circular rim instead of the blob.
     // Re-estimate radius from area and check it still looks like a disk, not a long strip.
     const estR = Math.sqrt(area / Math.PI);
     if (estR > r * 2.0 || estR < r * 0.5) return null;
@@ -1055,7 +1055,7 @@ async function traceCoin(cx, cy, r, w, h) {
 }
 
 function metricCards(f) {
-  const mm = f.crackLengthMm == null ? "—" : `${esc(String(f.crackLengthMm))} mm`;
+  const mm = f.crackLengthMm == null ? "-" : `${esc(String(f.crackLengthMm))} mm`;
   const area = f.areaCm2 == null ? "" : `<div class="metric"><b>${esc(String(f.areaCm2))} cm²</b><span>Area</span></div>`;
   const width = f.crackWidthMm == null ? "" : `<div class="metric"><b>${esc(String(f.crackWidthMm))} mm</b><span>Width</span></div>`;
   const label = String(f.label);
@@ -1076,7 +1076,7 @@ function receiptChips(receipts) {
 
 function measuredRows(findings, receipts) {
   return findings.map((f) => {
-    const mm = f.crackLengthMm === null ? "—" : `${esc(String(f.crackLengthMm))} mm`;
+    const mm = f.crackLengthMm === null ? "-" : `${esc(String(f.crackLengthMm))} mm`;
     const label = String(f.label);
     const cap = label.charAt(0).toUpperCase() + label.slice(1);
     return `<li><p class="found">${esc(cap)} found</p>` +
@@ -1104,7 +1104,7 @@ function maskBox(mask, w, h) {
 /**
  * Outline the mask the backend measured and tag it with its own numbers, on the
  * numbers photo card. Runs from the /v1/observe reply, so it is on screen as soon
- * as the claim leaves the transcript step — no report generation needed.
+ * as the claim leaves the transcript step - no report generation needed.
  */
 function drawNumOverlay() {
   const svg = $("numPhotoOverlay");
@@ -1296,7 +1296,7 @@ async function ensureMic() {
   if (!navigator.mediaDevices?.getUserMedia) {
     setPill("idle", "No mic");
     heard.classList.remove("idle");
-    heard.textContent = "No microphone on this device — type the line below.";
+    heard.textContent = "No microphone on this device - type the line below.";
     showVoiceError("No microphone", "This device has no microphone. Type the line below instead.");
     return false;
   }
@@ -1315,7 +1315,7 @@ async function ensureMic() {
   } catch {
     setPill("idle", "Mic blocked");
     heard.classList.remove("idle");
-    heard.textContent = "Mic blocked — allow access or type the line below.";
+    heard.textContent = "Mic blocked - allow access or type the line below.";
     showVoiceError("Mic blocked", "The browser blocked the microphone. Allow access and try again, or type the line below.");
     return false;
   }
@@ -1396,7 +1396,7 @@ async function finishListening(landed) {
     setPill("idle", "Idle");
     if (landed) {
       heard.classList.remove("idle");
-      heard.textContent = "Didn't catch anything — type the line below.";
+      heard.textContent = "Didn't catch anything - type the line below.";
       showVoiceError("Didn't hear anything", "The recording came back empty. Tap Try again or type the line below.");
     }
     return;
@@ -1441,17 +1441,17 @@ async function finishListening(landed) {
       if (local) { landTranscript(local); return; }
       setPill("idle", "Idle");
       heard.classList.remove("idle");
-      heard.textContent = "Didn't catch anything — type the line below.";
+      heard.textContent = "Didn't catch anything - type the line below.";
       showVoiceError("Didn't hear anything", "Nothing recognizable in that recording. Tap Try again or type the line below.");
       return;
     } catch (e) {
       setPill("idle", "Idle");
-      showVoiceError("Transcription failed", isOfflineNow() ? `${offlineModelMessage("speech")} Or type the line below.` : `Transcription failed — type the line below. (${e.message ?? e})`);
+      showVoiceError("Transcription failed", isOfflineNow() ? `${offlineModelMessage("speech")} Or type the line below.` : `Transcription failed - type the line below. (${e.message ?? e})`);
       return;
     }
   } catch (e) {
     setPill("idle", "Idle");
-    showVoiceError("Transcription failed", isOfflineNow() ? `${offlineModelMessage("speech")} Or type the line below.` : `Transcription failed — type the line below. (${e.message ?? e})`);
+    showVoiceError("Transcription failed", isOfflineNow() ? `${offlineModelMessage("speech")} Or type the line below.` : `Transcription failed - type the line below. (${e.message ?? e})`);
   }
 }
 function landTranscript(text) {
@@ -1559,7 +1559,7 @@ function canProceedToReport() {
   const done = (checkState.skeptic === "ok" || checkState.skeptic === "error") &&
     (checkState.xcheck === "ok" || checkState.xcheck === "error");
   if (!done) {
-    $("skStatus").textContent = "Run both checks to continue — retry any failed one.";
+    $("skStatus").textContent = "Run both checks to continue - retry any failed one.";
     show("sCheck");
   }
   return done;
@@ -1571,7 +1571,7 @@ async function runSkeptic(auto, retried = false) {
   checkState.skeptic = "loading";
   renderCheckCard(); updateReportGate();
   if (!retried) $("skOut").innerHTML = `<div class="skel" role="status" aria-label="Skeptic is checking"></div>`;
-  else $("skStatus").textContent = "First draft failed the gate — retrying once…";
+  else $("skStatus").textContent = "First draft failed the gate - retrying once…";
   try {
     // /v1/skeptic re-measures server-side: it needs the same measure inputs
     // /v1/report used, not just findings/receipts (else 422 "component and
@@ -1597,7 +1597,7 @@ async function runSkeptic(auto, retried = false) {
     setCheck("skeptic", "ok");
   } catch (e) {
     // The model is nondeterministic: one automatic retry on gate failure only.
-    // Any other 4xx/5xx is shown once with a manual Retry button — never an auto loop.
+    // Any other 4xx/5xx is shown once with a manual Retry button - never an auto loop.
     if (!retried && /Evidence gate failed/.test(e.message ?? "")) return runSkeptic(auto, true);
     const status = e.status ?? "?";
     console.error(`[skeptic] HTTP ${status}: ${e.message ?? e}`, e.details ?? "");
@@ -1621,17 +1621,17 @@ async function runXcheck(auto) {
     let other;
     if (dmg.source === "api") {
       if (!embeddings) {
-        if (samDeferred && samEmbedStartedFor !== samPhotoId) throw new Error("On-device comparison needs more free memory — close other tabs/apps, tap the damage to load it, then retry.");
-        throw new Error(isOfflineNow() ? offlineModelMessage("outlining") : "On-device model still loading — retry in a moment.");
+        if (samDeferred && samEmbedStartedFor !== samPhotoId) throw new Error("On-device comparison needs more free memory - close other tabs/apps, tap the damage to load it, then retry.");
+        throw new Error(isOfflineNow() ? offlineModelMessage("outlining") : "On-device model still loading - retry in a moment.");
       }
       const dev = await segmentOnDevice();
       if (!dev) throw new Error("The on-device model found nothing at those taps.");
       other = encodeRle(dev.mask, photo.width, photo.height);
     } else {
-      // Mock backend has no SAM to check against — say so without a doomed fetch.
-      if (await getBackendMode() === "mock") throw new Error("mock segment unavailable — SAM 3.1 is unwired in mock mode");
+      // Mock backend has no SAM to check against - say so without a doomed fetch.
+      if (await getBackendMode() === "mock") throw new Error("mock segment unavailable - SAM 3.1 is unwired in mock mode");
       // The measured mask's own bounding box constrains the re-prompt, so a
-      // thin crack comes back as the crack — not the whole wall again.
+      // thin crack comes back as the crack - not the whole wall again.
       let box;
       if (dmg.mask) {
         let minX = photo.width, minY = photo.height, maxX = -1, maxY = -1;
@@ -1667,10 +1667,10 @@ async function runXcheck(auto) {
     const status = e.status ?? "?";
     console.error(`[xcheck] HTTP ${status}: ${e.message ?? e}`, e.details ?? "");
     // /v1/segment is unavailable in mock mode, so a mask drawn by the API path
-    // has nothing to cross-check against — say so instead of a generic failure.
+    // has nothing to cross-check against - say so instead of a generic failure.
     const noSam = /mock segment|not wired|HTTP 501/.test(e.message ?? "");
     const unavailable = typeof status === "number" && status >= 400 && status < 500;
-    const title = noSam ? "Cross-check unavailable — SAM 3.1 is unavailable in mock mode"
+    const title = noSam ? "Cross-check unavailable - SAM 3.1 is unavailable in mock mode"
       : unavailable ? `Cross-check unavailable (HTTP ${status})` : "Cross-check failed.";
     const detailList = Array.isArray(e.details) && e.details.length
       ? `<ul>${e.details.map((d) => `<li><small>${esc(d)}</small></li>`).join("")}</ul>` : "";
@@ -1754,15 +1754,15 @@ $("shareBtn").onclick = async () => {
     if (navigator.share) await navigator.share({ title: "SnapClaim damage report", text });
     else throw new Error("no native share sheet");
   } catch {
-    try { await navigator.clipboard.writeText(text); $("reportState").textContent = "Copied — no share sheet on this device."; }
-    catch { $("reportState").textContent = "Sharing unavailable here — use Download SVG."; }
+    try { await navigator.clipboard.writeText(text); $("reportState").textContent = "Copied - no share sheet on this device."; }
+    catch { $("reportState").textContent = "Sharing unavailable here - use Download SVG."; }
   }
 };
 $("copyBtn").onclick = async () => {
   const text = reportSummaryText();
   if (!text) return;
   try { await navigator.clipboard.writeText(text); $("reportState").textContent = "Summary copied to clipboard."; }
-  catch { $("reportState").textContent = "Copy failed in this browser — select the summary manually."; }
+  catch { $("reportState").textContent = "Copy failed in this browser - select the summary manually."; }
 };
 $("newClaimBtn").onclick = () => {
   currentCaseId = null;
@@ -1884,7 +1884,7 @@ function caseItem(c) {
   b.type = "button"; b.className = "caseitem";
   const when = new Date(c.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
   const meta = [c.label ? `${c.label} ${c.percent ?? "?"}%` : null, c.severity, when].filter(Boolean).join(" · ");
-  // c.photo is a canvas data URL we wrote; never interpolate it raw — a
+  // c.photo is a canvas data URL we wrote; never interpolate it raw - a
   // quote-breakout (" onerror=) would run on open. Validate before use.
   const img = document.createElement("img");
   img.alt = "";
@@ -1958,6 +1958,8 @@ $("ctaNew").onclick = startCapture;
 $("tabNew").onclick = startCapture;
 $("ctaSample").onclick = () => { backToCam(); loadSample(); };
 $("doneHome").onclick = () => showTab("tHome");
+$("settingsGearHome").onclick = () => showTab("tSettings");
+$("settingsGearCases").onclick = () => showTab("tSettings");
 function openCase(id) {
   const c = caseStore.get(id);
   if (!c) return;
@@ -2014,7 +2016,7 @@ $("dlgFile").addEventListener("change", () => {
     const saved = caseStore.save({ id: dlgCaseId, photo: cap.toDataURL("image/jpeg", 0.85), photoDropped: false });
     openCase(saved.id);
     renderCases();
-    toast(saved.photoDropped ? "Photo too large for device storage — case kept without it" : "Photo updated");
+    toast(saved.photoDropped ? "Photo too large for device storage - case kept without it" : "Photo updated");
   };
   img.src = url;
 });
@@ -2024,7 +2026,7 @@ $("exportAllBtn").onclick = () => {
 };
 $("wipeBtn").onclick = () => {
   if (!caseStore.list().length) { toast("No cases to delete"); return; }
-  if (!confirm("Delete ALL cases from this device? Export first — there is no cloud copy.")) return;
+  if (!confirm("Delete ALL cases from this device? Export first - there is no cloud copy.")) return;
   caseStore.clear();
   renderCases();
   toast("All cases deleted");
@@ -2091,21 +2093,21 @@ async function checkBackend() {
     const j = await r.json();
     $("setHealth").textContent = `ok v${j.version} mode:${j.mode}`;
     $("healthOut").textContent = $("setHealth").textContent;
-  } catch { $("setHealth").textContent = "unreachable — check the URL and your connection"; }
+  } catch { $("setHealth").textContent = "unreachable - check the URL and your connection"; }
   syncNetPill();
 }
 $("setCheck").onclick = checkBackend;
 $("updateBtn").onclick = async () => {
-  if (!swReg) { toast("Service worker not registered yet — reload once, then check again"); return; }
+  if (!swReg) { toast("Service worker not registered yet - reload once, then check again"); return; }
   await swReg.update().catch(() => {});
-  toast($("updateBar").hidden ? "You are on the latest version" : "Update ready — tap Reload at the top");
+  toast($("updateBar").hidden ? "You are on the latest version" : "Update ready - tap Reload at the top");
 };
 function saveCaseFromReport() {
   const f = (lastMeasurement?.findings ?? [])[0];
   if (!f) return;
   const saved = caseStore.save({
     id: currentCaseId ?? undefined,
-    name: `${String(f.label).charAt(0).toUpperCase() + String(f.label).slice(1)} — ${new Date().toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`,
+    name: `${String(f.label).charAt(0).toUpperCase() + String(f.label).slice(1)} - ${new Date().toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`,
     transcript: $("transcriptBox").value.trim(),
     label: String(f.label), percent: f.percent, severity: String(f.severity),
     crackLengthMm: f.crackLengthMm ?? null, areaCm2: f.areaCm2 ?? null,

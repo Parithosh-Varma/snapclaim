@@ -5,7 +5,7 @@ import { HttpError, type Env } from "./providers.ts";
  *
  * The deployed mode still comes from `MOCK_MODE` in the environment, but a
  * local operator can flip modes at runtime without restarting the server.
- * The flip is an in-memory override only — it never persists and never leaks
+ * The flip is an in-memory override only - it never persists and never leaks
  * keys. Writes require `ADMIN_TOKEN` to be set and the caller to present it
  * as `Authorization: Bearer <token>`. Reads (`GET /v1/admin/status`) are
  * public and key-free, like `/v1/health` + `/v1/spend` combined.
@@ -32,8 +32,10 @@ export function resetAdminForTests(): void {
   mockOverride = null;
 }
 
+export const MIN_ADMIN_TOKEN_LEN = 16;
+
 export function isAdminEnabled(env: Env): boolean {
-  return (env.ADMIN_TOKEN ?? "").trim() !== "";
+  return (env.ADMIN_TOKEN ?? "").trim().length >= MIN_ADMIN_TOKEN_LEN;
 }
 
 function bearerToken(headers: Record<string, string | undefined>): string {
@@ -51,6 +53,9 @@ export function requireAdmin(
   const expected = (env.ADMIN_TOKEN ?? "").trim();
   if (expected === "") {
     throw new HttpError(403, "admin writes disabled: set ADMIN_TOKEN on the backend to enable the dev panel mode switch");
+  }
+  if (expected.length < MIN_ADMIN_TOKEN_LEN) {
+    throw new HttpError(403, `admin writes disabled: ADMIN_TOKEN must be at least ${MIN_ADMIN_TOKEN_LEN} characters`);
   }
   const got = bearerToken(headers);
   if (got === "") {

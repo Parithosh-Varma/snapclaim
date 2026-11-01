@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { pathToFileURL } from "node:url";
-import { checkRateLimit, corsHeadersFor, handleRequest } from "./app.ts";
+import { checkRouteRateLimit, corsHeadersFor, handleRequest, securityHeaders } from "./app.ts";
 
 const PORT = Number(process.env.PORT ?? 8787);
 
@@ -16,6 +16,7 @@ function sendJson(res: import("node:http").ServerResponse, status: number, value
   res.writeHead(status, {
     "content-type": "application/json",
     "x-content-type-options": "nosniff",
+    ...securityHeaders(),
     ...(retryAfterSec !== undefined ? { "retry-after": String(retryAfterSec) } : {}),
     ...corsHeadersFor(origin, process.env),
   });
@@ -54,9 +55,10 @@ export const server = createServer(async (req, res) => {
     return;
   }
   const path = new URL(req.url ?? "/", "http://localhost").pathname;
-  // Per-IP rate limit before touching the body: anonymous billable routes
-  // would otherwise let one client loop 1 MB POSTs and drain quota / CPU.
-  const limit = checkRateLimit(`node:${clientIp(req)}`);
+  // Tiered per-IP per-route limit before touching the body: anonymous
+  // billable routes drain spend/CPU at 1 MB POSTs, so they get 20/min while
+  // cheap deterministic routes stay at 120/min.
+  const limit = checkRouteRateLimit(clientIp(req), req.method ?? "GET", path);
   if (!limit.ok) {
     sendJson(res, 429, { ok: false, error: `rate limited: retry in ${limit.retryAfterSec}s`, code: 429, requestId: "unknown" }, origin, limit.retryAfterSec);
     try { req.destroy(); } catch { /* noop */ }
@@ -72,14 +74,22 @@ export const server = createServer(async (req, res) => {
     }
   }
   const fetchFn: typeof fetch = (url, init) => fetch(url, init);
-  const auth = req.headers.authorization;
+  const header = (name: string): string | undefined => {
+    const v = req.headers[name];
+    return typeof v === "string" ? v : undefined;
+  };
   const handled = await handleRequest({
     method: req.method ?? "GET",
     path,
     body,
     env: process.env,
     fetchFn,
-    headers: typeof auth === "string" ? { authorization: auth } : {},
+    headers: {
+      authorization: header("authorization"),
+      "x-meta-key": header("x-meta-key"),
+      "x-baseten-key": header("x-baseten-key"),
+    },
+    clientIp: req.socket.remoteAddress ?? "unknown",
   });
   sendJson(res, handled.status, handled.body, origin);
 });

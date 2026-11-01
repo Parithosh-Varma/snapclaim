@@ -6,7 +6,7 @@ import { stripMetadata } from "../src/vision/exif.ts";
  *
  * When a caller posts a `data:` image to /v1/segment, the decoded bytes are
  * stored in the `images` bucket so the exact input stays re-runnable and
- * auditable. Storage is best-effort by design: this module NEVER throws —
+ * auditable. Storage is best-effort by design: this module NEVER throws -
  * any misconfiguration or network failure yields `null` and the measurement
  * pipeline continues with the inline data URL untouched.
  *
@@ -38,10 +38,27 @@ function decodeDataUrl(dataUrl: string): { bytes: Uint8Array; ext: string; mime:
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     if (bytes.length === 0) return null;
+    // Magic-byte check: MIME string alone allows polyglot stored objects
+    // served as content-type:image/* (content-type confusion).
+    if (!matchesMagic(bytes, mime)) return null;
     return { bytes: scrubMetadata(bytes, mime) ?? bytes, ext, mime };
   } catch {
     return null;
   }
+}
+
+/** Verify the decoded bytes match the claimed raster type. */
+function matchesMagic(bytes: Uint8Array, mime: string): boolean {
+  if (mime === "image/png") {
+    return bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 && bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a;
+  }
+  if (mime === "image/jpeg") {
+    return bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xd8;
+  }
+  if (mime === "image/webp") {
+    return bytes.length >= 12 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50;
+  }
+  return false;
 }
 
 /**

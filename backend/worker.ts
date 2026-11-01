@@ -1,4 +1,4 @@
-import { checkRateLimit, corsHeadersFor, handleRequest } from "./app.ts";
+import { checkRouteRateLimit, corsHeadersFor, handleRequest, securityHeaders } from "./app.ts";
 import { D1Store, type D1Database } from "./store.ts";
 
 export interface Env {
@@ -27,20 +27,22 @@ export default {
     const headers = {
       "content-type": "application/json",
       "x-content-type-options": "nosniff",
+      "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+      ...securityHeaders(),
       ...corsHeadersFor(request.headers.get("origin"), env),
     };
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
     // cf-connecting-ip is set by Cloudflare's edge and cannot be spoofed by
     // the client; X-Forwarded-For can, so it is ignored for rate limiting.
     const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
-    const limit = checkRateLimit(`worker:${ip}`);
+    const url = new URL(request.url);
+    const limit = checkRouteRateLimit(ip, request.method, url.pathname);
     if (!limit.ok) {
       return Response.json(
         { ok: false, error: `rate limited: retry in ${limit.retryAfterSec}s`, code: 429, requestId: "unknown" },
         { status: 429, headers: { ...headers, "retry-after": String(limit.retryAfterSec) } },
       );
     }
-    const url = new URL(request.url);
     const declared = Number(request.headers.get("content-length") ?? 0);
     if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
       return Response.json(
@@ -107,7 +109,6 @@ export default {
     }
     // Bound wrapper: a bare global fetch loses its `this` on Workers (illegal invocation).
     const fetchFn: typeof fetch = (url, init) => fetch(url, init);
-    const auth = request.headers.get("authorization");
     const handled = await handleRequest({
       method: request.method,
       path: url.pathname,
@@ -115,7 +116,12 @@ export default {
       env,
       fetchFn,
       store: DB ? new D1Store(DB) : undefined,
-      headers: auth ? { authorization: auth } : {},
+      headers: {
+        authorization: request.headers.get("authorization") ?? undefined,
+        "x-meta-key": request.headers.get("x-meta-key") ?? undefined,
+        "x-baseten-key": request.headers.get("x-baseten-key") ?? undefined,
+      },
+      clientIp: ip,
     });
     return Response.json(handled.body as never, { status: handled.status, headers });
   },

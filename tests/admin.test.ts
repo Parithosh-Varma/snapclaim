@@ -5,7 +5,7 @@ import { resetAdminForTests } from "../backend/admin.ts";
 import { resetSpendForTests } from "../backend/spend.ts";
 import { LIVE_ENV } from "./helpers.ts";
 
-const ADMIN_ENV = { ...LIVE_ENV, ADMIN_TOKEN: "dev-secret" };
+const ADMIN_ENV = { ...LIVE_ENV, ADMIN_TOKEN: "dev-secret-0123456789abcdef" };
 
 function auth(token: string) {
   return { authorization: `Bearer ${token}` };
@@ -85,7 +85,7 @@ test("admin mode switch flips health mode at runtime and resets to env", async (
       path: "/v1/admin/mode",
       body: { mode: "mock" },
       env: ADMIN_ENV,
-      headers: auth("dev-secret"),
+      headers: auth("dev-secret-0123456789abcdef"),
     });
     assert.equal(flipped.status, 200);
     const flippedResult = (flipped.body as { result: Record<string, unknown> }).result;
@@ -104,7 +104,7 @@ test("admin mode switch flips health mode at runtime and resets to env", async (
       path: "/v1/admin/mode",
       body: { reset: true },
       env: ADMIN_ENV,
-      headers: auth("dev-secret"),
+      headers: auth("dev-secret-0123456789abcdef"),
     });
     assert.equal(reset.status, 200);
     assert.equal((reset.body as { result: Record<string, unknown> }).result["mockSource"], "env");
@@ -125,7 +125,7 @@ test("admin mode switch rejects malformed bodies", async () => {
         path: "/v1/admin/mode",
         body,
         env: ADMIN_ENV,
-        headers: auth("dev-secret"),
+        headers: auth("dev-secret-0123456789abcdef"),
       });
       assert.equal(res.status, 400, `expected 400 for ${JSON.stringify(body)}`);
     }

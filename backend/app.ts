@@ -9,11 +9,11 @@ import { MAX_CITATIONS_PER_FINDING, MAX_DRAFTS, MAX_STATEMENT_CHARS, validateFin
 import type { MeasuredFinding } from "../src/engine/types.ts";
 import type { Receipt } from "../src/receipts/types.ts";
 import { MAX_PHOTO_HREF_CHARS, type AnnexureOverlay, renderAnnexureSvg } from "../src/render/svg.ts";
-import { maskOutlinePath } from "../src/vision/contour.ts";
+import { ellipseOutlinePath, maskOutlinePath } from "../src/vision/contour.ts";
 import { guardFor, spendStatus } from "./spend.ts";
 import { applyAdminMode, effectiveMockMode, isAdminEnabled, mockSource, parseAdminModeBody, requireAdmin } from "./admin.ts";
-import { BudgetExceededError } from "../src/config/spend-guard.ts";
-import { configFromEnv, findingsProvider, requireLiveKeys, skepticProvider, visionProvider, HttpError, SAM_IMAGE_USD, type Env, type FetchFn } from "./providers.ts";
+import { BudgetExceededError, estimateCostUsd } from "../src/config/spend-guard.ts";
+import { configFromEnv, findingsProvider, requireLiveKeys, skepticProvider, visionProvider, HttpError, SAM_IMAGE_USD, SPARK_PRICE, type Env, type FetchFn } from "./providers.ts";
 import {
   DEFAULT_KEYWORDS,
   DEFAULT_LANGUAGE_BIAS,
@@ -47,7 +47,7 @@ export interface VerboseError {
 }
 
 function newRequestId(): string {
-  const bytes = new Uint8Array(8);
+  const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
@@ -72,7 +72,24 @@ export function toMeasureInput(body: unknown, serverMinConfidence?: number): Mea
     component: component as MeasureSessionInput["component"],
     masks: masks as MeasureSessionInput["masks"],
   };
-  if (scaleReference !== undefined) input.scaleReference = scaleReference as MeasureSessionInput["scaleReference"];
+  if (scaleReference !== undefined) {
+    // Scale is the forgery dial: knownMm=1e9 with lengthPx=0.01 invents
+    // arbitrary mm/cm2 that still passes the numbers-match gate. Bound it
+    // to physical reference objects (coin/ruler <= 1000mm, >=1px).
+    if (!isRecord(scaleReference)) throw new Error("scaleReference must be an object");
+    const sr = scaleReference as Record<string, unknown>;
+    if (typeof sr.id !== "string" || sr.id === "") throw new Error("scaleReference.id must be a non-empty string");
+    if (typeof sr.knownMm !== "number" || !Number.isFinite(sr.knownMm) || sr.knownMm <= 0 || sr.knownMm > 1000) {
+      throw new Error("scaleReference.knownMm must be in (0, 1000]");
+    }
+    if (typeof sr.lengthPx !== "number" || !Number.isFinite(sr.lengthPx) || sr.lengthPx < 1 || sr.lengthPx > 8192) {
+      throw new Error("scaleReference.lengthPx must be in [1, 8192]");
+    }
+    if (typeof sr.confidence !== "number" || !Number.isFinite(sr.confidence) || sr.confidence < 0 || sr.confidence > 1) {
+      throw new Error("scaleReference.confidence must be in [0, 1]");
+    }
+    input.scaleReference = scaleReference as unknown as MeasureSessionInput["scaleReference"];
+  }
   if (thresholds !== undefined) {
     // Threshold overrides are attacker-controlled severity dials
     // ({significantCrackMm: 0} marks everything significant). Validate shape
@@ -147,7 +164,7 @@ function parseRle(value: unknown, name: string): BinaryMask {
     throw new HttpError(400, `${name}.rle.counts must be a number array or COCO string`);
   }
   const runs = typeof counts === "string" ? counts.length : (counts as unknown[]).length;
-  // A compressed string carries ~1 run per 2–4 chars; bound both forms.
+  // A compressed string carries ~1 run per 2-4 chars; bound both forms.
   if (Array.isArray(counts) ? counts.length > MAX_RLE_RUNS : counts.length > MAX_RLE_RUNS * 4) {
     throw new HttpError(400, `${name}.rle has ${runs} runs/chars, capped at ${MAX_RLE_RUNS} runs`);
   }
@@ -175,12 +192,12 @@ function requireId(value: unknown, name: string): string {
 }
 
 /**
- * POST /v1/crosscheck — independent mask agreement.
+ * POST /v1/crosscheck - independent mask agreement.
  *
  * Takes two COCO RLE masks of the same frame (e.g. the on-device SlimSAM
  * preview and the authoritative SAM 3.1 record) and scores their overlap.
  * The verdict uses the caller's threshold (default 0.5). Pure set math,
- * no keys, no models — the planned SlimSAM-vs-SAM skeptic check.
+ * no keys, no models - the planned SlimSAM-vs-SAM skeptic check.
  */
 export function crosscheckBody(body: unknown, requestId = newRequestId()): EnvelopedResult {
   const started = Date.now();
@@ -306,7 +323,14 @@ export function observeBody(body: unknown, requestId = newRequestId()): Envelope
       result.scaleReference = measuredReference.reference;
     }
     result.referenceCheck = measuredReference.diagnostics;
-    result.overlay.masks.push({ id: measuredReference.reference.id, label: "coin", path: maskOutlinePath(refMask, { tolerance: OUTLINE_TOLERANCE_PX }) });
+    // Draw the fitted ellipse, not the simplified pixel polygon: the scale
+    // comes from the ellipse fit, so the outline should show that same shape.
+    const diag = measuredReference.diagnostics;
+    result.overlay.masks.push({
+      id: measuredReference.reference.id,
+      label: "coin",
+      path: ellipseOutlinePath(diag.cx, diag.cy, diag.majorPx / 2, diag.minorPx / 2, diag.axisDeg),
+    });
   }
   quietLog("[observe]", { requestId, masks: observed.length });
   return envelope(requestId, started, result);
@@ -314,7 +338,7 @@ export function observeBody(body: unknown, requestId = newRequestId()): Envelope
 
 /**
  * Draft findings and gate them. A rejection gets one repair retry with the
- * exact gate failures fed back to the model — the common miss is citing
+ * exact gate failures fed back to the model - the common miss is citing
  * scale/count numbers no citation can verify.
  */
 async function draftAndGate(
@@ -345,6 +369,12 @@ export async function reportBody(body: unknown, env: Env, requestId = newRequest
 
   let drafts: FindingDraft[];
   if (body.drafts !== undefined) {
+    // Gate-wash fix: caller-supplied phrasing with correct numbers passes
+    // the numbers-match gate but costs $0 and carries no model provenance.
+    // Only mock mode (tests/local) may inject drafts; live must generate.
+    if (!config.mockMode) {
+      throw new HttpError(422, "custom drafts not allowed in live mode: omit drafts or use /v1/findings with server recomputation");
+    }
     if (!Array.isArray(body.drafts)) throw new Error("drafts must be an array");
     if (body.drafts.length > MAX_DRAFTS) throw new HttpError(400, `drafts capped at ${MAX_DRAFTS}`);
     for (let i = 0; i < body.drafts.length; i++) {
@@ -387,7 +417,7 @@ export async function segmentBody(body: unknown, env: Env, requestId = newReques
     return envelope(requestId, started, result);
   }
   // Live: SAM 3.1 point prompts over the Responses API. The backend decodes
-  // masks with the official parser — it never invents them.
+  // masks with the official parser - it never invents them.
   const { metaKey } = requireLiveKeys(env, config);
   const imageUrl = typeof body.imageUrl === "string" ? body.imageUrl : "";
   assertSafeImageUrl(imageUrl);
@@ -397,7 +427,7 @@ export async function segmentBody(body: unknown, env: Env, requestId = newReques
     throw new HttpError(400, `width×height ${width}x${height} exceeds the ${MAX_MASK_PIXELS}-pixel cap`);
   }
   const rawPoints = Array.isArray(body.points) ? body.points : [];
-  if (rawPoints.length === 0 || rawPoints.length > 16) throw new HttpError(400, "live /v1/segment needs 1–16 body.points [{x, y}]");
+  if (rawPoints.length === 0 || rawPoints.length > 16) throw new HttpError(400, "live /v1/segment needs 1-16 body.points [{x, y}]");
   const points: SamPoint[] = rawPoints.map((point, i) => {
     if (!isRecord(point)) throw new HttpError(400, `points[${i}] must be an object`);
     return { x: requireNumber(point.x, `points[${i}].x`), y: requireNumber(point.y, `points[${i}].y`) };
@@ -500,8 +530,8 @@ export function assertSafeImageUrl(imageUrl: string): void {
   // Numeric-literal block: dotted quads miss decimal ("https://2130706433/"),
   // octal ("https://0177.0.0.1/"), hex and short-form ("https://127.1/")
   // spellings of the same loopback/private addresses. Any host made only of
-  // numeric labels is an IP-literal attempt — real public image hosts never
-  // look like that — so fail closed without trying to emulate the WHATWG
+  // numeric labels is an IP-literal attempt - real public image hosts never
+  // look like that - so fail closed without trying to emulate the WHATWG
   // parser branch by branch.
   const labels = host.split(".");
   const numericish = /^(0x[0-9a-f]+|0[0-9]+|[0-9]+)$/i;
@@ -525,7 +555,7 @@ export function assertSafeImageUrl(imageUrl: string): void {
   }
   // Residual: DNS rebinding and redirects cannot be ruled out by a string
   // check. Impact stays limited because the backend never fetches this URL
-  // itself — it only forwards it to Meta's Responses API (segmentWithSam) —
+  // itself - it only forwards it to Meta's Responses API (segmentWithSam) -
   // so there is no victim-VPC metadata fetch from our network.
 }
 
@@ -543,7 +573,7 @@ function base64ToBytes(value: unknown): Uint8Array {
 }
 
 /**
- * POST /v1/transcribe — spoken line to text via Muse Voice Transcribe.
+ * POST /v1/transcribe - spoken line to text via Muse Voice Transcribe.
  * Mock mode returns the supplied fixture transcript (the backend invents none).
  * Live mode proxies to {META_API_BASE}/v1/asr/transcribe as multipart.
  */
@@ -553,7 +583,7 @@ export async function transcribeBody(body: unknown, env: Env, requestId = newReq
   const config = configFromEnv(env);
   if (config.mockMode) {
     if (typeof body.fixtureTranscript !== "string") {
-      throw new HttpError(400, "mock transcribe requires body.fixtureTranscript — backend invents no transcripts");
+      throw new HttpError(400, "mock transcribe requires body.fixtureTranscript - backend invents no transcripts");
     }
     const result: TranscribeResult = { transcript: body.fixtureTranscript, audioDurationMs: 0, turns: [] };
     return envelope(requestId, started, result);
@@ -595,6 +625,110 @@ export async function transcribeBody(body: unknown, env: Env, requestId = newReq
     throw error;
   }
   return envelope(requestId, started, result);
+}
+
+/** Image-description ceiling: one photo + reasoning-heavy output (Spark spends
+    ~95% of completion tokens thinking, as the skeptic path documents). */
+const DESCRIBE_COST_CEILING_USD = 0.02;
+
+/**
+ * POST /v1/describe - what is in this picture, via the Meta chat model.
+ * The Say screen fills the transcript with the answer (force 100%): the
+ * reporter starts from an AI description and edits, instead of typing blind.
+ * Mock mode returns the supplied fixture description (the backend invents none).
+ */
+export async function describeBody(body: unknown, env: Env, requestId = newRequestId(), fetchFn?: FetchFn): Promise<EnvelopedResult> {
+  const started = Date.now();
+  if (!isRecord(body)) throw new Error("body must be a JSON object");
+  const config = configFromEnv(env);
+  if (config.mockMode) {
+    if (typeof body.fixtureDescription !== "string") {
+      throw new HttpError(400, "mock describe requires body.fixtureDescription - backend invents no descriptions");
+    }
+    return envelope(requestId, started, { description: body.fixtureDescription });
+  }
+  const { metaKey } = requireLiveKeys(env, config);
+  const imageUrl = typeof body.imageUrl === "string" ? body.imageUrl : "";
+  assertSafeImageUrl(imageUrl);
+  const note = typeof body.note === "string" ? body.note.trim().slice(0, 500) : "";
+  const spend = guardFor(env);
+  let hold: ReturnType<typeof spend.reserve> | undefined;
+  try {
+    hold = spend.reserve("describe ceiling", DESCRIBE_COST_CEILING_USD);
+  } catch (error) {
+    if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
+    throw error;
+  }
+  if (spend && spend.remainingUsd <= 0) {
+    hold?.release();
+    throw new HttpError(429, `spend guard: $0 remaining of $${spend.limitUsd} limit`);
+  }
+  let res: Awaited<ReturnType<NonNullable<typeof fetchFn>>>;
+  try {
+    res = await (fetchFn ?? fetch)(`${config.endpoints.meta}/chat/completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${metaKey}` },
+      body: JSON.stringify({
+        model: config.models.spark,
+        max_tokens: 2000,
+        messages: [
+          {
+            role: "system",
+            content:
+              note
+                ? "The reporter wrote one line about visible damage. Extend it into a fuller 2-3 sentence description for a repair report, using the photo. Stay with what is visible plus what the note says - never invent locations, causes or dates. Plain words, no measurements, no markdown, under 400 characters."
+                : "Describe the visible wall or surface damage in one short sentence for a repair report. " +
+                  "Name the damage type, where it runs, and anything placed beside it for scale. " +
+                  "Plain words, no measurements, no markdown, under 280 characters.",
+          },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: note ? `Extend this note using the picture: "${note}"` : "What is in this picture?" },
+              { type: "image_url", image_url: { url: imageUrl } },
+            ],
+          },
+        ],
+      }),
+    });
+  } catch {
+    hold?.release();
+    throw new HttpError(502, "Meta describe unreachable");
+  }
+  const j = (await res.json().catch(() => ({}))) as {
+    choices?: Array<{ message?: { content?: unknown } }>;
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
+    error?: { message?: string };
+  };
+  if (!res.ok) {
+    hold?.release();
+    throw new HttpError(res.status >= 500 ? 502 : res.status, `Meta describe failed${j.error?.message ? `: ${String(j.error.message).slice(0, 200)}` : ""}`);
+  }
+  const raw = j.choices?.[0]?.message?.content;
+  const content = Array.isArray(raw)
+    ? raw.filter((p) => isRecord(p) && p.type === "text").map((p) => String((p as { text?: unknown }).text ?? "")).join(" ")
+    : raw;
+  if (typeof content !== "string" || !content.trim()) {
+    hold?.release();
+    const shape = `keys=${Object.keys(j).join(",")};choice0=${JSON.stringify(j.choices?.[0]).slice(0, 300)}`;
+    throw new HttpError(502, `Meta describe returned no content (${shape})`);
+  }
+  const description = content.trim().slice(0, 400);
+  if (spend) {
+    try {
+      hold?.settle(
+        `spark describe in=${j.usage?.prompt_tokens ?? 0} out=${j.usage?.completion_tokens ?? 0}`,
+        estimateCostUsd(
+          { inputTokens: j.usage?.prompt_tokens ?? 0, outputTokens: j.usage?.completion_tokens ?? 0 },
+          SPARK_PRICE,
+        ),
+      );
+    } catch (error) {
+      if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
+      throw error;
+    }
+  }
+  return envelope(requestId, started, { description });
 }
 
 function assertFindingsShape(findings: unknown, receipts: unknown): asserts findings is MeasuredFinding[] {
@@ -692,15 +826,17 @@ export function parseOverlay(raw: unknown): AnnexureOverlay {
   const overlay: AnnexureOverlay = { width, height, masks };
   if (typeof raw.photoHref === "string") {
     if (raw.photoHref.length > MAX_PHOTO_HREF_CHARS) throw new HttpError(400, "overlay.photoHref too long");
-    // Defense in depth with svg.ts safeHref: reject non-https / non-raster here.
-    if (
-      !raw.photoHref.startsWith("https://") &&
-      !raw.photoHref.startsWith("data:image/png") &&
-      !raw.photoHref.startsWith("data:image/jpeg") &&
-      !raw.photoHref.startsWith("data:image/webp")
-    ) {
-      throw new HttpError(400, "overlay.photoHref must be https:// or data:image/png,jpeg,webp");
+    // Defense in depth with svg.ts safeHref: exact mime allowlist, no prefix tricks.
+    // Rejects data:image/pngblah, missing comma, or non-raster payloads.
+    let ok = false;
+    if (raw.photoHref.startsWith("data:")) {
+      const comma = raw.photoHref.indexOf(",");
+      const mime = raw.photoHref.slice(5, raw.photoHref.indexOf(";"));
+      ok = comma > 0 && comma <= 64 && (mime === "image/png" || mime === "image/jpeg" || mime === "image/webp");
+    } else if (raw.photoHref.startsWith("https://")) {
+      ok = !raw.photoHref.includes("\\") && !raw.photoHref.includes('"') && !raw.photoHref.includes("'");
     }
+    if (!ok) throw new HttpError(400, "overlay.photoHref must be https:// or data:image/png,jpeg,webp");
     overlay.photoHref = raw.photoHref;
   }
   return overlay;
@@ -741,7 +877,7 @@ export function errorBody(message: string, code: number, requestId: string, deta
 /**
  * Trust boundary: /v1/findings and /v1/skeptic require server-side
  * recomputation. Callers must send component + masks so the server can
- * re-measure and reject smuggled fake receipts — the gate alone only checks
+ * re-measure and reject smuggled fake receipts - the gate alone only checks
  * internal consistency. No opt-out: use /v1/report for the full pipeline.
  */
 export function crossCheckMeasurement(body: Record<string, unknown>, findings: unknown, receipts: unknown, env: Env = {}): void {
@@ -760,20 +896,28 @@ export function crossCheckMeasurement(body: Record<string, unknown>, findings: u
 const SESSION_MODES = ["absolute", "percent-only"];
 const defaultStore: Store = new MemoryStore();
 
-/** Validate a session body; picks only known keys. The server mints the id —
- * client-supplied ids allowed squatting/guessing via error-code probing. */
+/** Validate a session body; picks only known keys. The server mints the id -
+ * client-supplied ids allowed squatting/guessing via error-code probing.
+ * The server also mints `at`: client timestamps enabled backdating to
+ * control newest-first order (leaderboard/flood shaping). */
 export function toSavedSession(body: unknown): SavedSession {
   if (!isRecord(body)) throw new HttpError(400, "body must be a JSON object");
-  const { at, findings, mode } = body;
+  const { findings, mode } = body;
   if (typeof findings !== "number" || !Number.isInteger(findings) || findings < 0) throw new HttpError(400, "findings must be a non-negative integer");
   if (typeof mode !== "string" || !SESSION_MODES.includes(mode)) throw new HttpError(400, `mode must be one of ${SESSION_MODES.join(", ")}`);
-  if (at !== undefined && typeof at !== "string") throw new HttpError(400, "at must be a string");
-  if (typeof at === "string" && (Number.isNaN(Date.parse(at)) || !/^\d{4}-\d{2}-\d{2}T/.test(at))) throw new HttpError(400, "at must be an ISO date");
-  return { id: crypto.randomUUID(), at: at ?? new Date().toISOString(), findings, mode };
+  // Client timestamps are validated but ignored: backdated `at` controlled
+  // newest-first order (leaderboard shaping), so the server always mints time.
+  if ("at" in body && (body as Record<string, unknown>).at !== undefined) {
+    const at = (body as Record<string, unknown>).at;
+    if (typeof at !== "string" || Number.isNaN(Date.parse(at)) || !/^\d{4}-\d{2}-\d{2}T/.test(at)) {
+      throw new HttpError(400, "at must be an ISO date");
+    }
+  }
+  return { id: crypto.randomUUID(), at: new Date().toISOString(), findings, mode };
 }
 
 const CORS_METHODS = "GET, POST, OPTIONS";
-const CORS_HEADERS = "content-type, authorization";
+const CORS_HEADERS = "content-type, authorization, x-meta-key, x-baseten-key";
 
 export function corsHeaders(): Record<string, string> {
   return {
@@ -793,7 +937,7 @@ export function corsHeaders(): Record<string, string> {
  * - No allowlist + mock mode: "*" (local dev, $0 spend).
  * - No allowlist + live mode: no ACAO header (deny by default; curl unaffected).
  * - Allowlist set: echo the caller only on exact match, otherwise omit ACAO
- *   (fail closed — never fall back to the first allowlisted origin).
+ *   (fail closed - never fall back to the first allowlisted origin).
  */
 export function corsHeadersFor(origin: string | null, env: Env = {}): Record<string, string> {
   const raw = env.ALLOWED_ORIGINS ?? "";
@@ -829,7 +973,7 @@ export interface HandledResponse {
 export type RequestHeaders = Record<string, string | undefined>;
 
 /**
- * GET /v1/admin/status — public, key-free: everything the dev panel needs in
+ * GET /v1/admin/status - public, key-free: everything the dev panel needs in
  * one call (mode + where it came from, spend, model/endpoint names, whether
  * runtime switching is enabled). Never includes keys or tokens.
  */
@@ -868,14 +1012,42 @@ export function adminStatusBody(env: Env = {}): Record<string, unknown> {
   }
 }
 
-/** Minimal per-IP token bucket: 120 req/min per key. Both the Node server and
- * the Worker call it; each isolate keeps its own bucket (documented limit —
- * a global cap needs D1/Durable Objects, like the spend guard). */
+/** Tiered per-IP rate limits: anonymous billable routes are the spend-drain
+ * vector (120 req/min x ~$0.05 = $6/min), so they get the tightest bucket.
+ * Each isolate keeps its own buckets (documented limit - a global cap needs
+ * D1/Durable Objects); tiers at least stop one cheap client from melting one
+ * isolate and make distributed drain cost N IPs x small quota. */
 const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX = 120;
+const RATE_LIMIT_DEFAULT_MAX = 120;
+export const RATE_LIMITS: Record<string, number> = {
+  expensive: 20,
+  admin: 10,
+  sessionsWrite: 30,
+  sessionsRead: 60,
+  cheap: 120,
+};
+const EXPENSIVE_PATHS = new Set([
+  "/v1/report",
+  "/v1/segment",
+  "/v1/transcribe",
+  "/v1/describe",
+  "/v1/findings",
+  "/v1/skeptic",
+  "/v1/render",
+]);
+export function rateLimitTierForPath(method: string, path: string): keyof typeof RATE_LIMITS {
+  if (path === "/v1/admin/mode") return "admin";
+  if (method === "POST" && path === "/v1/sessions") return "sessionsWrite";
+  if (method === "GET" && path === "/v1/sessions") return "sessionsRead";
+  if (method === "POST" && EXPENSIVE_PATHS.has(path)) return "expensive";
+  return "cheap";
+}
+export function rateLimitMaxForPath(method: string, path: string): number {
+  return RATE_LIMITS[rateLimitTierForPath(method, path)] ?? RATE_LIMIT_DEFAULT_MAX;
+}
 const rateBuckets = new Map<string, { count: number; reset: number }>();
 
-export function checkRateLimit(key: string, now = Date.now()): { ok: boolean; retryAfterSec: number } {
+export function checkRateLimit(key: string, now = Date.now(), max = RATE_LIMIT_DEFAULT_MAX): { ok: boolean; retryAfterSec: number } {
   if (rateBuckets.size > 10_000) {
     for (const [k, v] of rateBuckets) if (now >= v.reset) rateBuckets.delete(k);
     if (rateBuckets.size > 10_000) rateBuckets.clear();
@@ -886,19 +1058,64 @@ export function checkRateLimit(key: string, now = Date.now()): { ok: boolean; re
     return { ok: true, retryAfterSec: 0 };
   }
   entry.count += 1;
-  if (entry.count > RATE_LIMIT_MAX) {
+  if (entry.count > max) {
     return { ok: false, retryAfterSec: Math.ceil((entry.reset - now) / 1000) };
   }
   return { ok: true, retryAfterSec: 0 };
+}
+
+/** Per-IP per-tier check: callers pass the raw IP and route; buckets are
+ * isolated per tier so cheap polling never starves expensive quota. */
+export function checkRouteRateLimit(ip: string, method: string, path: string, now = Date.now()): { ok: boolean; retryAfterSec: number; tier: string; max: number } {
+  const tier = rateLimitTierForPath(method, path);
+  const max = RATE_LIMITS[tier] ?? RATE_LIMIT_DEFAULT_MAX;
+  const r = checkRateLimit(`${ip}:${tier}`, now, max);
+  return { ...r, tier, max };
 }
 
 export function isRateLimited(key: string, now = Date.now()): boolean {
   return !checkRateLimit(key, now).ok;
 }
 
+/** Hardening headers for JSON API responses. The PWA already ships CSP +
+ * frame-ancestors; the API needs at minimum no-sniff + no-referrer so a
+ * rendered error/SVG never leaks the URL, plus HSTS on the Worker. */
+export function securityHeaders(): Record<string, string> {
+  return {
+    "referrer-policy": "no-referrer",
+    "permissions-policy": "camera=(), microphone=(), geolocation=()",
+  };
+}
+
 /** Test hook: clear buckets between tests. */
 export function resetRateLimits(): void {
   rateBuckets.clear();
+}
+
+/** Longest caller key we accept; real Meta/Baseten keys are far shorter. */
+const MAX_CALLER_KEY_CHARS = 512;
+
+/**
+ * Bring your own key: `x-meta-key` / `x-baseten-key` on a request replace the
+ * worker secrets for that request only, so a shared demo link spends the
+ * caller's credits, not ours. Keys are never logged or stored. Mock mode and
+ * the no-key routes (measure, observe, crosscheck) are unaffected.
+ */
+export function withCallerKeys(env: Env, headers: RequestHeaders): Env {
+  const pick = (name: string): string | undefined => {
+    const v = headers[name]?.trim();
+    if (!v) return undefined;
+    if (v.length > MAX_CALLER_KEY_CHARS) throw new HttpError(400, `${name} too long`);
+    return v;
+  };
+  const meta = pick("x-meta-key");
+  const baseten = pick("x-baseten-key");
+  if (!meta && !baseten) return env;
+  return {
+    ...env,
+    ...(meta ? { META_API_KEY: meta } : {}),
+    ...(baseten ? { BASETEN_API_KEY: baseten } : {}),
+  };
 }
 
 /** Single router used by both the Node server and the Cloudflare Worker. */
@@ -910,12 +1127,23 @@ export async function handleRequest(input: {
   fetchFn?: FetchFn;
   store?: Store;
   headers?: RequestHeaders;
+  clientIp?: string;
 }): Promise<HandledResponse> {
   const requestId = newRequestId();
   const store = input.store ?? defaultStore;
-  const env = input.env ?? {};
   const headers = input.headers ?? {};
+  let env = input.env ?? {};
+  // Defense in depth: when callers pass clientIp (server/worker do), enforce
+  // the per-route tier here too so direct handleRequest callers get the same
+  // protection as the edge.
+  if (input.clientIp !== undefined) {
+    const rl = checkRouteRateLimit(input.clientIp, input.method, input.path);
+    if (!rl.ok) {
+      return { status: 429, body: errorBody(`rate limited (${rl.tier} ${rl.max}/min): retry in ${rl.retryAfterSec}s`, 429, requestId) };
+    }
+  }
   try {
+    env = withCallerKeys(env, headers);
     if (input.method === "GET" && input.path === "/v1/health") return { status: 200, body: healthBody(env) };
     if (input.method === "GET" && input.path === "/v1/spend") return { status: 200, body: spendStatus(env) };
     if (input.method === "GET" && input.path === "/v1/admin/status") {
@@ -935,6 +1163,7 @@ export async function handleRequest(input: {
     if (input.method === "POST" && input.path === "/v1/report") return { status: 200, body: await reportBody(input.body, env, requestId, input.fetchFn) };
     if (input.method === "POST" && input.path === "/v1/segment") return { status: 200, body: await segmentBody(input.body, env, requestId, input.fetchFn) };
     if (input.method === "POST" && input.path === "/v1/transcribe") return { status: 200, body: await transcribeBody(input.body, env, requestId, input.fetchFn) };
+    if (input.method === "POST" && input.path === "/v1/describe") return { status: 200, body: await describeBody(input.body, env, requestId, input.fetchFn) };
     if (input.method === "POST" && input.path === "/v1/findings") return { status: 200, body: await findingsBody(input.body, env, requestId, input.fetchFn) };
     if (input.method === "POST" && input.path === "/v1/skeptic") return { status: 200, body: await skepticBody(input.body, env, requestId, input.fetchFn) };
     if (input.method === "POST" && input.path === "/v1/render") return { status: 200, body: await renderBody(input.body, env, requestId, input.fetchFn) };
@@ -951,7 +1180,7 @@ export async function handleRequest(input: {
     return { status: 404, body: errorBody("not found", 404, requestId, { method: input.method, path: input.path }) };
   } catch (error) {
     // Outbound model calls use AbortSignal.timeout: an AbortError/TimeoutError
-    // is the upstream hanging, not a bad client request — 502, not 400.
+    // is the upstream hanging, not a bad client request - 502, not 400.
     const message = error instanceof Error ? error.message : "invalid request";
     const isUpstreamTimeout = error instanceof Error &&
       (error.name === "TimeoutError" || error.name === "AbortError" || /aborted due to timeout/i.test(message));

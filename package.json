@@ -28,6 +28,6 @@
     "typescript": "^5.6.0"
   },
   "dependencies": {
-    "@meta-sam/parser": "^0.1.0"
+    "@meta-sam/parser": "0.1.0"
   }
 }
