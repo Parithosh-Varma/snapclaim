@@ -24,7 +24,7 @@ Usage:
 import argparse, json, os, re, subprocess, sys, time, urllib.request, urllib.error
 from datetime import datetime, timezone
 
-DEVICE = "RFCRC0QMDYT"
+DEVICE = os.environ.get("ADB_SERIAL", "emulator-5554")
 BACKEND_URL = "http://127.0.0.1:8787"
 PWA_URL = "http://127.0.0.1:8080/"
 PHOTOS = "fixtures/photos"

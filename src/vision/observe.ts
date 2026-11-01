@@ -71,7 +71,9 @@ export function observeMask(mask: BinaryMask, options: ObserveMaskOptions): Mask
     let blockyAreaPx = 0;
     let straightRegionCount = 0;
     let straightAreaPx = 0;
-    for (const region of regions) {
+    // CPU cap: skeletonize is synchronous; examine the 200 largest regions only.
+    const biggest = [...regions].sort((a, b) => b.areaPx - a.areaPx).slice(0, 200);
+    for (const region of biggest) {
       if (region.areaPx < MIN_SHAPE_AREA_PX) continue;
       const piece = cropRegion(clipped.width, region);
       const thicknessPx = 2 * maxInscribedRadiusPx(piece);

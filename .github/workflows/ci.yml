@@ -7,6 +7,9 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -14,11 +17,14 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
+      - run: npm --prefix react ci
+      - run: npm --prefix mg ci
       - run: npm test
       - run: npm run typecheck
       - run: npm run eval
       - name: smoke (mock backend)
         run: |
+          trap "kill $SRV 2>/dev/null || true" EXIT
           npm run backend:start &>/tmp/snapclaim.log &
           SRV=$!
           sleep 2

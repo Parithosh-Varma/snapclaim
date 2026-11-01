@@ -104,12 +104,12 @@ export function toMeasureInput(body: unknown, serverMinConfidence?: number): Mea
       return v;
     };
     const validated = {
-      cosmeticMaxRatio: num("cosmeticMaxRatio", 0.001, 1),
-      moderateMaxRatio: num("moderateMaxRatio", 0.001, 1),
-      significantCrackMm: num("significantCrackMm", 10, 10000),
-      significantRegionCount: Number.isInteger(t["significantRegionCount"]) && (t["significantRegionCount"] as number) >= 1 && (t["significantRegionCount"] as number) <= 100
+      cosmeticMaxRatio: num("cosmeticMaxRatio", 0.005, 0.2),
+      moderateMaxRatio: num("moderateMaxRatio", 0.01, 0.5),
+      significantCrackMm: num("significantCrackMm", 50, 500),
+      significantRegionCount: Number.isInteger(t["significantRegionCount"]) && (t["significantRegionCount"] as number) >= 1 && (t["significantRegionCount"] as number) <= 10
         ? (t["significantRegionCount"] as number)
-        : (() => { throw new Error("thresholds.significantRegionCount must be an integer in [1, 100]"); })(),
+        : (() => { throw new Error("thresholds.significantRegionCount must be an integer in [1, 10]"); })(),
     };
     if (validated.cosmeticMaxRatio >= validated.moderateMaxRatio) {
       throw new Error("thresholds.cosmeticMaxRatio must be lower than thresholds.moderateMaxRatio");
@@ -1254,12 +1254,13 @@ export async function handleRequest(input: {
       } catch {
         throw new HttpError(503, "sessions unavailable");
       }
-      return { status: 200, body: envelope(requestId, started, session) };
+      return { status: 200, body: { ...envelope(requestId, started, session), sessionsBackend: store instanceof MemoryStore ? "memory" : "d1" } };
     }
     if (input.method === "GET" && input.path === "/v1/sessions") {
       const started = Date.now();
       try {
-        return { status: 200, body: envelope(requestId, started, { sessions: await store.list() }) };
+        const sessions = await store.list();
+        return { status: 200, body: { ...envelope(requestId, started, { sessions }), sessionsBackend: store instanceof MemoryStore ? "memory" : "d1" } };
       } catch {
         throw new HttpError(503, "sessions unavailable");
       }

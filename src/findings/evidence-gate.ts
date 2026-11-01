@@ -95,7 +95,7 @@ function severityWords(statement: string): string[] {
 /**
  * Severity-adjacent language the engine never emits. Without this, "total
  * loss, replace the whole wall" ships with zero severity evidence while the
- * gate advertises severity agreement — the canonical bands are the only
+ * gate advertises severity agreement - the canonical bands are the only
  * verifiable severity vocabulary.
  */
 const UNVERIFIABLE_SEVERITY = /\b(severe|severely|critical|catastrophic|destroyed|total\s+loss|write-?off|minor|major|negligible|extensive|serious|badly\s+damaged)\b/i;
@@ -190,12 +190,13 @@ function validateFinding(
   // Every finding must cite at least one measured number. Qualitative-only
   // sentences ("the crack is serious") pass no evidence, so they fail.
   if (tokens.length === 0) {
-    failures.push(`${label}: no measured number cited — every finding must cite a receipt value`);
+    failures.push(`${label}: no measured number cited - every finding must cite a receipt value`);
   }
   for (const token of tokens) {
     // A typed number must match a receipt of the same unit: 85.9% can only
     // be backed by a percent receipt, never by an 85.9 mm receipt.
-    const pool = token.unit === "percent" ? percentOutputs : token.unit === "mm" ? mmOutputs : token.unit === "cm2" ? cm2Outputs : numericOutputs;
+    // Bare numbers match nothing: "86 units" must not launder via an 85.9mm receipt.
+    const pool = token.unit === "percent" ? percentOutputs : token.unit === "mm" ? mmOutputs : token.unit === "cm2" ? cm2Outputs : [];
     const backed = pool.some((value) => matchesReceipt(token.value, value));
     if (!backed) {
       failures.push(`${label}: number ${token.value} is not backed by any cited receipt`);
@@ -213,7 +214,7 @@ function validateFinding(
   // One finding, one mask: citing receipts from two different masks mixes evidence.
   const maskIds = maskIdsOf(cited);
   if (maskIds.length > 1) {
-    failures.push(`${label}: cites receipts from multiple masks (${maskIds.join(", ")}) — one finding per mask`);
+    failures.push(`${label}: cites receipts from multiple masks (${maskIds.join(", ")}) - one finding per mask`);
   }
 
   // Severity words must agree with the cited severity receipt.
@@ -221,7 +222,7 @@ function validateFinding(
   const unverifiable = draft.statement.match(UNVERIFIABLE_SEVERITY);
   if (unverifiable) {
     failures.push(
-      `${label}: unverifiable severity language "${unverifiable[0]}" — restate severity with its measured number using cosmetic, moderate or significant`,
+      `${label}: unverifiable severity language "${unverifiable[0]}" - restate severity with its measured number using cosmetic, moderate or significant`,
     );
   }
   if (words.length > 0) {
@@ -246,7 +247,7 @@ function validateFinding(
 export function validateFindings(drafts: FindingDraft[], receipts: Receipt[]): GateResult {
   const list = Array.isArray(drafts) ? drafts : [];
   if (list.length === 0) {
-    return { ok: false, failures: ["no findings: an empty report verifies nothing — the model must cite at least one measured number"] };
+    return { ok: false, failures: ["no findings: an empty report verifies nothing - the model must cite at least one measured number"] };
   }
   if (list.length > MAX_DRAFTS) {
     return { ok: false, failures: [`too many findings: ${list.length} > ${MAX_DRAFTS}`] };
