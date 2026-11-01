@@ -17,8 +17,9 @@ export function sanitizeSvg(svg: string): string {
     .replace(/<\s*(iframe|embed|object|link|style|meta|base|form|handler|set|animate|animateTransform)[\s/>]/gi, "<!--$1-blocked-->")
     .replace(/<\s*foreignObject\b[^>]*\/>/gi, "")
     .replace(/<\s*\w+[^>]*\/\s*on\w+\s*=[^>]*>/gi, "")
+    .replace(/\sstyle\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
     .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-    .replace(/\s(?:xlink:href|href|src|data|background|poster|srcdoc|action|formaction)\s*=\s*("\s*(?:javascript|data\s*:)[^"]*"|'\s*(?:javascript|data\s*:)[^']*'|(?:javascript|data\s*:)[^\s>]*)/gi, "");
+    .replace(/\s(?:xlink:href|href|src|data|background|poster|srcdoc|action|formaction)\s*=\s*("\s*(?:javascript|data\s*:(?!image\/(png|jpeg|webp)))[^"]*"|'\s*(?:javascript|data\s*:(?!image\/(png|jpeg|webp)))[^']*'|(?:javascript|data\s*:(?!image\/(png|jpeg|webp)))[^\s>]*)/gi, "");
 }
 
 export default function Report() {

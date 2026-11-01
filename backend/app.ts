@@ -137,6 +137,14 @@ export function toMeasureInput(body: unknown, serverMinConfidence?: number): Mea
     if (!Number.isFinite((m as { areaPx?: unknown }).areaPx) || (m as { areaPx: number }).areaPx < 0 || (m as { areaPx: number }).areaPx > 100_000_000) {
       throw new Error("masks[].areaPx must be in [0, 100000000]");
     }
+    const sk = (m as { skeletonPx?: unknown }).skeletonPx;
+    if (sk !== undefined && (!Number.isFinite(sk) || (sk as number) < 0 || (sk as number) > 10_000_000)) {
+      throw new Error("masks[].skeletonPx must be in [0, 10000000]");
+    }
+    const rc = (m as { regionCount?: unknown }).regionCount;
+    if (rc !== undefined && (!Number.isInteger(rc) || (rc as number) < 1 || (rc as number) > 100000)) {
+      throw new Error("masks[].regionCount must be an integer in [1, 100000]");
+    }
   }
   return input;
 }
@@ -222,6 +230,17 @@ export function crosscheckBody(body: unknown, requestId = newRequestId()): Envel
   if (!isRecord(body.a) || !isRecord(body.b)) throw new HttpError(400, "body needs {a, b} COCO RLE masks");
   const threshold = body.threshold === undefined ? 0.5 : requireConfidence(body.threshold, "threshold");
   if (threshold < 0.1) throw new HttpError(400, "threshold must be in [0.1, 1]");
+  // Header pre-scan like observeBody: sum declared sizes before any alloc.
+  for (const [nm, part] of [["a", body.a], ["b", body.b]] as const) {
+    const size = (part as Record<string, unknown>).rle !== undefined
+      ? ((part as Record<string, unknown>).rle as Record<string, unknown>).size
+      : (part as Record<string, unknown>).size;
+    if (Array.isArray(size) && size.length === 2 && Number.isInteger(size[0]) && Number.isInteger(size[1])) {
+      if ((size[0] as number) * (size[1] as number) > MAX_TOTAL_MASK_PIXELS) {
+        throw new HttpError(400, `${nm}.rle.size exceeds per-request pixel budget`);
+      }
+    }
+  }
   const a = parseRle(body.a, "a");
   const b = parseRle(body.b, "b");
   if (a.width * a.height + b.width * b.height > MAX_TOTAL_MASK_PIXELS) {
@@ -583,7 +602,7 @@ export function assertSafeImageUrl(imageUrl: string): void {
   if (v4) {
     const [a, b] = [Number(v4[1]), Number(v4[2])];
     const isPrivate =
-      Number(v4[1]) === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) ||
+      a === 0 || Number(v4[1]) === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) ||
       a === 127 || (a === 169 && b === 254) || a >= 224;
     if (isPrivate || [a, b, Number(v4[3]), Number(v4[4])].some((n) => n > 255)) {
       throw new HttpError(400, "live /v1/segment imageUrl must be a public host");
@@ -999,7 +1018,7 @@ export function corsHeadersFor(origin: string | null, env: Env = {}): Record<str
     return {
       "access-control-allow-methods": CORS_METHODS,
       "access-control-allow-headers": CORS_HEADERS,
-      vary: "Origin",
+      vary: "Origin, x-meta-key, x-baseten-key",
     };
   }
   if (origin !== null && allowed.includes(origin)) {
@@ -1009,7 +1028,7 @@ export function corsHeadersFor(origin: string | null, env: Env = {}): Record<str
   return {
     "access-control-allow-methods": CORS_METHODS,
     "access-control-allow-headers": CORS_HEADERS,
-    vary: "Origin",
+    vary: "Origin, x-meta-key, x-baseten-key",
   };
 }
 
@@ -1141,6 +1160,7 @@ export function isRateLimited(key: string, now = Date.now()): boolean {
  * rendered error/SVG never leaks the URL, plus HSTS on the Worker. */
 export function securityHeaders(): Record<string, string> {
   return {
+    "x-content-type-options": "nosniff",
     "referrer-policy": "no-referrer",
     "permissions-policy": "camera=(), microphone=(), geolocation=()",
   };

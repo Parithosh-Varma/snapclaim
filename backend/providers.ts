@@ -314,12 +314,14 @@ export class BasetenSkepticProvider implements FindingsProvider {
       usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
     if (spend) {
+      const usageIn = Math.min(Math.max(0, data.usage?.prompt_tokens ?? 0), 32768);
+      const usageOut = Math.min(Math.max(0, data.usage?.completion_tokens ?? 0), 8192);
       const usd = estimateCostUsd(
-        { inputTokens: data.usage?.prompt_tokens ?? 0, outputTokens: data.usage?.completion_tokens ?? 0 },
+        { inputTokens: usageIn, outputTokens: usageOut },
         SPARK_OPEN_PRICE,
       );
       try {
-        hold?.settle(`skeptic ${this.#opts.model}`, usd);
+        hold?.settle(`skeptic ${this.#opts.model} in=${usageIn} out=${usageOut}`, usd);
       } catch (error) {
         if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
         throw error;

@@ -9,7 +9,7 @@ coverage/
 
 fixtures/photos/
 *.mp4
-bench/runs/*/
+bench/runs/
 !bench/runs/.gitkeep
 shots/
 recovered-queue-images/
@@ -21,6 +21,12 @@ mg/out/
 
 # OpenCode loop state (local agent scratch, never committed)
 .opencode/
+.omc/
+
+# Local-only machine tooling / ops notes (never public).
+start-web-118.sh
+stress-phone.mjs
+DEFENSIVE-DOMAINS.md
 
 # Marketing lives in the private snapclaim-marketing repo, not here.
 /site/

@@ -72,6 +72,16 @@ export const server = createServer(async (req, res) => {
       sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : "invalid JSON", code: 400, requestId: "unknown" }, origin);
       return;
     }
+    // Canonical-body cap parity with Worker: re-encoded JSON must fit 1MB.
+    try {
+      if (new TextEncoder().encode(JSON.stringify(body)).length > 1_000_000) {
+        sendJson(res, 400, { ok: false, error: "body too large (1MB cap)", code: 400, requestId: "unknown" }, origin);
+        return;
+      }
+    } catch {
+      sendJson(res, 400, { ok: false, error: "invalid JSON", code: 400, requestId: "unknown" }, origin);
+      return;
+    }
   }
   const fetchFn: typeof fetch = (url, init) => fetch(url, init);
   const header = (name: string): string | undefined => {
