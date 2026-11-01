@@ -4,10 +4,14 @@
 // only the default Worker host (https) and loopback http for local dev.
 // To self-host: add the host to connect-src AND to DEFAULT_BACKEND_HOST.
 // See README "Self-hosted backend".
+// Settings key mirror - the canonical constant lives in ./store.ts (importing
+// it breaks one of the two tsconfigs: root needs an explicit extension,
+// react/bundler forbids it). Keep in sync.
+const SETTINGS_KEY = "snapclaim.settings.v1";
 export const DEFAULT_BASE = "https://snapclaim-backend.parithosh.workers.dev";
 export const DEFAULT_BACKEND_HOST = "snapclaim-backend.parithosh.workers.dev";
 export const POLICY_BACKEND_MESSAGE =
-  `This backend isn't allowed by the app's security policy — use https://${DEFAULT_BACKEND_HOST} or http://localhost:8787 for local dev.`;
+  `This backend isn't allowed by the app's security policy - use https://${DEFAULT_BACKEND_HOST} or http://localhost:8787 for local dev.`;
 
 /** Backend URL allowlist: https only for the default host, http only loopback. */
 export function isAllowedBackendUrl(raw: unknown): boolean {
@@ -47,15 +51,35 @@ export interface ApiReply {
   [key: string]: unknown;
 }
 
+/** Bring-your-own-key headers, read fresh every call so save/clear applies
+    immediately. Keys live only in this device's localStorage and travel only
+    to the configured backend, which uses them per-request and never stores
+    them. Absent outside a browser (tests, SSR) this is safely empty. */
+export function byokHeaders(): Record<string, string> {
+  try {
+    if (typeof localStorage === "undefined") return {};
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return {};
+    const s = JSON.parse(raw) as { metaKey?: unknown; basetenKey?: unknown };
+    const out: Record<string, string> = {};
+    if (typeof s.metaKey === "string" && s.metaKey.trim()) out["x-meta-key"] = s.metaKey.trim().slice(0, 512);
+    if (typeof s.basetenKey === "string" && s.basetenKey.trim()) out["x-baseten-key"] = s.basetenKey.trim().slice(0, 512);
+    return out;
+  } catch {
+    return {};
+  }
+}
+
 export async function apiPost(
   base: string,
   path: string,
   body: unknown,
   signal?: AbortSignal,
+  extraHeaders?: Record<string, string>,
 ): Promise<{ res: Response; j: ApiReply }> {
   const res = await fetch(checkedBase(base) + path, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...byokHeaders(), ...extraHeaders },
     body: JSON.stringify(body),
     signal,
   });
@@ -63,8 +87,16 @@ export async function apiPost(
   return { res, j };
 }
 
-export async function apiGet(base: string, path: string): Promise<{ res: Response; j: ApiReply }> {
-  const res = await fetch(checkedBase(base) + path);
+export async function apiGet(
+  base: string,
+  path: string,
+  signal?: AbortSignal,
+  extraHeaders?: Record<string, string>,
+): Promise<{ res: Response; j: ApiReply }> {
+  const res = await fetch(checkedBase(base) + path, {
+    headers: { ...byokHeaders(), ...extraHeaders },
+    signal,
+  });
   const j = (await res.json().catch(() => ({}))) as ApiReply;
   return { res, j };
 }

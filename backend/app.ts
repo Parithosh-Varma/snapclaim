@@ -919,17 +919,16 @@ export function parseOverlay(raw: unknown): AnnexureOverlay {
   const overlay: AnnexureOverlay = { width, height, masks };
   if (typeof raw.photoHref === "string") {
     if (raw.photoHref.length > MAX_PHOTO_HREF_CHARS) throw new HttpError(400, "overlay.photoHref too long");
-    // Defense in depth with svg.ts safeHref: exact mime allowlist, no prefix tricks.
-    // Rejects data:image/pngblah, missing comma, or non-raster payloads.
+    // Defense in depth with svg.ts safeHref: inline data: only. Remote
+    // https: URLs would beacon the viewer's IP to the host, and webp is
+    // rejected because EXIF stripping only supports png/jpeg (fail closed).
     let ok = false;
     if (raw.photoHref.startsWith("data:")) {
       const comma = raw.photoHref.indexOf(",");
       const mime = raw.photoHref.slice(5, raw.photoHref.indexOf(";"));
-      ok = comma > 0 && comma <= 64 && (mime === "image/png" || mime === "image/jpeg" || mime === "image/webp");
-    } else if (raw.photoHref.startsWith("https://")) {
-      ok = !raw.photoHref.includes("\\") && !raw.photoHref.includes('"') && !raw.photoHref.includes("'");
+      ok = comma > 0 && comma <= 64 && (mime === "image/png" || mime === "image/jpeg");
     }
-    if (!ok) throw new HttpError(400, "overlay.photoHref must be https:// or data:image/png,jpeg,webp");
+    if (!ok) throw new HttpError(400, "overlay.photoHref must be data:image/png,jpeg");
     overlay.photoHref = raw.photoHref;
   }
   return overlay;
@@ -1078,6 +1077,9 @@ export function adminStatusBody(env: Env = {}): Record<string, unknown> {
   try {
     const config = configFromEnv(env);
     const spend = spendStatus(env);
+    // Public oracle hardening: totals are needed for the dev-panel meter,
+    // but per-call labels/timestamps aid spend-drain timing. Strip entries.
+    const { entries: _entries, ...spendTotals } = spend;
     const mode: "mock" | "live" | "config-error" = config.mockMode
       ? "mock"
       : env.META_API_KEY?.trim()
@@ -1089,7 +1091,7 @@ export function adminStatusBody(env: Env = {}): Record<string, unknown> {
       mockSource: mockSource(),
       mode,
       adminEnabled: isAdminEnabled(env),
-      spend,
+      spend: spendTotals,
       models: { ...config.models },
       endpoints: { ...config.endpoints },
       minReferenceConfidence: config.minReferenceConfidence,
@@ -1266,12 +1268,17 @@ export async function handleRequest(input: {
   try {
     env = withCallerKeys(env, headers);
     // Optional billing lockdown: operator sets REQUIRE_BILLING_AUTH=1 to force
-    // a bearer token on all billable routes (kills anonymous spend-drain).
+    // a valid admin token on all billable routes (kills anonymous spend-drain).
+    // Any Bearer value is NOT enough: compare against ADMIN_TOKEN in
+    // constant time like requireAdmin does.
     if (env.REQUIRE_BILLING_AUTH === "1" && input.method === "POST" &&
       ["/v1/report", "/v1/segment", "/v1/transcribe", "/v1/describe", "/v1/findings", "/v1/skeptic", "/v1/render"].includes(input.path)) {
-      const auth = headers["authorization"] ?? headers["Authorization"] ?? "";
-      if (!/^Bearer\s+.+$/i.test(auth.trim())) {
-        return { status: 401, body: errorBody("billing auth required", 401, requestId) };
+      try {
+        requireAdmin(headers, env);
+      } catch (e) {
+        const status = (e as { status?: unknown }).status === 401 ? 401 : 403;
+        const message = e instanceof Error ? e.message : "billing auth required";
+        return { status, body: errorBody(message, status, requestId) };
       }
     }
     if (input.method === "GET" && input.path === "/v1/health") return { status: 200, body: healthBody(env) };

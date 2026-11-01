@@ -18,14 +18,27 @@ export function transcribeOnDevice(
   const w = voiceWorker;
   const id = voiceId++;
   return new Promise((resolve, reject) => {
-    w.onmessage = ({ data }: MessageEvent) => {
-      if (data.type === "progress") onProgress?.(data.percent);
-      else if (data.type === "transcribed" && data.id === id) {
+    const cleanup = () => {
+      w.removeEventListener("message", onMessage);
+      w.removeEventListener("error", onError);
+    };
+    const onMessage = ({ data }: MessageEvent) => {
+      if (data.type === "progress") {
+        // Progress carries no id (worker broadcasts download %); only the
+        // most recent caller should drive the UI to avoid flicker.
+        if (id === voiceId - 1) onProgress?.(data.percent);
+      } else if (data.type === "transcribed" && data.id === id) {
+        cleanup();
         if (data.error) reject(new Error(data.error));
         else resolve(String(data.text ?? ""));
       }
     };
-    w.onerror = (e) => reject(new Error(e.message ?? "speech worker failed to start"));
+    const onError = (e: ErrorEvent) => {
+      cleanup();
+      reject(new Error(e.message ?? "speech worker failed to start"));
+    };
+    w.addEventListener("message", onMessage);
+    w.addEventListener("error", onError);
     w.postMessage({ type: "transcribe", id, audio }, [audio.buffer]);
   });
 }

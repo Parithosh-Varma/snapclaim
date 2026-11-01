@@ -20,6 +20,8 @@ export class SamClient {
   onProgress: ((p: SamProgress) => void) | null = null;
   onReady: ((device: string, embedMs: number) => void) | null = null;
   onError: ((message: string) => void) | null = null;
+  private embedWaiters = new Map<number, { resolve: (v: boolean) => void; timer: ReturnType<typeof setTimeout>; quiet: boolean }>();
+  private settleStale: ((v: boolean) => void) | null = null;
 
   private ensure(): Worker {
     if (this.worker) return this.worker;
@@ -38,12 +40,54 @@ export class SamClient {
         else p.resolve({ mask: data.result.mask, iou: data.result.iou });
         return;
       }
+      if (data.type === "progress" || data.type === "ready" || data.type === "error") {
+        const waiter = data.photoId !== undefined ? this.embedWaiters.get(data.photoId) : undefined;
+        if (data.type === "progress") {
+          if (waiter) {
+            // Quiet embeds (background warm-up) must not drive the UI progress bar.
+            if (!waiter.quiet) this.onProgress?.({ percent: data.percent });
+          } else if (data.photoId === undefined || data.photoId === this.photoId) {
+            this.onProgress?.({ percent: data.percent });
+          }
+          return;
+        }
+        if (data.type === "ready") {
+          if (waiter) {
+            this.lastError = null;
+            waiter.resolve(true);
+            // Still notify the UI so embeddings.current flips even when the
+            // ready came from an ensureEmbedded call.
+            if (data.photoId === this.photoId) this.onReady?.(data.device, data.embedMs);
+            return;
+          }
+          if (data.photoId !== undefined && data.photoId !== this.photoId) return; // stale photo
+          this.onReady?.(data.device, data.embedMs);
+          return;
+        }
+        if (data.type === "error") {
+          if (waiter) {
+            this.lastError = data.message;
+            waiter.resolve(false);
+            if (data.photoId === this.photoId) this.onError?.(data.message);
+            return;
+          }
+          if (data.photoId !== undefined && data.photoId !== this.photoId) return; // stale photo
+          this.onError?.(data.message);
+          return;
+        }
+      }
       if (data.photoId !== undefined && data.photoId !== this.photoId) return; // stale photo
       if (data.type === "progress") this.onProgress?.({ percent: data.percent });
       else if (data.type === "ready") this.onReady?.(data.device, data.embedMs);
       else if (data.type === "error") this.onError?.(data.message);
     };
-    w.onerror = (e) => this.onError?.(e.message ?? "worker error");
+    w.onerror = (e) => {
+      // Worker failed to start: fail all pending embeds fast, not via 180s timeout.
+      for (const [, waiter] of [...this.embedWaiters]) {
+        try { waiter.resolve(false); } catch { /* noop */ }
+      }
+      this.onError?.((e as ErrorEvent).message ?? "worker error");
+    };
     this.worker = w;
     return w;
   }
@@ -60,7 +104,6 @@ export class SamClient {
   }
 
   private embedCache = new Map<HTMLCanvasElement, Promise<boolean>>();
-  private settleStale: ((v: boolean) => void) | null = null;
   /** Last on-device failure, for error messages that name the cause. */
   lastError: string | null = null;
 
@@ -68,7 +111,7 @@ export class SamClient {
    * Embed the photo for on-device outlining, once per photo. Resolves true
    * when the model is ready, false when it fails or a newer photo supersedes
    * it. Damage taps go to cloud SAM first, so this is only awaited for the
-   * coin outline, the offline fallback and the cross-check — never on entry.
+   * coin outline, the offline fallback and the cross-check - never on entry.
    */
   ensureEmbedded(photo: HTMLCanvasElement, quiet = false): Promise<boolean> {
     const hit = this.embedCache.get(photo);
@@ -76,41 +119,36 @@ export class SamClient {
     // A newer photo supersedes any in-flight embed: settle it instead of hanging.
     this.settleStale?.(false);
     this.settleStale = null;
+    this.lastError = null;
+    const before = this.photoId;
+    this.embed(photo);
+    // No 2d context: nothing was posted, fail fast instead of 180s hang.
+    if (this.photoId === before) return Promise.resolve(false);
+    const pid = this.photoId;
     const p = new Promise<boolean>((resolve) => {
-      let timer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+      const timer: ReturnType<typeof setTimeout> = setTimeout(() => {
+        this.embedWaiters.delete(pid);
+        this.settleStale = null;
         this.lastError = "model download timed out";
-        done(false);
+        this.embedCache.delete(photo);
+        resolve(false);
       }, 180_000);
-      this.settleStale = (v: boolean) => {
-        this.settleStale = null;
-        resolve(v);
-      };
-      const prevReady = this.onReady;
-      const prevError = this.onError;
-      const prevProgress = this.onProgress;
       const done = (v: boolean) => {
-        if (timer) { clearTimeout(timer); timer = null; }
+        clearTimeout(timer);
+        this.embedWaiters.delete(pid);
         this.settleStale = null;
-        this.onReady = prevReady;
-        this.onError = prevError;
-        this.onProgress = prevProgress;
         // Never cache a failure: retry must re-attempt the download.
         if (!v) this.embedCache.delete(photo);
         resolve(v);
       };
-      this.onReady = (device, ms) => {
-        this.lastError = null;
-        prevReady?.(device, ms);
-        done(true);
+      this.settleStale = (v: boolean) => {
+        clearTimeout(timer);
+        this.embedWaiters.delete(pid);
+        this.settleStale = null;
+        if (!v) this.embedCache.delete(photo);
+        resolve(v);
       };
-      this.onError = (message) => {
-        this.lastError = message;
-        prevError?.(message);
-        done(false);
-      };
-      if (quiet) this.onProgress = null;
-      this.lastError = null;
-      this.embed(photo);
+      this.embedWaiters.set(pid, { resolve: done, timer, quiet });
     });
     this.embedCache.set(photo, p);
     if (this.embedCache.size > 3) {
@@ -145,31 +183,28 @@ export async function segmentViaApi(
   photo: HTMLCanvasElement,
   points: [number, number][],
   box?: { left: number; top: number; right: number; bottom: number },
+  signal?: AbortSignal,
 ): Promise<SamMask> {
-  const res = await fetch(base.replace(/\/$/, "") + "/v1/segment", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      imageUrl: photo.toDataURL("image/jpeg", 0.85),
-      width: photo.width,
-      height: photo.height,
-      points: points.map(([x, y]) => ({ x, y })),
-      ...(box ? { box } : {}),
-    }),
-  });
-  const j = (await res.json().catch(() => ({}))) as {
-    ok?: boolean; error?: string;
-    result?: { records?: { rle: Parameters<typeof decodeRle>[0]; confidence?: number }[] };
+  const { apiPost } = await import("./api");
+  const { res, j } = await apiPost(base, "/v1/segment", {
+    imageUrl: photo.toDataURL("image/jpeg", 0.85),
+    width: photo.width,
+    height: photo.height,
+    points: points.map(([x, y]) => ({ x, y })),
+    ...(box ? { box } : {}),
+  }, signal);
+  const result = (j.result ?? {}) as {
+    records?: { rle: Parameters<typeof decodeRle>[0]; confidence?: number }[];
   };
-  if (!res.ok || !j.ok) throw new Error(j.error ?? `segment HTTP ${res.status}`);
+  if (!res.ok || !j.ok) throw new Error((j as { error?: string }).error ?? `segment HTTP ${res.status}`);
   // SAM may split one crack into several objects; all of them are the damage.
   // But a single tap on a thin crack often returns the wall itself (90%+ of
-  // the frame, high confidence) instead of the crack — unioning that buries
+  // the frame, high confidence) instead of the crack - unioning that buries
   // the damage. Drop wall-sized records before the union; when nothing but
   // wall remains, throw so the caller falls back to on-device SlimSAM, whose
   // prefer-smallest decode picks the crack over the wall.
-  const records = j.result?.records ?? [];
-  if (!records.length) throw new Error("SAM found nothing there — tap the middle of the damage and retry.");
+  const records = result.records ?? [];
+  if (!records.length) throw new Error("SAM found nothing there - tap the middle of the damage and retry.");
   const framePx = photo.width * photo.height;
   const kept = records.filter((rec) => {
     try {
@@ -181,7 +216,7 @@ export async function segmentViaApi(
       return false;
     }
   });
-  if (!kept.length) throw new Error("SAM caught the wall, not the crack — trying on-device; fill the frame with the crack and tap its middle.");
+  if (!kept.length) throw new Error("SAM caught the wall, not the crack - trying on-device; fill the frame with the crack and tap its middle.");
   const mask = unionMasks(kept.map((rec) => decodeRle(rec.rle))) as Uint8Array;
   return { mask, iou: Math.min(...kept.map((rec) => rec.confidence ?? 0)), rle: encodeRle(mask, photo.width, photo.height) };
 }

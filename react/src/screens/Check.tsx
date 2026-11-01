@@ -31,6 +31,41 @@ function damageBox(mask: Uint8Array, w: number, h: number): { left: number; top:
   };
 }
 
+/** Both outlines over the photo: red is the measured mask, green the second
+    model's. A DISPUTED verdict alone says nothing - this shows where. */
+function XOverlay({ photo, api, other }: { photo: HTMLCanvasElement; api: Uint8Array; other: Uint8Array }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const c = ref.current;
+    if (!c || api.length !== other.length) return;
+    c.width = photo.width;
+    c.height = photo.height;
+    const g = c.getContext("2d");
+    if (!g) return;
+    const img = g.createImageData(c.width, c.height);
+    const d = img.data;
+    for (let i = 0; i < api.length; i++) {
+      const o = i * 4;
+      if (api[i] && other[i]) {
+        d[o] = 120; d[o + 1] = 20; d[o + 2] = 60; d[o + 3] = 170;
+      } else if (api[i]) {
+        d[o] = 200; d[o + 1] = 30; d[o + 2] = 41; d[o + 3] = 115;
+      } else if (other[i]) {
+        d[o] = 14; d[o + 1] = 138; d[o + 2] = 77; d[o + 3] = 115;
+      }
+    }
+    g.putImageData(img, 0, 0);
+  }, [photo, api, other]);
+  return (
+    <canvas
+      ref={ref}
+      id="xOverlay"
+      aria-hidden="true"
+      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}
+    />
+  );
+}
+
 async function segmentOnDevice(sam: SamClient, s: Session): Promise<SamMask | null> {
   while (s.dmg.pointMasks.length < s.dmg.points.length) {
     s.dmg.pointMasks.push(await sam.decodeDamage(s.dmg.points[s.dmg.pointMasks.length] as [number, number]));
@@ -60,10 +95,11 @@ export default function Check() {
   const [xBadge, setXBadge] = useState<{ verdict: string; iou: unknown } | null>(null);
   const [xError, setXError] = useState<{ title: string; message: string; details: string[] } | null>(null);
   const [xNote, setXNote] = useState("");
+  const [xOther, setXOther] = useState<{ mask: Uint8Array; by: string } | null>(null);
   const checksRef = useRef(checks);
   checksRef.current = checks;
   const setPhase = (which: "skeptic" | "xcheck", phase: CheckPhase) =>
-    setChecks({ ...checksRef.current, [which]: phase });
+    setChecks((prev) => ({ ...prev, [which]: phase }));
 
   const runSkeptic = useCallback(async (auto: boolean, retried = false) => {
     if (checksRef.current.skeptic === "loading" && !retried) return;
@@ -78,7 +114,7 @@ export default function Check() {
       setSkRows(null);
       setSkStatus("Asking the skeptic model…");
     } else {
-      setSkStatus("First draft failed the gate — retrying once…");
+      setSkStatus("First draft failed the gate - retrying once…");
     }
     try {
       // /v1/skeptic re-measures server-side: it needs the same measure inputs
@@ -132,9 +168,12 @@ export default function Check() {
     setPhase("xcheck", "loading");
     setXError(null);
     setXBadge(null);
+    setXOther(null);
     try {
       // Cross-check against the model that did NOT draw the mask.
       let other;
+      let otherMask: Uint8Array | null = null;
+      let otherBy = "";
       if (s.dmg.source === "api") {
         if (!embeddings.current) {
           if (!s.photo) throw new Error("Mark the damage first.");
@@ -143,20 +182,25 @@ export default function Check() {
           setXNote("");
           if (!ready) throw new Error(
           sam.lastError
-            ? `On-device model failed to load (${sam.lastError}) — retry in a moment.`
+            ? `On-device model failed to load (${sam.lastError}) - retry in a moment.`
             : navigator.onLine === false
-              ? "On-device outlining model not available offline yet — reconnect once to download it, then it works offline."
-              : "On-device model is still loading — retry in a moment.",
+              ? "On-device outlining model not available offline yet - reconnect once to download it, then it works offline."
+              : "On-device model is still loading - retry in a moment.",
         );
         }
         const dev = await segmentOnDevice(sam, s);
         if (!dev) throw new Error("The on-device model found nothing at those taps.");
         other = encodeRle(dev.mask, s.photo.width, s.photo.height);
+        otherMask = dev.mask;
+        otherBy = "on-device";
       } else {
         // The measured mask's own bounding box constrains the re-prompt, so a
-        // thin crack comes back as the crack — not the whole wall again.
+        // thin crack comes back as the crack - not the whole wall again.
         const box = s.dmg.mask ? damageBox(s.dmg.mask, s.photo.width, s.photo.height) : null;
-        other = (await segmentViaApi(base, s.photo, s.dmg.points, box ?? undefined)).rle;
+        const apiOut = await segmentViaApi(base, s.photo, s.dmg.points, box ?? undefined);
+        other = apiOut.rle;
+        otherMask = apiOut.mask;
+        otherBy = "SAM 3.1";
       }
       const { res, j } = await apiPost(base, "/v1/crosscheck", {
         a: encodeRle(s.dmg.mask, s.photo.width, s.photo.height),
@@ -166,6 +210,7 @@ export default function Check() {
       if (!res.ok || !j.ok) throw backendError(res, j, "cross-check failed");
       const result = j.result as unknown as { verdict: string; iou: unknown };
       setXBadge({ verdict: result.verdict, iou: result.iou });
+      if (otherMask) setXOther({ mask: otherMask, by: otherBy });
       setPhase("xcheck", "ok");
     } catch (e) {
       const err = e as { message?: string; status?: unknown; details?: string[] };
@@ -173,12 +218,12 @@ export default function Check() {
       const status = typeof err.status === "number" ? err.status : NaN;
       console.error(`[xcheck] HTTP ${Number.isNaN(status) ? "?" : status}: ${msg}`, err.details ?? "");
       // /v1/segment is unavailable in mock mode, so a mask drawn by the API
-      // path has nothing to cross-check against — say so, not "failed".
+      // path has nothing to cross-check against - say so, not "failed".
       const noSam = /mock segment|not wired|HTTP 501/.test(msg);
       const unavailable = !Number.isNaN(status) && status >= 400 && status < 500;
       setXError({
         title: noSam
-          ? "Cross-check unavailable — SAM 3.1 is unavailable in mock mode"
+          ? "Cross-check unavailable - SAM 3.1 is unavailable in mock mode"
           : unavailable
             ? `Cross-check unavailable (HTTP ${status})`
             : "Cross-check failed.",
@@ -228,9 +273,10 @@ export default function Check() {
           <p>Spark Open re-derives every number from the receipts. Anything it cannot reproduce is marked disputed.</p>
           <button
             id="skepticBtn"
-            className="btn btn-dark"
+            className="btn-dark"
             type="button"
             style={{ width: "100%" }}
+            disabled={checks.skeptic === "loading"}
             onClick={() => {
               setPhase("skeptic", "idle");
               void runSkeptic(false);
@@ -279,9 +325,10 @@ export default function Check() {
           <p>Sends this photo once to SAM 3.1 and compares its outline with the one measured on this device.</p>
           <button
             id="xcheckBtn"
-            className="btn btn-ghostline"
+            className="btn-ghostline"
             type="button"
             style={{ width: "100%" }}
+            disabled={checks.xcheck === "loading"}
             onClick={() => {
               setPhase("xcheck", "idle");
               void runXcheck(false);
@@ -313,6 +360,18 @@ export default function Check() {
               </span>
             )}
           </span>
+          {xOther && s.stillDataUrl && s.dmg.mask && (
+            <figure id="xPhotoCard" className="photocard" style={{ marginTop: 12 }}>
+              <img id="xPhoto" alt="Cross-check: measured outline in red, second model in green" src={s.stillDataUrl} />
+              {s.photo && <XOverlay photo={s.photo} api={s.dmg.mask} other={xOther.mask} />}
+              <span className="chip">
+                <i aria-hidden="true" />
+                <span id="xChip">
+                  Red measured ({s.dmg.source === "api" ? "SAM 3.1" : "on-device"}) · Green second check ({xOther.by})
+                </span>
+              </span>
+            </figure>
+          )}
         </div>
 
         <div className="stickycta">
@@ -324,7 +383,7 @@ export default function Check() {
             disabled={!canReport}
             onClick={() => {
               if (canReport) go("sReport");
-              else setSkStatus("Run both checks to continue — retry any failed one.");
+              else setSkStatus("Run both checks to continue - retry any failed one.");
             }}
           >
             {canReport ? "Make the report →" : "Run both checks to continue"}

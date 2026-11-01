@@ -44,9 +44,14 @@ const COLORS: Record<string, string> = { ok: "#1f7a4d", flatter: "#a86a00", refu
  * sensors (desktops). On iOS the sensors need a tap first, so a button asks.
  * Returns a function that stops listening.
  */
-export function mountTiltMeter(el: HTMLElement | null, { win = globalThis, surface = "wall" }: { win?: any; surface?: string } = {}): () => void {
+type TiltWindow = Pick<typeof globalThis, "addEventListener" | "removeEventListener" | "requestAnimationFrame"> & {
+  DeviceOrientationEvent?: typeof DeviceOrientationEvent & { requestPermission?: () => Promise<string> };
+  matchMedia?: (query: string) => { matches: boolean };
+};
+export function mountTiltMeter(el: HTMLElement | null, { win = globalThis as TiltWindow, surface = "wall" }: { win?: TiltWindow; surface?: string } = {}): () => void {
   const Orientation = win.DeviceOrientationEvent;
   if (!el || !Orientation || typeof win.addEventListener !== "function") return () => {};
+  if (el.querySelector("[data-bubble]")) return () => {};
 
   el.innerHTML = `
     <div style="display:none;align-items:center;gap:10px;margin:0 0 12px">
@@ -62,16 +67,20 @@ export function mountTiltMeter(el: HTMLElement | null, { win = globalThis, surfa
       </span>
     </div>
     <button type="button" data-ask hidden style="margin:0 0 12px;font-size:13px">Show the tilt level</button>`;
-  const bubble = el.querySelector("[data-bubble]") as any;
-  const text = el.querySelector("[data-text]") as any;
-  const ask = el.querySelector("[data-ask]") as any;
-  const row = el.firstElementChild as any;
-  const surfaceButtons = [...el.querySelectorAll("[data-surface]")] as any[];
+  const bubble = el.querySelector("[data-bubble]");
+  const text = el.querySelector("[data-text]");
+  const ask = el.querySelector("[data-ask]") as HTMLButtonElement | null;
+  const row = el.firstElementChild as HTMLElement | null;
+  const surfaceButtons = [...el.querySelectorAll("[data-surface]")] as HTMLButtonElement[];
+  if (!bubble || !text || !ask || !row) return () => {};
+  const bubbleEl: Element = bubble;
+  const textEl: Element = text;
+  const rowEl: HTMLElement = row;
 
   let smooth: { beta: number; gamma: number } | null = null;
   let frame = 0;
   const paintSurface = () => surfaceButtons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.surface === surface)));
-  surfaceButtons.forEach((b) => (b.onclick = () => { surface = b.dataset.surface; paintSurface(); render(); }));
+  surfaceButtons.forEach((b) => { b.onclick = () => { surface = b.dataset.surface ?? surface; paintSurface(); render(); }; });
   paintSurface();
 
   function render() {
@@ -83,30 +92,31 @@ export function mountTiltMeter(el: HTMLElement | null, { win = globalThis, surfa
     const r = (18 * Math.min(deg, 90)) / 90;
     // the bubble drifts toward the low side, like a spirit level
     const angle = Math.atan2(smooth.beta - (surface === "floor" ? 0 : 90), smooth.gamma);
-    bubble.setAttribute("cx", String(r * Math.cos(angle)));
-    bubble.setAttribute("cy", String(r * Math.sin(angle)));
-    bubble.setAttribute("fill", COLORS[zone]);
-    text.style.color = COLORS[zone];
-    text.textContent = tiltMessage(deg, surface);
-    row.style.display = "flex";
+    bubbleEl.setAttribute("cx", String(r * Math.cos(angle)));
+    bubbleEl.setAttribute("cy", String(r * Math.sin(angle)));
+    bubbleEl.setAttribute("fill", COLORS[zone] ?? "#5b6b61");
+    (textEl as HTMLElement).style.color = COLORS[zone] ?? "#5b6b61";
+    textEl.textContent = tiltMessage(deg, surface);
+    rowEl.style.display = "flex";
   }
 
-  function onOrientation(e: any) {
-    if (e.beta === null || e.gamma === null) return;
+  function onOrientation(e: DeviceOrientationEvent) {
+    if (e.beta == null || e.gamma == null) return;
     // light smoothing so hand shake doesn't flicker the message
     smooth = smooth === null ? { beta: e.beta, gamma: e.gamma } : { beta: smooth.beta * 0.8 + e.beta * 0.2, gamma: smooth.gamma * 0.8 + e.gamma * 0.2 };
-    if (!frame) frame = (win.requestAnimationFrame ?? ((f: any) => setTimeout(f, 16)))(render);
+    if (!frame) frame = (win.requestAnimationFrame ?? ((f: FrameRequestCallback) => window.setTimeout(() => f(performance.now()), 16)))(render);
   }
 
-  const listen = () => win.addEventListener("deviceorientation", onOrientation);
-  if (typeof Orientation.requestPermission === "function") {
+  const listen = () => win.addEventListener("deviceorientation", onOrientation as EventListener);
+  const requestPermission = (Orientation as { requestPermission?: unknown }).requestPermission;
+  if (typeof requestPermission === "function") {
     // iOS: permission can only be asked from a tap. Desktop browsers expose the
     // same call without a sensor behind it, so only offer it on touch screens.
     if (!win.matchMedia?.("(pointer: coarse)").matches) return () => {};
     ask.hidden = false;
     ask.onclick = async () => {
       try {
-        if ((await Orientation.requestPermission()) === "granted") { ask.hidden = true; listen(); }
+        if ((await (requestPermission as () => Promise<string>).call(Orientation)) === "granted") { ask.hidden = true; listen(); }
         else ask.textContent = "Motion access was denied. The level stays off.";
       } catch {
         ask.textContent = "The tilt level is not available here.";
@@ -115,5 +125,5 @@ export function mountTiltMeter(el: HTMLElement | null, { win = globalThis, surfa
   } else {
     listen();
   }
-  return () => win.removeEventListener("deviceorientation", onOrientation);
+  return () => win.removeEventListener("deviceorientation", onOrientation as EventListener);
 }

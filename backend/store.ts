@@ -53,10 +53,14 @@ export class D1Store implements Store {
       .bind(s.id, s.at, s.findings, s.mode)
       .run();
     // Same 1000-cap as MemoryStore: prune oldest to bound D1 growth/billing.
-    await this.#db
-      .prepare("DELETE FROM sessions WHERE rowid NOT IN (SELECT rowid FROM sessions ORDER BY at DESC, rowid DESC LIMIT 1000)")
-      .run()
-      .catch(() => {});
+    // Never swallow: a failing prune would grow the table forever.
+    try {
+      await this.#db
+        .prepare("DELETE FROM sessions WHERE rowid NOT IN (SELECT rowid FROM sessions ORDER BY at DESC, rowid DESC LIMIT 1000)")
+        .run();
+    } catch (e) {
+      console.error("[sessions] D1 prune failed", e);
+    }
   }
   async list(): Promise<SavedSession[]> {
     const { results } = await this.#db

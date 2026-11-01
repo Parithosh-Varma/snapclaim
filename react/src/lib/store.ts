@@ -7,6 +7,26 @@ export const SETTINGS_KEY = "snapclaim.settings.v1";
 export const MAX_CASES = 100;
 export const MAX_PHOTO_CHARS = 700_000;
 
+/** CSPRNG case id. randomUUID needs a secure context; getRandomValues works
+ * everywhere, so use it as the fallback instead of guessable Date+Math.random. */
+export function secureId(): string {
+  try {
+    const c = globalThis.crypto as Crypto | undefined;
+    if (c?.randomUUID) return c.randomUUID();
+    if (c?.getRandomValues) {
+      const b = new Uint8Array(16);
+      c.getRandomValues(b);
+      b[6] = (b[6]! & 0x0f) | 0x40;
+      b[8] = (b[8]! & 0x3f) | 0x80;
+      const hex = [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+      return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    }
+  } catch {
+    /* fall through to last-resort below */
+  }
+  return `case-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
+}
+
 export interface SnapCase {
   id: string;
   createdAt: string;
@@ -61,8 +81,7 @@ export function createCaseStore(
   opts: { now?: () => string; makeId?: () => string } = {},
 ): CaseStore {
   const now = opts.now ?? (() => new Date().toISOString());
-  const makeId = opts.makeId ?? (() =>
-    (globalThis.crypto?.randomUUID?.() ?? `case-${Date.now()}-${Math.floor(Math.random() * 1e9)}`));
+  const makeId = opts.makeId ?? secureId;
 
   function readCases(): SnapCase[] {
     const list = parse<unknown>(storage.getItem(CASES_KEY), []);

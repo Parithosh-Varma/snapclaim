@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useApp } from "../App";
-import { DEFAULT_BASE, POLICY_BACKEND_MESSAGE, apiGet, isAllowedBackendUrl } from "../lib/api";
+import { DEFAULT_BASE, POLICY_BACKEND_MESSAGE, apiGet, apiPost, isAllowedBackendUrl } from "../lib/api";
 import { BackButton, Badge } from "../lib/ui";
 
 const LOCAL_BASE = "http://localhost:8787";
@@ -125,14 +125,12 @@ export default function Admin() {
     }
     setSwitching(true);
     try {
-      const res = await fetch(`${base}/v1/admin/mode`, {
-        method: "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${saved}` },
-        body: JSON.stringify(body),
+      // apiPost enforces the backend allowlist + BYOK headers; auth travels as extraHeaders.
+      const { res, j } = await apiPost(base, "/v1/admin/mode", body, undefined, {
+        authorization: `Bearer ${saved}`,
       });
-      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; result?: AdminStatus };
       if (!res.ok || !j.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
-      setStatus(j.result ?? null);
+      setStatus((j.result ?? null) as AdminStatus | null);
       toast(label);
     } catch (e) {
       toast(e instanceof Error ? e.message : String(e));

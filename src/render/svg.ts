@@ -38,9 +38,11 @@ function r2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-/** Only inline raster images and https URLs may be embedded as the photo.
- * svg+xml is rejected: an opened annexure would run embedded scripts. */
-const ALLOWED_DATA_MIMES = new Set(["image/png", "image/jpeg", "image/webp"]);
+/** Only inline raster images may be embedded as the photo.
+ * svg+xml is rejected: an opened annexure would run embedded scripts.
+ * Remote https: URLs are rejected too: a viewer opening the SVG would leak
+ * its IP (tracking beacon) to the URL host. Callers send data: URLs. */
+const ALLOWED_DATA_MIMES = new Set(["image/png", "image/jpeg"]);
 export const MAX_PHOTO_HREF_CHARS = 200_000;
 
 function safeHref(href: string | undefined): string | null {
@@ -51,9 +53,6 @@ function safeHref(href: string | undefined): string | null {
     if (comma < 0 || comma > 64) return null;
     const mime = href.slice(5, href.indexOf(";"));
     if (!ALLOWED_DATA_MIMES.has(mime)) return null;
-    return href;
-  }
-  if (href.startsWith("https://") && !href.includes("\\") && !href.includes('"') && !href.includes("'")) {
     return href;
   }
   return null;
@@ -99,7 +98,7 @@ function renderOverlay(overlay: AnnexureOverlay, findings: MeasuredFinding[]): {
       return (
         `<g transform="translate(24 ${OVERLAY_TOP}) scale(${scale})" data-mask="${esc(m.id)}">` +
         `<title>${esc(m.label)}</title>` +
-        `<path d="${esc(m.path)}" fill="${color}" fill-opacity="0.35" stroke="${color}" stroke-width="1.5" vector-effect="non-scaling-stroke" fill-rule="evenodd"/>` +
+        `<path d="${esc(m.path)}" fill="${color}" fill-opacity="0.42" stroke="${color}" stroke-width="2" vector-effect="non-scaling-stroke" fill-rule="evenodd"/>` +
         `</g>`
       );
     })
@@ -160,7 +159,7 @@ export function renderAnnexureSvg(input: AnnexureInput): string {
     .map((r, i) => {
       const y = receiptStartY + 22 + i * 22;
       const value = typeof r.output.value === "number" ? String(r.output.value) : r.output.value;
-      return `<text x="24" y="${y}" font-size="11" font-family="monospace">${esc(r.id)} ${esc(r.method)} ${esc(value)} ${esc(r.output.unit)} — ${esc(r.formula)}</text>`;
+      return `<text x="24" y="${y}" font-size="11" font-family="monospace">${esc(r.id)} ${esc(r.method)} ${esc(value)} ${esc(r.output.unit)} - ${esc(r.formula)}</text>`;
     })
     .join("");
 

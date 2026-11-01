@@ -12,11 +12,13 @@ import Numbers from "./screens/Numbers";
 import Check from "./screens/Check";
 import Report from "./screens/Report";
 import Admin from "./screens/Admin";
+import Shared from "./screens/Shared";
+import { decodeShareHash, type SharedReport } from "./lib/share";
 import { Home, Cases, Settings } from "./screens/Tabs";
 
 export type Screen =
   | "tHome" | "tCases" | "tSettings" | "tAdmin"
-  | "capture" | "sReview" | "sMark" | "sSay" | "sNum" | "sCheck" | "sReport";
+  | "capture" | "sReview" | "sMark" | "sSay" | "sNum" | "sCheck" | "sReport" | "sShared";
 
 export type CheckPhase = "idle" | "loading" | "ok" | "error";
 
@@ -39,7 +41,7 @@ export interface AppCtx {
   setNumError(e: { title: string; detail: string } | null): void;
   measureRef: { current: (() => void) | null };
   checks: { skeptic: CheckPhase; xcheck: CheckPhase };
-  setChecks(c: { skeptic: CheckPhase; xcheck: CheckPhase }): void;
+  setChecks(c: React.SetStateAction<{ skeptic: CheckPhase; xcheck: CheckPhase }>): void;
   swUpdateReady: boolean;
   checkForUpdates(): Promise<void>;
   applyUpdate(): void;
@@ -68,9 +70,20 @@ export default function App() {
   const measuringRef = useRef(false);
 
   /* a finished or abandoned claim unblocks a pending update */
-  const [screen, setScreen] = useState<Screen>(() =>
-    window.location.pathname.startsWith("/admin") ? "tAdmin" : "tHome",
-  );
+  const sharedRef = useRef<SharedReport | null>(null);
+  const [screen, setScreen] = useState<Screen>(() => {
+    if (window.location.pathname.startsWith("/admin")) return "tAdmin";
+    // A landlord link carries the whole report in `#/s/...` - open the
+    // read-only view straight away; garbage hashes fall through to home.
+    try {
+      const shared = decodeShareHash(window.location.hash);
+      if (shared) {
+        sharedRef.current = shared;
+        return "sShared";
+      }
+    } catch { /* fall through to home */ }
+    return "tHome";
+  });
   const [base, setBaseState] = useState<string>(() => {
     const saved = String(store.getSettings().baseUrl ?? DEFAULT_BASE);
     return isAllowedBackendUrl(saved) ? saved : DEFAULT_BASE;
@@ -99,14 +112,29 @@ export default function App() {
     store.setSettings({ baseUrl: url.trim().replace(/\/$/, "") });
   }, [store, toast]);
 
-  const go = useCallback((s: Screen) => setScreen(s), []);
+  const [stepLoading, setStepLoading] = useState(false);
+  const stepTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* Forced scripted transition: every screen change shows the step loader
+     for a full second, even when the next screen is instant. Timer resets
+     on rapid taps; cleared on unmount. */
+  const go = useCallback((s: Screen) => {
+    setScreen(s);
+    setStepLoading(true);
+    if (stepTimer.current) clearTimeout(stepTimer.current);
+    stepTimer.current = setTimeout(() => setStepLoading(false), 1000);
+  }, []);
+
+  useEffect(() => () => {
+    if (stepTimer.current) clearTimeout(stepTimer.current);
+  }, []);
 
   const startCapture = useCallback(() => {
     const s = sessionRef.current;
     s.currentCaseId = null;
     resetDmg(s);
-    setScreen("capture");
-  }, []);
+    go("capture");
+  }, [go]);
 
   const bumpCases = useCallback(() => setCasesVersion((v) => v + 1), []);
 
@@ -163,25 +191,37 @@ export default function App() {
         });
       });
     }).catch(() => { /* the app still runs uncached */ });
+    // Long-lived sessions never navigate, so the browser may never check for
+    // a new worker on its own - poll every 20 min and on every foreground.
+    const poll = () => swReg.current?.update().catch(() => {});
+    const beat = setInterval(poll, 20 * 60 * 1000);
+    const onVis = () => {
+      if (document.visibilityState === "visible") poll();
+    };
+    document.addEventListener("visibilitychange", onVis);
     const onController = () => {
       if (reloading.current) return;
       reloading.current = true;
       location.reload();
     };
     navigator.serviceWorker.addEventListener("controllerchange", onController);
-    return () => navigator.serviceWorker.removeEventListener("controllerchange", onController);
+    return () => {
+      clearInterval(beat);
+      document.removeEventListener("visibilitychange", onVis);
+      navigator.serviceWorker.removeEventListener("controllerchange", onController);
+    };
   }, []);
 
   const checkForUpdates = useCallback(async () => {
     if (!swReg.current) {
-      toast("Service worker not registered yet — reload once, then check again");
+      toast("Service worker not registered yet - reload once, then check again");
       return;
     }
     await swReg.current.update().catch(() => {});
     if (waitingSw.current) {
-      toast(tryAutoUpdate() ? "Update found — applying…" : "Update ready — finishes your claim first");
+      toast(tryAutoUpdate() ? "Update found - applying…" : "Update ready - finishes your claim first");
     } else {
-      toast(updateReady ? "Update ready — finishes your claim first" : "You are on the latest version");
+      toast(updateReady ? "Update ready - finishes your claim first" : "You are on the latest version");
     }
   }, [toast, updateReady, tryAutoUpdate]);
 
@@ -223,6 +263,7 @@ export default function App() {
       {screen === "sNum" && <Numbers />}
       {screen === "sCheck" && <Check />}
       {screen === "sReport" && <Report />}
+      {screen === "sShared" && sharedRef.current && <Shared rep={sharedRef.current} />}
       {screen === "tHome" && <Home />}
       {screen === "tCases" && <Cases />}
       {screen === "tSettings" && <Settings />}
@@ -231,44 +272,53 @@ export default function App() {
       {TAB_SCREENS.includes(screen) && (
         <nav id="tabs" aria-label="Main">
           <button type="button" data-tab="tHome" aria-current={screen === "tHome" ? "page" : undefined} onClick={() => go("tHome")}>
-            <span className="tabicon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11l9-8 9 8" /><path d="M5 9.5V21h5v-6h4v6h5V9.5" /></svg>
+            <span className="tab-pill">
+              <span className="tabicon" aria-hidden="true">
+                <svg className="icon-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11l9-8 9 8" /><path d="M5 9.5V21h5v-6h4v6h5V9.5" /></svg>
+                <svg className="icon-filled" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6l10 8.4h-2.8v10H14v-6h-4v6H4.8V11H2z" /></svg>
+              </span>
+              <span className="tablabel">Home</span>
             </span>
-            <span className="tablabel">Home</span>
           </button>
           <button type="button" data-tab="capture" id="tabNew" aria-label="Start a new claim" onClick={startCapture}>
-            <span className="fabdot" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+            <span className="tab-pill">
+              <span className="tabicon tabicon--fab" aria-hidden="true">
+                <span className="fabdot">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+                </span>
+              </span>
+              <span className="tablabel">New</span>
             </span>
-            <span className="tablabel">New</span>
           </button>
           <button type="button" data-tab="tCases" aria-current={screen === "tCases" ? "page" : undefined} onClick={() => go("tCases")}>
-            <span className="tabicon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg>
+            <span className="tab-pill">
+              <span className="tabicon" aria-hidden="true">
+                <svg className="icon-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg>
+                <svg className="icon-filled" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 6a3 3 0 0 1 3-3h4l2 2h8a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z" /></svg>
+              </span>
+              <span className="tablabel">Cases</span>
             </span>
-            <span className="tablabel">Cases</span>
-          </button>
-          <button type="button" data-tab="tSettings" aria-current={screen === "tSettings" ? "page" : undefined} onClick={() => go("tSettings")}>
-            <span className="tabicon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8h9M19 8h1M4 16h3M13 16h7" /><circle cx="16" cy="8" r="2.2" /><circle cx="10" cy="16" r="2.2" /></svg>
-            </span>
-            <span className="tablabel">Settings</span>
           </button>
         </nav>
       )}
       {updateReady && (
         <div id="updateBar" role="status">
-          <span>A new version is ready — applies when this claim ends.</span>
+          <span>A new version is ready - applies when this claim ends.</span>
           <button id="updateGo" type="button" onClick={applyUpdate}>Reload</button>
         </div>
       )}
       {!online && (
         <div id="offlineBar" role="status">
-          You&apos;re offline. Saved cases and capture still work here — new measurements, reports and checks need a connection. On-device outlining and voice need one online load first to download their models.
+          You&apos;re offline. Saved cases and capture still work here - new measurements, reports and checks need a connection. On-device outlining and voice need one online load first to download their models.
         </div>
       )}
       {toastMsg && <div id="toast" role="status">{toastMsg}</div>}
-      <div id="appLive" className="sr-only" aria-live="polite">{toastMsg ?? ""}</div>
+      {stepLoading && (
+        <div id="stepLoading" role="status" aria-label="Loading next step">
+          <span className="spin" aria-hidden="true" />
+          <b>Loading…</b>
+        </div>
+      )}
     </Ctx.Provider>
   );
 }

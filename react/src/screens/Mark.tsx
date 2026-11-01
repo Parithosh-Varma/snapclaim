@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "../App";
-import { apiPost } from "../lib/api";
+import { apiGet, apiPost } from "../lib/api";
 import { checkPhoto } from "../lib/photo-check";
 import { findCoins } from "../../../src/vision/coin-detect.js";
 import { circleRle, encodeRle } from "../lib/rle";
@@ -8,6 +8,158 @@ import { closeMask } from "../lib/mask";
 import { segmentViaApi, type SamClient } from "../lib/sam";
 import { COIN_GROUPS, COIN_OPTIONS, resetDmg, type SamMask, type Session } from "../lib/session";
 import { BackButton, Stepper } from "../lib/ui";
+
+/** Custom coin-size dropdown: the native select cannot be styled square or
+    themed, so this listbox renders the same presets (plus the gate's
+    auto-detected coin) with full keyboard support. */
+function CoinDrop(props: {
+  dropRef: { current: HTMLDivElement | null };
+  btnRef: { current: HTMLButtonElement | null };
+  open: boolean;
+  setOpen: (v: boolean) => void;
+  active: number | null;
+  setActive: (v: number | null) => void;
+  selected: number;
+  gateValue: number;
+  gateLabel: string;
+  gateCustom: boolean;
+  onPick: (v: number, label: string) => void;
+}) {
+  const { dropRef, btnRef, open, setOpen, active, setActive, selected, gateValue, gateLabel, gateCustom, onPick } = props;
+  const listRef = useRef<HTMLUListElement>(null);
+  type Row = { kind: "opt"; value: number; label: string } | { kind: "head"; label: string };
+  const rows: Row[] = [{ kind: "opt", value: 0, label: "Choose the reference size…" }];
+  if (gateValue > 0 && !COIN_OPTIONS.some((o) => o.value === gateValue) && !gateCustom) {
+    rows.push({ kind: "opt", value: gateValue, label: gateLabel || `${gateValue} mm reference` });
+  }
+  for (const g of COIN_GROUPS) {
+    rows.push({ kind: "head", label: g.name });
+    for (const o of g.options) rows.push({ kind: "opt", value: o.value, label: o.label });
+  }
+  const order = rows.map((r, i) => (r.kind === "opt" ? i : -1)).filter((i) => i >= 0);
+  const selectedIdx = rows.findIndex((r) => r.kind === "opt" && r.value === selected);
+  const currentLabel = (selectedIdx >= 0 ? (rows[selectedIdx] as { label: string }).label : null) ?? "Choose the reference size…";
+
+  useEffect(() => {
+    if (!open) return;
+    listRef.current?.focus();
+    const onDown = (e: PointerEvent) => {
+      if (!dropRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [open, dropRef, setOpen]);
+
+  const pick = (idx: number) => {
+    const r = rows[idx];
+    if (!r || r.kind !== "opt") return;
+    onPick(r.value, r.label);
+    setOpen(false);
+    btnRef.current?.focus();
+  };
+  const step = (dir: 1 | -1) => {
+    const at = active === null ? order.indexOf(selectedIdx) : order.indexOf(active);
+    const nextIdx = order[(at + dir + order.length) % order.length];
+    if (nextIdx === undefined) return;
+    setActive(nextIdx);
+    document.getElementById(`coinopt-${nextIdx}`)?.scrollIntoView({ block: "nearest" });
+  };
+
+  return (
+    <div className="coindrop" ref={dropRef}>
+      <button
+        ref={btnRef}
+        id="coinKind"
+        type="button"
+        className="coindrop-btn"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => {
+          if (open) {
+            setOpen(false);
+          } else {
+            setActive(selectedIdx >= 0 ? selectedIdx : (order[0] ?? null));
+            setOpen(true);
+          }
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setActive(selectedIdx >= 0 ? selectedIdx : (order[0] ?? null));
+            setOpen(true);
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setActive(order[order.length - 1] ?? null);
+            setOpen(true);
+          } else if (e.key === "Escape" && open) {
+            setOpen(false);
+          }
+        }}
+      >
+        <span>{currentLabel}</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+      </button>
+      {open && (
+        <ul
+          className="coindrop-list"
+          ref={listRef}
+          role="listbox"
+          aria-label="Coin size"
+          aria-activedescendant={active !== null ? `coinopt-${active}` : undefined}
+          tabIndex={-1}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              step(1);
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              step(-1);
+            } else if (e.key === "Home") {
+              e.preventDefault();
+              setActive(order[0] ?? null);
+            } else if (e.key === "End") {
+              e.preventDefault();
+              setActive(order[order.length - 1] ?? null);
+            } else if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              if (active !== null) pick(active);
+            } else if (e.key === "Escape") {
+              setOpen(false);
+              btnRef.current?.focus();
+            } else if (e.key === "Tab") {
+              setOpen(false);
+            }
+          }}
+        >
+          {rows.map((r, i) =>
+            r.kind === "head" ? (
+              <li key={`h-${r.label}`} className="coindrop-group" aria-hidden="true">
+                {r.label}
+              </li>
+            ) : (
+              <li
+                key={`${r.value}-${r.label}`}
+                id={`coinopt-${i}`}
+                role="option"
+                aria-selected={r.value === selected}
+                className={i === active ? "active" : undefined}
+                onClick={() => pick(i)}
+                onMouseEnter={() => {
+                  if (active !== i) setActive(i);
+                }}
+              >
+                <span>{r.label}</span>
+                {r.value === selected && (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10" /></svg>
+                )}
+              </li>
+            ),
+          )}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 const MAX_SIDE = 512;
 const CHIPS: { id: string; label: string; text: string }[] = [
@@ -26,7 +178,7 @@ async function segmentOnDevice(sam: SamClient, s: Session): Promise<SamMask | nu
   if (!found.length) return null;
   const union = new Uint8Array((found[0] as SamMask).mask.length);
   for (const { mask } of found) for (let i = 0; i < union.length; i++) union[i] = (union[i] ?? 0) | (mask[i] ?? 0);
-  // Wall-sized union is the room, not the damage — reject so the tap retries.
+  // Wall-sized union is the room, not the damage - reject so the tap retries.
   let n = 0;
   for (let i = 0; i < union.length; i++) if (union[i]) n++;
   if (n > union.length * 0.5) return null;
@@ -46,10 +198,20 @@ export default function Mark() {
   const [hasMask, setHasMask] = useState(!!s.dmg.mask);
   const [tapCount, setTapCount] = useState(s.dmg.points.length);
   const [markBusy, setMarkBusy] = useState(false);
+  const [measureBusy, setMeasureBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const [coinCorrect, setCoinCorrect] = useState(false);
   const [coinFixHint, setCoinFixHint] = useState("");
   const [taped, setTaped] = useState(s.coinTaped);
+  const [coinOpen, setCoinOpen] = useState(false);
+  const [coinActive, setCoinActive] = useState<number | null>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
+  const dropBtnRef = useRef<HTMLButtonElement>(null);
+  // Stale-write guard: each measure() run gets a seq; navigation away or a
+  // retry supersedes the previous run so only the latest may mutate session
+  // or navigate. Incremented on unmount to drop late arrivals.
+  const measureSeq = useRef(0);
+  useEffect(() => () => { measureSeq.current++; }, []);
 
   /** Manual radius matches measure()'s circleRef radius (gate-derived, or a
    * 3.5% fallback when the gate missed) so the ring shows what gets measured. */
@@ -154,7 +316,7 @@ export default function Mark() {
         }
       }
       const circle = Math.PI * r * r;
-      // Tape halo inflates the mask (coin + tape strip) — allow 2.5× and a
+      // Tape halo inflates the mask (coin + tape strip) - allow 2.5× and a
       // looser centroid when taped, matching the vanilla PWA.
       const taped = s.coinTaped;
       if (area < circle * 0.4 || area > circle * (taped ? 2.5 : 1.6)) return null;
@@ -165,9 +327,9 @@ export default function Mark() {
   );
 
   /** Auto coin hunt: Hough proposes centres, SAM disposes. The first verified
-      outline becomes the coin tap, same as a manual one — the user only picks
+      outline becomes the coin tap, same as a manual one - the user only picks
       the size. Runs only when the gate missed the coin entirely, and only
-      after a crack is selected — never a download before first tap. */
+      after a crack is selected - never a download before first tap. */
   const huntCoin = useCallback(async (
     found: { x: number; y: number; r: number }[],
     photo: HTMLCanvasElement,
@@ -192,7 +354,7 @@ export default function Mark() {
         s.coinManualPt = [Math.round(c.x), Math.round(c.y)];
         s.coinMask = traced.mask;
         s.coinIou = traced.iou;
-        setCoinFixHint(`Coin found (${Math.round(traced.iou * 100)}% sure) — pick its size`);
+        setCoinFixHint(`Coin found (${Math.round(traced.iou * 100)}% sure) - pick its size`);
         drawMark();
         return;
       }
@@ -201,11 +363,13 @@ export default function Mark() {
   }, [drawMark, s, sam, traceCoin]);
 
   const huntRef = useRef<{ points: { x: number; y: number; r: number }[]; photo: HTMLCanvasElement } | null>(null);
+  /* Undo order: the last tap undone first, crack or coin. Entries land when
+     a tap takes effect; a fresh photo clears the slate with the taps. */
+  const histRef = useRef<("crack" | "coin")[]>([]);
 
   /* build the marking photo; the on-device model embeds only on demand
-     (coin outline, cloud fallback, cross-check) — never on entry */
-  useEffect(() => {
-    sam.onProgress = ({ percent }) => setTfState(`Downloading the outlining model… ${percent}%`);
+     (coin outline, cloud fallback, cross-check) - never on entry */
+  useEffect(() => {    sam.onProgress = ({ percent }) => setTfState(`Downloading the outlining model… ${percent}%`);
     sam.onReady = (device, embedMs) => {
       embeddings.current = true;
       setTfState("");
@@ -214,7 +378,7 @@ export default function Mark() {
     sam.onError = (message) => {
       setTfState("");
       setStatus(navigator.onLine === false
-        ? "On-device outlining model not available offline yet — reconnect once to download it, then it works offline."
+        ? "On-device outlining model not available offline yet - reconnect once to download it, then it works offline."
         : `Outlining unavailable (${message}). Check the connection and retry.`);
     };
     if (s.photo && s.photoFor === s.stillDataUrl) {
@@ -226,6 +390,7 @@ export default function Mark() {
     // slow or failed load can never leave a stale outline behind the button.
     // The button stays disabled until the new photo is outlined (hasMask).
     resetDmg(s);
+    histRef.current = [];
     s.coinManualPt = null;
     s.coinMask = null;
     s.coinIou = 0;
@@ -238,16 +403,48 @@ export default function Mark() {
     setStatus("Select crack to continue.");
     drawMark();
     const img = new Image();
+    const still = s.stillDataUrl;
+    if (!still) {
+      setReady(false);
+      setStatus("No photo loaded - go back and take or pick one.");
+      return;
+    }
+    // A stalled decode (huge image, throttled phone) fires neither onload
+    // nor onerror - stop the silent skeleton after 12 s with a real message.
+    const stall = setTimeout(() => {
+      if (s.photoFor !== still) {
+        setReady(false);
+        setStatus("Photo is taking too long to load - try a smaller sample or retake.");
+      }
+    }, 12000);
     img.onload = () => {
+      clearTimeout(stall);
       const scale = Math.min(1, MAX_SIDE / Math.max(img.width, img.height));
       const photo = document.createElement("canvas");
       photo.width = Math.round(img.width * scale);
       photo.height = Math.round(img.height * scale);
       photo.getContext("2d", { willReadFrequently: true })?.drawImage(img, 0, 0, photo.width, photo.height);
+      // Never bank a silent black canvas: if a decoded image paints nothing,
+      // say so instead of showing a black photo.
+      try {
+        const px = photo.getContext("2d", { willReadFrequently: true })?.getImageData(0, 0, photo.width, photo.height);
+        if (px) {
+          let sum = 0;
+          let n = 0;
+          const d = px.data;
+          for (let i = 0; i < d.length; i += 401 * 4) {
+            sum += (d[i] as number) + (d[i + 1] as number) + (d[i + 2] as number);
+            n += 3;
+          }
+          if (n > 0 && sum / n / 255 < 0.02) {
+            setStatus("That photo came out black - try another sample or retake.");
+          }
+        }
+      } catch { /* validation is best-effort; the photo still shows */ }
       s.photo = photo;
       s.photoFor = s.stillDataUrl;
       resetDmg(s);
-      // A manual coin tap is pixel coords of the previous photo — never reuse it.
+      // A manual coin tap is pixel coords of the previous photo - never reuse it.
       s.coinManualPt = null;
       s.coinMask = null;
       s.coinIou = 0;
@@ -255,7 +452,7 @@ export default function Mark() {
       setReady(true);
       drawMark();
       // The gate missed the coin: propose centres now (free, same thread),
-      // verify with SAM only after a crack is selected — never a download
+      // verify with SAM only after a crack is selected - never a download
       // before first tap.
       if (!s.gateCoin && !s.coinManualPt) {
         try {
@@ -266,20 +463,36 @@ export default function Mark() {
       }
     };
     img.onerror = () => {
+      clearTimeout(stall);
       setReady(false);
-      setStatus("That photo could not be read — go back and take it again.");
+      setStatus("That photo could not be read - go back and take it again.");
     };
     img.src = s.stillDataUrl;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* The build effect above calls drawMark() before setReady(true) paints the
+     canvas into the DOM, so that first paint lands on nothing and the canvas
+     keeps its default black until the next tap. Repaint once ready flips. */
+  useEffect(() => {
+    if (ready) drawMark();
+  }, [ready, drawMark]);
+
   const measure = useCallback(async () => {
-    // Belt and braces with the disabled button: no mask, no empty mask, no photo — no report.
-    if (!s.dmg.mask || !s.photo) return;
+    // Belt and braces with the disabled button: no mask, no empty mask, no photo - no report.
+    if (!s.dmg.mask || !s.photo) {
+      setStatus("Tap the crack first - there is nothing outlined to measure.");
+      return;
+    }
+    const seq = ++measureSeq.current;
+    const stale = () => seq !== measureSeq.current;
+    setStatus("Measuring - asking the backend for the numbers…");
+    setMeasureBusy(true);
     let area = 0;
     for (let i = 0; i < s.dmg.mask.length; i++) if (s.dmg.mask[i]) area++;
     if (!area) {
-      setStatus("Tap the crack first — there is nothing outlined to measure.");
+      setStatus("Tap the crack first - there is nothing outlined to measure.");
+      setMeasureBusy(false);
       return;
     }
     try {
@@ -289,13 +502,26 @@ export default function Mark() {
     const w = s.photo.width;
     const h = s.photo.height;
     ctx.setNumError(null);
+    // No mock measurements, ever: a mock backend invents numbers, so refuse
+    // before leaving Mark. Unreachable health is not a refusal - measure
+    // surfaces the real connection error itself.
+    try {
+      const { j } = await apiGet(base, "/v1/health");
+      if ((j as { mode?: unknown }).mode === "mock") {
+        setStatus("Backend is in mock mode - measurements would be fake. Settings - Connection shows how to point at the live backend.");
+        ctx.setNumError({ title: "Mock backend refused", detail: "This backend invents measurements. Open Settings - Connection and use the SnapClaim cloud URL, then measure again." });
+        setMeasureBusy(false);
+        go("sNum");
+        return;
+      }
+    } catch { /* health failed: measure reports the real error below */ }
     ctx.setMeasuring(true);
     go("sNum");
     const body: Record<string, unknown> = {
       masks: [{ id: "damage-1", label: s.dmgLabel, rle: encodeRle(s.dmg.mask, w, h), confidence: s.dmg.iou || 0.8 }],
     };
     let circleRef: Record<string, unknown> | null = null;
-    // Manual coin tap wins over the gate — taped coin or missed detection.
+    // Manual coin tap wins over the gate - taped coin or missed detection.
     const coinCxCyR = (() => {
       if (s.coinManualPt) {
         const estR = Math.max(10, w * 0.035);
@@ -327,22 +553,28 @@ export default function Mark() {
     setStatus("");
     try {
       let { res, j } = await apiPost(base, "/v1/observe", body);
+      if (stale()) return;
       // a traced outline the backend refuses (not coin-shaped) falls back to the gate's circle
       if (res.status === 422 && circleRef && body.reference !== circleRef) {
         console.info(`[coin] traced outline refused (${j.error}); using the detected circle`);
         body.reference = circleRef;
         ({ res, j } = await apiPost(base, "/v1/observe", body));
+        if (stale()) return;
       }
       if (!res.ok || !j.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
       const m = await apiPost(base, "/v1/measure", j.result);
+      if (stale()) return;
       if (!m.res.ok || !m.j.ok) throw new Error(m.j.error ?? `HTTP ${m.res.status}`);
       s.payload = j.result as typeof s.payload;
       s.measurement = m.j.result as unknown as typeof s.measurement;
       s.autoListen = true;
       ctx.setMeasuring(false);
+      setMeasureBusy(false);
       go("sSay");
     } catch (e) {
+      if (stale()) return;
       ctx.setMeasuring(false);
+      setMeasureBusy(false);
       const msg = e instanceof Error ? e.message : String(e);
       setStatus(`Measuring failed (${msg}).`);
       ctx.setNumError({ title: "Measurement failed", detail: msg });
@@ -365,6 +597,7 @@ export default function Mark() {
       s.coinManualPt = [x, y];
       s.coinMask = null;
       s.coinIou = 0;
+      histRef.current.push("coin");
       setCoinCorrect(false);
       setCoinFixHint("Outlining coin…");
       setMarkBusy(true);
@@ -374,10 +607,15 @@ export default function Mark() {
       // not on entry. Falls back to the estimated circle when it fails.
       setCoinFixHint("Loading the coin model…");
       if (s.photo) {
-        const ok = await sam.ensureEmbedded(s.photo);
+        let ok = false;
+        try {
+          ok = await sam.ensureEmbedded(s.photo);
+        } catch {
+          ok = false;
+        }
         if (!ok) {
           embeddings.current = false;
-          setCoinFixHint("Coin model failed to load — using the circle; pick its size");
+          setCoinFixHint("Coin model failed to load - using the circle; pick its size");
           setMarkBusy(false);
           drawMark();
           return;
@@ -392,15 +630,15 @@ export default function Mark() {
           if (traced) {
             s.coinMask = traced.mask;
             s.coinIou = traced.iou;
-            setCoinFixHint(`Coin outlined (${Math.round(traced.iou * 100)}% sure) — pick its size`);
+            setCoinFixHint(`Coin outlined (${Math.round(traced.iou * 100)}% sure) - pick its size`);
           } else {
-            setCoinFixHint("Coin outline unclear — using the circle; pick its size");
+            setCoinFixHint("Coin outline unclear - using the circle; pick its size");
           }
         } catch {
-          setCoinFixHint("Coin outline unclear — using the circle; pick its size");
+          setCoinFixHint("Coin outline unclear - using the circle; pick its size");
         }
       } else {
-        setCoinFixHint("Coin marked — outlines when the model loads; pick its size");
+        setCoinFixHint("Coin marked - outlines when the model loads; pick its size");
       }
       setMarkBusy(false);
       drawMark();
@@ -419,14 +657,19 @@ export default function Mark() {
       source = "device";
       if (!embeddings.current) {
         setStatus("Loading the on-device outlining model…");
-        const ready = s.photo ? await sam.ensureEmbedded(s.photo) : false;
+        let ready = false;
+        try {
+          ready = s.photo ? await sam.ensureEmbedded(s.photo) : false;
+        } catch {
+          ready = false;
+        }
         if (!ready) {
           s.dmg.points.pop();
           setStatus(sam.lastError
-            ? `Outlining model failed to load (${sam.lastError}) — retry.`
+            ? `Outlining model failed to load (${sam.lastError}) - retry.`
             : navigator.onLine === false
-              ? "On-device outlining model not available offline yet — reconnect once to download it, then it works offline."
-              : "Outlining model failed to load — check the connection and retry.");
+              ? "On-device outlining model not available offline yet - reconnect once to download it, then it works offline."
+              : "Outlining model failed to load - check the connection and retry.");
           setMarkBusy(false);
           drawMark();
           return;
@@ -444,8 +687,9 @@ export default function Mark() {
       s.dmg.mask = closeMask(out.mask, s.photo.width, s.photo.height, 2);
       s.dmg.iou = out.iou;
       s.dmg.source = source;
+      histRef.current.push("crack");
       setStatus(`Outlined (${Math.round(out.iou * 100)}% sure) via ${source === "api" ? "SAM 3.1 API" : "on-device"}.`);
-      // Crack selected: now verify the stashed coin candidates (if any) —
+      // Crack selected: now verify the stashed coin candidates (if any):
       // the first download happens here, never before first tap. Otherwise
       // warm the model quietly for the coin outline and cross-check.
       const pending = huntRef.current;
@@ -465,12 +709,26 @@ export default function Mark() {
 
   const undo = useCallback(async () => {
     if (!s.photo || markBusy) return;
-    if (coinCorrect) {
+    const last = histRef.current[histRef.current.length - 1];
+    // A pending correction mode cancels first without consuming history.
+    if (coinCorrect && last !== "coin") {
       setCoinCorrect(false);
       setCoinFixHint("");
       drawMark();
       return;
     }
+    // Otherwise the last tap undone first, crack or coin.
+    if (last === "coin") {
+      histRef.current.pop();
+      if (coinCorrect) setCoinCorrect(false);
+      s.coinManualPt = null;
+      s.coinMask = null;
+      s.coinIou = 0;
+      setCoinFixHint("");
+      drawMark();
+      return;
+    }
+    if (last === "crack") histRef.current.pop();
     if (s.dmg.points.length) {
       s.dmg.points.pop();
       s.dmg.pointMasks.pop();
@@ -515,7 +773,7 @@ export default function Mark() {
       } else {
         s.dmg.mask = null;
         s.dmg.source = null;
-        setStatus("Undo done — remaining taps found nothing. Tap again.");
+        setStatus("Undo done - remaining taps found nothing. Tap again.");
       }
       setMarkBusy(false);
       drawMark();
@@ -532,10 +790,10 @@ export default function Mark() {
 
   const coinState = s.coinManualPt ? (s.coinMask ? "manual-ok" : "manual") : s.gateCoin ? "auto" : "none";
   const coinStateText =
-    coinState === "auto" ? "Coin auto-detected — confirm its size."
-    : coinState === "manual-ok" ? "Coin outlined from your tap — confirm its size."
-    : coinState === "manual" ? "Coin tap saved — confirm its size below."
-    : "No coin yet — add one, or measure percent-only.";
+    coinState === "auto" ? "Coin auto-detected - confirm its size."
+    : coinState === "manual-ok" ? "Coin outlined from your tap - confirm its size."
+    : coinState === "manual" ? "Coin tap saved - confirm its size below."
+    : "No coin yet - add one, or measure percent-only.";
   const needSize = Boolean(s.gateCoin || s.coinManualPt) && s.coinKindMm <= 0;
 
   return (
@@ -545,7 +803,14 @@ export default function Mark() {
         <Stepper step={2} />
         <h1 id="h-mark">Tap the damage.</h1>
         <p className="sub">One tap on the crack. The coin is already outlined from the gate.</p>
-        <div className="card evcard">
+        {!ready ? (
+          <>
+            <div className="skel" role="status" aria-label="Loading photo" />
+            <div className="skel" />
+          </>
+        ) : (
+          <>
+            <div className="card evcard">
           <div className="evframe">
             <canvas id="markCanvas" ref={canvasRef} onPointerDown={onTap} />
             {tapCount > 0 && (
@@ -591,30 +856,24 @@ export default function Mark() {
           </div>
           <label className="field">
             Coin size
-            <select
-              id="coinKind"
-              value={coinCustom ? 0 : coinKind}
-              onChange={(e) => {
-                const v = Number(e.target.value);
-                const text = e.target.selectedOptions[0]?.text ?? "";
+            <CoinDrop
+              dropRef={dropRef}
+              btnRef={dropBtnRef}
+              open={coinOpen}
+              setOpen={setCoinOpen}
+              active={coinActive}
+              setActive={setCoinActive}
+              selected={coinCustom ? 0 : coinKind}
+              gateValue={s.coinKindMm}
+              gateLabel={s.coinLabel}
+              gateCustom={!!coinCustom}
+              onPick={(v, label) => {
                 setCoinKind(v);
                 setCoinCustom("");
                 s.coinKindMm = v;
-                s.coinLabel = v > 0 ? text.replace(/ · (\d+(?:\.\d+)?) mm$/, " · $1 mm dia") : "";
+                s.coinLabel = v > 0 ? label.replace(/ · (\d+(?:\.\d+)?) mm$/, " · $1 mm dia") : "";
               }}
-            >
-              <option value={0}>Choose the reference size…</option>
-              {s.coinKindMm > 0 && !COIN_OPTIONS.some((o) => o.value === s.coinKindMm) && !coinCustom ? (
-                <option value={s.coinKindMm}>{s.coinLabel || `${s.coinKindMm} mm reference`}</option>
-              ) : null}
-              {COIN_GROUPS.map((g) => (
-                <optgroup key={g.name} label={g.name}>
-                  {g.options.map((o) => (
-                    <option key={o.label} value={o.value}>{o.label}</option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+            />
           </label>
           <label className="field">
             Or type the diameter <small className="fieldex">any coin, ruler, card</small>
@@ -671,9 +930,11 @@ export default function Mark() {
                 drawMark();
               }}
             />
-            <span>Coin has tape<small>Lenient outline — allows the tape halo</small></span>
+            <span>Coin has tape<small>Lenient outline - allows the tape halo</small></span>
           </label>
         </div>
+          </>
+        )}
         {photoNotes ? <div id="photoNotes" className="hint">{photoNotes}</div> : null}
         {tfState ? (
           <div className="modelline" role="status">
@@ -681,8 +942,8 @@ export default function Mark() {
             <span id="tfState">{tfState}</span>
           </div>
         ) : null}
-        <button id="measureBtn" className="btn-primary" type="button" disabled={!hasMask || needSize} onClick={measure}>
-          Measure damage
+        <button id="measureBtn" className={`btn-primary${measureBusy ? " busy" : ""}`} type="button" disabled={measureBusy || !hasMask || needSize} aria-busy={measureBusy} onClick={measure}>
+          {measureBusy ? "Measuring…" : "Measure damage"}
         </button>
         {!hasMask ? (
           <p className="ctahint">Tap the damage on the photo to enable measuring.</p>

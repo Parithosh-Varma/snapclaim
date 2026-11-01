@@ -963,8 +963,10 @@ function checkPhotoNotes() {
 }
   let checkState = { skeptic: "idle", xcheck: "idle" }; // idle|loading|ok|error per check
 
+let measureBusy = false;
 $("measureBtn").onclick = async () => {
-  if (!dmg.mask) return;
+  if (!dmg.mask || measureBusy) return;
+  measureBusy = true; $("measureBtn").disabled = true;
   checkPhotoNotes();
   const w = photo.width, h = photo.height;
   show("sNum");
@@ -1021,6 +1023,8 @@ $("measureBtn").onclick = async () => {
     setNumLoading(false);
     $("status").textContent = `Measuring failed (${e.message ?? e}).`;
     showNumError("Measurement failed", String(e.message ?? e), () => $("measureBtn").click());
+  } finally {
+    measureBusy = false; $("measureBtn").disabled = !dmg.mask;
   }
 };
 let coinManualPt = null, coinCorrectMode = false;
@@ -1470,14 +1474,29 @@ let voiceWorker = null, voiceId = 0;
 /** Mono 16 kHz samples → text, on the device. Empty string means nothing heard. */
 function transcribeOnDevice(audio) {
   voiceWorker ??= new Worker(new URL("./voice-worker.js", import.meta.url), { type: "module" });
+  const w = voiceWorker;
   const id = voiceId++;
   return new Promise((resolve, reject) => {
-    voiceWorker.onmessage = ({ data }) => {
-      if (data.type === "progress") setPill("busy", `Getting speech model… ${data.percent}%`);
-      else if (data.type === "transcribed" && data.id === id) data.error ? reject(new Error(data.error)) : resolve(data.text);
+    const cleanup = () => {
+      w.removeEventListener("message", onMessage);
+      w.removeEventListener("error", onError);
     };
-    voiceWorker.onerror = (e) => reject(new Error(e.message ?? "speech worker failed to start"));
-    voiceWorker.postMessage({ type: "transcribe", id, audio }, [audio.buffer]);
+    const onMessage = ({ data }) => {
+      if (data.type === "progress") {
+        if (id === voiceId - 1) setPill("busy", `Getting speech model… ${data.percent}%`);
+      } else if (data.type === "transcribed" && data.id === id) {
+        cleanup();
+        if (data.error) reject(new Error(data.error));
+        else resolve(data.text);
+      }
+    };
+    const onError = (e) => {
+      cleanup();
+      reject(new Error(e.message ?? "speech worker failed to start"));
+    };
+    w.addEventListener("message", onMessage);
+    w.addEventListener("error", onError);
+    w.postMessage({ type: "transcribe", id, audio }, [audio.buffer]);
   });
 }
 mic.onclick = () => { if (listening) finishListening(true); else startListening(); };
@@ -1490,8 +1509,10 @@ $("backMark").onclick = () => show("sReview");
 $("backSay").onclick = () => show("sMark");
 
 /* ---------- report / skeptic / render ---------- */
+let reportBusy = false;
 async function runReport() {
-  if (!payloadObj) return;
+  if (!payloadObj || reportBusy) return;
+  reportBusy = true; sendBtn.disabled = true;
   $("findings").innerHTML = "";
   const body = JSON.parse(JSON.stringify(payloadObj));
   body.transcript = $("transcriptBox").value;
@@ -1504,9 +1525,11 @@ async function runReport() {
   if (res.status === 503 || !res.ok || !j.ok) {
     const fails = res.status === 503 ? [j.error ?? "API key missing"] : (j.details ?? j.failures ?? [j.error]);
     $("findings").innerHTML = `<span class="badge fail">${res.status === 503 ? "AI FINDINGS UNAVAILABLE" : "GATED"}</span><pre>${esc(JSON.stringify(fails, null, 2))}</pre>`;
+    reportBusy = false; sendBtn.disabled = false;
     return;
   }
   lastMeasurement = j.result.measurement ?? null;
+  reportBusy = false; sendBtn.disabled = false;
   resetCheckState();
   const f0 = (j.result.findings ?? [])[0];
   const summary = f0 && typeof f0.statement === "string" ? f0.statement : null;
@@ -1781,6 +1804,7 @@ $("newClaimBtn").onclick = () => {
   $("numPhotoOverlay").replaceChildren();
   $("skOut").innerHTML = ""; $("skStatus").textContent = ""; $("xStatus").textContent = "";
   const card = $("numPhotoCard"); if (card) card.hidden = true;
+  if (window.__annexUrl) { try { URL.revokeObjectURL(window.__annexUrl); } catch {} window.__annexUrl = null; }
   $("annexWrap").innerHTML = `<img id="annexImg" alt="Generated report annexure" hidden />`;
   $("dl").style.display = "none"; $("dl").removeAttribute("href");
   $("docGate").textContent = "Pending"; $("docGate").className = "badge wait";
@@ -1795,8 +1819,10 @@ $("newClaimBtn").onclick = () => {
   setLocked(true, "Add a coin for scale");
   acquireCamera();
 };
+let renderBusy = false;
 $("renderBtn").onclick = async () => {
-  if (!payloadObj) return;
+  if (!payloadObj || renderBusy) return;
+  renderBusy = true; $("renderBtn").disabled = true;
   const state = $("reportState");
   state.textContent = "Generating report…";
   $("annexWrap").innerHTML = `<img id="annexImg" alt="Generated report annexure" hidden /><div class="skel" role="status" aria-label="Generating report"></div>`;
@@ -1818,7 +1844,9 @@ $("renderBtn").onclick = async () => {
     // as a document and would run embedded scripts. Strip scriptable content.
     const cleanSvg = sanitizeSvg(j.result.svg);
     const blob = new Blob([cleanSvg], { type: "image/svg+xml" });
+    if (window.__annexUrl) { try { URL.revokeObjectURL(window.__annexUrl); } catch {} window.__annexUrl = null; }
     const url = URL.createObjectURL(blob);
+    window.__annexUrl = url;
     const img = document.getElementById("annexImg");
     await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = () => reject(new Error("preview failed to render")); img.src = url; img.hidden = false; });
     document.querySelector("#annexWrap .skel")?.remove();
@@ -1830,6 +1858,7 @@ $("renderBtn").onclick = async () => {
     fillReportDoc(true);
     setShareCopyEnabled(true);
     state.textContent = "";
+    renderBusy = false; $("renderBtn").disabled = false;
     saveCaseFromReport();
   } catch (e) {
     const name = e instanceof Error ? e.name : "";
@@ -1837,6 +1866,7 @@ $("renderBtn").onclick = async () => {
     $("annexWrap").innerHTML = `<img id="annexImg" alt="Generated report annexure" hidden />
       <div class="statecard err" role="alert"><b>Report failed.</b><p style="margin:8px 0 12px;color:#5b6b8c">${esc(what)}</p><button class="btn-dark" type="button" id="renderRetry" style="width:100%">Retry</button></div>`;
     document.getElementById("renderRetry").onclick = () => $("renderBtn").click();
+    renderBusy = false; $("renderBtn").disabled = false;
     state.textContent = "";
   }
 };

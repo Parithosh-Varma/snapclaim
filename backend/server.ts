@@ -2,7 +2,12 @@ import { createServer } from "node:http";
 import { pathToFileURL } from "node:url";
 import { checkRouteRateLimit, corsHeadersFor, handleRequest, securityHeaders } from "./app.ts";
 
-const PORT = Number(process.env.PORT ?? 8787);
+function parsePort(value: string | undefined): number {
+  const n = Number(value ?? 8787);
+  return Number.isFinite(n) && n > 0 && n <= 65535 ? Math.floor(n) : 8787;
+}
+
+const PORT = parsePort(process.env.PORT);
 
 function clientIp(req: import("node:http").IncomingMessage): string {
   // Never trust X-Forwarded-For from the open internet: anyone can send
