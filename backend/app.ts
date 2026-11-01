@@ -180,6 +180,12 @@ function requireNumber(value: unknown, name: string): number {
   return value;
 }
 
+function requireConfidence(value: unknown, name: string): number {
+  const n = requireNumber(value, name);
+  if (n < 0 || n > 1) throw new HttpError(400, `${name} must be in [0, 1]`);
+  return n;
+}
+
 function requirePositive(value: unknown, name: string, max = MAX_MASK_DIMENSION): number {
   const n = requireNumber(value, name);
   if (n <= 0 || n > max) throw new HttpError(400, `${name} must be in (0, ${max}]`);
@@ -188,6 +194,7 @@ function requirePositive(value: unknown, name: string, max = MAX_MASK_DIMENSION)
 
 function requireId(value: unknown, name: string): string {
   if (typeof value !== "string" || value === "") throw new HttpError(400, `${name} must be a non-empty string`);
+  if (value.length > 256) throw new HttpError(400, `${name} capped at 256 chars`);
   return value;
 }
 
@@ -223,6 +230,27 @@ export function observeBody(body: unknown, requestId = newRequestId()): Envelope
   const { component, masks, reference } = body;
   if (!Array.isArray(masks) || masks.length === 0) throw new HttpError(400, "masks must be a non-empty array");
   if (masks.length > MAX_MASKS) throw new HttpError(400, `masks capped at ${MAX_MASKS} per call; chunk the request`);
+  // Pre-decode budget: sum declared size headers BEFORE allocating any
+  // Uint8Array (50x4096² RLE bodies are ~20 bytes each on the wire but
+  // expand to ~800MB). Fail fast without touching the allocator.
+  let headerPixels = 0;
+  for (let i = 0; i < masks.length; i++) {
+    const raw = masks[i] as Record<string, unknown>;
+    const rle = (isRecord(raw) ? (raw as Record<string, unknown>).rle : undefined) as { size?: unknown } | undefined;
+    if (isRecord(rle) && Array.isArray((rle as Record<string, unknown>).size)) {
+      const size = (rle as Record<string, unknown>).size as unknown[];
+      if (size.length === 2 && Number.isInteger(size[0]) && Number.isInteger(size[1]) && (size[0] as number) > 0 && (size[1] as number) > 0) {
+        headerPixels += (size[0] as number) * (size[1] as number);
+      } else {
+        headerPixels += MAX_MASK_PIXELS + 1;
+      }
+    } else {
+      headerPixels += MAX_MASK_PIXELS + 1;
+    }
+    if (headerPixels > MAX_TOTAL_MASK_PIXELS) {
+      throw new HttpError(400, `masks exceed the per-request ${MAX_TOTAL_MASK_PIXELS}-pixel budget; chunk the request`);
+    }
+  }
 
   const decoded = masks.map((raw, i) => {
     if (!isRecord(raw)) throw new HttpError(400, `masks[${i}] must be an object`);
@@ -254,7 +282,7 @@ export function observeBody(body: unknown, requestId = newRequestId()): Envelope
     componentObs = {
       id: requireId(component.id, "component.id"),
       areaPx,
-      confidence: requireNumber(component.confidence, "component.confidence"),
+      confidence: requireConfidence(component.confidence, "component.confidence"),
     };
   }
 
@@ -270,7 +298,7 @@ export function observeBody(body: unknown, requestId = newRequestId()): Envelope
       measuredReference = circularReference(refMask, {
         id: requireId(reference.id, "reference.id"),
         knownMm: requirePositive(reference.knownMm, "reference.knownMm", 1000),
-        confidence: requireNumber(reference.confidence, "reference.confidence"),
+        confidence: requireConfidence(reference.confidence, "reference.confidence"),
       });
     } catch (error) {
       throw new HttpError(422, `reference: ${error instanceof Error ? error.message : "cannot measure"}`);
@@ -292,7 +320,7 @@ export function observeBody(body: unknown, requestId = newRequestId()): Envelope
     return observeMask(mask, {
       id: requireId(raw.id, `masks[${i}].id`),
       label: label as never,
-      confidence: requireNumber(raw.confidence, `masks[${i}].confidence`),
+      confidence: requireConfidence(raw.confidence, `masks[${i}].confidence`),
       ...(componentMask ? { component: componentMask } : {}),
       ...(stretch ? { stretch } : {}),
     });
@@ -365,6 +393,7 @@ export async function reportBody(body: unknown, env: Env, requestId = newRequest
   if (!isRecord(body)) throw new Error("body must be a JSON object");
   const config = configFromEnv(env);
   const measurement = measureSession(toMeasureInput(body, config.minReferenceConfidence));
+  if (body.transcript !== undefined && typeof body.transcript !== "string") throw new HttpError(400, "transcript must be a string");
   const transcript = typeof body.transcript === "string" ? body.transcript.slice(0, 2000) : "";
 
   let drafts: FindingDraft[];
@@ -585,6 +614,7 @@ export async function transcribeBody(body: unknown, env: Env, requestId = newReq
     if (typeof body.fixtureTranscript !== "string") {
       throw new HttpError(400, "mock transcribe requires body.fixtureTranscript - backend invents no transcripts");
     }
+    if (body.fixtureTranscript.length > 2000) throw new HttpError(400, "mock fixtureTranscript capped at 2000 chars");
     const result: TranscribeResult = { transcript: body.fixtureTranscript, audioDurationMs: 0, turns: [] };
     return envelope(requestId, started, result);
   }
@@ -645,6 +675,7 @@ export async function describeBody(body: unknown, env: Env, requestId = newReque
     if (typeof body.fixtureDescription !== "string") {
       throw new HttpError(400, "mock describe requires body.fixtureDescription - backend invents no descriptions");
     }
+    if (body.fixtureDescription.length > 2000) throw new HttpError(400, "mock fixtureDescription capped at 2000 chars");
     return envelope(requestId, started, { description: body.fixtureDescription });
   }
   const { metaKey } = requireLiveKeys(env, config);
@@ -753,6 +784,7 @@ function assertFindingsShape(findings: unknown, receipts: unknown): asserts find
 export async function findingsBody(body: unknown, env: Env, requestId = newRequestId(), fetchFn?: FetchFn): Promise<EnvelopedResult> {
   const started = Date.now();
   if (!isRecord(body)) throw new Error("body must be a JSON object");
+  if (body.transcript !== undefined && typeof body.transcript !== "string") throw new HttpError(400, "transcript must be a string");
   const findings = body.findings as MeasuredFinding[];
   const receipts = body.receipts as Receipt[];
   assertFindingsShape(findings, receipts);
@@ -778,6 +810,7 @@ export async function findingsBody(body: unknown, env: Env, requestId = newReque
 export async function skepticBody(body: unknown, env: Env, requestId = newRequestId(), fetchFn?: FetchFn): Promise<EnvelopedResult> {
   const started = Date.now();
   if (!isRecord(body)) throw new Error("body must be a JSON object");
+  if (body.transcript !== undefined && typeof body.transcript !== "string") throw new HttpError(400, "transcript must be a string");
   const findings = body.findings as MeasuredFinding[];
   const receipts = body.receipts as Receipt[];
   assertFindingsShape(findings, receipts);
@@ -810,6 +843,7 @@ export function parseOverlay(raw: unknown): AnnexureOverlay {
   if (!isRecord(raw)) throw new HttpError(400, "overlay must be an object");
   const width = requirePositive(raw.width, "overlay.width");
   const height = requirePositive(raw.height, "overlay.height");
+  if (!Number.isInteger(width) || !Number.isInteger(height)) throw new HttpError(400, "overlay.width/height must be integers");
   if (width * height > MAX_MASK_PIXELS) {
     throw new HttpError(400, `overlay ${width}x${height} exceeds the ${MAX_MASK_PIXELS}-pixel cap`);
   }
@@ -820,7 +854,7 @@ export function parseOverlay(raw: unknown): AnnexureOverlay {
       throw new HttpError(400, `overlay.masks[${i}] needs an id, a label and an SVG path`);
     }
     if ((m.path as string).length > 500_000) throw new HttpError(400, `overlay.masks[${i}].path too long`);
-    if (typeof m.label !== "string" || (m.label as string).length > 64) throw new HttpError(400, `overlay.masks[${i}].label too long`);
+    if ((m.label as string).length === 0 || (m.label as string).length > 64) throw new HttpError(400, `overlay.masks[${i}].label must be 1-64 chars`);
     return { id: requireId(m.id, `overlay.masks[${i}].id`), label: m.label, path: m.path };
   });
   const overlay: AnnexureOverlay = { width, height, masks };
@@ -850,6 +884,7 @@ export async function renderBody(body: unknown, env: Env, requestId = newRequest
     findings: FindingDraft[];
     gate: { ok: boolean };
   };
+  if (isRecord(body) && body.transcript !== undefined && typeof body.transcript !== "string") throw new HttpError(400, "transcript must be a string");
   const transcript = isRecord(body) && typeof body.transcript === "string" ? (body.transcript as string).slice(0, 2000) : "";
   const svg = renderAnnexureSvg({
     findings: result.measurement.findings,
@@ -903,7 +938,7 @@ const defaultStore: Store = new MemoryStore();
 export function toSavedSession(body: unknown): SavedSession {
   if (!isRecord(body)) throw new HttpError(400, "body must be a JSON object");
   const { findings, mode } = body;
-  if (typeof findings !== "number" || !Number.isInteger(findings) || findings < 0) throw new HttpError(400, "findings must be a non-negative integer");
+  if (!Number.isInteger(findings) || (findings as number) < 0 || (findings as number) > 1_000_000) throw new HttpError(400, "findings must be an integer in [0, 1000000]");
   if (typeof mode !== "string" || !SESSION_MODES.includes(mode)) throw new HttpError(400, `mode must be one of ${SESSION_MODES.join(", ")}`);
   // Client timestamps are validated but ignored: backdated `at` controlled
   // newest-first order (leaderboard shaping), so the server always mints time.
@@ -1049,8 +1084,19 @@ const rateBuckets = new Map<string, { count: number; reset: number }>();
 
 export function checkRateLimit(key: string, now = Date.now(), max = RATE_LIMIT_DEFAULT_MAX): { ok: boolean; retryAfterSec: number } {
   if (rateBuckets.size > 10_000) {
-    for (const [k, v] of rateBuckets) if (now >= v.reset) rateBuckets.delete(k);
-    if (rateBuckets.size > 10_000) rateBuckets.clear();
+    for (const [k, v] of rateBuckets) {
+      if (now >= v.reset) rateBuckets.delete(k);
+      if (rateBuckets.size <= 9000) break;
+    }
+    // Fail closed-ish: evict oldest instead of clear() (clear = fail open).
+    if (rateBuckets.size > 10_000) {
+      const keys = rateBuckets.keys();
+      for (let i = 0; i < 1000; i++) {
+        const k = keys.next();
+        if (k.done) break;
+        rateBuckets.delete(k.value);
+      }
+    }
   }
   const entry = rateBuckets.get(key);
   if (!entry || now >= entry.reset) {

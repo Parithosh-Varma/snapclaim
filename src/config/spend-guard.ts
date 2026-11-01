@@ -17,7 +17,7 @@ function round6(value: number): number {
 
 /** Hard cap on live API spend. Every live call records its estimated cost here. */
 export class SpendGuard {
-  readonly limitUsd: number;
+  limitUsd: number;
   #entries: SpendEntry[] = [];
   // Funds held by in-flight live calls. A hold is taken BEFORE the upstream
   // request fires and settled after, so two concurrent requests cannot both
@@ -89,14 +89,9 @@ export class SpendGuard {
         if (done) throw new Error("spend hold already settled");
         done = true;
         this.#reservedUsd = round6(this.#reservedUsd - estimate);
-        // The hold guaranteed headroom for `estimate`; an actual above it
-        // re-checks rather than silently overspending.
-        if (round6(actualUsd) > estimate) {
-          this.charge(actualLabel, actualUsd);
-        } else {
-          const entry: SpendEntry = { label: actualLabel, usd: round6(actualUsd), at: new Date().toISOString() };
-          this.#entries.push(entry);
-        }
+        // Both branches go through charge() so the limit is always
+        // enforced, including actual<=estimate (rounds + dust safe).
+        this.charge(actualLabel, actualUsd);
       },
     };
   }

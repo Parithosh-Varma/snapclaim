@@ -4,9 +4,11 @@
 */
 /snap-claim/*:
   X-Frame-Options: DENY
-  Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline'
+  Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline'; object-src 'none'; base-uri 'none'
   Referrer-Policy: no-referrer
+  X-Content-Type-Options: nosniff
 /*:
   X-Frame-Options: DENY
-  Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline'
+  Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline'; object-src 'none'; base-uri 'none'
   Referrer-Policy: no-referrer
+  X-Content-Type-Options: nosniff

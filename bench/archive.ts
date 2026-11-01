@@ -53,11 +53,14 @@ export function buildCaseRun(input: ArchiveInput): CaseRun {
 
 /** Writes bench/runs/<caseId>.json. Never overwrites: a second run for a case is a decision, not an accident. */
 export function archiveRun(run: CaseRun, dir: URL = new URL("./runs/", import.meta.url)): string {
-  if (!/^[\w.-]+$/.test(run.caseId)) throw new Error(`archive: unsafe caseId "${run.caseId}"`);
+  if (!/^[\w.-]+$/.test(run.caseId) || run.caseId === "." || run.caseId === ".." || run.caseId.length > 64) throw new Error(`archive: unsafe caseId "${run.caseId}"`);
   mkdirSync(fileURLToPath(dir), { recursive: true });
   const path = fileURLToPath(new URL(`${run.caseId}.json`, dir));
-  if (existsSync(path)) throw new Error(`archive: ${path} already exists; move it aside to re-run`);
-  writeFileSync(path, JSON.stringify(run, null, 2) + "\n");
+  try {
+    writeFileSync(path, JSON.stringify(run, null, 2) + "\n", { flag: "wx" });
+  } catch (err) {
+    throw new Error(`archive: ${path} already exists; move it aside to re-run`);
+  }
   return path;
 }
 

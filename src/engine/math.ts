@@ -43,7 +43,7 @@ export function areaRatio(damageAreaPx: number, componentAreaPx: number): number
   }
   if (damageAreaPx > componentAreaPx) {
     throw new MeasurementError(
-      `damage area (${damageAreaPx}px) exceeds component area (${componentAreaPx}px) — mask leak, refusing to publish a ratio`,
+      `damage area (${damageAreaPx}px) exceeds component area (${componentAreaPx}px) - mask leak, refusing to publish a ratio`,
     );
   }
   return damageAreaPx / componentAreaPx;
@@ -59,7 +59,7 @@ export function ratioToPercent(ratio: number, decimalPlaces = 2): number {
 
 /**
  * Millimetres per pixel from a reference object.
- * Returns null when the reference confidence is below the threshold — the report
+ * Returns null when the reference confidence is below the threshold - the report
  * then stays in percent-only mode rather than inventing absolute units.
  */
 export function mmPerPx(
@@ -67,6 +67,9 @@ export function mmPerPx(
   minConfidence = DEFAULT_MIN_REFERENCE_CONFIDENCE,
 ): number | null {
   assertNonNegative(reference.confidence, "reference.confidence");
+  if (typeof minConfidence !== "number" || !Number.isFinite(minConfidence) || minConfidence < 0 || minConfidence > 1) {
+    throw new MeasurementError(`minConfidence must be in [0, 1], got ${minConfidence}`);
+  }
   if (reference.confidence < minConfidence) {
     return null;
   }
@@ -107,7 +110,7 @@ export function areaCm2(areaPx: number, scaleMmPerPx: number): number {
 
 /**
  * Mean crack width in mm: area / centreline length × scale.
- * Returns null without a skeleton (non-crack labels) — never divides by zero.
+ * Returns null without a skeleton (non-crack labels) - never divides by zero.
  */
 export function crackWidthMm(areaPx: number, skeletonPx: number, scaleMmPerPx: number): number | null {
   assertNonNegative(areaPx, "areaPx");

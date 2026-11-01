@@ -89,7 +89,6 @@ export const server = createServer(async (req, res) => {
       "x-meta-key": header("x-meta-key"),
       "x-baseten-key": header("x-baseten-key"),
     },
-    clientIp: req.socket.remoteAddress ?? "unknown",
   });
   sendJson(res, handled.status, handled.body, origin);
 });

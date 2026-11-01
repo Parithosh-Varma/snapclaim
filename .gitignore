@@ -8,6 +8,16 @@ coverage/
 *.log
 
 fixtures/photos/
+*.mp4
+bench/runs/*/
+!bench/runs/.gitkeep
+shots/
+recovered-queue-images/
+raw/
+frames/
+pwa/stress-photos
+.wrangler/
+mg/out/
 
 # OpenCode loop state (local agent scratch, never committed)
 .opencode/

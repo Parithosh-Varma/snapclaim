@@ -93,7 +93,13 @@ export function parseAdminModeBody(body: unknown): AdminModeInput {
     throw new HttpError(400, "body must be a JSON object {mockMode: boolean} | {mode: 'mock'|'live'} | {reset: true}");
   }
   const b = body as Record<string, unknown>;
-  if (b["reset"] === true) return { reset: true };
+  const hasReset = b["reset"] === true;
+  const hasMock = typeof b["mockMode"] === "boolean";
+  const hasMode = b["mode"] === "mock" || b["mode"] === "live";
+  if (hasReset && (hasMock || hasMode || Object.keys(b).length > 1)) {
+    throw new HttpError(400, "reset:true must not be combined with mockMode/mode");
+  }
+  if (hasReset) return { reset: true };
   if (typeof b["mockMode"] === "boolean") return { mockMode: b["mockMode"] };
   if (b["mode"] === "mock") return { mockMode: true };
   if (b["mode"] === "live") return { mockMode: false };

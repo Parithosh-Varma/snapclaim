@@ -36,7 +36,7 @@ export function requireLiveKeys(env: Env, config: AppConfig): { metaKey: string;
 
 export function visionProvider(env: Env, config: AppConfig, fixture?: VisionResult): VisionProvider {
   if (config.mockMode) {
-    if (!fixture) throw new HttpError(400, "mock segment requires body.fixture {component, masks} — backend invents no masks");
+    if (!fixture) throw new HttpError(400, "mock segment requires body.fixture {component, masks} - backend invents no masks");
     return new MockVisionProvider(fixture);
   }
   requireLiveKeys(env, config);
@@ -147,15 +147,16 @@ export class MetaFindingsProvider implements FindingsProvider {
         headers: { "content-type": "application/json", authorization: `Bearer ${this.#opts.apiKey}` },
         body: JSON.stringify({
           model: this.#opts.model,
+          max_tokens: 8192,
           messages: [
             {
               role: "system",
               content:
-                "Write claim findings. Every finding must contain at least one number that exactly matches a cited receipt output — never write qualitative-only findings; restate severity together with its measured number. " +
-              "Only percent (…%), mm length/width, and cm2 area outputs can back a number. Never write the mm_per_px scale factor, region counts, or bare severity-band numbers — no citation verifies them and the finding will be rejected. " +
+                "Write claim findings. Every finding must contain at least one number that exactly matches a cited receipt output - never write qualitative-only findings; restate severity together with its measured number. " +
+              "Only percent (…%), mm length/width, and cm2 area outputs can back a number. Never write the mm_per_px scale factor, region counts, or bare severity-band numbers - no citation verifies them and the finding will be rejected. Vary your phrasing: lead with the location one finding, the headline measurement the next - never repeat the same sentence shape twice in one report. " +
               "Every number must exactly match a cited receipt output. Cite only receipts from one mask per finding. " +
               "Severity words (cosmetic, moderate, significant) must match the cited severity receipt. " +
-              "Use % or percent for ratios, mm for lengths and widths, cm2 for areas — never write square cm, sq cm, centimetres, square metres or m2. " +
+              "Use % or percent for ratios, mm for lengths and widths, cm2 for areas - never write square cm, sq cm, centimetres, square metres or m2. " +
               'Reply with JSON only: [{"statement":"...","citations":["receipt-id"]}]',
           },
           {
@@ -168,7 +169,7 @@ export class MetaFindingsProvider implements FindingsProvider {
               content:
                 "Your previous draft was rejected by the evidence gate for these reasons:\n" +
                 request.repairNote.slice(0, 2000) +
-                "\nRewrite every finding so each number exactly matches a cited receipt output (percent, mm or cm2 only — never the scale factor, counts or band numbers). Reply with JSON only.",
+                "\nRewrite every finding so each number exactly matches a cited receipt output (percent, mm or cm2 only - never the scale factor, counts or band numbers). Reply with JSON only.",
             }]
             : []),
         ],
@@ -272,11 +273,11 @@ export class BasetenSkepticProvider implements FindingsProvider {
             {
               role: "system",
               content:
-                "You are an independent skeptic. Re-derive every number from the receipts only — never invent or round from memory. " +
-                "Only percent (…%), mm length/width, and cm2 area outputs can back a number. Never write the mm_per_px scale factor, region counts, or bare severity-band numbers — no citation verifies them and the finding will be rejected. " +
-                "Every finding must contain at least one number that exactly matches a cited receipt output — never write qualitative-only findings; restate severity together with its measured number. " +
+                "You are an independent skeptic. Re-derive every number from the receipts only - never invent or round from memory. " +
+                "Only percent (…%), mm length/width, and cm2 area outputs can back a number. Never write the mm_per_px scale factor, region counts, or bare severity-band numbers - no citation verifies them and the finding will be rejected. Vary your phrasing: lead with the location one finding, the headline measurement the next - never repeat the same sentence shape twice in one report. " +
+                "Every finding must contain at least one number that exactly matches a cited receipt output - never write qualitative-only findings; restate severity together with its measured number. " +
                 "For each fact, either restate it exactly with its receipt citations, or mark it DISPUTED with the reason (DISPUTED findings must still cite numbers). " +
-                "Use % or percent for ratios, mm for lengths and widths, cm2 for areas — never write square cm, sq cm, centimetres, square metres or m2. " +
+                "Use % or percent for ratios, mm for lengths and widths, cm2 for areas - never write square cm, sq cm, centimetres, square metres or m2. " +
                 'Reply with JSON only: [{"statement":"...","citations":["receipt-id"]}]',
             },
             {
@@ -289,7 +290,7 @@ export class BasetenSkepticProvider implements FindingsProvider {
                 content:
                   "Your previous draft was rejected by the evidence gate for these reasons:\n" +
                   request.repairNote.slice(0, 2000) +
-                  "\nRewrite every finding so each number exactly matches a cited receipt output (percent, mm or cm2 only — never the scale factor, counts or band numbers). Reply with JSON only.",
+                  "\nRewrite every finding so each number exactly matches a cited receipt output (percent, mm or cm2 only - never the scale factor, counts or band numbers). Reply with JSON only.",
               }]
               : []),
           ],

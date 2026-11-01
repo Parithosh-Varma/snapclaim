@@ -6,8 +6,12 @@ let current: { limit: number; guard: SpendGuard } | null = null;
 
 export function guardFor(env: Env): SpendGuard {
   const limit = loadConfig(env).spendLimitUsd;
-  if (!current || current.limit !== limit) {
+  if (!current) {
     current = { limit, guard: new SpendGuard(limit) };
+  } else if (current.limit !== limit) {
+    // Preserve ledger across limit changes; only update the cap.
+    current.limit = limit;
+    current.guard.limitUsd = limit;
   }
   return current.guard;
 }

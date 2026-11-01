@@ -121,7 +121,6 @@ export default {
         "x-meta-key": request.headers.get("x-meta-key") ?? undefined,
         "x-baseten-key": request.headers.get("x-baseten-key") ?? undefined,
       },
-      clientIp: ip,
     });
     return Response.json(handled.body as never, { status: handled.status, headers });
   },
