@@ -115,11 +115,13 @@ function escSeverity(s) {
 function sanitizeSvg(svg) {
   return String(svg)
     .replace(/<script[\s\S]*?<\/script\s*>/gi, "")
+    .replace(/<script[^>]*\/>/gi, "")
     .replace(/<foreignObject[\s\S]*?<\/foreignObject\s*>/gi, "")
-    .replace(/<\s*(iframe|embed|object|link|style|meta|base|form|handler|set|animate|animateTransform)[\s>]/gi, "<!--$1-blocked-->")
+    .replace(/<\s*(iframe|embed|object|link|style|meta|base|form|handler|set|animate|animateTransform)[\s/>]/gi, "<!--$1-blocked-->")
     .replace(/<\s*foreignObject\b[^>]*\/>/gi, "")
+    .replace(/<\s*\w+[^>]*\/\s*on\w+\s*=[^>]*>/gi, "")
     .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-    .replace(/\s(?:xlink:href|href|src|data|background|poster|srcdoc|action|formaction)\s*=\s*("\s*(?:javascript|data\s*:\s*text\/html)[^"]*"|'\s*(?:javascript|data\s*:\s*text\/html)[^']*'|(?:javascript|data\s*:)[^\s>]*)/gi, "");
+    .replace(/\s(?:xlink:href|href|src|data|background|poster|srcdoc|action|formaction)\s*=\s*("\s*(?:javascript|data\s*:)[^"]*"|'\s*(?:javascript|data\s*:)[^']*'|(?:javascript|data\s*:)[^\s>]*)/gi, "");
 }
 
 /* ---------- navigation ---------- */

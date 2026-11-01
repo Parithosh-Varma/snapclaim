@@ -190,12 +190,15 @@ export class MetaFindingsProvider implements FindingsProvider {
       usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
     if (spend) {
+      // Clamp upstream usage: a lying/compromised upstream must not bill unbounded.
+      const usageIn = Math.min(Math.max(0, data.usage?.prompt_tokens ?? 0), 32768);
+      const usageOut = Math.min(Math.max(0, data.usage?.completion_tokens ?? 0), 8192);
       const usd = estimateCostUsd(
-        { inputTokens: data.usage?.prompt_tokens ?? 0, outputTokens: data.usage?.completion_tokens ?? 0 },
+        { inputTokens: usageIn, outputTokens: usageOut },
         SPARK_PRICE,
       );
       try {
-        hold?.settle(`spark findings in=${data.usage?.prompt_tokens ?? 0} out=${data.usage?.completion_tokens ?? 0}`, usd);
+        hold?.settle(`spark findings in=${usageIn} out=${usageOut}`, usd);
       } catch (error) {
         if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
         throw error;

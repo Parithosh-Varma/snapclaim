@@ -590,6 +590,8 @@ export function assertSafeImageUrl(imageUrl: string): void {
 
 function base64ToBytes(value: unknown): Uint8Array {
   if (typeof value !== "string" || value.length === 0) throw new HttpError(400, "body.audioBase64 must be a non-empty string");
+  // Pre-decode cap: 4MB decoded ~= 5.4MB base64; reject huge bodies before atob alloc.
+  if (value.length > 5_600_000) throw new HttpError(400, "audio over 4 MB; send a clip of 10 seconds or less");
   const clean = value.includes(",") ? (value.split(",").pop() as string) : value;
   try {
     const binary = atob(clean);
@@ -938,7 +940,7 @@ const defaultStore: Store = new MemoryStore();
 export function toSavedSession(body: unknown): SavedSession {
   if (!isRecord(body)) throw new HttpError(400, "body must be a JSON object");
   const { findings, mode } = body;
-  if (!Number.isInteger(findings) || (findings as number) < 0 || (findings as number) > 1_000_000) throw new HttpError(400, "findings must be an integer in [0, 1000000]");
+  if (typeof findings !== "number" || !Number.isInteger(findings) || findings < 0 || findings > 1_000_000) throw new HttpError(400, "findings must be an integer in [0, 1000000]");
   if (typeof mode !== "string" || !SESSION_MODES.includes(mode)) throw new HttpError(400, `mode must be one of ${SESSION_MODES.join(", ")}`);
   // Client timestamps are validated but ignored: backdated `at` controlled
   // newest-first order (leaderboard shaping), so the server always mints time.
@@ -1216,12 +1218,20 @@ export async function handleRequest(input: {
     if (input.method === "POST" && input.path === "/v1/sessions") {
       const started = Date.now();
       const session = toSavedSession(input.body);
-      await store.save(session);
+      try {
+        await store.save(session);
+      } catch {
+        throw new HttpError(503, "sessions unavailable");
+      }
       return { status: 200, body: envelope(requestId, started, session) };
     }
     if (input.method === "GET" && input.path === "/v1/sessions") {
       const started = Date.now();
-      return { status: 200, body: envelope(requestId, started, { sessions: await store.list() }) };
+      try {
+        return { status: 200, body: envelope(requestId, started, { sessions: await store.list() }) };
+      } catch {
+        throw new HttpError(503, "sessions unavailable");
+      }
     }
     return { status: 404, body: errorBody("not found", 404, requestId, { method: input.method, path: input.path }) };
   } catch (error) {

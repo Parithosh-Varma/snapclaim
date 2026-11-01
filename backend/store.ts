@@ -52,6 +52,11 @@ export class D1Store implements Store {
       .prepare("INSERT INTO sessions (id, at, findings, mode) VALUES (?, ?, ?, ?)")
       .bind(s.id, s.at, s.findings, s.mode)
       .run();
+    // Same 1000-cap as MemoryStore: prune oldest to bound D1 growth/billing.
+    await this.#db
+      .prepare("DELETE FROM sessions WHERE rowid NOT IN (SELECT rowid FROM sessions ORDER BY at DESC, rowid DESC LIMIT 1000)")
+      .run()
+      .catch(() => {});
   }
   async list(): Promise<SavedSession[]> {
     const { results } = await this.#db

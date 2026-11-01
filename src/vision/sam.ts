@@ -12,7 +12,7 @@ export { encodeRleMask as encodeRle, rleRoundTripMask as rleRoundTrip };
  * (see dev.meta.ai/docs/sam/reading-segmentation): one line per frame,
  * one box + one mask per record, masks base85-encoded. Prompting uses
  * point/box tokens in the same grammar. Mask rasters are decoded with
- * the official `@meta-sam/parser` package — this repo never guesses
+ * the official `@meta-sam/parser` package - this repo never guesses
  * the base85 packing.
  */
 
@@ -238,6 +238,9 @@ export function maskTokenToBinaryMask(mask: SamMaskToken): BinaryMask {
   if (mask.w * mask.h > MAX_SAM_RASTER_PIXELS) {
     throw new MeasurementError(`mask raster ${mask.w}x${mask.h} exceeds the ${MAX_SAM_RASTER_PIXELS}-pixel cap`);
   }
+  if (!Number.isInteger(mask.w) || !Number.isInteger(mask.h) || mask.w <= 0 || mask.h <= 0) {
+    throw new MeasurementError("mask dimensions must be positive integers");
+  }
   // The wire grammar puts the encoding marker before the payload (`!`/`~`);
   // the official decoder wants the payload WITH its marker, so re-attach it.
   const marked = `${mask.enc === "one_bit" ? "!" : "~"}${mask.payload}`;
@@ -292,7 +295,7 @@ export interface SamFetchResult {
  * Live SAM 3.1 segmentation over the Responses API.
  * Accumulates `response.output_text.delta` lanes from the SSE stream,
  * parses them with `parseSamOutputText`, and decodes every mask.
- * Throws — never returns a fake mask — on any malformed or empty output.
+ * Throws - never returns a fake mask - on any malformed or empty output.
  */
 export async function segmentWithSam(input: {
   fetchFn?: typeof fetch;

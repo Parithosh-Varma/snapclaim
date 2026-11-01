@@ -12,11 +12,13 @@ import { shareUrl } from "../lib/share";
 export function sanitizeSvg(svg: string): string {
   return String(svg)
     .replace(/<script[\s\S]*?<\/script\s*>/gi, "")
+    .replace(/<script[^>]*\/>/gi, "")
     .replace(/<foreignObject[\s\S]*?<\/foreignObject\s*>/gi, "")
-    .replace(/<\s*(iframe|embed|object|link|style|meta|base|form|handler|set|animate|animateTransform)[\s>]/gi, "<!--$1-blocked-->")
+    .replace(/<\s*(iframe|embed|object|link|style|meta|base|form|handler|set|animate|animateTransform)[\s/>]/gi, "<!--$1-blocked-->")
     .replace(/<\s*foreignObject\b[^>]*\/>/gi, "")
+    .replace(/<\s*\w+[^>]*\/\s*on\w+\s*=[^>]*>/gi, "")
     .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-    .replace(/\s(?:xlink:href|href|src|data|background|poster|srcdoc|action|formaction)\s*=\s*("\s*(?:javascript|data\s*:\s*text\/html)[^"]*"|'\s*(?:javascript|data\s*:\s*text\/html)[^']*'|(?:javascript|data\s*:)[^\s>]*)/gi, "");
+    .replace(/\s(?:xlink:href|href|src|data|background|poster|srcdoc|action|formaction)\s*=\s*("\s*(?:javascript|data\s*:)[^"]*"|'\s*(?:javascript|data\s*:)[^']*'|(?:javascript|data\s*:)[^\s>]*)/gi, "");
 }
 
 export default function Report() {
@@ -392,7 +394,7 @@ export default function Report() {
           )}
           {s.extendedTranscript?.trim() ? (
             <>
-              <blockquote id="docQuote">{s.extendedTranscript.trim()}</blockquote>
+              <blockquote id="docQuote" className="doc-lead">{s.extendedTranscript.trim()}</blockquote>
               <p className="doc-note">AI-extended from your one line (“{s.transcript.trim()}”).</p>
             </>
           ) : s.transcript.trim() ? (
@@ -507,15 +509,20 @@ export default function Report() {
           </button>
           <p className="fineprint" style={{ margin: "6px 2px 0" }}>The link itself carries the report - photo and numbers open for anyone, nothing is uploaded.</p>
           {linkFallback && (
-            <textarea
-              id="linkFallback"
-              readOnly
-              rows={3}
-              value={linkFallback}
-              onFocus={(e) => e.currentTarget.select()}
-              style={{ width: "100%", marginTop: 8, fontSize: 12, wordBreak: "break-all" }}
-              aria-label="Share link, select and copy manually"
-            />
+            <details className="learn" open style={{ marginTop: 8 }}>
+              <summary>Copy the link manually</summary>
+              <p className="fineprint" style={{ margin: "6px 0" }}>Clipboard is blocked here - tap the field to select the full link, then copy.</p>
+              <input
+                id="linkFallback"
+                readOnly
+                value={linkFallback}
+                onFocus={(e) => e.currentTarget.select()}
+                onClick={(e) => e.currentTarget.select()}
+                aria-label="Share link, select and copy manually"
+                className="text-input mono"
+                style={{ marginTop: 0 }}
+              />
+            </details>
           )}
           <div className="rowbtns">
             {annexSrc && (

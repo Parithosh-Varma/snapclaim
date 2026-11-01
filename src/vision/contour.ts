@@ -44,6 +44,9 @@ export function traceContours(mask: BinaryMask): Point[][] {
   const maxSteps = edges.length * 4 + 16;
   let steps = 0;
   const loops: Point[][] = [];
+  const MAX_LOOPS = 10000;
+  const MAX_VERTICES = 200000;
+  let vertices = 0;
   for (let start = 0; start < edges.length; start++) {
     for (;;) {
       const free = edges[start]! & ~used[start]!;
@@ -55,7 +58,7 @@ export function traceContours(mask: BinaryMask): Point[][] {
       let dir = startDir;
       for (;;) {
         if (++steps > maxSteps) {
-          throw new MeasurementError("contour walk exceeded its step budget — mask too adversarial to outline");
+          throw new MeasurementError("contour walk exceeded its step budget - mask too adversarial to outline");
         }
         used[v]! |= 1 << dir;
         const next = v + DY[dir]! * stride + DX[dir]!;
@@ -69,14 +72,16 @@ export function traceContours(mask: BinaryMask): Point[][] {
           }
         }
         if (nd < 0) {
-          throw new MeasurementError("contour walk reached a dead end — malformed edge graph");
+          throw new MeasurementError("contour walk reached a dead end - malformed edge graph");
         }
         if (next === start && nd === startDir) break;
-        if (nd !== dir) loop.push([next % stride, Math.floor(next / stride)]);
+        if (nd !== dir) { loop.push([next % stride, Math.floor(next / stride)]); vertices++; }
+        if (vertices > MAX_VERTICES) throw new MeasurementError("contour has too many vertices - mask too adversarial");
         v = next;
         dir = nd;
       }
       loops.push(loop);
+      if (loops.length > MAX_LOOPS) throw new MeasurementError("contour has too many loops - mask too adversarial");
     }
   }
   return loops;
@@ -164,4 +169,37 @@ export function maskOutlinePath(mask: BinaryMask, options: { tolerance?: number;
   const tolerance = options.tolerance ?? 0;
   const loops = traceContours(mask).map((loop) => simplifyContour(loop, tolerance));
   return contoursToSvgPath(loops, options.scale ?? 1);
+}
+
+/**
+ * Outline of a fitted ellipse as one closed SVG path (`M x y L … Z`), using
+ * only straight segments so it passes the overlay path allowlist. A 64-gon
+ * reads as a smooth curve at coin sizes, unlike the Douglas-Peucker polygon
+ * of the raw pixels - which is why a measured coin looked octagonal.
+ * Angle is degrees from +x, image y points down (matches the coin fitter).
+ */
+export function ellipseOutlinePath(
+  cx: number,
+  cy: number,
+  rx: number,
+  ry: number,
+  angleDeg: number,
+  vertices = 64,
+): string {
+  if (![cx, cy, rx, ry, angleDeg].every(Number.isFinite)) {
+    throw new MeasurementError("ellipse parameters must be finite numbers");
+  }
+  if (!(rx > 0) || !(ry > 0)) throw new MeasurementError("ellipse radii must be positive");
+  const n = Math.max(8, Math.floor(vertices));
+  const a = (angleDeg * Math.PI) / 180;
+  const cos = Math.cos(a);
+  const sin = Math.sin(a);
+  const pts: string[] = [];
+  for (let i = 0; i < n; i++) {
+    const t = (2 * Math.PI * i) / n;
+    const x = cx + rx * Math.cos(t) * cos - ry * Math.sin(t) * sin;
+    const y = cy + rx * Math.cos(t) * sin + ry * Math.sin(t) * cos;
+    pts.push(`${i === 0 ? "M" : "L"} ${fmt(x)} ${fmt(y)}`);
+  }
+  return `${pts.join(" ")} Z`;
 }

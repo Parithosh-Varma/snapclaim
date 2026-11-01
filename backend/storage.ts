@@ -41,7 +41,10 @@ function decodeDataUrl(dataUrl: string): { bytes: Uint8Array; ext: string; mime:
     // Magic-byte check: MIME string alone allows polyglot stored objects
     // served as content-type:image/* (content-type confusion).
     if (!matchesMagic(bytes, mime)) return null;
-    return { bytes: scrubMetadata(bytes, mime) ?? bytes, ext, mime };
+    // Fail closed: scrub failure (incl. WebP/unknown) skips archival.
+    const scrubbed = scrubMetadata(bytes, mime);
+    if (!scrubbed) return null;
+    return { bytes: scrubbed, ext, mime };
   } catch {
     return null;
   }
@@ -68,6 +71,8 @@ function matchesMagic(bytes: Uint8Array, mime: string): boolean {
  * to the original bytes).
  */
 function scrubMetadata(bytes: Uint8Array, mime: string): Uint8Array | null {
+  // WebP has no server-side strip support: fail closed (skip archival)
+  // instead of archiving GPS-bearing originals.
   if (mime !== "image/png" && mime !== "image/jpeg") return null;
   try {
     return stripMetadata(bytes).bytes;

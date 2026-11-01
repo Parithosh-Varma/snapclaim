@@ -5,7 +5,7 @@ import { configFromEnv } from "./providers.ts";
  * Muse Voice Transcribe over `POST {META_API_BASE}/v1/asr/transcribe`.
  *
  * Multipart upload: a `request` JSON part plus the `audio` WAV part
- * (mono 16-bit PCM at 16 or 24 kHz — the PWA encodes exactly that).
+ * (mono 16-bit PCM at 16 or 24 kHz - the PWA encodes exactly that).
  * Fail-closed like every other live route: no key, no call.
  * Pricing: $0.18/hour of audio, charged to the spend ledger.
  */
@@ -71,7 +71,10 @@ export async function transcribeWithMuse(input: {
     turns?: unknown;
   };
   if (typeof data.transcript !== "string") throw new HttpError(502, "Muse transcribe returned no transcript");
-  const audioDurationMs = typeof data.audioDurationMs === "number" ? data.audioDurationMs : Math.round((bytes.length / 32000) * 1000);
+  // Clamp upstream duration: never bill more than the bytes could represent.
+  const maxMs = Math.round((bytes.length / 32000) * 1000);
+  const claimed = typeof data.audioDurationMs === "number" ? data.audioDurationMs : maxMs;
+  const audioDurationMs = Math.min(Math.max(0, claimed), maxMs);
   const turns = Array.isArray(data.turns)
     ? (data.turns as Array<Record<string, unknown>>).map((turn) => ({
         turnId: typeof turn["turnId"] === "number" ? turn["turnId"] : 0,

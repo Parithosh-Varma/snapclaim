@@ -92,7 +92,7 @@ export default function Admin() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setStatus(null);
-      setStatusError(msg.includes("security policy") ? msg : `Unreachable — is the backend running at ${base}? (${msg})`);
+      setStatusError(msg.includes("security policy") ? msg : `Unreachable - is the backend running at ${base}? (${msg})`);
     } finally {
       setChecking(false);
     }
@@ -117,9 +117,10 @@ export default function Admin() {
       toast(POLICY_BACKEND_MESSAGE);
       return;
     }
+    if (!window.confirm(`${label}? This flips live/mock for everyone and is not audited.`)) return;
     const saved = readToken();
     if (!saved) {
-      toast("Save the admin token first — it lives only in this tab");
+      toast("Save the admin token first - it lives only in this tab");
       return;
     }
     setSwitching(true);
@@ -159,7 +160,7 @@ export default function Admin() {
       await navigator.clipboard.writeText(payload);
       toast("Diagnostics copied");
     } catch {
-      toast("Copy blocked — select the status manually");
+      toast("Copy blocked - select the status manually");
     }
   };
 
@@ -175,7 +176,7 @@ export default function Admin() {
       <div className="wrap">
         <BackButton label="Home" onClick={() => window.location.assign("/")} />
         <h1 id="h-admin">Admin panel.</h1>
-        <p className="sub">Mock vs live, backend, and spend — on this device only. Live mode spends real API budget.</p>
+        <p className="sub">Mock vs live, backend, and spend - on this device only. Live mode spends real API budget.</p>
 
         <div className="group">
           <h3>Mode {status && <ModeBadge mode={status.mode} />}</h3>
@@ -194,7 +195,7 @@ export default function Admin() {
               className={mockActive ? "on" : undefined}
               aria-pressed={mockActive}
               disabled={switching || !status?.adminEnabled}
-              onClick={() => void switchMode({ mode: "mock" }, "Mock mode on — $0 spend")}
+              onClick={() => void switchMode({ mode: "mock" }, "Mock mode on - $0 spend")}
             >
               Mock · $0
             </button>
@@ -204,7 +205,7 @@ export default function Admin() {
               className={!mockActive ? "on" : undefined}
               aria-pressed={!mockActive}
               disabled={switching || !status?.adminEnabled}
-              onClick={() => void switchMode({ mode: "live" }, "Live mode on — spends budget")}
+              onClick={() => void switchMode({ mode: "live" }, "Live mode on - spends budget")}
             >
               Live · metered
             </button>
@@ -230,7 +231,7 @@ export default function Admin() {
             </button>
           </div>
           {!status?.adminEnabled && status && !legacy && (
-            <p className="fineprint">Runtime switching is off on this backend — set <span className="mono">ADMIN_TOKEN</span> on a local dev server to enable it. Restarting the backend also returns to the env default.</p>
+            <p className="fineprint">Runtime switching is off on this backend - set <span className="mono">ADMIN_TOKEN</span> on a local dev server to enable it. Restarting the backend also returns to the env default.</p>
           )}
           {legacy && (
             <p className="fineprint">This backend predates the admin route: switch modes by restarting it with <span className="mono">MOCK_MODE=0</span> (live) or unset (mock), or point the panel at a newer backend.</p>
@@ -295,17 +296,17 @@ export default function Admin() {
                   ))}
                 </div>
               ) : (
-                <p className="fineprint">No charges yet — mock mode stays at $0.</p>
+                <p className="fineprint">No charges yet - mock mode stays at $0.</p>
               )}
             </>
           ) : (
-            <p className="fineprint">No spend data — check the backend connection above.</p>
+            <p className="fineprint">No spend data - check the backend connection above.</p>
           )}
         </div>
 
         <div className="group">
           <h3>Admin token</h3>
-          <p className="fineprint" style={{ marginTop: 4 }}>Saved in session storage (this tab only) — never in cases or local storage. Only set <span className="mono">ADMIN_TOKEN</span> on backends you run yourself; never on the public Worker.</p>
+          <p className="fineprint" style={{ marginTop: 4 }}>Saved in session storage (this tab only) - never in cases or local storage. Only set <span className="mono">ADMIN_TOKEN</span> on backends you run yourself; never on the public Worker.</p>
           <label className="field" htmlFor="adminToken">Bearer token</label>
           <input
             id="adminToken"
@@ -313,7 +314,7 @@ export default function Admin() {
             type="password"
             autoComplete="off"
             spellCheck={false}
-            placeholder={tokenSaved ? "Saved for this tab — paste to replace" : "Paste ADMIN_TOKEN"}
+            placeholder={tokenSaved ? "Saved for this tab - paste to replace" : "Paste ADMIN_TOKEN"}
             value={token}
             onChange={(e) => setToken(e.target.value)}
           />

@@ -2,7 +2,7 @@ import { MeasurementError } from "../engine/math.ts";
 import { assertMask, type BinaryMask } from "./mask.ts";
 
 /**
- * Agreement between two masks of the same frame — the planned independent
+ * Agreement between two masks of the same frame - the planned independent
  * check between the on-device SlimSAM preview and authoritative SAM 3.1.
  * Pure set math on pixels; no models, no thresholds hidden from the caller.
  */
@@ -31,7 +31,9 @@ export function maskAgreement(a: BinaryMask, b: BinaryMask): Agreement {
   if (union === 0) return { intersection: 0, union: 0, iou: 1, dice: 1 };
   const iou = intersection / union;
   const dice = (2 * intersection) / (aOn(a) + aOn(b) || 1);
-  return { intersection, union, iou: round3(iou), dice: round3(dice) };
+  // Keep iou unrounded for the verdict: rounding 0.4995->0.5 flips DISPUTED->AGREED.
+  // Dice stays rounded for display (tests pin 0.571).
+  return { intersection, union, iou, dice: round3(dice) };
 }
 
 function aOn(mask: BinaryMask): number {
