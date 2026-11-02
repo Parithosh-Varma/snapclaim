@@ -55,11 +55,12 @@ Scored by `scoreDisputes` in `bench/score.ts`, with DISPUTED as the positive cla
 |---|---|---|---|
 | 2026-10-28 | 2 pass, 0 skip, 0 fail | scorer unit-tested, no live runs yet | wall-crack: 5.17% / 85.9 mm / 2.6 mm wide / 2.19 cm² (significant); stain: 1.29% percent-only (moderate) |
 | 2026-10-30 | 7 pass, 0 skip, 0 fail | dev fixtures grown (door-peel, facade-crack, tilted-wall, noscale); held-out still 0 archived runs (UNRUN ×4, strict exit 1) | tilted-wall: 0.27% / 66.8 mm cosmetic; facade-crack: 0.74% percent-only significant |
+| 2026-11-02 | 7 pass, 0 skip, 0 fail; gap first row scored, both arms | `terrace-slab-tape-01`: tape 227 mm vs measured 218.5 mm (err 8.5, 3.7%, in) vs Spark photo-alone 315 mm (err 88, 38.8%, out) | builder-measured slab DSC_0711.JPG, Ref SC-25D35C5E |
 
 ## Failures and misses
 
 - Held-out photos have masks/expected files but no photo bytes in the repo
-  (`fixtures/photos/` gitignored) — they document the protocol, not results.
+  (`fixtures/photos/` gitignored) - they document the protocol, not results.
 - Live SAM 3.1 segment verified on one photo 2026-10-29 (`200`, full-frame RLE, $0.0025).
 - Live skeptic verified 2026-10-29 on the hackathon model `meta-models/muse-spark-open-1026`.
 

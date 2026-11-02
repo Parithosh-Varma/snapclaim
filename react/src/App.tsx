@@ -2,6 +2,9 @@ import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
 } from "react";
 import { DEFAULT_BASE, POLICY_BACKEND_MESSAGE, isAllowedBackendUrl } from "./lib/api";
+import {
+  applyDraft, clearDraft, collectDraft, draftSummary, loadDraft, saveDraft, type DraftSummary,
+} from "./lib/draft";
 import { SamClient } from "./lib/sam";
 import { createSession, resetDmg, type Session } from "./lib/session";
 import { appStore, type CaseStore } from "./lib/store";
@@ -46,6 +49,11 @@ export interface AppCtx {
   checkForUpdates(): Promise<void>;
   applyUpdate(): void;
   online: boolean;
+  /** Newest autosaved in-progress claim, if any (Home resume banner). */
+  draft: DraftSummary | null;
+  resumeDraft(): void;
+  discardDraft(): void;
+  clearDraft(): void;
 }
 
 const Ctx = createContext<AppCtx | null>(null);
@@ -115,23 +123,111 @@ export default function App() {
   const [stepLoading, setStepLoading] = useState(false);
   const stepTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /* Draft: autosave the in-progress claim on every step change and when the
+     page hides, so a reload or crash never wastes progress. Finished or
+     abandoned claims clear it (see startCapture / Report save). */
+  const screenRef = useRef(screen);
+  screenRef.current = screen;
+  const [draft, setDraft] = useState<DraftSummary | null>(() => {
+    try {
+      const d = loadDraft(localStorage);
+      return d ? draftSummary(d) : null;
+    } catch {
+      return null;
+    }
+  });
+  const persistDraft = useCallback((forScreen: string) => {
+    try {
+      const d = collectDraft(sessionRef.current, forScreen);
+      if (d) {
+        if (saveDraft(localStorage, d)) setDraft(draftSummary(d));
+      }
+    } catch { /* autosave is best-effort; the claim continues */ }
+  }, []);
+
   /* Forced scripted transition: every screen change shows the step loader
      for a full second, even when the next screen is instant. Timer resets
      on rapid taps; cleared on unmount. */
   const go = useCallback((s: Screen) => {
+    persistDraft(s);
     setScreen(s);
     setStepLoading(true);
     if (stepTimer.current) clearTimeout(stepTimer.current);
     stepTimer.current = setTimeout(() => setStepLoading(false), 1000);
-  }, []);
+  }, [persistDraft]);
 
   useEffect(() => () => {
     if (stepTimer.current) clearTimeout(stepTimer.current);
   }, []);
 
+  const resumeDraft = useCallback(() => {
+    try {
+      const d = loadDraft(localStorage);
+      if (!d) {
+        setDraft(null);
+        return;
+      }
+      Object.assign(sessionRef.current, createSession());
+      applyDraft(sessionRef.current, d);
+      setDraft(draftSummary(d));
+      setScreen(d.screen);
+      setStepLoading(true);
+      if (stepTimer.current) clearTimeout(stepTimer.current);
+      stepTimer.current = setTimeout(() => setStepLoading(false), 1000);
+    } catch {
+      toast("That draft could not be restored - starting fresh");
+      try {
+        clearDraft(localStorage);
+      } catch { /* ignore */ }
+      setDraft(null);
+    }
+  }, [toast]);
+
+  const discardDraft = useCallback(() => {
+    try {
+      clearDraft(localStorage);
+    } catch { /* ignore */ }
+    setDraft(null);
+  }, []);
+
+  const clearDraftState = useCallback(() => {
+    try {
+      clearDraft(localStorage);
+    } catch { /* ignore */ }
+    setDraft(null);
+  }, []);
+
+  /* Crash coverage: the step-change save above misses a kill between steps. */
+  useEffect(() => {
+    const save = () => persistDraft(screenRef.current);
+    const onVis = () => {
+      if (document.visibilityState === "hidden") save();
+    };
+    window.addEventListener("pagehide", save);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("pagehide", save);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [persistDraft]);
+
   const startCapture = useCallback(() => {
+    try {
+      clearDraft(localStorage);
+    } catch { /* ignore */ }
+    setDraft(null);
     const s = sessionRef.current;
     s.currentCaseId = null;
+    s.capturingAngle = 1;
+    s.stillA = "";
+    s.still2DataUrl = "";
+    s.bundleA = null;
+    s.bundleB = null;
+    s.measurementA = null;
+    s.measurementB = null;
+    s.payloadA = null;
+    s.payloadB = null;
+    s.winnerAngle = null;
     resetDmg(s);
     go("capture");
   }, [go]);
@@ -253,6 +349,10 @@ export default function App() {
     checkForUpdates,
     applyUpdate,
     online,
+    draft,
+    resumeDraft,
+    discardDraft,
+    clearDraft: clearDraftState,
   };
 
   return (

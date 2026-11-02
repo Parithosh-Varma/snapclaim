@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { contoursToSvgPath, maskOutlinePath, simplifyContour, traceContours } from "../src/vision/contour.ts";
+import { contoursToSvgPath, ellipseOutlinePath, maskOutlinePath, simplifyContour, traceContours } from "../src/vision/contour.ts";
 import { type BinaryMask, createMask, maskFromRows } from "../src/vision/mask.ts";
 
 test("a single pixel traces its four corners", () => {
@@ -104,4 +104,25 @@ test("simplification keeps detail near the start and end wrap", () => {
   assert.deepEqual(simple[0], [0, 0]);
   assert.deepEqual(simple[simple.length - 1], [-3, 5]);
   assert.equal(simple.length, 5);
+});
+
+test("a fitted ellipse draws as a smooth closed polygon", () => {
+  const path = ellipseOutlinePath(100, 60, 30, 30, 0);
+  assert.match(path, /^M [\d.]+ [\d.]+( L [\d.]+ [\d.]+){63} Z$/);
+  // A circle returns to (nearly) its start: radius preserved in all quadrants.
+  const nums = path.match(/-?[\d.]+/g)!.map(Number);
+  const radii = [];
+  for (let i = 0; i < nums.length; i += 2) radii.push(Math.hypot((nums[i] as number) - 100, (nums[i + 1] as number) - 60));
+  assert.ok(radii.every((r) => Math.abs(r - 30) < 0.05), `radii drift: ${Math.min(...radii)}..${Math.max(...radii)}`);
+});
+
+test("a tilted ellipse draws along the fitted axes", () => {
+  // 90° swaps the axes: width 60, height 20 becomes width 20, height 60.
+  const path = ellipseOutlinePath(0, 0, 30, 10, 90);
+  const nums = path.match(/-?[\d.]+/g)!.map(Number);
+  const xs = nums.filter((_, i) => i % 2 === 0);
+  const ys = nums.filter((_, i) => i % 2 === 1);
+  assert.ok(Math.max(...xs) - Math.min(...xs) <= 20.1, `x span ${xs}`);
+  assert.ok(Math.max(...ys) - Math.min(...ys) >= 59.9, `y span ${ys}`);
+  assert.throws(() => ellipseOutlinePath(0, 0, 0, 10, 0), /positive/);
 });

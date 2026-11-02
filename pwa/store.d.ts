@@ -2,6 +2,14 @@
 export const CASES_KEY: string;
 export const SETTINGS_KEY: string;
 
+export interface CasePhotos {
+  a?: string | null;
+  b?: string | null;
+  context?: string | null;
+}
+
+export type DroppedSlot = "a" | "b" | "context";
+
 export interface SnapCase {
   id: string;
   createdAt: string;
@@ -16,8 +24,12 @@ export interface SnapCase {
   crackLengthMm?: number | null;
   areaCm2?: number | null;
   mode?: string;
+  /** Legacy v1 single photo, migrated to photos.a on save. */
   photo?: string | null;
   photoDropped?: boolean;
+  /** Three-shot photos; quota fallback drops context, then b, then a. */
+  photos?: CasePhotos | null;
+  dropped?: DroppedSlot[];
   [key: string]: unknown;
 }
 

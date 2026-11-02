@@ -41,7 +41,7 @@ All replies are enveloped `{ok, requestId, durationMs, result}`; errors are verb
 - `MOCK_MODE=0`: live routes fail closed — `503` without `META_API_KEY`. Measure still needs no key.
  - Bring your own key: send `x-meta-key` and/or `x-baseten-key` and that request uses them instead of the worker secrets. Nothing is stored or logged.
 - Live findings call Muse Spark at `META_API_BASE/chat/completions`. Usage (`prompt_tokens`, `completion_tokens`) is recorded to the spend ledger via `backend/spend.ts`; `usd` stays `0` until Meta pricing is confirmed — no guessed rates. `$0 remaining` fails closed with `429` before any fetch.
-- Keys live only in local `.env` / Worker secrets. Never commit them, never send them from the PWA.
+ - Operator keys live only in local `.env` / Worker secrets and are never committed. BYOK device keys are different: the PWA sends them per-request as truncated headers and the backend never stores or logs them.
 
 ## Limits
 

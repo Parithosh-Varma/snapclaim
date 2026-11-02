@@ -8,7 +8,7 @@
  * (same shape as `fixtures/expected/wall-crack.json`) and run `npm run eval`.
  * Cases without an expected file are reported as SKIP, never as failure.
  *
- * Usage: `npm run eval` — exit 0 on pass/skip, 1 on any gap over tolerance.
+ * Usage: `npm run eval` - exit 0 on pass/skip, 1 on any gap over tolerance.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { basename } from "node:path";

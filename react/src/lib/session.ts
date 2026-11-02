@@ -2,7 +2,7 @@
 // React state (canvases, masks, backend payloads). React state mirrors only
 // what the screens render; this object is the single source of truth between
 // steps, exactly like the module-level variables in the vanilla app.js.
-import type { Rle } from "./rle";
+import type { Rle } from "./rle.ts";
 
 export interface GateCoin {
   cx: number; cy: number; rr: number; fw: number; fh: number;
@@ -21,6 +21,47 @@ export interface DmgState {
   mask: Uint8Array | null;
   iou: number;
   source: "api" | "device" | null;
+}
+
+/** Per-angle work: everything Mark mutates lives here so two angles can be
+    marked independently, then the stronger measurement wins. */
+export interface AngleSlot {
+  photo: HTMLCanvasElement | null;
+  photoFor: string;
+  dmg: DmgState;
+  coinManualPt: [number, number] | null;
+  coinMask: Uint8Array | null;
+  coinIou: number;
+  gateCoin: GateCoin | null;
+  taped: boolean;
+  /** Undo order for the taps above; kept so a draft resume pops correctly. */
+  hist: ("crack" | "coin")[];
+}
+
+export function freshAngleSlot(): AngleSlot {
+  return {
+    photo: null,
+    photoFor: "",
+    dmg: { points: [], pointMasks: [], mask: null, iou: 0, source: null },
+    coinManualPt: null,
+    coinMask: null,
+    coinIou: 0,
+    gateCoin: null,
+    taped: false,
+    hist: [],
+  };
+}
+
+/** Best view wins: the angle covering more of the frame measured more of the
+    damage, so its numbers stand for the report. Ties and missing angles fall
+    back to angle 1. */
+export function pickWinnerAngle(
+  a: { percent: number } | null,
+  b: { percent: number } | null,
+): 1 | 2 {
+  if (!a) return 2;
+  if (!b) return 1;
+  return b.percent > a.percent ? 2 : 1;
 }
 
 export interface Finding {
@@ -85,8 +126,33 @@ export interface Session {
   reportFail: string | null;
   raw: string;
   transcript: string;
+  /** Optional wide shot showing where the damage is - context only, never measured. */
+  locationPhoto: string | null;
+  /** Which capture slot the camera is filling (1, then 2 for the second angle). */
+  capturingAngle: 1 | 2;
+  /** Permanent angle-A still (the working stillDataUrl gets swapped while marking B). */
+  stillA: string;
+  /** Second-angle still, empty until the second photo is taken. */
+  still2DataUrl: string;
+  /** Per-angle marking state; the working fields mirror the active angle. */
+  bundleA: AngleSlot | null;
+  bundleB: AngleSlot | null;
+  /** Per-angle results; the winner drives Say/Numbers/Check/Report. */
+  measurementA: Measurement | null;
+  measurementB: Measurement | null;
+  payloadA: Payload | null;
+  payloadB: Payload | null;
+  winnerAngle: 1 | 2 | null;
+  /** AI extension of the manual line, written at report time - null until then. */
+  extendedTranscript: string | null;
   currentCaseId: string | null;
   annexUrl: string | null;
+  /** Which angle is showing in Mark; the draft snapshotter needs it. */
+  activeAngle: 1 | 2;
+  /** Undo order for the working taps; Mark mirrors histRef here on every draw. */
+  workingHist: ("crack" | "coin")[];
+  /** One-shot resume target for Mark's mount after a draft restore. */
+  resumeAngle: 1 | 2 | null;
 }
 
 export function createSession(): Session {
@@ -111,8 +177,23 @@ export function createSession(): Session {
     reportFail: null,
     raw: "{}",
     transcript: "",
+    locationPhoto: null,
+    capturingAngle: 1,
+    stillA: "",
+    still2DataUrl: "",
+    bundleA: null,
+    bundleB: null,
+    measurementA: null,
+    measurementB: null,
+    payloadA: null,
+    payloadB: null,
+    winnerAngle: null,
+    extendedTranscript: null,
     currentCaseId: null,
     annexUrl: null,
+    activeAngle: 1,
+    workingHist: [],
+    resumeAngle: null,
   };
 }
 

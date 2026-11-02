@@ -20,7 +20,7 @@ export interface StrippedImage {
   format: ImageFormat;
   bytes: Uint8Array;
   /**
-   * EXIF orientation (1–8) read before stripping, or 1 when absent. Stripping
+   * EXIF orientation (1-8) read before stripping, or 1 when absent. Stripping
    * removes the tag, so a viewer must apply this rotation itself.
    */
   orientation: number;
@@ -51,7 +51,7 @@ const JPEG_METADATA_MARKERS = new Map<number, string>([
 
 /** PNG chunks kept verbatim: critical chunks plus colourimetry/geometry ancillaries.
  * Everything else (text, EXIF, timestamps, ICC profiles, histograms and any
- * unknown private chunks) is dropped — a denylist cannot cover custom
+ * unknown private chunks) is dropped - a denylist cannot cover custom
  * ancillary chunks that may carry location or device identifiers. */
 const PNG_KEPT_CHUNKS = new Set([
   "IHDR", "PLTE", "IDAT", "IEND",
@@ -110,7 +110,7 @@ function stripJpeg(bytes: Uint8Array): StrippedImage {
     if (marker === 0xda || marker === 0xd9) {
       // Start of scan (or a bare end of image): copy through the end of image
       // marker, then drop anything trailing it. Bytes after EOI are not image
-      // data — metadata smuggled past SOS (a second APP1 in the tail) is cut
+      // data - metadata smuggled past SOS (a second APP1 in the tail) is cut
       // here instead of being copied verbatim.
       const eoi = findEoi(bytes, p);
       if (eoi < 0) {

@@ -2,12 +2,12 @@
   Typosquat fallback headers: the meta-refresh page is framable without these.
   Served alongside defensive-redirect/index.html.
 */
-/snap-claim/*:
+/snap-claim/*
   X-Frame-Options: DENY
   Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline'; object-src 'none'; base-uri 'none'
   Referrer-Policy: no-referrer
   X-Content-Type-Options: nosniff
-/*:
+/*
   X-Frame-Options: DENY
   Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline'; object-src 'none'; base-uri 'none'
   Referrer-Policy: no-referrer

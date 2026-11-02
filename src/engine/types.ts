@@ -94,10 +94,25 @@ export interface MeasureSessionInput {
   minReferenceConfidence?: number;
 }
 
+export interface RefutedMask {
+  maskId: string;
+  label: DamageLabel;
+  reason: "blocky" | "straight" | "empty";
+  detail: string;
+}
+
 export interface MeasureSessionResult {
   findings: MeasuredFinding[];
   receipts: Receipt[];
   mode: "absolute" | "percent-only";
+  /**
+   * "damage" when at least one finding measured; "no-damage" when zero
+   * findings - every supplied mask was refuted as not-damage, or no masks
+   * were supplied at all. Lets the pipeline answer "this is not a crack"
+   * instead of failing closed with an empty gate.
+   */
+  verdict: "damage" | "no-damage";
+  refuted: RefutedMask[];
   /**
    * "pixel-verified" only when EVERY mask carried an `rle` whose decoded
    * pixels agree with the claimed areaPx (and skeletonPx, when present).

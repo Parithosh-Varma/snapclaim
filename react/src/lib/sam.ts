@@ -2,9 +2,20 @@
 // download, per-photo embedding and tap decoding run off the main thread.
 // Messages in: {type:"embed", photoId, image} / {type:"decode", id, photoId,
 // point, preferSmallest}. Messages out: progress/ready/error and decoded.
-import type { SamMask } from "./session";
-import { decodeRle, encodeRle } from "./rle";
-import { unionMasks } from "./mask";
+import type { SamMask } from "./session.ts";
+import { decodeRle, encodeRle, type Rle } from "./rle.ts";
+import { unionMasks } from "./mask.ts";
+import { onDeviceAllowed } from "./compute.ts";
+
+/** Why on-device work is currently refused, for honest error surfaces. */
+function onDeviceBlockedReason(): string {
+  try {
+    const gb = typeof navigator !== "undefined" ? (navigator as unknown as { deviceMemory?: unknown }).deviceMemory : undefined;
+    const n = Number(gb);
+    if (!(n > 0) || n <= 4) return "this device is low-memory";
+  } catch { /* fall through to the settings reason */ }
+  return "on-device outlining is off - enable it in Settings → Compute";
+}
 
 export interface SamProgress {
   percent: number;
@@ -25,6 +36,11 @@ export class SamClient {
 
   private ensure(): Worker {
     if (this.worker) return this.worker;
+    // Cloud-by-default: never create the worker (and its ~100-300 MB model
+    // download) unless the user opted in AND the device can hold it. This is
+    // the OOM guard: an A32-class phone dies loading the model otherwise.
+    if (!onDeviceAllowed()) throw new Error(`on-device outlining unavailable (${onDeviceBlockedReason()}) - tap outlines via the cloud instead`);
+    if (typeof window === "undefined" || typeof Worker === "undefined") throw new Error("no Worker runtime - tap outlines via the cloud instead");
     const url = new URL("sam-worker.js", window.location.href);
     // ?device=wasm|webgpu on the page URL forces the worker's backend, for comparisons.
     const device = new URLSearchParams(window.location.search).get("device");
@@ -114,6 +130,11 @@ export class SamClient {
    * coin outline, the offline fallback and the cross-check - never on entry.
    */
   ensureEmbedded(photo: HTMLCanvasElement, quiet = false): Promise<boolean> {
+    // Fail fast before touching the photo: no worker, no download, no OOM.
+    if (!onDeviceAllowed()) {
+      this.lastError = `on-device outlining unavailable (${onDeviceBlockedReason()}) - using cloud instead`;
+      return Promise.resolve(false);
+    }
     const hit = this.embedCache.get(photo);
     if (hit) return hit;
     // A newer photo supersedes any in-flight embed: settle it instead of hanging.
@@ -162,7 +183,17 @@ export class SamClient {
     const id = this.decodeId++;
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
-      this.ensure().postMessage({ type: "decode", id, photoId: this.photoId, point, preferSmallest });
+      let w: Worker;
+      try {
+        w = this.ensure();
+      } catch (e) {
+        // On-device refused (opt-out or low-mem): callers fall back to cloud.
+        this.pending.delete(id);
+        this.lastError = e instanceof Error ? e.message : String(e);
+        resolve(null);
+        return;
+      }
+      w.postMessage({ type: "decode", id, photoId: this.photoId, point, preferSmallest });
     });
   }
 
@@ -185,7 +216,7 @@ export async function segmentViaApi(
   box?: { left: number; top: number; right: number; bottom: number },
   signal?: AbortSignal,
 ): Promise<SamMask> {
-  const { apiPost } = await import("./api");
+  const { apiPost } = await import("./api.ts");
   const { res, j } = await apiPost(base, "/v1/segment", {
     imageUrl: photo.toDataURL("image/jpeg", 0.85),
     width: photo.width,
@@ -219,4 +250,101 @@ export async function segmentViaApi(
   if (!kept.length) throw new Error("SAM caught the wall, not the crack - trying on-device; fill the frame with the crack and tap its middle.");
   const mask = unionMasks(kept.map((rec) => decodeRle(rec.rle))) as Uint8Array;
   return { mask, iou: Math.min(...kept.map((rec) => rec.confidence ?? 0)), rle: encodeRle(mask, photo.width, photo.height) };
+}
+
+export interface CoinOutline {
+  mask: Uint8Array;
+  iou: number;
+  rle: Rle;
+}
+
+/** Compactness of a binary mask: 4πA/P², 1 for a disc. Coins are discs;
+    cracks, shadows and wall patches are not. P is the boundary-pixel count. */
+function compactness(mask: Uint8Array, w: number, h: number, area: number): number {
+  let edge = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!mask[y * w + x]) continue;
+      if (
+        x === 0 || y === 0 || x === w - 1 || y === h - 1 ||
+        !mask[y * w + x - 1] || !mask[y * w + x + 1] ||
+        !mask[(y - 1) * w + x] || !mask[(y + 1) * w + x]
+      ) edge++;
+    }
+  }
+  if (!edge) return 0;
+  return (4 * Math.PI * area) / (edge * edge);
+}
+
+/**
+ * Pick the coin among SAM's candidates for a tap. Must contain the tap,
+ * coin-sized (a wall slab is never a coin) and the most disc-like of those.
+ * Pure - unit-tested without a backend.
+ */
+export function pickCoinRecord(
+  records: { rle: Rle; confidence?: number }[],
+  tap: [number, number],
+  w: number,
+  h: number,
+): { mask: Uint8Array; iou: number } | null {
+  const framePx = w * h;
+  const tx = Math.min(w - 1, Math.max(0, Math.round(tap[0])));
+  const ty = Math.min(h - 1, Math.max(0, Math.round(tap[1])));
+  let best: { mask: Uint8Array; iou: number } | null = null;
+  let bestScore = 0;
+  for (const rec of records) {
+    let mask: Uint8Array;
+    try {
+      mask = decodeRle(rec.rle);
+    } catch {
+      continue;
+    }
+    if (mask.length !== framePx) continue;
+    let n = 0;
+    let sx = 0;
+    let sy = 0;
+    for (let i = 0; i < mask.length; i++) {
+      if (!mask[i]) continue;
+      n++;
+      sx += i % w;
+      sy += Math.floor(i / w);
+    }
+    // Speckle is not a coin; a wall slab is not a coin.
+    if (n < 20 || n > framePx * 0.25) continue;
+    if (!mask[ty * w + tx]) continue;
+    const dist = Math.hypot(sx / n - tap[0], sy / n - tap[1]);
+    const score = (compactness(mask, w, h, n) * (rec.confidence ?? 0.5)) / (1 + dist / Math.sqrt(n));
+    if (score > bestScore) {
+      bestScore = score;
+      best = { mask, iou: rec.confidence ?? 0.5 };
+    }
+  }
+  return bestScore > 0 ? best : null;
+}
+
+/**
+ * Outline the coin at a manual tap via the SAM 3.1 API - the same mechanism
+ * as the crack tap. Throws when nothing coin-like is under the tap.
+ */
+export async function segmentCoinViaApi(
+  base: string,
+  photo: HTMLCanvasElement,
+  point: [number, number],
+): Promise<CoinOutline> {
+  const { apiPost } = await import("./api.ts");
+  const { res, j } = await apiPost(base, "/v1/segment", {
+    imageUrl: photo.toDataURL("image/jpeg", 0.85),
+    width: photo.width,
+    height: photo.height,
+    points: [{ x: point[0], y: point[1] }],
+  });
+  const result = (j.result ?? {}) as {
+    records?: { rle: Rle; confidence?: number }[];
+  };
+  if (!res.ok || !j.ok) throw new Error((j as { error?: string }).error ?? `segment HTTP ${res.status}`);
+  const records = result.records ?? [];
+  if (!records.length) throw new Error("SAM found nothing there - tap the middle of the coin.");
+  const picked = pickCoinRecord(records, point, photo.width, photo.height);
+  if (!picked) throw new Error("No coin found there - tap the middle of the coin.");
+  return { ...picked, rle: encodeRle(picked.mask, photo.width, photo.height) };
 }
