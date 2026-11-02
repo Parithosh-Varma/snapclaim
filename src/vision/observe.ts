@@ -61,6 +61,8 @@ export function observeMask(mask: BinaryMask, options: ObserveMaskOptions): Mask
     regionCount: regions.length,
     confidence: options.confidence,
   };
+  // A tilted wall is squashed by 1 / factor along one axis, so its area is too.
+  if (options.stretch !== undefined && areaPx > 0) observation.planeAreaPx = round(areaPx * options.stretch.factor, 1);
 
   if (options.label === "crack" && regions.length > 0) {
     const kept = maskFromRegions(clipped.width, clipped.height, regions);

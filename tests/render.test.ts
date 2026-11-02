@@ -153,5 +153,5 @@ test("overlay legend labels each measured outline with its own numbers", () => {
 
 test("no-overlay svg is pinned (golden hash)", () => {
   const svg = renderAnnexureSvg({ ...renderBase(), generatedAt: "2026-10-28T00:00:00.000Z" });
-  assert.equal(createHash("sha256").update(svg).digest("hex"), "f492a47f3614ac376393bca8cdbab2c37c5dc40688587b15968ed6e28c058ffa");
+  assert.equal(createHash("sha256").update(svg).digest("hex"), "4dca9f24f387eeaeb95ccb8553abde22a43623e8103cc83f27598df321ae62dc");
 });

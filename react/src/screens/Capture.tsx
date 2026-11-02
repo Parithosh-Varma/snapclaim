@@ -3,7 +3,7 @@ import { useApp } from "../App";
 import { CoinGate } from "../lib/camera";
 import { loadSamplePhoto } from "../lib/sample";
 import { SamplePicker } from "./SamplePicker";
-import { resetDmg } from "../lib/session";
+import { applyLastCoin, resetDmg } from "../lib/session";
 
 const CAM_ERRORS: Record<string, string> = {
   NotAllowedError: "Camera permission is off — tap Enable camera",
@@ -26,15 +26,78 @@ export default function Capture() {
   const [count, setCount] = useState<number | null>(null);
   const [flash, setFlash] = useState(false);
   const [enableCam, setEnableCam] = useState(false);
-  const [donate, setDonate] = useState(() => {
-    try { return !!localStorage.getItem("snapclaim.donatePhoto"); } catch { return false; }
-  });
   const [pickerOpen, setPickerOpen] = useState(false);
   const [picking, setPicking] = useState<string | null>(null);
-  const [tipsOpen, setTipsOpen] = useState(true);
+  const [tipsOpen, setTipsOpen] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [live, setLive] = useState(false);
+  const [acquiring, setAcquiring] = useState(false);
+  const [tapMsg, setTapMsg] = useState<string | null>(null);
+  const [noScale, setNoScale] = useState(false);
+  const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const dragY = useRef<number | null>(null);
+  /* tips: closed by default; auto-open only on first visit */
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem("snapclaim.tipsSeen")) setTipsOpen(true);
+    } catch { /* private mode: stay closed rather than crash */ }
+  }, []);
+  const closeTips = useCallback(() => {
+    setTipsOpen(false);
+    try { localStorage.setItem("snapclaim.tipsSeen", "1"); } catch { /* ignore */ }
+  }, []);
+
+  /* locked-tap hint clears after a few seconds */
+  useEffect(() => () => {
+    if (tapTimer.current) clearTimeout(tapTimer.current);
+  }, []);
+
+  /* Esc closes the tips sheet */
+  useEffect(() => {
+    if (!tipsOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") closeTips(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [tipsOpen, closeTips]);
+
   const noCam = typeof navigator !== "undefined" && !navigator.mediaDevices?.getUserMedia;
+
+  /* one status line, driven by state */
+  const statusLine = enableCam
+    ? "Enable camera"
+    : !live
+      ? "Starting camera…"
+      : noScale
+        ? "Percentages only — no millimetres"
+        : tapMsg ?? (locked ? "Place a coin next to the damage" : "Coin found – fit damage + coin in frame");
+
+  const onShutterTap = () => {
+    if (locked) {
+      setTapMsg("Hold a coin in front of the camera");
+      if (tapTimer.current) clearTimeout(tapTimer.current);
+      tapTimer.current = setTimeout(() => setTapMsg(null), 4000);
+      return;
+    }
+    captureStill();
+  };
+
+  /* bottom-sheet drag to dismiss */
+  const dragStart = (clientY: number) => {
+    dragY.current = clientY;
+  };
+  const dragMove = (clientY: number) => {
+    if (dragY.current === null || !sheetRef.current) return;
+    const dy = Math.max(0, clientY - dragY.current);
+    sheetRef.current.style.transform = `translateY(${dy}px)`;
+  };
+  const dragEnd = (clientY: number) => {
+    if (dragY.current === null) return;
+    const dy = clientY - dragY.current;
+    dragY.current = null;
+    if (sheetRef.current) sheetRef.current.style.transform = "";
+    if (dy > 110) closeTips();
+  };
 
   const captureStill = useCallback(() => {
     const gate = gateRef.current;
@@ -56,8 +119,8 @@ export default function Capture() {
           sw: cap.width, sh: cap.height, sx: cap.width / vw, sy: cap.height / vh,
         };
       }
-      session.coinLabel = gate.coinLabel;
-      if (gate.coinMm > 0) session.coinKindMm = gate.coinMm;
+      // The gate's coin ID is a colour guess; it must not set the scale.
+      applyLastCoin(session);
     } catch { /* stills are best-effort */ }
     gate.stop();
     setFlash(true);
@@ -85,6 +148,7 @@ export default function Capture() {
       onAutoCapture: () => captureRef.current(),
       onCameraError: (name) => {
         setLive(false);
+        setAcquiring(false);
         setEnableCam(true);
         setBlocked(name === "NotAllowedError" || name === "SecurityError");
         setHint(CAM_ERRORS[name] ?? `Camera unavailable (${name}) — tap Enable camera`);
@@ -123,6 +187,9 @@ export default function Capture() {
     resetDmg(session);
     setEnableCam(false);
     setBlocked(false);
+    setNoScale(false);
+    setTapMsg(null);
+    setAcquiring(true);
     go("capture");
     // The Capture tree stays mounted for sReview, so re-acquire explicitly.
     gateRef.current?.reset();
@@ -130,10 +197,6 @@ export default function Capture() {
   };
 
   const usePhoto = () => {
-    try {
-      if (donate) localStorage.setItem("snapclaim.donatePhoto", "1");
-      else localStorage.removeItem("snapclaim.donatePhoto");
-    } catch { /* storage may be unavailable; the photo flow must not break */ }
     go("sMark");
   };
 
@@ -152,8 +215,7 @@ export default function Capture() {
       session.stillDataUrl = cap.toDataURL("image/jpeg", 0.85); // canvas redraw strips EXIF
       session.gateCoin = null;
       session.noScaleMode = true;
-      session.coinLabel = "";
-      session.coinKindMm = 0;
+      applyLastCoin(session);
       gateRef.current?.stop();
       go("sReview");
     };
@@ -196,6 +258,7 @@ export default function Capture() {
           autoPlay
           onPlaying={() => {
             setLive(true);
+            setAcquiring(false);
             setEnableCam(false);
             setBlocked(false);
           }}
@@ -217,7 +280,7 @@ export default function Capture() {
               Coin tips
             </button>
           </div>
-          <div id="coinHint" role="status">{hint}</div>
+          <div id="coinHint" role="status">{statusLine}</div>
           <input
             ref={fileRef}
             type="file"
@@ -239,14 +302,17 @@ export default function Capture() {
                 <button
                   id="enableCam"
                   type="button"
-                  className="btn-primary"
+                  className={`btn-primary${acquiring ? " busy" : ""}`}
+                  disabled={acquiring}
+                  aria-busy={acquiring}
                   onClick={() => {
                     setEnableCam(false);
                     setBlocked(false);
-                    void gateRef.current?.acquire();
+                    setAcquiring(true);
+                    void gateRef.current?.acquire().finally(() => setAcquiring(false));
                   }}
                 >
-                  Enable camera
+                  {acquiring ? "Starting…" : "Enable camera"}
                 </button>
               )}
               {blocked && !noCam && (
@@ -265,28 +331,31 @@ export default function Capture() {
             </div>
           ) : (
             <>
-              <div className="guide" aria-hidden="true">
-                <span className="guide-frame">
-                  <i className="g tl" /><i className="g tr" /><i className="g bl" /><i className="g br" />
-                </span>
-                <span className="guide-cap">Fit damage + coin inside</span>
-              </div>
+              {live && (
+                <div className="guide" aria-hidden="true">
+                  <span className="guide-frame">
+                    <i className="g tl" /><i className="g tr" /><i className="g bl" /><i className="g br" />
+                  </span>
+                </div>
+              )}
               <div className="shutter-block">
                 <button
                   id="shutter"
                   type="button"
                   aria-label={locked || !live ? "Capture (waiting for camera)" : "Capture"}
-                  className={locked || !live ? "locked" : ""}
+                  className={locked ? "locked" : ""}
                   disabled={!live}
-                  onClick={() => {
-                    if (locked) {
-                      setHint("Hold a coin in front of the camera");
-                      return;
-                    }
-                    captureStill();
-                  }}
-                />
-                <span className="shutter-label">{!live ? "Starting camera…" : locked ? "Add a coin for scale" : "Tap to capture"}</span>
+                  onClick={onShutterTap}
+                >
+                  {locked && (
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <rect x="5" y="10" width="14" height="10" fill="currentColor" />
+                      <path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" strokeWidth="2.4" fill="none" />
+                      <circle cx="12" cy="15" r="1.6" fill="#8b93a3" />
+                    </svg>
+                  )}
+                </button>
+                <span className="shutter-label">{!live ? "Starting camera…" : locked ? "Place a coin to unlock" : "Tap to capture"}</span>
                 <div className="alt-row">
                   <button id="uploadBtn" className="alt-btn" type="button" onClick={() => fileRef.current?.click()}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5" /><path d="M4 20h16" /></svg>
@@ -304,24 +373,55 @@ export default function Capture() {
                   onClick={() => {
                     session.noScaleMode = true;
                     session.gateCoin = null;
+                    setNoScale(true);
                     gateRef.current?.unlockWithoutScale();
                   }}
                 >
-                  No coin? Continue without scale →
+                  Continue without a coin
                 </button>
+                <p className="noscale-note">Results will be percentages only — no millimetres.</p>
               </div>
             </>
           )}
           {tipsOpen && !enableCam && (
-            <div id="tipsCard" role="dialog" aria-labelledby="tipsTitle">
-              <p id="tipsTitle">Coin tips</p>
-              <ul>
-                <li>Lay the coin flat, touching the damage</li>
-                <li>Keep coin + damage sharp, fill the frame</li>
-                <li>Flat light — no flash glare</li>
-              </ul>
-              <button type="button" id="tipsGotIt" onClick={() => setTipsOpen(false)}>Got it</button>
-            </div>
+            <>
+              <button type="button" id="tipsScrim" aria-label="Close coin tips" onClick={closeTips} />
+              <div
+                id="tipsCard"
+                role="dialog"
+                aria-labelledby="tipsTitle"
+                aria-modal="true"
+                ref={sheetRef}
+                onTouchStart={(e) => dragStart(e.touches[0]?.clientY ?? 0)}
+                onTouchMove={(e) => dragMove(e.touches[0]?.clientY ?? 0)}
+                onTouchEnd={(e) => dragEnd(e.changedTouches[0]?.clientY ?? 0)}
+              >
+                <span className="tips-grab" aria-hidden="true" />
+                <button type="button" id="tipsClose" aria-label="Close coin tips" onClick={closeTips}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                </button>
+                <p id="tipsTitle">Coin tips</p>
+                <svg className="tips-diagram" viewBox="0 0 240 120" role="img" aria-label="Diagram: coin touching the damage, wall lit evenly">
+                  <rect x="4" y="4" width="232" height="112" fill="#2b2820" />
+                  <circle cx="204" cy="26" r="10" fill="none" stroke="#f5d76e" strokeWidth="3" />
+                  <g stroke="#f5d76e" strokeWidth="2.4" strokeLinecap="round">
+                    <path d="M204 8v-4M204 44v4M186 26h-4M222 26h4M191 13l-3-3M217 13l3-3M191 39l-3 3M217 39l3 3" />
+                  </g>
+                  <path d="M70 8 L64 34 L74 58 L66 84 L72 112" stroke="#0e0c08" strokeWidth="7" fill="none" strokeLinecap="round" />
+                  <path d="M70 8 L64 34 L74 58 L66 84 L72 112" stroke="#4a4438" strokeWidth="1.6" fill="none" />
+                  <ellipse cx="98" cy="66" rx="30" ry="8" fill="rgba(0,0,0,.35)" />
+                  <circle cx="98" cy="58" r="26" fill="#e8b93c" />
+                  <circle cx="98" cy="58" r="18" fill="none" stroke="#0b1e46" strokeWidth="2" strokeDasharray="4 3" />
+                  <circle cx="98" cy="58" r="3" fill="#0b1e46" />
+                </svg>
+                <ul>
+                  <li>Coin flat, touching the damage</li>
+                  <li>Both sharp, filling the frame</li>
+                  <li>Even light, no flash glare</li>
+                </ul>
+                <button type="button" id="tipsGotIt" onClick={closeTips}>Got it</button>
+              </div>
+            </>
           )}
         </div>
       )}
@@ -347,16 +447,6 @@ export default function Capture() {
             src={session.stillDataUrl}
             style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain", background: "#000" }}
           />
-          <label style={{ position: "absolute", left: 18, right: 18, bottom: "calc(96px + env(safe-area-inset-bottom))", display: "flex", gap: 10, alignItems: "center", color: "#fff", fontSize: 13, fontWeight: 600, background: "rgba(11,30,70,.88)", padding: "10px 14px", borderRadius: 14 }}>
-            <input
-              id="donateCheck"
-              type="checkbox"
-              style={{ width: 22, height: 22, flex: "none" }}
-              checked={donate}
-              onChange={(e) => setDonate(e.target.checked)}
-            />
-            Donate this photo to the dataset (consent saved on this device; nothing is uploaded now)
-          </label>
           <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, display: "flex", gap: 10, padding: "14px 18px calc(26px + env(safe-area-inset-bottom))", background: "linear-gradient(transparent, rgba(0,0,0,.65))" }}>
             <button id="retake" type="button" style={{ flex: 1, minHeight: 56, borderRadius: 16, border: "2px solid rgba(255,255,255,.85)", background: "transparent", color: "#fff", fontWeight: 800, fontSize: 17 }} onClick={retake}>Retake</button>
             <button id="usePhoto" type="button" style={{ flex: 1, minHeight: 56, borderRadius: 16, border: 0, background: "var(--coin)", color: "#fff", fontWeight: 800, fontSize: 17 }} onClick={usePhoto}>Use photo</button>

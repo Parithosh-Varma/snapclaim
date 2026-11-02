@@ -30,6 +30,9 @@ start-web-118.sh
 stress-phone.mjs
 DEFENSIVE-DOMAINS.md
 
+# OpenCode loop state (local agent scratch, never committed)
+.opencode/
+
 # Marketing lives in the private snapclaim-marketing repo, not here.
 /site/
 /promo/

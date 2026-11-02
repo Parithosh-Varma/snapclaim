@@ -348,9 +348,6 @@ export function Settings() {
   const cases = store.list();
   void casesVersion;
   const [theme, setTheme] = useState(() => String(store.getSettings().theme ?? document.documentElement.dataset.theme ?? "auto"));
-  const [donate, setDonate] = useState(() => {
-    try { return !!localStorage.getItem("snapclaim.donatePhoto"); } catch { return false; }
-  });
   const [bytes, setBytes] = useState(0);
   const [quota, setQuota] = useState<number | null>(null);
   const [backend, setBackend] = useState<BackendState>({ kind: "idle" });
@@ -389,15 +386,6 @@ export function Settings() {
     document.documentElement.dataset.theme = v;
     setTheme(v);
     toast(v === "auto" ? "Theme follows your system" : `Theme: ${v}`);
-  };
-
-  const setDonatePref = (v: boolean) => {
-    setDonate(v);
-    try {
-      if (v) localStorage.setItem("snapclaim.donatePhoto", "1");
-      else localStorage.removeItem("snapclaim.donatePhoto");
-    } catch { /* ignore */ }
-    toast(v ? "Photo sharing on — only with your tap" : "Photo sharing off");
   };
 
   const runBackendCheck = async () => {
@@ -477,33 +465,6 @@ export function Settings() {
               Dark
             </button>
           </div>
-        </Section>
-
-        <Section
-          label="Privacy"
-          icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l7 3v5c0 5-3.5 8-7 10-3.5-2-7-5-7-10V6z" /><path d="M9.5 12l2 2 3.5-4" /></svg>}
-        >
-          <div className="privacy-row">
-            <span className="privacy-text">
-              <b>Share photos to improve measurements</b>
-              <small>Off by default. Nothing uploads without your tap.</small>
-            </span>
-            <button
-              id="donateSetting"
-              type="button"
-              role="switch"
-              aria-checked={donate}
-              aria-label="Share photos to improve measurements"
-              className={`switch${donate ? " on" : ""}`}
-              onClick={() => setDonatePref(!donate)}
-            >
-              <span className="switch-knob" aria-hidden="true" />
-            </button>
-          </div>
-          <details className="learn">
-            <summary>Learn what&apos;s shared</summary>
-            <p>Only the photos you explicitly attach — never your whole library. Shared photos train damage measurement; names, notes and locations stay on this device and can be stripped before upload.</p>
-          </details>
         </Section>
 
         {!installed && (

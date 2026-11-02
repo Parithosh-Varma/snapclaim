@@ -57,11 +57,11 @@ test("case store settings round-trip and survive case wipe", () => {
   const store = createCaseStore(storage);
   assert.deepEqual(store.getSettings(), {});
   store.setSettings({ theme: "dark" });
-  store.setSettings({ donate: true });
-  assert.deepEqual(store.getSettings(), { theme: "dark", donate: true });
+  store.setSettings({ sharePhotos: true });
+  assert.deepEqual(store.getSettings(), { theme: "dark", sharePhotos: true });
   store.save({ name: "C" });
   store.clear();
-  assert.deepEqual(store.getSettings(), { theme: "dark", donate: true }, "wipe clears cases, not settings");
+  assert.deepEqual(store.getSettings(), { theme: "dark", sharePhotos: true }, "wipe clears cases, not settings");
 });
 
 test("case store tolerates corrupt stored JSON", () => {

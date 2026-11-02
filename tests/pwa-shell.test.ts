@@ -36,7 +36,7 @@ test("PWA shell is installable and honest", () => {
   }
   assert.ok(!html.includes("user-scalable=no"), "viewport allows pinch zoom");
   assert.ok(html.includes('id="apple-touch-icon"') || html.includes('rel="apple-touch-icon"'), "iOS home-screen icon linked");
-  for (const id of ["camStep","uploadBtn","camFile","donateCheck","updateBar","updateGo"]) {
+  for (const id of ["camStep","uploadBtn","camFile","updateBar","updateGo"]) {
     assert.ok(html.includes(`id="${id}"`), `shell element ${id} exists`);
   }
   for (const id of ["numPhotoCard","numPhoto","numChip","numLoading","numError","reportDoc","docGate","docMeta","docPhoto","docQuote","docRows","annexImg","shareBtn","copyBtn","newClaimBtn","installBtn","offlineBar","toReport","renderBtn"]) {
@@ -48,7 +48,7 @@ test("PWA shell is installable and honest", () => {
   assert.ok(html.includes("US quarter") && html.includes("1 euro"), "reference presets span regions");
   assert.ok(html.indexOf("US quarter") < html.indexOf("India ₹10"), "presets are not India-first");
   for (const id of ["tHome","netPill","nextTitle","nextSub","ctaNew","ctaSample","recentList","recentEmpty",
-    "tCases","caseList","caseEmpty","tSettings","sc-theme-light","sc-theme-auto","sc-theme-dark","donateSetting",
+    "tCases","caseList","caseEmpty","tSettings","sc-theme-light","sc-theme-auto","sc-theme-dark",
     "installHint","updateBtn","storeInfo","sc-store-meter","exportAllBtn","wipeBtn","baseUrl2","setCheck","setHealth",
     "caseDlg","dlgName","dlgProp","dlgNotes","dlgPhotos","dlgAddPhoto","dlgFile","dlgSave","dlgExport","dlgDelete","dlgClose",
     "tabs","toast","appLive","doneHome"]) {
@@ -81,7 +81,8 @@ test("service worker caches the shell, never the API", () => {
   assert.ok(app.includes("/v1/transcribe"), "voice posts to the transcribe proxy");
   assert.ok(app.includes("OfflineAudioContext"), "clip is resampled on-device");
   assert.ok(app.includes("/v1/crosscheck"), "PWA can cross-check on-device masks against SAM");
-  assert.ok(app.includes("CoinModel.extractFeatures"), "coin ID uses the real feature extractor");
+  assert.ok(!/setCoinSize\(def\./.test(app), "the colour-only coin guess never sets the scale");
+  assert.ok(app.includes("restoreCoinSize") && app.includes("rememberCoin"), "coin size defaults to the user's last confirmed pick");
   assert.ok(app.includes("findRing"), "coin gate uses edge + radial-uniformity detection");
   assert.ok(!app.includes("$(\"raw\").innerHTML"), "no raw HTML injection of backend output");
   assert.ok(app.includes("Run the measurement first"), "skeptic guards a missing measurement instead of sending an empty request");
