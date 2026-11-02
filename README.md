@@ -18,7 +18,7 @@ All three commands are free and deterministic; run them yourself.
 |---|---|---|
 | Measurement code vs known answers (54 scenes drawn in code, coin scale, some on tilted walls) | `npm run bench:truth` | length median error 1.4%, 100% within ±10%; width median error 4.0%, 96.3% within ±10%; 3/3 no-scale refusals held |
 | Regression on dev mask fixtures | `npm run eval` | 7 pass, 0 skip, 0 fail |
-| Live pipeline on held-out real photos | `npm run bench` | 11 cases, 0 archived runs yet (all UNRUN, so the command exits 1 on purpose) |
+| Live pipeline on held-out real photos | `npm run bench` | 4 public photos run live 2026-11-02: 4/4 refused millimetres, but only 2/4 masks were on the crack and the skeptic flagged neither miss ([details](docs/eval-report.md#failures-and-misses)); 7 team cases UNRUN, so the command still exits 1 on purpose |
 
 What this does not show yet: how well SAM finds the crack on a real photo. `bench:truth` checks the maths given a mask, not the mask itself. No real crack has been tape-measured yet, so `npm run bench:gap` (pipeline vs model-only guess against a tape) still prints UNSCORED. We would rather show that gap than fill it with a number we cannot back.
 
