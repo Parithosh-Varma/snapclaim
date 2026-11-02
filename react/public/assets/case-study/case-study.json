@@ -7,7 +7,7 @@
   "photos": [
     {
       "src": "assets/case-study/photos/DSC_0711.jpg",
-      "alt": "Vertical crack in a terrace slab with a taped coin beside it and a hand holding a yellow measuring tape along the crack",
+      "alt": "Vertical crack in a terrace slab with a taped coin beside it and a yellow measuring tape held along the crack",
       "caption": "Figure 1 — photo with tape: the measuring tape held along the crack is the ground truth (227 mm)."
     },
     {

@@ -67,8 +67,8 @@ if (toggle) {
       img.src = String(p.src);
       img.alt = String(p.alt || "");
       img.loading = "lazy";
-      img.width = 800;
-      img.height = 1000;
+      img.width = 1200;
+      img.height = 900;
       fig.appendChild(img);
       if (p.caption) {
         const cap = document.createElement("figcaption");

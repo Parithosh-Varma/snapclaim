@@ -180,8 +180,9 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .case-study { padding-block: 24px 112px; }
 .case-study .status { margin-bottom: 20px; }
 .case-study .sub { margin-top: 16px; max-width: 62ch; }
-.cs-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 40px; margin-top: 36px; align-items: start; }
-.cs-photos { display: grid; gap: 24px; align-content: start; }
+.cs-photos { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 36px; align-items: start; }
+.cs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 40px; margin-top: 36px; align-items: start; }
+.cs-grid > div > h3.doc-sec:first-child { margin-top: 0; }
 .cs-photos figure { margin: 0; }
 .cs-photos img { border-radius: 16px; width: 100%; height: auto; background: var(--sand); }
 .cs-compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-top: 8px; }
@@ -306,6 +307,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   .lede { max-width: 44ch; }
   .faq { grid-template-columns: 1fr; gap: 48px; }
   .cs-grid { grid-template-columns: 1fr; }
+  .cs-photos { grid-template-columns: 1fr; }
   .foot-cols { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 860px) {
