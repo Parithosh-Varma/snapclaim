@@ -110,6 +110,22 @@ test("unknown and duplicate caseIds are reported and fail the run", () => {
   assert.ok(out.lines.some((l) => l.startsWith("UNKNOWN z.json")));
 });
 
+const auditLabel = (caseId: string, expected: "CONFIRMED" | "DISPUTED") => ({ caseId, maskId: "m", expected, labeledBy: "me", labeledAt: "2026-11-02" });
+
+test("post-freeze audit labels are scored like split labels", () => {
+  const runs = [file("a.json", run("a", [{ maskId: "m", crackLengthMm: null, verdict: "CONFIRMED" }])), file("b.json", run("b", [{ maskId: "m", crackLengthMm: null, verdict: "CONFIRMED" }]))];
+  const out = evaluate(split(["a", "b"]), runs, { auditText: JSON.stringify({ labels: [auditLabel("a", "DISPUTED"), auditLabel("b", "CONFIRMED")] }) });
+  assert.equal(out.exitCode, 0);
+  assert.ok(out.lines.some((l) => l.startsWith("disputes: tp=0 fp=0 fn=1 tn=1 precision=n/a recall=0")));
+});
+
+test("a malformed audit file exits 2 and an unknown audit caseId fails the run", () => {
+  assert.equal(evaluate(split(["a"]), [], { allowUnrun: true, auditText: JSON.stringify({ labels: [{ caseId: "a" }] }) }).exitCode, 2);
+  const out = evaluate(split(["a"]), [], { allowUnrun: true, auditText: JSON.stringify({ labels: [auditLabel("z", "DISPUTED")] }) });
+  assert.equal(out.exitCode, 1);
+  assert.ok(out.lines.some((l) => l.startsWith('UNKNOWN audit label: caseId "z"')));
+});
+
 // Golden digests: a held-out case that is edited after the freeze changes its hash and fails here.
 // Adding a case is fine (add its line); changing or removing one is the thing this catches.
 const FROZEN_DIGESTS: Record<string, string> = {
