@@ -137,7 +137,6 @@ function show(id) {
   document.body.classList.remove("tabbing");
   document.body.classList.toggle("reviewing", id === "sReview");
   document.body.classList.toggle("step2", id === "sSay");
-  if (id === "sReview") { try { $("donateCheck").checked = !!localStorage.getItem("snapclaim.donatePhoto"); } catch { /* ignore */ } }
 }
 function backToCam() {
   try { stopMicTracks(); } catch { /* noop */ }
@@ -547,12 +546,6 @@ $("retake").onclick = () => {
   acquireCamera();
 };
 $("usePhoto").onclick = () => {
-  // Consent is recorded on-device only: there is no dataset endpoint yet,
-  // so checking this box never uploads anything by itself.
-  try {
-    if ($("donateCheck").checked) localStorage.setItem("snapclaim.donatePhoto", "1");
-    else localStorage.removeItem("snapclaim.donatePhoto");
-  } catch { /* storage may be unavailable; the photo flow must not break */ }
   show("sMark"); setupMarkPhoto();
 };
 $("backCam").onclick = () => { $("retake").onclick(); };
@@ -2077,15 +2070,7 @@ for (const [id, v] of [["sc-theme-light", "light"], ["sc-theme-auto", "auto"], [
   };
 }
 paintThemeButtons();
-/* settings: donate default, backend (single input), health, updates */
-try { $("donateSetting").checked = !!localStorage.getItem("snapclaim.donatePhoto"); } catch { /* ignore */ }
-$("donateSetting").onchange = () => {
-  try {
-    if ($("donateSetting").checked) localStorage.setItem("snapclaim.donatePhoto", "1");
-    else localStorage.removeItem("snapclaim.donatePhoto");
-  } catch { /* ignore */ }
-  $("donateCheck").checked = $("donateSetting").checked;
-};
+/* settings: backend (single input), health, updates */
 syncBackendInputs();
 $("baseUrl2").addEventListener("input", () => {
   // Commit while valid so base() never reads a rejected URL; surface the

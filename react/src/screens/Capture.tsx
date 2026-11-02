@@ -26,9 +26,6 @@ export default function Capture() {
   const [count, setCount] = useState<number | null>(null);
   const [flash, setFlash] = useState(false);
   const [enableCam, setEnableCam] = useState(false);
-  const [donate, setDonate] = useState(() => {
-    try { return !!localStorage.getItem("snapclaim.donatePhoto"); } catch { return false; }
-  });
   const [pickerOpen, setPickerOpen] = useState(false);
   const [picking, setPicking] = useState<string | null>(null);
   const [tipsOpen, setTipsOpen] = useState(false);
@@ -200,10 +197,6 @@ export default function Capture() {
   };
 
   const usePhoto = () => {
-    try {
-      if (donate) localStorage.setItem("snapclaim.donatePhoto", "1");
-      else localStorage.removeItem("snapclaim.donatePhoto");
-    } catch { /* storage may be unavailable; the photo flow must not break */ }
     go("sMark");
   };
 
@@ -455,16 +448,6 @@ export default function Capture() {
             src={session.stillDataUrl}
             style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain", background: "#000" }}
           />
-          <label style={{ position: "absolute", left: 18, right: 18, bottom: "calc(96px + env(safe-area-inset-bottom))", display: "flex", gap: 10, alignItems: "center", color: "#fff", fontSize: 13, fontWeight: 600, background: "rgba(11,30,70,.88)", padding: "10px 14px", borderRadius: 14 }}>
-            <input
-              id="donateCheck"
-              type="checkbox"
-              style={{ width: 22, height: 22, flex: "none" }}
-              checked={donate}
-              onChange={(e) => setDonate(e.target.checked)}
-            />
-            Donate this photo to the dataset (consent saved on this device; nothing is uploaded now)
-          </label>
           <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, display: "flex", gap: 10, padding: "14px 18px calc(26px + env(safe-area-inset-bottom))", background: "linear-gradient(transparent, rgba(0,0,0,.65))" }}>
             <button id="retake" type="button" style={{ flex: 1, minHeight: 56, borderRadius: 16, border: "2px solid rgba(255,255,255,.85)", background: "transparent", color: "#fff", fontWeight: 800, fontSize: 17 }} onClick={retake}>Retake</button>
             <button id="usePhoto" type="button" style={{ flex: 1, minHeight: 56, borderRadius: 16, border: 0, background: "var(--coin)", color: "#fff", fontWeight: 800, fontSize: 17 }} onClick={usePhoto}>Use photo</button>
