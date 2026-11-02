@@ -1,0 +1,29 @@
+{
+  "published": false,
+
+  "title": "The wall that settled it",
+  "sub": "Where · when · what was at stake, in one line. Example: Bedroom wall, rented flat — documented on move-in day, re-measured at move-out.",
+
+  "photos": [
+    {
+      "src": "assets/case-study/photos/01-crack-wide.jpg",
+      "alt": "Describe the photo for screen readers. Example: Long vertical crack with a coin taped beside it for scale.",
+      "caption": "Figure 1 — the captured photo, with the coin for scale."
+    }
+  ],
+
+  "quote": {
+    "text": "What you (or the tenant) said, in one or two sentences.",
+    "cite": "In your words"
+  },
+
+  "measurements": [
+    { "item": "Crack length", "value": "85.9 mm", "evidence": "—", "status": "Confirmed" },
+    { "item": "Surface affected", "value": "5.17 %", "evidence": "—", "status": "Confirmed" },
+    { "item": "Severity", "value": "Significant", "evidence": "—", "status": "Confirmed" }
+  ],
+
+  "method": "One line on how it was measured. Example: Photo + coin for scale, measured in SnapClaim; tilt corrected from the coin's ellipse.",
+  "verification": "One line on the checks. Example: Evidence gate passed; independent skeptic verified; mask cross-check verified.",
+  "outcome": "What happened because of the report. Example: The landlord accepted the numbers and the deposit was returned in full."
+}

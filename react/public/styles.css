@@ -178,6 +178,23 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .fake-btn.fake-dark { background: var(--ink); color: var(--bg); }
 .phone-stage figcaption { font-size: 0.8125rem; color: var(--ink-3); margin-top: 48px; text-align: center; }
 
+/* Case study (rendered from assets/case-study/case-study.json; hidden until published) */
+[hidden] { display: none !important; }
+.case-study { padding-block: 24px 112px; }
+.case-study .status { margin-bottom: 20px; }
+.case-study .sub { margin-top: 16px; max-width: 62ch; }
+.cs-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 40px; margin-top: 36px; align-items: start; }
+.cs-photos { display: grid; gap: 24px; align-content: start; }
+.cs-photos figure { margin: 0; }
+.cs-photos img { border-radius: 16px; aspect-ratio: 4 / 5; object-fit: cover; width: 100%; background: var(--sand); }
+.cs-photos figcaption { font-size: 0.8125rem; color: var(--ink-3); margin-top: 8px; }
+.case-study table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 0.9375rem; }
+.case-study th { text-align: left; font-weight: 500; color: var(--ink-2); padding: 10px 0; border-bottom: 1px solid var(--line); }
+.case-study td { padding: 10px 0 10px 12px; border-bottom: 1px solid var(--line); font-weight: 680; white-space: nowrap; }
+.case-study thead th { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.case-study td:last-child { text-align: right; }
+.case-study .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.8125rem; }
+
 /* App-mirror: the phone shows the real Get-the-numbers screen */
 .screen .eyebrow { display: flex; align-items: center; gap: 8px; padding: 16px 18px 0; font-size: 0.75rem; font-weight: 700; color: var(--go-ink); }
 .screen .eyebrow .dashes { display: inline-flex; gap: 4px; }
@@ -315,6 +332,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   .hero { grid-template-columns: 1fr; gap: 48px; padding-block: 56px 88px; }
   .lede { max-width: 44ch; }
   .report, .faq { grid-template-columns: 1fr; gap: 48px; }
+  .cs-grid { grid-template-columns: 1fr; }
   .doc { position: static; }
   .foot-cols { grid-template-columns: 1fr 1fr; }
 }
