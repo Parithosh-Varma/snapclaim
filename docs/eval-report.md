@@ -4,7 +4,7 @@ Updated 2026-10-30. Weak rows stay in; nothing is buried.
 
 ## Setup
 
-Two scripts, both deterministic and free to run. `npm run eval` measures the dev mask fixtures against hand-checked expected values. `npm run bench` reads one archived live run per held-out case from `bench/runs/` and checks it (see `eval/README.md`). A case with no archived run prints UNRUN and fails the strict command, so a missing run cannot pass as a clean one. Every archived run carries the git SHA, model, prompt version and timestamp it came from. `npm run replay -- request.json measurement.json` reproduces findings + receipts + mode byte-for-byte (see `tests/replay.test.ts`).
+Two scripts, both deterministic and free to run. `npm run eval` measures the dev mask fixtures against stored expected values (these are regression baselines taken from the pipeline's own output, not independent hand measurements; `npm run bench:truth` is the check against known answers). `npm run bench` reads one archived live run per held-out case from `bench/runs/` and checks it (see `eval/README.md`). A case with no archived run prints UNRUN and fails the strict command, so a missing run cannot pass as a clean one. Every archived run carries the git SHA, model, prompt version and timestamp it came from. `npm run replay -- request.json measurement.json` reproduces findings + receipts + mode byte-for-byte (see `tests/replay.test.ts`).
 
 ## Data and split
 
@@ -12,7 +12,7 @@ Cases and their split live in `bench/split.json`. The held-out split is frozen b
 
 Dev: one synthetic wall-crack fixture with a coin scale reference.
 
-Held-out: four public photos, none with a scale reference in the crack's plane, so what they test is whether the pipeline refuses to invent millimetres. Scaled accuracy cases (coin or ruler in frame) are still missing; scaled cases print SKIP until accuracy scoring exists.
+Held-out: 11 cases. Four public photos with no scale reference in the crack's plane test whether the pipeline refuses to invent millimetres. Seven team photos with a coin joined on 2026-10-30 (see below); none has a tape measurement yet, so accuracy on real photos is still UNSCORED.
 
 | Case | Surface | Source license |
 | --- | --- | --- |
