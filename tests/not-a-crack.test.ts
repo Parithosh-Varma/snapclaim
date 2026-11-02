@@ -144,3 +144,41 @@ test("POST /v1/findings on a refuted tap answers no-damage", async () => {
   const result = (res.body as { result: { findings: Array<{ statement: string }> } }).result;
   assert.match(result.findings[0]?.statement ?? "", /no crack found/i);
 });
+
+test("observe then report: empty mask flows end to end, not 400", async () => {
+  const W = 16, H = 16;
+  const observed = await handleRequest({
+    method: "POST",
+    path: "/v1/observe",
+    body: { masks: [{ id: "m1", label: "crack", rle: { size: [H, W], counts: [H * W] }, confidence: 0.9 }] },
+    env: {},
+  });
+  assert.equal(observed.status, 200);
+  const body = (observed.body as { result: Record<string, unknown> }).result;
+  const reported = await handleRequest({ method: "POST", path: "/v1/report", body: { ...body, transcript: "wall" }, env: {} });
+  assert.equal(reported.status, 200);
+  const result = (reported.body as { result: { gate: { ok: boolean }; measurement: { verdict: string } } }).result;
+  assert.equal(result.measurement.verdict, "no-damage");
+  assert.equal(result.gate.ok, true);
+});
+
+test("observe drops 1-3px noise regions before measuring", async () => {
+  const W = 64, H = 64;
+  const counts: number[] = [];
+  let cur = 0, run = 0;
+  for (let x = 0; x < W; x++) for (let y = 0; y < H; y++) {
+    const v = (x * 7 + y * 13) % 97 < 2 ? 1 : 0;
+    if (v !== cur) { counts.push(run); run = 0; cur = v; }
+    run++;
+  }
+  counts.push(run);
+  const observed = await handleRequest({
+    method: "POST",
+    path: "/v1/observe",
+    body: { masks: [{ id: "m1", label: "crack", rle: { size: [H, W] as [number, number], counts }, confidence: 0.9 }] },
+    env: {},
+  });
+  assert.equal(observed.status, 200);
+  const masks = (observed.body as { result: { masks: Array<{ regionCount: number; areaPx: number }> } }).result.masks;
+  assert.ok(masks[0]!.regionCount <= 2, `noise regions should be floored, got ${masks[0]!.regionCount}`);
+});

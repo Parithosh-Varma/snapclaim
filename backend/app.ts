@@ -142,8 +142,8 @@ export function toMeasureInput(body: unknown, serverMinConfidence?: number): Mea
       throw new Error("masks[].skeletonPx must be in [0, 10000000]");
     }
     const rc = (m as { regionCount?: unknown }).regionCount;
-    if (rc !== undefined && (!Number.isInteger(rc) || (rc as number) < 1 || (rc as number) > 100000)) {
-      throw new Error("masks[].regionCount must be an integer in [1, 100000]");
+    if (rc !== undefined && (!Number.isInteger(rc) || (rc as number) < 0 || (rc as number) > 100000)) {
+      throw new Error("masks[].regionCount must be an integer in [0, 100000]");
     }
     // Optional pixel binding: light shape check here, exact pixel agreement
     // enforced in measureSession (fail-closed on mismatch).
@@ -367,6 +367,9 @@ export function observeBody(body: unknown, requestId = newRequestId()): Envelope
       id: requireId(raw.id, `masks[${i}].id`),
       label: label as never,
       confidence: requireConfidence(raw.confidence, `masks[${i}].confidence`),
+      // Drop 1-3px noise regions: single-pixel SAM speckle otherwise counts
+      // as dozens of "regions" and flips severity to significant.
+      minRegionAreaPx: 4,
       ...(componentMask ? { component: componentMask } : {}),
       ...(stretch ? { stretch } : {}),
     });
