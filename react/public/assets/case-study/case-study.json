@@ -43,5 +43,9 @@
   },
 
   "outcome": "The photo measurement landed inside ±10% of the tape; the photo-alone guess did not. Bench case terrace-slab-tape-01.",
-  "reportPdf": "assets/case-study/terrace-slab.pdf"
+  "reportPdf": "assets/case-study/terrace-slab.pdf",
+  "pages": [
+    "assets/case-study/terrace-slab-p1.png",
+    "assets/case-study/terrace-slab-p2.png"
+  ]
 }
