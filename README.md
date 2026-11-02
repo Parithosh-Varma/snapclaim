@@ -1,6 +1,6 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
-  <img src="assets/logo.svg" width="128" alt="SnapClaim logo — viewfinder corners around a measured crack">
+  <source media="(prefers-color-scheme: dark)" srcset="assets/snapclaim-mark-dark.png">
+  <img src="assets/snapclaim-mark.png" width="128" alt="SnapClaim logo — viewfinder corners around a measured crack, with a green measuring ruler">
 </picture>
 
 # SnapClaim
