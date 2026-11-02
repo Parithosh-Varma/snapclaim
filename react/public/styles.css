@@ -5,6 +5,12 @@
   font-stretch: 62% 125%;
   font-display: swap;
 }
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("assets/fonts/jetbrains-mono.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+}
 
 :root {
   --bg: #fbfaf7;
@@ -24,6 +30,9 @@
   --damage-ink: #8c141c;
   --go-ink: #0f7a36;
   --deep: #0e3b26;
+  --tape: #f2b007;
+  --tape-ink: #14213d;
+  --font-data: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --shadow-sm: 0 1px 2px rgba(11, 37, 87, 0.06), 0 4px 12px -4px rgba(11, 37, 87, 0.1);
   --shadow-lg: 0 2px 6px rgba(11, 37, 87, 0.06), 0 30px 60px -24px rgba(11, 37, 87, 0.32);
@@ -159,7 +168,10 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .tag {
   position: absolute; left: 58%; top: 42%;
   display: inline-flex; align-items: center; gap: 6px;
-  background: var(--paper); color: var(--ink); font-size: 0.75rem; font-weight: 680;
+  background: var(--tape); color: var(--tape-ink);
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.75rem; font-weight: 700;
   padding: 5px 9px; border-radius: 7px; box-shadow: var(--shadow-sm); white-space: nowrap;
 }
 .tag::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--damage); }
@@ -170,7 +182,20 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .measures div { padding: 10px 12px; }
 .measures div + div { border-left: 1px solid var(--line); }
 .measures dt { font-size: 0.75rem; color: var(--ink-3); }
-.measures dd { margin: 0; white-space: nowrap; font-weight: 720; font-size: 1.0625rem; letter-spacing: -0.01em; }
+.measures dd { margin: 0; white-space: nowrap; font-weight: 700; font-size: 1.0625rem; letter-spacing: -0.01em; }
+/* Instrument voice: every number on the page is a measurement, set in mono */
+.measures dd, .mini-row i:last-child, .stats-grid dd, .screen .eyebrow {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+}
+.screen .eyebrow { letter-spacing: 0.04em; }
+/* Tape-marker hero thesis */
+.marker {
+  background-image: linear-gradient(100deg, transparent 0.5%, var(--tape) 3%, var(--tape) 97%, transparent 99.5%);
+  background-repeat: no-repeat;
+  background-size: 100% 0.32em;
+  background-position: 0 88%;
+}
 .fake-btn { display: grid; place-items: center; min-height: 44px; border-radius: 10px; background: var(--go); color: #fff; font-weight: 640; font-size: 0.9375rem; }
 .fake-btn.fake-dark { background: var(--ink); color: var(--bg); }
 .phone-stage figcaption { font-size: 0.8125rem; color: var(--ink-3); margin-top: 48px; text-align: center; }
