@@ -90,6 +90,20 @@ export function measureSession(input: MeasureSessionInput): MeasureSessionResult
   const minConfidence = input.minReferenceConfidence ?? DEFAULT_MIN_REFERENCE_CONFIDENCE;
   const ledger = new ReceiptLedger();
 
+  // No masks at all (clean wall, empty tap): record a verdict receipt so the
+  // pipeline can answer "no damage" with a citation instead of failing the
+  // gate on an empty evidence set.
+  if (masks.length === 0) {
+    ledger.add({
+      method: "damage_refuted",
+      inputs: { masks: 0 },
+      output: { value: "no-damage", unit: "band" },
+      formula: "no masks supplied - nothing to measure",
+      confidence: 1,
+      notes: ["no input masks; report stays empty by verdict, not by error"],
+    });
+  }
+
   let scale: { receiptId: string; mmPerPx: number; reference: ScaleReference } | null = null;
 
   if (input.scaleReference !== undefined) {
@@ -127,12 +141,67 @@ export function measureSession(input: MeasureSessionInput): MeasureSessionResult
     }
   }
 
-  const findings: MeasuredFinding[] = masks.map((mask) => measureMask(mask, component, ledger, scale, thresholds, minConfidence));
+  // Not-a-crack filter: a crack mask whose every region was flagged
+  // blocky (thick, not long-and-thin) or straight-edged (ledge/frame) is
+  // the segmenter catching non-damage. Refute it with a receipt instead of
+  // measuring noise as damage. Anything with an unflagged region still
+  // measures - missing real damage is worse than measuring a false tap.
+  const refuted: import("./types.ts").RefutedMask[] = [];
+  const measurable = masks.filter((mask) => {
+    if ((mask.regionCount ?? 1) === 0) {
+      refuted.push({
+        maskId: mask.id,
+        label: mask.label,
+        reason: "empty",
+        detail: "mask has no regions - the segmenter found nothing to measure",
+      });
+      ledger.add({
+        method: "damage_refuted",
+        inputs: { maskId: mask.id, label: mask.label, regionCount: 0 },
+        output: { value: "no-damage", unit: "band" },
+        formula: "empty mask - refuted as not-damage",
+        confidence: mask.confidence,
+        notes: ["empty segmenter output; excluded from findings by verdict, not by error"],
+      });
+      return false;
+    }
+    if (mask.label !== "crack") return true;
+    const blocky = mask.blockyRegionCount ?? 0;
+    const straight = mask.straightRegionCount ?? 0;
+    const regions = mask.regionCount ?? 1;
+    if (blocky + straight < regions) return true;
+    const reason = (mask.blockyAreaPx ?? 0) >= (mask.straightAreaPx ?? 0) ? "blocky" : "straight";
+    refuted.push({
+      maskId: mask.id,
+      label: mask.label,
+      reason,
+      detail: `${regions} region(s), all ${reason}-flagged (blocky ${blocky}, straight-edged ${straight}) - not crack geometry`,
+    });
+    ledger.add({
+      method: "damage_refuted",
+      inputs: {
+        maskId: mask.id,
+        label: mask.label,
+        regionCount: regions,
+        blockyRegionCount: blocky,
+        straightRegionCount: straight,
+      },
+      output: { value: "no-damage", unit: "band" },
+      formula: "all regions blocky or straight-edged - refuted as not-damage",
+      confidence: mask.confidence,
+      notes: ["tap caught non-damage geometry; excluded from findings by verdict, not by error"],
+    });
+    return false;
+  });
+
+  const findings: MeasuredFinding[] = measurable.map((mask) => measureMask(mask, component, ledger, scale, thresholds, minConfidence));
 
   return {
     findings,
     receipts: ledger.all(),
     mode: scale === null ? "percent-only" : "absolute",
+    verdict: findings.length > 0 ? "damage" : "no-damage",
+    refuted,
     provenance: verified ? "pixel-verified" : "self-reported",
   };
 }

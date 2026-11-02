@@ -447,6 +447,13 @@ export async function reportBody(body: unknown, env: Env, requestId = newRequest
   if (body.transcript !== undefined && typeof body.transcript !== "string") throw new HttpError(400, "transcript must be a string");
   const transcript = typeof body.transcript === "string" ? body.transcript.slice(0, 2000) : "";
 
+  // No-damage verdict: skip the LLM entirely and answer deterministically.
+  // A clean wall or a refuted tap is a verdict with cited receipts, not a
+  // model generation - $0, no invention possible.
+  if (measurement.verdict === "no-damage") {
+    return noDamageResult(measurement, requestId, started);
+  }
+
   let drafts: FindingDraft[];
   if (body.drafts !== undefined) {
     // Gate-wash fix: caller-supplied phrasing with correct numbers passes
@@ -847,7 +854,12 @@ export async function findingsBody(body: unknown, env: Env, requestId = newReque
   const findings = body.findings as MeasuredFinding[];
   const receipts = body.receipts as Receipt[];
   assertFindingsShape(findings, receipts);
-  crossCheckMeasurement(body, findings, receipts, env);
+  {
+    const recomputed = crossCheckMeasurement(body, findings, receipts, env);
+    if (recomputed.verdict === "no-damage") {
+      return noDamageResult(recomputed, requestId, started);
+    }
+  }
   const provider = findingsProvider(env, configFromEnv(env), fetchFn, operatorSpend(env, "meta"));
   const { drafts, gate } = await draftAndGate(
     provider,
@@ -873,7 +885,12 @@ export async function skepticBody(body: unknown, env: Env, requestId = newReques
   const findings = body.findings as MeasuredFinding[];
   const receipts = body.receipts as Receipt[];
   assertFindingsShape(findings, receipts);
-  crossCheckMeasurement(body, findings, receipts, env);
+  {
+    const recomputed = crossCheckMeasurement(body, findings, receipts, env);
+    if (recomputed.verdict === "no-damage") {
+      return noDamageResult(recomputed, requestId, started);
+    }
+  }
   const provider = skepticProvider(env, configFromEnv(env), fetchFn, operatorSpend(env, "baseten"));
   const { drafts, gate } = await draftAndGate(
     provider,
@@ -973,7 +990,7 @@ export function errorBody(message: string, code: number, requestId: string, deta
  * re-measure and reject smuggled fake receipts - the gate alone only checks
  * internal consistency. No opt-out: use /v1/report for the full pipeline.
  */
-export function crossCheckMeasurement(body: Record<string, unknown>, findings: unknown, receipts: unknown, env: Env = {}): void {
+export function crossCheckMeasurement(body: Record<string, unknown>, findings: unknown, receipts: unknown, env: Env = {}): import("../src/engine/types.ts").MeasureSessionResult {
   if (body.component === undefined || body.masks === undefined) {
     throw new HttpError(422, "component and masks are required: send measurement inputs for server-side recomputation");
   }
@@ -987,6 +1004,24 @@ export function crossCheckMeasurement(body: Record<string, unknown>, findings: u
     (err as HttpError & { details?: unknown }).details = ["re-measured server-side; resubmit via /v1/report or send matching receipts"];
     throw err;
   }
+  return recomputed;
+}
+
+/** Deterministic no-damage answer shared by /v1/report|findings|skeptic. */
+function noDamageResult(
+  measurement: import("../src/engine/types.ts").MeasureSessionResult,
+  requestId: string,
+  started: number,
+): EnvelopedResult {
+  const refutedIds = measurement.receipts.filter((r) => r.method === "damage_refuted").map((r) => r.id);
+  const drafts = [{ statement: "No crack found - the marked region is not damage.", citations: refutedIds }];
+  const gate = validateFindings(drafts, measurement.receipts);
+  if (!gate.ok) {
+    const err = new HttpError(422, "Evidence gate failed");
+    (err as HttpError & { details?: unknown }).details = gate.failures;
+    throw err;
+  }
+  return envelope(requestId, started, { measurement, findings: drafts, gate });
 }
 
 const SESSION_MODES = ["absolute", "percent-only"];
