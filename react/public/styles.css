@@ -152,6 +152,8 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .lede { margin-top: 24px; font-size: clamp(1.125rem, 1.6vw, 1.3125rem); color: var(--ink-2); max-width: 34ch; line-height: 1.55; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-top: 36px; }
 .assurances { margin-top: 40px; display: grid; gap: 10px; font-size: 0.9375rem; color: var(--ink-2); }
+.hero-proof { margin-top: 20px; font-size: 0.9375rem; color: var(--ink-2); max-width: 40ch; }
+.hero-proof b { font-family: var(--font-data); font-weight: 700; color: var(--ink); }
 .assurances li { display: flex; align-items: center; gap: 10px; }
 .assurances svg, .checked svg, .mini-ok svg { width: 18px; height: 18px; flex: none; fill: none; stroke: var(--go-ink); stroke-width: 2.25; stroke-linecap: round; stroke-linejoin: round; }
 
