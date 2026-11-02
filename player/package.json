@@ -1,0 +1,17 @@
+{
+  "name": "snapclaim-landing-player",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "vite build" },
+  "dependencies": {
+    "@remotion/player": "^4.0.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "remotion": "^4.0.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.4.0",
+    "vite": "^6.3.0"
+  }
+}
