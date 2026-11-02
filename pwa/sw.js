@@ -2,8 +2,8 @@
 // Version the cache; network-only for /v1 (never cache measurements),
 // cache-first for the same-origin shell. No photo bytes are cached.
 // Updates wait: the page shows #updateBar and posts SKIP_WAITING on Reload.
-const CACHE = "snapclaim-shell-v24";
-const SHELL = ["./", "./index.html", "./app.js", "./coin-model.js", "./photo-check.js", "./rle.js", "./store.js", "./theme.js", "./mask-ops.js", "./manifest.webmanifest",
+const CACHE = "snapclaim-shell-v26";
+const SHELL = ["./", "./index.html", "./app.js", "./agree.js", "./coin-model.js", "./compute.js", "./photo-check.js", "./rle.js", "./store.js", "./theme.js", "./mask-ops.js", "./manifest.webmanifest",
   "./sam-worker.js", "./voice-worker.js", "./tilt-meter.js",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/maskable-512.png", "./icons/apple-touch-icon.png"];
 
@@ -20,7 +20,7 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("message", (event) => {
   // Only the controlled page (same origin, via client postMessage) can trigger
-  // an update — cross-origin pages cannot reach the service worker directly.
+  // an update - cross-origin pages cannot reach the service worker directly.
   if (event.data === "SKIP_WAITING" && event.source) self.skipWaiting();
 });
 

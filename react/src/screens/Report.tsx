@@ -67,6 +67,7 @@ export default function Report() {
     });
     s.currentCaseId = saved.id;
     bumpCases();
+    ctx.clearDraft();
     toast(saved.photoDropped || saved.locationDropped ? "Case saved without photo (device storage full)" : "Case saved on this device");
   };
 

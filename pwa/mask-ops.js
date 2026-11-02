@@ -57,7 +57,7 @@ function erode(mask, w, h, r) {
 /**
  * Close gaps up to 2*radius px wide. Solid areas keep their outline: dilation
  * grows them by radius, erosion shrinks them back. Border pixels erode away
- * (a mask touching the frame edge loses `radius` px there) — acceptable for
+ * (a mask touching the frame edge loses `radius` px there) - acceptable for
  * damage masks, which the photo framing keeps off the very edge.
  */
 export function closeMask(mask, w, h, radius = 2) {

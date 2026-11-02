@@ -7,15 +7,15 @@
 <meta name="color-scheme" content="light dark" />
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
 <script src="./theme.js"></script>
-<meta name="description" content="SnapClaim — photo + one line in, measured damage report out." />
-<meta property="og:title" content="SnapClaim — measured damage reports" />
+<meta name="description" content="SnapClaim - photo + one line in, measured damage report out." />
+<meta property="og:title" content="SnapClaim - measured damage reports" />
 <meta property="og:description" content="Photo + one line in, measured damage report out. Computed, not generated." />
 <meta property="og:type" content="website" />
 <meta name="twitter:card" content="summary" />
-<meta name="twitter:title" content="SnapClaim — measured damage reports" />
+<meta name="twitter:title" content="SnapClaim - measured damage reports" />
 <meta name="twitter:description" content="Photo + one line in, measured damage report out." />
 <!-- Browsers ignore frame-ancestors inside a <meta> CSP, so it is deliberately
-  absent here — keeping it only logs a console warning. Frame embedding is
+  absent here - keeping it only logs a console warning. Frame embedding is
   blocked for real by pwa/_headers (a Content-Security-Policy response header,
   plus X-Frame-Options for old browsers). Keep the two policies in sync;
   tests/csp-headers.test.ts fails if they drift. -->
@@ -71,7 +71,7 @@
     text-shadow:0 4px 30px rgba(0,0,0,.5);pointer-events:none}
   #count.pop{animation:pop .3s ease}
   @keyframes pop{from{transform:translate(-50%,-50%) scale(1.35)}to{transform:translate(-50%,-50%) scale(1)}}
-  /* Shutter: white ring, tape key — the tape is what takes the measurement. */
+  /* Shutter: white ring, tape key - the tape is what takes the measurement. */
   #shutter{position:absolute;z-index:3;left:50%;transform:translateX(-50%);
     bottom:calc(34px + env(safe-area-inset-bottom));
     width:82px;height:82px;border-radius:50%;border:5px solid #fff;
@@ -83,15 +83,16 @@
   .flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .3s ease;z-index:9}
   .flash.go{opacity:1;transition:none}
   /* Fallback entries: one pill cluster, thumb-sized, above the shutter. */
-  #altEntry,#noCoin,#uploadBtn{position:absolute;z-index:3;left:50%;transform:translateX(-50%);
+  #altEntry,#noCoin,#uploadBtn,#skipShot{position:absolute;z-index:3;left:50%;transform:translateX(-50%);
     border:1px solid rgba(255,255,255,.35);background:rgba(10,16,28,.62);
     color:#fff;font-size:14px;font-weight:700;padding:10px 18px;white-space:nowrap;border-radius:999px;
     min-height:44px;display:flex;align-items:center;justify-content:center}
   #uploadBtn{bottom:calc(216px + env(safe-area-inset-bottom))}
   #altEntry{bottom:calc(170px + env(safe-area-inset-bottom))}
   #noCoin{bottom:calc(124px + env(safe-area-inset-bottom));}
-  body.reviewing #altEntry,body.reviewing #noCoin,body.reviewing #uploadBtn,
-  body.step2 #altEntry,body.step2 #noCoin,body.step2 #uploadBtn{display:none}
+  #skipShot{bottom:calc(124px + env(safe-area-inset-bottom));}
+  body.reviewing #altEntry,body.reviewing #noCoin,body.reviewing #uploadBtn,body.reviewing #skipShot,
+  body.step2 #altEntry,body.step2 #noCoin,body.step2 #uploadBtn,body.step2 #skipShot{display:none}
   #camStep{position:absolute;z-index:3;left:16px;top:calc(54px + env(safe-area-inset-top));
     color:#fff;background:rgba(18,37,64,.92);padding:6px 12px;border-radius:999px}
   #updateBar{position:fixed;left:12px;right:12px;top:calc(12px + env(safe-area-inset-top));z-index:21;
@@ -235,23 +236,42 @@
   a#dl{font-weight:700;color:var(--ink)}
 
   /* ---------- tabs, cases, settings ---------- */
+  body.tabbing{background:var(--card)}
   #tabs{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(560px,100%);z-index:15;
-    display:none;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--card);border-top:1px solid var(--line);
-    box-shadow:0 -8px 28px rgba(18,37,64,.10);padding-bottom:env(safe-area-inset-bottom)}
+    display:none;grid-template-columns:repeat(3,minmax(0,1fr));background:var(--card);border-top:1px solid var(--line);
+    box-shadow:0 -8px 28px rgba(18,37,64,.10);padding:8px 4px calc(8px + env(safe-area-inset-bottom))}
   body.tabbing #tabs{display:grid}
-  #tabs button{min-height:56px;min-width:0;border:0;background:none;font-weight:700;font-size:12px;color:var(--slate);
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:8px 2px 6px;
-    white-space:nowrap;position:relative}
-  #tabs button svg{width:22px;height:22px;flex:none}
+  #tabs button{min-height:64px;min-width:48px;border:0;background:none;font-weight:600;font-size:12px;color:var(--slate);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 2px;
+    white-space:nowrap;position:relative;transition:transform 150ms ease,background-color 150ms ease,color 150ms ease}
+  #tabs button:active{transform:scale(.96)}
+  #tabs .tab-pill{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
+    padding:6px 16px;border-radius:18px;transition:background-color 150ms ease,color 150ms ease,transform 150ms ease}
+  #tabs .tabicon{height:30px;display:grid;place-items:center}
+  #tabs .tabicon svg{width:24px;height:24px;flex:none}
+  #tabs .tabicon .icon-filled{display:none}
+  #tabs button[aria-current="page"] .tabicon .icon-outline{display:none}
+  #tabs button[aria-current="page"] .tabicon .icon-filled{display:block}
+  #tabs .tablabel{line-height:16px;margin-top:4px;font-size:12px;font-weight:600}
   #tabs button[aria-current="page"]{color:var(--coin)}
-  #tabs button[aria-current="page"]::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);
-    width:26px;height:3px;border-radius:0 0 3px 3px;background:var(--coin)}
-  #tabs #tabNew{color:var(--slate);font-size:12px}
-  #tabs #tabNew .fabdot{width:44px;height:44px;margin-top:-20px;border-radius:50%;background:var(--tape);color:#122540;
-    display:grid;place-items:center;box-shadow:0 6px 18px rgba(224,168,26,.45);border:3px solid var(--card)}
-  #tabs #tabNew .fabdot svg{width:22px;height:22px}
+  #tabs button[aria-current="page"] .tab-pill{background:#e4f3ea}
+  #tabs #tabNew{color:var(--slate)}
+  #tabs #tabNew .tabicon--fab{height:30px;overflow:visible}
+  #tabs #tabNew .fabdot{width:56px;height:56px;transform:translateY(-14px);border-radius:50%;background:var(--tape);color:#122540;
+    display:grid;place-items:center;box-shadow:0 6px 18px rgba(224,168,26,.45),0 2px 6px rgba(18,37,64,.18);border:4px solid var(--card);
+    transition:transform 150ms ease,filter 150ms ease}
+  #tabs #tabNew:active .fabdot{transform:translateY(-14px) scale(.94)}
+  #tabs #tabNew .fabdot svg{width:24px;height:24px}
+  #tabs #tabNew .tablabel{margin-top:4px}
+  .iconbtn{flex:none;width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--card);
+    color:var(--ink);display:grid;place-items:center;transition:transform 150ms ease,background-color 150ms ease}
+  .iconbtn:active{transform:scale(.94)}
+  .iconbtn svg{width:22px;height:22px}
+  .page-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;min-height:44px}
+  .page-top h1{font-size:32px;margin:0}
+  .navrow .iconbtn{margin-left:auto}
   .screen.tab{z-index:6}
-  .screen.tab .wrap{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+  .screen.tab .wrap{padding-bottom:calc(112px + env(safe-area-inset-bottom))}
   .caseitem{display:flex;width:100%;text-align:left;gap:12px;align-items:center;background:var(--card);
     border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin-bottom:8px;color:var(--ink);font:inherit}
   .caseitem img{width:52px;height:52px;object-fit:cover;border-radius:10px;flex:none;background:#000}
@@ -313,7 +333,9 @@
   html[data-theme="dark"] #tabs{background:#1d1b17;border-color:#34302a}
   html[data-theme="dark"] #tabs button{color:#ada595}
   html[data-theme="dark"] #tabs button[aria-current="page"]{color:#52d18a}
+  html[data-theme="dark"] #tabs button[aria-current="page"] .tab-pill{background:#173524}
   html[data-theme="dark"] #tabs #tabNew .fabdot{border-color:#1d1b17}
+  html[data-theme="dark"] body.tabbing{background:#1d1b17}
   html[data-theme="dark"] .stt-pill{background:#173524;color:#52d18a}
   html[data-theme="dark"] .stt-pill.busy,html[data-theme="dark"] .stt-pill.idle{background:#27241e;color:#ada595}
   html[data-theme="dark"] .stt-clock,html[data-theme="dark"] .stt-meta{color:#ada595}
@@ -358,6 +380,7 @@
     html[data-theme="auto"] #tabs{background:#1d1b17;border-color:#34302a}
     html[data-theme="auto"] #tabs button{color:#ada595}
     html[data-theme="auto"] #tabs button[aria-current="page"]{color:#52d18a}
+    html[data-theme="auto"] #tabs button[aria-current="page"] .tab-pill{background:#173524}
     html[data-theme="auto"] #tabs #tabNew .fabdot{border-color:#1d1b17}
     html[data-theme="auto"] .stt-pill{background:#173524;color:#52d18a}
     html[data-theme="auto"] .stt-pill.busy,html[data-theme="auto"] .stt-pill.idle{background:#27241e;color:#ada595}
@@ -380,6 +403,8 @@
 <span class="corner bl" aria-hidden="true"></span><span class="corner br" aria-hidden="true"></span>
 <div class="coinring" id="coinRing" aria-hidden="true" style="display:none"></div>
 <div id="camStep" class="step-tag">01 / 06 · Capture</div>
+<div id="shotTag" class="step-tag" style="position:absolute;z-index:3;left:16px;top:calc(82px + env(safe-area-inset-top))" hidden>1 of 3</div>
+<div id="shotCopy" style="position:absolute;z-index:3;left:50%;transform:translateX(-50%);top:calc(106px + env(safe-area-inset-top));max-width:min(420px,calc(100% - 32px));text-align:center;color:#fff;background:rgba(5,10,25,.55);backdrop-filter:blur(6px);border-radius:999px;padding:7px 14px;font:inherit;font-size:13px;font-weight:600;white-space:nowrap" hidden></div>
 <div id="coinHint">Add a coin for scale</div>
 <button id="enableCam" type="button" style="display:none;position:absolute;z-index:4;left:50%;top:55%;transform:translateX(-50%);border:2px solid #fff;background:rgba(5,10,25,.55);backdrop-filter:blur(6px);color:#fff;font:inherit;font-weight:800;font-size:17px;padding:14px 26px;border-radius:999px;cursor:pointer">Enable camera</button>
 <!-- live level: hold the phone square to the wall (the coin's ellipse corrects the rest) -->
@@ -392,14 +417,11 @@
 <input id="camFile" type="file" accept="image/*" hidden />
 <button id="altEntry" type="button">Use a sample photo</button>
 <button id="noCoin" type="button">Continue without a coin</button>
+<button id="skipShot" type="button" hidden>Skip location shot →</button>
 
 <!-- 02 · review -->
 <section class="screen" id="sReview" aria-label="Review photo">
   <img id="shotFull" alt="Captured photo" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000" />
-  <label style="position:absolute;left:18px;right:18px;bottom:calc(96px + env(safe-area-inset-bottom));display:flex;gap:10px;align-items:center;color:#fff;font-size:13px;font-weight:600;background:rgba(18,37,64,.92);padding:10px 14px;border-radius:14px">
-    <input id="donateCheck" type="checkbox" />
-    Donate this photo to the dataset (consent saved on this device; nothing is uploaded now)
-  </label>
   <div style="position:absolute;left:0;right:0;bottom:0;display:flex;gap:10px;padding:14px 18px calc(26px + env(safe-area-inset-bottom));background:linear-gradient(transparent,rgba(0,0,0,.65))">
     <button id="retake" type="button" style="flex:1;min-height:56px;border-radius:16px;border:2px solid rgba(255,255,255,.85);background:transparent;color:#fff;font-weight:800;font-size:17px">Retake</button>
     <button id="usePhoto" type="button" style="flex:1;min-height:56px;border-radius:16px;border:0;background:var(--tape);color:#122540;font-weight:700;font-size:17px;font-family:var(--display)">Use photo</button>
@@ -410,7 +432,7 @@
 <section class="screen" id="sMark" aria-labelledby="h-mark">
   <div class="wrap">
     <div class="navrow"><button id="backCam" type="button">‹ Camera</button></div>
-    <div class="eyebrow">02 / 06 <span class="dashes" aria-hidden="true"><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i></span></div>
+    <div class="eyebrow">02 / 06 <span class="dashes" aria-hidden="true"><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i></span> <span id="frameTag" class="step-tag" hidden></span></div>
     <h1 id="h-mark">Tap the damage.</h1>
     <p class="sub">One tap on the crack. The coin is already outlined from the gate.</p>
     <div class="card">
@@ -426,7 +448,7 @@
         <button id="chipPeel" type="button">Peel</button>
         <button id="chipDent" type="button">Dent</button>
       </div>
-      <label class="field">Scale reference (auto-detected — confirm)
+      <label class="field">Scale reference (auto-detected - confirm)
         <select id="coinKind">
           <option value="0">Choose the reference size…</option>
           <optgroup label="USA">
@@ -478,7 +500,7 @@
         <input id="coinCustomMm" class="field-input" type="number" inputmode="decimal" min="5" max="100" step="0.01" placeholder="e.g. 24.26" />
       </label>
       <div id="coinHintMark" class="hint" style="font-size:13px;color:var(--slate);margin:4px 0 6px"></div>
-      <label class="switchrow" style="margin:8px 0 4px"><input id="coinTaped" type="checkbox" /> Coin has tape — use lenient outline (allows tape halo)</label>
+      <label class="switchrow" style="margin:8px 0 4px"><input id="coinTaped" type="checkbox" /> Coin has tape - use lenient outline (allows tape halo)</label>
       <div style="display:flex;gap:8px;margin:6px 0 10px"><button id="coinFixBtn" class="btn-ghostline" type="button" style="flex:1;min-height:44px">Tap coin to correct</button><span id="coinFixHint" style="font-size:12px;color:var(--slate);align-self:center"></span></div>
       <div id="photoNotes" class="hint" style="font-size:13px;color:var(--slate)"></div>
       <div id="tfState" style="font-size:12px;color:var(--slate);font-family:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace"></div>
@@ -505,7 +527,7 @@
       <p id="micClock" class="stt-clock" aria-hidden="true"></p>
       <div class="wave" id="wave" aria-hidden="true"></div>
       <p id="heard" class="stt-heard idle" aria-live="polite"></p>
-      <label class="field stt-field">Transcript — edit if needed
+      <label class="field stt-field">Transcript - edit if needed
         <textarea id="transcriptBox" class="field-input stt-box" rows="2" maxlength="280" placeholder="Or type the line…"></textarea>
       </label>
       <div class="stt-meta"><span id="sttHint">Review the words, then send.</span><span id="sttCount">0 / 280</span></div>
@@ -532,11 +554,12 @@
       <span class="chip"><i aria-hidden="true"></i><span id="numChip">Measured</span></span>
     </div>
     <div id="measured" aria-live="polite"></div>
+    <div id="agreeBox" hidden></div>
     <div id="numLoading" hidden><div class="skel"></div><div class="skel"></div></div>
     <div id="numError" hidden></div>
     <svg id="scheme" class="schematic" viewBox="0 0 400 140" role="img" aria-label="Schematic damage bars"></svg>
     <div id="findings" aria-live="polite"></div>
-    <div class="stickycta"><button id="toCheck" class="btn-dark" type="button" style="width:100%">Check it twice →</button></div>
+    <div class="stickycta"><button id="toCheck" class="btn-dark" type="button" style="width:100%">Check it twice →</button><button id="multiNext" class="btn-dark" type="button" style="width:100%" hidden></button></div>
   </div>
 </section>
 
@@ -577,6 +600,7 @@
         <span class="badge wait" id="docGate">Pending</span>
       </header>
       <img id="docPhoto" alt="Captured damage photo" style="width:100%;height:200px;object-fit:cover;display:none" />
+      <figure id="locPlate" style="margin:12px 0 0" hidden><img id="locPhoto" alt="Location context photo" style="width:100%;height:160px;object-fit:cover" /><figcaption style="font-size:12px;color:var(--slate);margin-top:4px">Location — context only, not measured.</figcaption></figure>
       <blockquote id="docQuote" hidden></blockquote>
       <table><tbody id="docRows"><tr><th>Measurement</th><td>Generate the report to fill this in.</td></tr></tbody></table>
     </article>
@@ -596,7 +620,7 @@
       <div id="annexWrap" style="margin-top:12px"><img id="annexImg" alt="Generated report annexure" hidden /></div>
     </div>
     <details class="dev">
-      <summary>Developer — backend, payload &amp; raw output</summary>
+      <summary>Developer - backend, payload &amp; raw output</summary>
       <div style="margin-top:12px">
         <p style="font-size:13px;font-weight:600;margin:0 0 10px">Backend: <span id="baseUrlShow"></span> <span style="font-weight:400;color:var(--slate)">(change it in Settings → Backend)</span></p>
         <button id="healthBtn" class="btn-ghostline" type="button">Check backend</button>
@@ -610,13 +634,13 @@
 <!-- Home tab -->
 <section class="screen tab" id="tHome" aria-labelledby="h-home">
   <div class="wrap">
-    <div class="navrow"><span class="step-tag">SnapClaim</span><span id="netPill" class="badge wait" role="status">Checking…</span></div>
+    <div class="navrow"><span class="step-tag">SnapClaim</span><span id="netPill" class="badge wait" role="status">Checking…</span><button id="settingsGearHome" class="iconbtn" type="button" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button></div>
     <h1 id="h-home">Measured damage reports.</h1>
     <p class="sub">Photo + one line in, measured damage report out. Cases stay on this device.</p>
     <div class="card">
       <p class="found" id="nextTitle">Start a new claim</p>
       <p class="sub" id="nextSub">Point the camera at the damage with a coin beside it for scale.</p>
-      <button id="ctaNew" class="btn-primary" type="button">New claim</button>
+      <button id="ctaNew" class="btn-primary" type="button">Start with a photo</button>
       <div class="rowbtns"><button id="ctaSample" class="btn-ghostline" type="button">Use sample measurement</button></div>
     </div>
     <h2 style="font-size:17px;margin:16px 0 8px">Recent cases</h2>
@@ -628,8 +652,11 @@
 <!-- Cases tab -->
 <section class="screen tab" id="tCases" aria-labelledby="h-cases">
   <div class="wrap">
-    <h1 id="h-cases" style="font-size:32px">Cases</h1>
-    <p class="sub">Saved on this device only. Export before deleting — there is no cloud copy.</p>
+    <header class="page-top">
+      <h1 id="h-cases" style="font-size:32px">Cases</h1>
+      <button id="settingsGearCases" class="iconbtn" type="button" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+    </header>
+    <p class="sub">Saved on this device only. Export before deleting - there is no cloud copy.</p>
     <div id="caseList"></div>
     <div id="caseEmpty" class="empty">No cases saved yet.</div>
   </div>
@@ -649,7 +676,6 @@
     </div>
     <div class="group">
       <h3>Privacy</h3>
-      <label class="switchrow"><input id="donateSetting" type="checkbox" /> Donate photos to the dataset by default (consent only — nothing uploads without your tap)</label>
       <p class="sub" style="margin-top:10px" id="installHint">On iPhone: Share → Add to Home Screen installs SnapClaim. Installed apps keep their data; Safari may evict uninstalled sites.</p>
     </div>
     <div class="group">
@@ -661,6 +687,16 @@
         <button id="exportAllBtn" class="btn-ghostline" type="button">Export all cases</button>
         <button id="wipeBtn" class="btn-ghostline" type="button">Delete all cases</button>
       </div>
+    </div>
+    <div class="group">
+      <h3>Capture</h3>
+      <label class="switchrow" style="margin-top:10px"><input id="setMultiShot" type="checkbox" /> Three-shot capture - two close-ups plus a location frame</label>
+      <p class="sub" style="margin-top:6px">Off keeps the single-shot flow used by the recorded demo.</p>
+    </div>
+    <div class="group">
+      <h3>Compute</h3>
+      <label class="switchrow" style="margin-top:10px"><input id="setOnDevice" type="checkbox" /> On-device processing - experimental outlining + voice on this phone</label>
+      <p class="sub" style="margin-top:6px">Off = cloud only (recommended). On = experimental on-device outlining + voice; may crash low-memory phones.</p>
     </div>
     <div class="group">
       <h3>Backend</h3>
@@ -695,15 +731,14 @@
 </dialog>
 
 <nav id="tabs" aria-label="Main">
-  <button type="button" data-tab="tHome"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 9.5V21h5v-6h4v6h5V9.5"/></svg>Home</button>
-  <button type="button" data-tab="capture" id="tabNew"><span class="fabdot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>New</button>
-  <button type="button" data-tab="tCases"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Cases</button>
-  <button type="button" data-tab="tSettings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 8h9M19 8h1M4 16h3M13 16h7"/><circle cx="16" cy="8" r="2.2"/><circle cx="10" cy="16" r="2.2"/></svg>Settings</button>
+  <button type="button" data-tab="tHome"><span class="tab-pill"><span class="tabicon"><svg class="icon-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 9.5V21h5v-6h4v6h5V9.5"/></svg><svg class="icon-filled" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6l10 8.4h-2.8v10H14v-6h-4v6H4.8V11H2z"/></svg></span><span class="tablabel">Home</span></span></button>
+  <button type="button" data-tab="capture" id="tabNew" aria-label="Start a new claim"><span class="tab-pill"><span class="tabicon tabicon--fab"><span class="fabdot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span></span><span class="tablabel">New</span></span></button>
+  <button type="button" data-tab="tCases"><span class="tab-pill"><span class="tabicon"><svg class="icon-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><svg class="icon-filled" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 6a3 3 0 0 1 3-3h4l2 2h8a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z"/></svg></span><span class="tablabel">Cases</span></span></button>
 </nav>
 <div id="toast" role="status" hidden></div>
 <div id="appLive" class="sr-only" aria-live="polite"></div>
 <div id="updateBar" role="status" hidden><span>A new version of SnapClaim is ready.</span><button id="updateGo" type="button">Reload</button></div>
-<div id="offlineBar" role="status" hidden>You're offline. Saved cases and capture still work here — new measurements, reports and checks need a connection. On-device outlining and voice need one online load first to download their models.</div>
+<div id="offlineBar" role="status" hidden>You're offline. Saved cases and capture still work here - new measurements, reports and checks need a connection.</div>
 
 <script src="./coin-model.js"></script>
 <script type="module" src="./app.js"></script>

@@ -36,7 +36,7 @@ test("PWA shell is installable and honest", () => {
   }
   assert.ok(!html.includes("user-scalable=no"), "viewport allows pinch zoom");
   assert.ok(html.includes('id="apple-touch-icon"') || html.includes('rel="apple-touch-icon"'), "iOS home-screen icon linked");
-  for (const id of ["camStep","uploadBtn","camFile","donateCheck","updateBar","updateGo"]) {
+  for (const id of ["camStep","uploadBtn","camFile","updateBar","updateGo"]) {
     assert.ok(html.includes(`id="${id}"`), `shell element ${id} exists`);
   }
   for (const id of ["numPhotoCard","numPhoto","numChip","numLoading","numError","reportDoc","docGate","docMeta","docPhoto","docQuote","docRows","annexImg","shareBtn","copyBtn","newClaimBtn","installBtn","offlineBar","toReport","renderBtn"]) {
@@ -48,7 +48,7 @@ test("PWA shell is installable and honest", () => {
   assert.ok(html.includes("US quarter") && html.includes("1 euro"), "reference presets span regions");
   assert.ok(html.indexOf("US quarter") < html.indexOf("India ₹10"), "presets are not India-first");
   for (const id of ["tHome","netPill","nextTitle","nextSub","ctaNew","ctaSample","recentList","recentEmpty",
-    "tCases","caseList","caseEmpty","tSettings","sc-theme-light","sc-theme-auto","sc-theme-dark","donateSetting",
+    "tCases","caseList","caseEmpty","tSettings","sc-theme-light","sc-theme-auto","sc-theme-dark",
     "installHint","updateBtn","storeInfo","sc-store-meter","exportAllBtn","wipeBtn","baseUrl2","setCheck","setHealth",
     "caseDlg","dlgName","dlgProp","dlgNotes","dlgPhotos","dlgAddPhoto","dlgFile","dlgSave","dlgExport","dlgDelete","dlgClose",
     "tabs","toast","appLive","doneHome"]) {

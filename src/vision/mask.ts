@@ -42,7 +42,7 @@ export function assertMaskSize(width: number, height: number): void {
     width * height > MAX_MASK_PIXELS
   ) {
     throw new MeasurementError(
-      `mask size must be 1–${MAX_MASK_DIMENSION}px per side and ≤${MAX_MASK_PIXELS} pixels total, got ${width}x${height}`,
+      `mask size must be 1-${MAX_MASK_DIMENSION}px per side and ≤${MAX_MASK_PIXELS} pixels total, got ${width}x${height}`,
     );
   }
 }
@@ -253,7 +253,7 @@ export function maskFromRegions(width: number, height: number, regions: Region[]
 }
 
 /**
- * Zhang–Suen thinning: reduces a crack mask to a one-pixel centreline.
+ * Zhang-Suen thinning: reduces a crack mask to a one-pixel centreline.
  * Deterministic and dependency-free, so the same skeleton replays anywhere.
  * Capped iterations so a crafted solid mask cannot block the event loop.
  */
@@ -280,7 +280,7 @@ export function skeletonize(mask: BinaryMask, maxIterations = 500): BinaryMask {
   let iterations = 0;
   while (changed) {
     if (++iterations > maxIterations) {
-      throw new MeasurementError(`skeletonize exceeded ${maxIterations} iterations — mask too large or adversarial`);
+      throw new MeasurementError(`skeletonize exceeded ${maxIterations} iterations - mask too large or adversarial`);
     }
     changed = false;
     for (const step of [0, 1]) {
@@ -288,7 +288,7 @@ export function skeletonize(mask: BinaryMask, maxIterations = 500): BinaryMask {
       for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
           if (++visits > maxVisits) {
-            throw new MeasurementError(`skeletonize exceeded its work budget — mask too large or adversarial`);
+            throw new MeasurementError(`skeletonize exceeded its work budget - mask too large or adversarial`);
           }
           if (img[y * width + x] === 0) continue;
           // P2..P9 clockwise from north.
@@ -325,7 +325,7 @@ const RING: Array<[number, number]> = [
 ];
 
 /**
- * Zhang–Suen leaves 4-connected staircases on diagonal lines, which would be
+ * Zhang-Suen leaves 4-connected staircases on diagonal lines, which would be
  * measured as 2 px per step instead of √2. Removes each staircase corner
  * (two perpendicular orthogonal neighbours) whose neighbours stay connected
  * without it, in place, so the line keeps its connectivity.

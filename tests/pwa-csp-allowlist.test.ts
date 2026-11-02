@@ -63,8 +63,8 @@ test("allowlist and CSP connect-src never diverge", () => {
     );
   }
   // Functional contract of the shared allowlist (imported from the React copy;
-  // pwa/app.js carries the identical logic but cannot be imported in Node — it
-  // touches the DOM at module top level — so the source-text checks above pin it).
+  // pwa/app.js carries the identical logic but cannot be imported in Node - it
+  // touches the DOM at module top level - so the source-text checks above pin it).
   assert.equal(isAllowedBackendUrl(`https://${DEFAULT_BACKEND_HOST}/v1/health`), true);
   assert.equal(isAllowedBackendUrl("https://evil.example.com/v1/health"), false);
   assert.equal(isAllowedBackendUrl("https://snapclaim-backend.parithosh.workers.dev.evil.com/"), false);

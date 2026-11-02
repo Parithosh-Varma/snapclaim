@@ -1,5 +1,5 @@
 'use strict';
-/* CoinModel — a tiny on-device coin classifier. No dependencies.
+/* CoinModel - a tiny on-device coin classifier. No dependencies.
  *
  * What it is: circle detection (background-contrast + shape filter) +
  * handcrafted colour/texture features + k-NN. Prototype priors built from
@@ -44,7 +44,7 @@
     { id: 'INR-2',   country: 'INR',   label: '₹2',  diam: 23.00, color: 'silver' },
     { id: 'INR-5',   country: 'INR',   label: '₹5',  diam: 25.00, color: 'silver' },
     { id: 'INR-10',  country: 'INR',   label: '₹10', diam: 27.00, color: 'bimetal' },
-    // Japan (¥5 and ¥50 have centre holes — detection is less reliable)
+    // Japan (¥5 and ¥50 have centre holes - detection is less reliable)
     { id: 'JPY-1',   country: 'JPY',   label: '¥1',   diam: 20.00, color: 'silver-light', note: 'aluminium' },
     { id: 'JPY-5',   country: 'JPY',   label: '¥5',   diam: 22.00, color: 'gold', note: 'holed' },
     { id: 'JPY-10',  country: 'JPY',   label: '¥10',  diam: 23.50, color: 'copper' },
@@ -202,7 +202,7 @@
     // masks the whole frame (giant blob, everything rejected). Large coins
     // are covered by the border-background rule below instead.
     const R = Math.max(6, Math.floor(Math.min(W, H) / 24));
-    // frame border is almost always background — anchors close-ups where
+    // frame border is almost always background - anchors close-ups where
     // the blur window fits inside the coin
     let br = 0, bg2 = 0, bb = 0, bn = 0;
     const BD = 4;

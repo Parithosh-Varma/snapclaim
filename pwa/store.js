@@ -37,28 +37,50 @@ export function createCaseStore(storage, opts = {}) {
         createdAt: existing?.createdAt ?? input.createdAt ?? now(),
         updatedAt: now(),
       };
+      // Three-shot photos live under photos:{a,b,context}. A v1 {photo}
+      // migrates to photos.a so old cases keep rendering; photoDropped
+      // migrates to dropped:["a"].
+      const photos = { a: null, b: null, context: null, ...((record.photos && typeof record.photos === "object") ? record.photos : {}) };
+      if (record.photo !== undefined && photos.a == null) {
+        photos.a = record.photo;
+        if (record.photoDropped) photos.dropped = ["a"];
+      }
+      delete record.photo;
+      const dropped = Array.isArray(record.dropped) ? record.dropped.filter((d) => d === "a" || d === "b" || d === "context") : [];
+      if (Array.isArray(photos.dropped)) {
+        for (const d of photos.dropped) if ((d === "a" || d === "b" || d === "context") && !dropped.includes(d)) dropped.push(d);
+      }
+      delete photos.dropped;
+      const validPhoto = (p) => typeof p === "string" && /^data:image\/(png|jpeg|webp);base64,/.test(p);
       // Drop oversized photo blobs up front: one 700KB+ data URL would crowd
       // out every other case in the ~5MB localStorage quota.
-      if (typeof record.photo === "string" && record.photo.length > MAX_PHOTO_CHARS) {
-        record.photo = null;
-        record.photoDropped = true;
+      for (const k of ["a", "b", "context"]) {
+        if (typeof photos[k] === "string" && (photos[k].length > MAX_PHOTO_CHARS || !validPhoto(photos[k]))) {
+          photos[k] = null;
+          if (!dropped.includes(k)) dropped.push(k);
+        }
       }
-      // Only our own downscaled data URLs are stored; anything else is dropped.
-      if (typeof record.photo === "string" && !/^data:image\/(png|jpeg|webp);base64,/.test(record.photo)) {
-        record.photo = null;
-        record.photoDropped = true;
-      }
+      record.photos = photos;
+      record.dropped = dropped;
       let next = list.filter((c) => c.id !== record.id);
       next.push(record);
       // Evict oldest-first so the store cannot grow without bound.
       next = next.sort((a, b) => String(a.updatedAt).localeCompare(String(b.updatedAt))).slice(-MAX_CASES);
-      try {
-        writeCases(next);
-      } catch {
-        // Quota: keep the measurements, drop the photo bytes.
-        record.photo = null;
-        record.photoDropped = true;
-        writeCases(next.map((c) => (c.id === record.id ? record : c)));
+      // Quota fallback: drop context, then B, then A. Measurements,
+      // receipts and the case itself are never dropped.
+      for (;;) {
+        try {
+          writeCases(next);
+          break;
+        } catch {
+          const victim = ["context", "b", "a"].find((k) => record.photos[k] != null);
+          if (!victim) {
+            writeCases(next.map((c) => (c.id === record.id ? record : c)));
+            break;
+          }
+          record.photos[victim] = null;
+          if (!record.dropped.includes(victim)) record.dropped.push(victim);
+        }
       }
       return record;
     },
