@@ -18,13 +18,16 @@ test("a blocky tap is refuted, not measured", () => {
   assert.ok(out.receipts.some((r) => r.method === "damage_refuted"));
 });
 
-test("a straight-edged tap is refuted, not measured", () => {
+test("a straight-edged tap still measures (straight cracks are real)", () => {
+  // Mortar joints, saw cuts and the synthetic tilted-wall bench crack are
+  // ruler-straight. Straight alone never refutes - only blocky does.
   const out = measureSession({
     component: wall,
-    masks: [{ id: "t2", label: "crack", areaPx: 300, regionCount: 1, straightRegionCount: 1, straightAreaPx: 300, confidence: 0.85 }],
+    masks: [{ id: "t2", label: "crack", areaPx: 300, skeletonPx: 120, regionCount: 1, straightRegionCount: 1, straightAreaPx: 300, confidence: 0.85 }],
   });
-  assert.equal(out.verdict, "no-damage");
-  assert.equal(out.refuted[0]?.reason, "straight");
+  assert.equal(out.verdict, "damage");
+  assert.equal(out.findings.length, 1);
+  assert.equal(out.refuted.length, 0);
 });
 
 test("a real crack still measures when mixed with a blob", () => {
@@ -67,5 +70,77 @@ test("POST /v1/report on a clean wall answers 200, not 422", async () => {
   assert.equal(res.status, 200);
   const result = (res.body as { result: { findings: Array<{ statement: string }>; gate: { ok: boolean } } }).result;
   assert.equal(result.gate.ok, true);
+  assert.match(result.findings[0]?.statement ?? "", /no crack found/i);
+});
+
+test("tiny unexamined regions stay measurable (conservative)", () => {
+  // Regions under MIN_SHAPE_AREA_PX are never shape-checked: a mask of pure
+  // speckle is measured, not refuted. Missing real micro-damage is worse
+  // than measuring speckle, so refutation requires a flagged region.
+  const out = measureSession({
+    component: { id: "wall", areaPx: 10000, confidence: 1 },
+    masks: [{ id: "s1", label: "crack", areaPx: 12, regionCount: 3, confidence: 0.9 }],
+  });
+  assert.equal(out.verdict, "damage");
+  assert.equal(out.findings.length, 1);
+});
+
+test("non-crack labels are never shape-refuted", () => {
+  const out = measureSession({
+    component: { id: "wall", areaPx: 10000, confidence: 1 },
+    masks: [{ id: "s1", label: "stain", areaPx: 500, regionCount: 1, blockyRegionCount: 1, blockyAreaPx: 500, confidence: 0.9 }],
+  });
+  assert.equal(out.verdict, "damage");
+  assert.equal(out.refuted.length, 0);
+});
+
+test("threshold dial cannot flip a verdict past its receipt", () => {
+  const base = {
+    component: { id: "wall", areaPx: 10000, confidence: 1 },
+    masks: [{ id: "c1", label: "crack" as const, areaPx: 500, skeletonPx: 100, regionCount: 1, confidence: 0.9 }],
+  };
+  const strict = measureSession({ ...base, thresholds: { cosmeticMaxRatio: 0.005, moderateMaxRatio: 0.01, significantCrackMm: 50, significantRegionCount: 1 } });
+  const loose = measureSession({ ...base, thresholds: { cosmeticMaxRatio: 0.005, moderateMaxRatio: 0.5, significantCrackMm: 500, significantRegionCount: 10 } });
+  // Same pixels, same percent - only the band label moves, and the receipt records which dials were used.
+  assert.equal(strict.findings[0]?.percent, loose.findings[0]?.percent);
+  assert.equal(strict.findings[0]?.severity, "significant");
+});
+
+test("gate blocks payout-grade severity without a severity receipt", () => {
+  const out = measureSession({
+    component: { id: "wall", areaPx: 10000, confidence: 1 },
+    masks: [{ id: "c1", label: "crack", areaPx: 500, skeletonPx: 100, regionCount: 1, confidence: 0.9 }],
+  });
+  const ratio = out.findings[0]?.receiptIds.ratio ?? "R000";
+  const sev = out.findings[0]?.receiptIds.severity ?? "R000";
+  for (const word of ["demolish", "condemned", "collapse", "evacuate"]) {
+    const gate = validateFindings(
+      [{ statement: `crack covers ${out.findings[0]?.percent}%; wall must be ${word}.`, citations: [ratio, sev] }],
+      out.receipts,
+    );
+    assert.equal(gate.ok, false, word);
+  }
+});
+
+test("POST /v1/findings on a refuted tap answers no-damage", async () => {
+  const measured = measureSession({
+    component: { id: "wall", areaPx: 10000, confidence: 1 },
+    masks: [{ id: "t1", label: "crack", areaPx: 500, regionCount: 1, blockyRegionCount: 1, blockyAreaPx: 500, confidence: 0.9 }],
+  });
+  assert.equal(measured.verdict, "no-damage");
+  const res = await handleRequest({
+    method: "POST",
+    path: "/v1/findings",
+    body: {
+      component: { id: "wall", areaPx: 10000, confidence: 1 },
+      masks: [{ id: "t1", label: "crack", areaPx: 500, regionCount: 1, blockyRegionCount: 1, blockyAreaPx: 500, confidence: 0.9 }],
+      transcript: "x",
+      findings: measured.findings,
+      receipts: measured.receipts,
+    },
+    env: {},
+  });
+  assert.equal(res.status, 200);
+  const result = (res.body as { result: { findings: Array<{ statement: string }> } }).result;
   assert.match(result.findings[0]?.statement ?? "", /no crack found/i);
 });

@@ -167,15 +167,13 @@ export function measureSession(input: MeasureSessionInput): MeasureSessionResult
     }
     if (mask.label !== "crack") return true;
     const blocky = mask.blockyRegionCount ?? 0;
-    const straight = mask.straightRegionCount ?? 0;
     const regions = mask.regionCount ?? 1;
-    if (blocky + straight < regions) return true;
-    const reason = (mask.blockyAreaPx ?? 0) >= (mask.straightAreaPx ?? 0) ? "blocky" : "straight";
+    if (blocky < regions) return true;
     refuted.push({
       maskId: mask.id,
       label: mask.label,
-      reason,
-      detail: `${regions} region(s), all ${reason}-flagged (blocky ${blocky}, straight-edged ${straight}) - not crack geometry`,
+      reason: "blocky",
+      detail: `${regions} region(s), all blocky-flagged (thick, not long-and-thin) - not crack geometry`,
     });
     ledger.add({
       method: "damage_refuted",
@@ -184,10 +182,9 @@ export function measureSession(input: MeasureSessionInput): MeasureSessionResult
         label: mask.label,
         regionCount: regions,
         blockyRegionCount: blocky,
-        straightRegionCount: straight,
       },
       output: { value: "no-damage", unit: "band" },
-      formula: "all regions blocky or straight-edged - refuted as not-damage",
+      formula: "all regions blocky - refuted as not-damage",
       confidence: mask.confidence,
       notes: ["tap caught non-damage geometry; excluded from findings by verdict, not by error"],
     });
