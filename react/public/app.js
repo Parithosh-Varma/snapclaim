@@ -228,3 +228,89 @@ if (toggle) {
   section.hidden = false;
   document.querySelectorAll("[data-case-link]").forEach((a) => { a.hidden = false; });
 })();
+
+// Progress page: live repo stats from the public GitHub API (no key).
+// Renders into #gh-stats/#gh-commits/#gh-people when present; the static
+// milestone timeline below needs no JavaScript. Fails soft when offline
+// or rate-limited so the page never looks broken.
+(() => {
+  const stats = document.getElementById("gh-stats");
+  if (!stats) return;
+  const note = document.getElementById("gh-note");
+  const commitsEl = document.getElementById("gh-commits");
+  const peopleEl = document.getElementById("gh-people");
+  const repo = "Parithosh-Varma/snapclaim";
+  const api = `https://api.github.com/repos/${repo}`;
+
+  const rel = (iso) => {
+    const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 3600) return `${Math.max(1, Math.round(s / 60))} min ago`;
+    if (s < 86400) return `${Math.round(s / 3600)} h ago`;
+    const d = Math.round(s / 86400);
+    return d === 1 ? "yesterday" : `${d} days ago`;
+  };
+  const get = (url) => fetch(url, { headers: { Accept: "application/vnd.github+json" } })
+    .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); });
+  const set = (key, value) => {
+    const el = stats.querySelector(`[data-gh="${key}"]`);
+    if (el) el.textContent = value;
+  };
+
+  Promise.all([
+    get(api),
+    get(`${api}/commits?per_page=5`),
+    get(`${api}/contributors?per_page=6`),
+  ]).then(([r, commits, people]) => {
+    set("stars", String(r.stargazers_count ?? "—"));
+    set("forks", String(r.forks_count ?? "—"));
+    set("issues", String(r.open_issues_count ?? "—"));
+    set("pushed", r.pushed_at ? rel(r.pushed_at) : "—");
+    if (note) note.textContent = "Live from the public repo — refresh for the latest.";
+
+    if (commitsEl) {
+      commitsEl.textContent = "";
+      for (const c of commits || []) {
+        if (!c || !c.commit) continue;
+        const li = document.createElement("li");
+        const a = document.createElement("a");
+        a.href = c.html_url || `https://github.com/${repo}/commits`;
+        a.textContent = String(c.commit.message || "").split("\n")[0];
+        li.appendChild(a);
+        const meta = document.createElement("small");
+        const who = (c.commit.author && c.commit.author.name) || (c.author && c.author.login) || "someone";
+        const when = c.commit.author && c.commit.author.date ? ` · ${rel(c.commit.author.date)}` : "";
+        meta.textContent = `${who}${when}`;
+        li.appendChild(meta);
+        commitsEl.appendChild(li);
+      }
+      if (!commitsEl.children.length) commitsEl.textContent = "No commits found.";
+    }
+
+    if (peopleEl) {
+      peopleEl.textContent = "";
+      for (const p of people || []) {
+        if (!p || !p.login) continue;
+        const li = document.createElement("li");
+        const a = document.createElement("a");
+        a.href = p.html_url || `https://github.com/${p.login}`;
+        const img = document.createElement("img");
+        img.src = `https://avatars.githubusercontent.com/u/${p.id}?v=4&s=64`;
+        img.alt = "";
+        img.loading = "lazy";
+        img.width = 32;
+        img.height = 32;
+        a.appendChild(img);
+        const span = document.createElement("span");
+        span.textContent = `${p.login} · ${p.contributions ?? 0}`;
+        a.appendChild(span);
+        li.appendChild(a);
+        peopleEl.appendChild(li);
+      }
+      if (!peopleEl.children.length) peopleEl.textContent = "No contributors found.";
+    }
+  }).catch(() => {
+    if (note) note.textContent = "Live stats unavailable (offline or rate-limited) — the milestones below are current.";
+    if (commitsEl) commitsEl.textContent = "Could not load commits.";
+    if (peopleEl) peopleEl.textContent = "Could not load contributors.";
+  });
+})();

@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
-const pages = ["index.html", "how.html", "case-study.html", "faq.html"];
+const pages = ["index.html", "how.html", "case-study.html", "faq.html", "progress.html"];
 // Extra pages exist on the landing branch only; on main only index.html
 // builds. Filtering by existence keeps both branches green.
 export default defineConfig({

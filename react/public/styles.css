@@ -275,6 +275,31 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   margin: 0 0 16px;
 }
 
+/* Progress page: live stats, timeline */
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 24px 0 8px; }
+.stats-grid div { border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: var(--paper); }
+.stats-grid dt { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+.stats-grid dd { margin: 4px 0 0; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; white-space: nowrap; }
+.commits { display: grid; gap: 8px; margin-top: 12px; }
+.commits li { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--paper); font-size: 0.9375rem; }
+.commits a { font-weight: 680; text-decoration: none; }
+.commits a:hover { text-decoration: underline; }
+.commits small { display: block; color: var(--ink-3); margin-top: 2px; }
+.people { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+.people li { list-style: none; }
+.people a { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-weight: 640; font-size: 0.9375rem; }
+.people img { width: 32px; height: 32px; border-radius: 50%; }
+.timeline { margin-top: 24px; display: grid; gap: 0; }
+.timeline li { position: relative; padding: 0 0 28px 28px; border-left: 2px solid var(--line); margin-left: 6px; }
+.timeline li:last-child { padding-bottom: 0; }
+.timeline li::before { content: ""; position: absolute; left: -7px; top: 4px; width: 12px; height: 12px; border-radius: 50%; background: var(--go); box-shadow: 0 0 0 3px var(--go-tint); }
+.timeline time { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--go-ink); }
+.timeline h3 { margin-top: 4px; }
+.timeline p { margin-top: 4px; color: var(--ink-2); max-width: 60ch; }
+@media (max-width: 860px) {
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+}
+
 /* FAQ */
 .faq { padding-block: 32px 112px; display: grid; grid-template-columns: 0.85fr 1.15fr; gap: 72px; }
 .faq-list { border-top: 1px solid var(--line); }
