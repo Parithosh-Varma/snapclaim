@@ -170,30 +170,12 @@ export default function Check() {
     setXBadge(null);
     setXOther(null);
     try {
-      // Cross-check against the model that did NOT draw the mask.
+      // Cloud-only: cross-check is an independent API re-prompt in the mask's
+      // own bounding box, never an on-device comparison.
       let other;
       let otherMask: Uint8Array | null = null;
       let otherBy = "";
-      if (s.dmg.source === "api") {
-        if (!embeddings.current) {
-          if (!s.photo) throw new Error("Mark the damage first.");
-          setXNote("Loading the on-device model…");
-          const ready = await sam.ensureEmbedded(s.photo);
-          setXNote("");
-          if (!ready) throw new Error(
-          sam.lastError
-            ? `On-device model failed to load (${sam.lastError}) - retry in a moment.`
-            : navigator.onLine === false
-              ? "On-device outlining model not available offline yet - reconnect once to download it, then it works offline."
-              : "On-device model is still loading - retry in a moment.",
-        );
-        }
-        const dev = await segmentOnDevice(sam, s);
-        if (!dev) throw new Error("The on-device model found nothing at those taps.");
-        other = encodeRle(dev.mask, s.photo.width, s.photo.height);
-        otherMask = dev.mask;
-        otherBy = "on-device";
-      } else {
+      {
         // The measured mask's own bounding box constrains the re-prompt, so a
         // thin crack comes back as the crack - not the whole wall again.
         const box = s.dmg.mask ? damageBox(s.dmg.mask, s.photo.width, s.photo.height) : null;
@@ -214,7 +196,8 @@ export default function Check() {
       setPhase("xcheck", "ok");
     } catch (e) {
       const err = e as { message?: string; status?: unknown; details?: string[] };
-      const msg = err.message ?? String(e);
+      const offline = navigator.onLine === false;
+      const msg = offline ? "Cross-check needs a connection - reconnect and retry." : (err.message ?? String(e));
       const status = typeof err.status === "number" ? err.status : NaN;
       console.error(`[xcheck] HTTP ${Number.isNaN(status) ? "?" : status}: ${msg}`, err.details ?? "");
       // /v1/segment is unavailable in mock mode, so a mask drawn by the API

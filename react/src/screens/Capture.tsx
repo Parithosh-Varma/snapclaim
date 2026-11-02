@@ -1,29 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "../App";
-import { CoinGate } from "../lib/camera";
 import { loadSamplePhoto } from "../lib/sample";
 import { SamplePicker } from "./SamplePicker";
+<<<<<<< HEAD
 import { applyLastCoin, resetDmg } from "../lib/session";
+=======
+import { freshAngleSlot, resetDmg } from "../lib/session";
+>>>>>>> fix/rate-limits-vulns-part2
 
 const CAM_ERRORS: Record<string, string> = {
-  NotAllowedError: "Camera permission is off — tap Enable camera",
-  SecurityError: "Camera permission is off — tap Enable camera",
-  NotFoundError: "No back camera found — tap Enable camera to retry",
-  OverconstrainedError: "No back camera found — tap Enable camera to retry",
-  NotReadableError: "Camera busy in another app — close it, then tap Enable camera",
-  stopped: "Camera stopped — tap Enable camera",
-  unsupported: "No camera on this device — use a sample or upload a photo",
+  NotAllowedError: "Camera permission is off - tap Enable camera",
+  SecurityError: "Camera permission is off - tap Enable camera",
+  NotFoundError: "No back camera found - tap Enable camera to retry",
+  OverconstrainedError: "No back camera found - tap Enable camera to retry",
+  NotReadableError: "Camera busy in another app - close it, then tap Enable camera",
+  stopped: "Camera stopped - tap Enable camera",
+  unsupported: "No camera on this device - use a sample or upload a photo",
 };
 
 export default function Capture() {
   const { session, go, screen } = useApp();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const gateRef = useRef<CoinGate | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const [hint, setHint] = useState("Add a coin for scale");
-  const [ring, setRing] = useState<{ left: number; top: number; size: number } | null>(null);
-  const [locked, setLocked] = useState(true);
-  const [count, setCount] = useState<number | null>(null);
+  const [hint, setHint] = useState("Fit damage + coin in frame - you'll tap both next");
   const [flash, setFlash] = useState(false);
   const [enableCam, setEnableCam] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -32,9 +32,7 @@ export default function Capture() {
   const [blocked, setBlocked] = useState(false);
   const [live, setLive] = useState(false);
   const [acquiring, setAcquiring] = useState(false);
-  const [tapMsg, setTapMsg] = useState<string | null>(null);
   const [noScale, setNoScale] = useState(false);
-  const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
   const dragY = useRef<number | null>(null);
   /* tips: closed by default; auto-open only on first visit */
@@ -46,11 +44,6 @@ export default function Capture() {
   const closeTips = useCallback(() => {
     setTipsOpen(false);
     try { localStorage.setItem("snapclaim.tipsSeen", "1"); } catch { /* ignore */ }
-  }, []);
-
-  /* locked-tap hint clears after a few seconds */
-  useEffect(() => () => {
-    if (tapTimer.current) clearTimeout(tapTimer.current);
   }, []);
 
   /* Esc closes the tips sheet */
@@ -69,17 +62,16 @@ export default function Capture() {
     : !live
       ? "Starting camera…"
       : noScale
-        ? "Percentages only — no millimetres"
-        : tapMsg ?? (locked ? "Place a coin next to the damage" : "Coin found – fit damage + coin in frame");
+        ? "Percentages only - no millimetres"
+        : "Fit damage + coin in frame - you'll tap both next";
 
+  /* Double-tap guard: one shutter press, one still. No lock, no gate. */
+  const shotBusy = useRef(false);
   const onShutterTap = () => {
-    if (locked) {
-      setTapMsg("Hold a coin in front of the camera");
-      if (tapTimer.current) clearTimeout(tapTimer.current);
-      tapTimer.current = setTimeout(() => setTapMsg(null), 4000);
-      return;
-    }
-    captureStill();
+    if (shotBusy.current) return;
+    shotBusy.current = true;
+    void captureStill();
+    setTimeout(() => { shotBusy.current = false; }, 1000);
   };
 
   /* bottom-sheet drag to dismiss */
@@ -99,75 +91,153 @@ export default function Capture() {
     if (dy > 110) closeTips();
   };
 
-  const captureStill = useCallback(() => {
-    const gate = gateRef.current;
+  /* Direct camera handling: free shutter, no detection gate. The coin is
+     tapped on the captured photo, exactly like the crack. */
+  const stopStream = useCallback(() => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+  }, []);
+
+  const onCameraError = useCallback((name: string) => {
+    setLive(false);
+    setAcquiring(false);
+    setEnableCam(true);
+    setBlocked(name === "NotAllowedError" || name === "SecurityError");
+    setHint(CAM_ERRORS[name] ?? `Camera unavailable (${name}) - tap Enable camera`);
+  }, []);
+
+  const acquire = useCallback(async () => {
     const video = videoRef.current;
-    if (!gate || !video || gate.videoEl.videoWidth === 0) return;
+    if (!video) return;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      onCameraError("unsupported");
+      return;
+    }
+    stopStream();
+    const backCam: MediaStreamConstraints = { video: { facingMode: { exact: "environment" } }, audio: false };
+    const anyCam: MediaStreamConstraints = { video: { facingMode: "environment" }, audio: false };
     try {
-      const vw = video.videoWidth;
-      const vh = video.videoHeight;
-      const cap = document.createElement("canvas");
-      const side = Math.max(vw, vh) > 1024 ? 1024 / Math.max(vw, vh) : 1;
-      cap.width = Math.round(vw * side);
-      cap.height = Math.round(vh * side);
-      cap.getContext("2d")?.drawImage(video, 0, 0, cap.width, cap.height);
-      session.stillDataUrl = cap.toDataURL("image/jpeg", 0.85);
-      const raw = gate.gateCoinRaw();
-      if (raw) {
-        session.gateCoin = {
-          cx: raw.cx, cy: raw.cy, rr: raw.rr, fw: raw.fw, fh: raw.fh,
-          sw: cap.width, sh: cap.height, sx: cap.width / vw, sy: cap.height / vh,
-        };
+      const stream = await navigator.mediaDevices.getUserMedia(backCam).catch(() =>
+        navigator.mediaDevices.getUserMedia(anyCam));
+      streamRef.current = stream;
+      (stream as MediaStream & { oninactive: (() => void) | null }).oninactive = () => {
+        setLive(false);
+        setAcquiring(false);
+        setEnableCam(true);
+        setHint("Camera stopped - tap Enable camera");
+      };
+      video.srcObject = stream;
+      await video.play();
+    } catch (e) {
+      onCameraError((e as { name?: string })?.name ?? "unknown");
+    }
+  }, [onCameraError, stopStream]);
+
+  const captureStill = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video || video.videoWidth === 0) return;
+    // Some phones hand the video element transient black frames (warm-up,
+    // exposure snap, throttled track) while reporting real dimensions, so a
+    // blind drawImage can bank a black still. Grab up to 3 frames and keep
+    // the brightest; refuse a still that is still black.
+    if (video.readyState < 2) {
+      setHint("Camera warming up - wait a second and try again.");
+      return;
+    }
+    // A track the OS muted (another app holding the camera) or already ended
+    // delivers black frames with real dimensions forever - retries can't fix
+    // that, so say so and recover instead of banking another black still.
+    const track = (video.srcObject as MediaStream | null)?.getVideoTracks?.()[0];
+    if (!track || track.readyState === "ended") {
+      setHint("Camera stopped - restarting…");
+      setLive(false);
+      setEnableCam(true);
+      setAcquiring(true);
+      await acquire().finally(() => setAcquiring(false));
+      return;
+    }
+    if (track.muted) {
+      setHint("Camera feed is blocked - close other camera apps, then retry.");
+      return;
+    }
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    const side = Math.max(vw, vh) > 1024 ? 1024 / Math.max(vw, vh) : 1;
+    const cw = Math.round(vw * side);
+    const ch = Math.round(vh * side);
+    const snap = (): { cap: HTMLCanvasElement; mean: number } | null => {
+      try {
+        const cap = document.createElement("canvas");
+        cap.width = cw;
+        cap.height = ch;
+        const g = cap.getContext("2d", { willReadFrequently: true });
+        if (!g) return null;
+        g.drawImage(video, 0, 0, cw, ch);
+        const d = g.getImageData(0, 0, cw, ch).data;
+        let sum = 0;
+        let n = 0;
+        for (let i = 0; i < d.length; i += 397 * 4) {
+          sum += (d[i] as number) + (d[i + 1] as number) + (d[i + 2] as number);
+          n += 3;
+        }
+        return { cap, mean: n === 0 ? 0 : sum / n / 255 };
+      } catch {
+        return null;
       }
+<<<<<<< HEAD
       // The gate's coin ID is a colour guess; it must not set the scale.
       applyLastCoin(session);
+=======
+    };
+    let best: { cap: HTMLCanvasElement; mean: number } | null = snap();
+    for (let i = 0; i < 2 && (!best || best.mean < 3 / 255); i++) {
+      await new Promise((r) => setTimeout(r, 120));
+      if (!videoRef.current || video.readyState < 2) break;
+      const next = snap();
+      if (next && (!best || next.mean > best.mean)) best = next;
+    }
+    if (!best || best.mean < 3 / 255) {
+      // Camera stays live: the user can retry immediately, no black review.
+      setHint("That frame came out black - hold steady and try again.");
+      return;
+    }
+    try {
+      const cap = best.cap;
+      const still = cap.toDataURL("image/jpeg", 0.85);
+      const angle = session.capturingAngle === 2 ? 2 : 1;
+      // No detection gate: the coin is tapped on the photo in Mark, exactly
+      // like the crack. Scale is confirmed there, never here.
+      if (angle === 1) {
+        session.stillDataUrl = still;
+        session.stillA = still;
+        session.bundleA = { ...freshAngleSlot() };
+      } else {
+        session.stillDataUrl = still;
+        session.still2DataUrl = still;
+        session.bundleB = { ...freshAngleSlot() };
+      }
+      session.gateCoin = null;
+>>>>>>> fix/rate-limits-vulns-part2
     } catch { /* stills are best-effort */ }
-    gate.stop();
+    stopStream();
     setFlash(true);
     setTimeout(() => {
       setFlash(false);
       go("sReview");
     }, 160);
-  }, [go, session]);
+  }, [acquire, go, session]);
 
-  const captureRef = useRef(captureStill);
-  captureRef.current = captureStill;
-
-  /* gate lifecycle: created once per mount, acquires on the capture screen */
+  /* camera lifecycle: acquire on the capture screen, release on unmount */
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    const gate = new CoinGate(video, {
-      onHint: setHint,
-      onRing: (r, isLocked) => {
-        setRing(r);
-        setLocked(isLocked);
-      },
-      onCount: setCount,
-      onCoinIdentified: () => {},
-      onAutoCapture: () => captureRef.current(),
-      onCameraError: (name) => {
-        setLive(false);
-        setAcquiring(false);
-        setEnableCam(true);
-        setBlocked(name === "NotAllowedError" || name === "SecurityError");
-        setHint(CAM_ERRORS[name] ?? `Camera unavailable (${name}) — tap Enable camera`);
-      },
-    });
-    gateRef.current = gate;
     // Remote diagnosis hook, as in the vanilla app.
-    (window as unknown as { __snapclaim?: unknown }).__snapclaim = () => ({
-      ...gate.debug(),
-      locked,
-      hint,
-    });
+    (window as unknown as { __snapclaim?: unknown }).__snapclaim = () => ({ live });
     if (screen === "capture") {
-      gate.reset();
-      void gate.acquire();
+      setAcquiring(true);
+      void acquire().finally(() => setAcquiring(false));
     }
     return () => {
-      gate.stop();
-      gateRef.current = null;
+      stopStream();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -179,24 +249,50 @@ export default function Capture() {
   }, [screen]);
 
   const retake = () => {
+    // Retake re-shoots the current angle only: clear its still and its
+    // marking bundle so no stale outline survives the new photo.
+    if (session.capturingAngle === 2) {
+      session.still2DataUrl = "";
+    } else {
+      session.stillDataUrl = "";
+      session.stillA = "";
+    }
     session.stillDataUrl = "";
     session.gateCoin = null;
     session.coinLabel = "";
     session.coinKindMm = 0;
     session.noScaleMode = false;
     resetDmg(session);
+    if (session.capturingAngle === 2) {
+      session.bundleB = { ...freshAngleSlot() };
+    } else {
+      session.bundleA = { ...freshAngleSlot() };
+    }
     setEnableCam(false);
     setBlocked(false);
     setNoScale(false);
-    setTapMsg(null);
     setAcquiring(true);
     go("capture");
     // The Capture tree stays mounted for sReview, so re-acquire explicitly.
-    gateRef.current?.reset();
-    void gateRef.current?.acquire();
+    void acquire();
   };
 
   const usePhoto = () => {
+<<<<<<< HEAD
+=======
+    // Two angles: after the first photo goes back behind the camera for the
+    // second; after the second, on to marking.
+    if (session.capturingAngle !== 2) {
+      session.capturingAngle = 2;
+      setEnableCam(false);
+      setBlocked(false);
+      setNoScale(false);
+      setAcquiring(true);
+      go("capture");
+      void acquire();
+      return;
+    }
+>>>>>>> fix/rate-limits-vulns-part2
     go("sMark");
   };
 
@@ -212,16 +308,30 @@ export default function Capture() {
       cap.width = Math.round(img.width * side);
       cap.height = Math.round(img.height * side);
       cap.getContext("2d")?.drawImage(img, 0, 0, cap.width, cap.height);
-      session.stillDataUrl = cap.toDataURL("image/jpeg", 0.85); // canvas redraw strips EXIF
+      const still = cap.toDataURL("image/jpeg", 0.85); // canvas redraw strips EXIF
+      session.stillDataUrl = still;
+      if ((session.capturingAngle ?? 1) === 2) {
+        session.still2DataUrl = still;
+        session.bundleB = { ...freshAngleSlot() };
+      } else {
+        session.stillA = still;
+        session.bundleA = { ...freshAngleSlot() };
+      }
       session.gateCoin = null;
       session.noScaleMode = true;
+<<<<<<< HEAD
       applyLastCoin(session);
       gateRef.current?.stop();
+=======
+      session.coinLabel = "";
+      session.coinKindMm = 0;
+      stopStream();
+>>>>>>> fix/rate-limits-vulns-part2
       go("sReview");
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      setHint("That photo could not be read — try another.");
+      setHint("That photo could not be read - try another.");
     };
     img.src = url;
   };
@@ -249,7 +359,6 @@ export default function Capture() {
         id="cam"
         role="img"
         aria-label="Live camera feed"
-        onPointerDown={(e) => gateRef.current?.assistAt(e.clientX, e.clientY)}
       >
         <video
           ref={videoRef}
@@ -294,10 +403,11 @@ export default function Capture() {
           {enableCam ? (
             <div className="permitcard" role="alertdialog" aria-labelledby="permitTitle" aria-describedby="permitDesc">
               <span className="permit-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="7" width="18" height="13" rx="3" /><circle cx="12" cy="13.5" r="3.4" /><circle cx="12" cy="13.5" r="0.6" fill="currentColor" /><path d="M8.5 7l1-2.2h5L15.5 7" /></svg>
+                <img className="mark-light" src="./snapclaim-mark.png" alt="" width={40} height={38} />
+                <img className="mark-dark" src="./snapclaim-mark-dark.png" alt="" width={40} height={38} />
               </span>
               <p id="permitTitle">{noCam ? "No camera on this device" : "Camera is off"}</p>
-              <p id="permitDesc">{noCam ? "Upload a photo or pick a sample instead — measuring works the same." : "We use your camera to measure your object. Photos stay on this device."}</p>
+              <p id="permitDesc">{noCam ? "Upload a photo or pick a sample instead - measuring works the same." : "We use your camera to measure your object. Photos stay on this device."}</p>
               {!noCam && (
                 <button
                   id="enableCam"
@@ -309,7 +419,7 @@ export default function Capture() {
                     setEnableCam(false);
                     setBlocked(false);
                     setAcquiring(true);
-                    void gateRef.current?.acquire().finally(() => setAcquiring(false));
+                    void acquire().finally(() => setAcquiring(false));
                   }}
                 >
                   {acquiring ? "Starting…" : "Enable camera"}
@@ -324,7 +434,7 @@ export default function Capture() {
                   Upload photo
                 </button>
                 <button id="altEntry" className="alt-btn" type="button" onClick={onSample}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="3" /><circle cx="12" cy="13.5" r="3.4" /></svg>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="0" /><circle cx="12" cy="13.5" r="3.4" /></svg>
                   Use a sample
                 </button>
               </div>
@@ -342,27 +452,19 @@ export default function Capture() {
                 <button
                   id="shutter"
                   type="button"
-                  aria-label={locked || !live ? "Capture (waiting for camera)" : "Capture"}
-                  className={locked ? "locked" : ""}
+                  aria-label="Capture"
                   disabled={!live}
                   onClick={onShutterTap}
                 >
-                  {locked && (
-                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <rect x="5" y="10" width="14" height="10" fill="currentColor" />
-                      <path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" strokeWidth="2.4" fill="none" />
-                      <circle cx="12" cy="15" r="1.6" fill="#8b93a3" />
-                    </svg>
-                  )}
                 </button>
-                <span className="shutter-label">{!live ? "Starting camera…" : locked ? "Place a coin to unlock" : "Tap to capture"}</span>
+                <span className="shutter-label">{!live ? "Starting camera…" : "Tap to capture"}</span>
                 <div className="alt-row">
                   <button id="uploadBtn" className="alt-btn" type="button" onClick={() => fileRef.current?.click()}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5" /><path d="M4 20h16" /></svg>
                     Upload photo
                   </button>
                   <button id="altEntry" className="alt-btn" type="button" onClick={onSample}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="3" /><circle cx="12" cy="13.5" r="3.4" /></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="0" /><circle cx="12" cy="13.5" r="3.4" /></svg>
                     Use a sample
                   </button>
                 </div>
@@ -374,12 +476,11 @@ export default function Capture() {
                     session.noScaleMode = true;
                     session.gateCoin = null;
                     setNoScale(true);
-                    gateRef.current?.unlockWithoutScale();
                   }}
                 >
                   Continue without a coin
                 </button>
-                <p className="noscale-note">Results will be percentages only — no millimetres.</p>
+                <p className="noscale-note">Results will be percentages only - no millimetres.</p>
               </div>
             </>
           )}
@@ -425,9 +526,6 @@ export default function Capture() {
           )}
         </div>
       )}
-      {count !== null && (
-        <div id="count" className="pop" style={{ display: "block" }} aria-hidden="true">{count}</div>
-      )}
       <div className={`flash${flash ? " go" : ""}`} />
       <SamplePicker open={pickerOpen} picking={picking} onClose={() => setPickerOpen(false)} onPick={(f) => void pickSample(f)} />
 
@@ -448,7 +546,7 @@ export default function Capture() {
             style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain", background: "#000" }}
           />
           <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, display: "flex", gap: 10, padding: "14px 18px calc(26px + env(safe-area-inset-bottom))", background: "linear-gradient(transparent, rgba(0,0,0,.65))" }}>
-            <button id="retake" type="button" style={{ flex: 1, minHeight: 56, borderRadius: 16, border: "2px solid rgba(255,255,255,.85)", background: "transparent", color: "#fff", fontWeight: 800, fontSize: 17 }} onClick={retake}>Retake</button>
+            <button id="retake" type="button" style={{ flex: 1, minHeight: 56, borderRadius: 0, border: "2px solid rgba(255,255,255,.85)", background: "transparent", color: "#fff", fontWeight: 800, fontSize: 17 }} onClick={retake}>Retake</button>
             <button id="usePhoto" type="button" style={{ flex: 1, minHeight: 56, borderRadius: 16, border: 0, background: "var(--coin)", color: "#fff", fontWeight: 800, fontSize: 17 }} onClick={usePhoto}>Use photo</button>
           </div>
         </section>

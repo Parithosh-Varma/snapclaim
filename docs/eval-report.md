@@ -56,11 +56,12 @@ Scored by `scoreDisputes` in `bench/score.ts`, with DISPUTED as the positive cla
 | 2026-10-28 | 2 pass, 0 skip, 0 fail | scorer unit-tested, no live runs yet | wall-crack: 5.17% / 85.9 mm / 2.6 mm wide / 2.19 cm² (significant); stain: 1.29% percent-only (moderate) |
 | 2026-10-30 | 7 pass, 0 skip, 0 fail | dev fixtures grown (door-peel, facade-crack, tilted-wall, noscale); held-out still 0 archived runs (UNRUN ×4, strict exit 1) | tilted-wall: 0.27% / 66.8 mm cosmetic; facade-crack: 0.74% percent-only significant |
 | 2026-11-02 | held-out: 4 public runs archived, 4/4 refused millimetres; 7 team cases UNRUN (strict exit 1) | no labels yet (split is frozen), see below | first live held-out runs, deployed worker at 4f96974: SAM 3.1 point prompts, muse-spark-1.3 findings, muse-spark-open-1026 skeptic |
+| 2026-11-02 | 7 pass, 0 skip, 0 fail; gap first row scored, both arms | `terrace-slab-tape-01`: tape 227 mm vs measured 218.5 mm (err 8.5, 3.7%, in) vs Spark photo-alone 315 mm (err 88, 38.8%, out) | builder-measured slab DSC_0711.JPG, Ref SC-25D35C5E |
 
 ## Failures and misses
 
 - Held-out photos have masks/expected files but no photo bytes in the repo
-  (`fixtures/photos/` gitignored) — they document the protocol, not results.
+  (`fixtures/photos/` gitignored) - they document the protocol, not results.
 - Live SAM 3.1 segment verified on one photo 2026-10-29 (`200`, full-frame RLE, $0.0025).
 - Live skeptic verified 2026-10-29 on the hackathon model `meta-models/muse-spark-open-1026`.
 - 2026-11-02 live held-out runs: refusal held on all four public photos (percent-only, no mm receipt). But the bench's "crack found" only means "a finding exists". Looking at the masks, two of the four are on the crack (ruin wall, ceiling) and two are not: on `public-stone-wall-crack-02` SAM returned the whole curved wall plus the sign (27.01%), and on `public-cracked-tile-04` it returned one broken tile piece (3.81%). The skeptic CONFIRMED all four, so it caught neither wrong mask. Against hand labels that would be recall 0 on 2 DISPUTED, but the labels are not in `split.json` because adding them changes the frozen case hashes; that needs a team call. Neither bad mask was caught by the PWA's wall-size filter, which only drops masks over 50% of the frame.

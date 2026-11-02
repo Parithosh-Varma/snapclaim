@@ -3,6 +3,8 @@ import { closeMask, unionMasks } from "./mask-ops.js";
 import { decodeRle } from "./rle.js";
 import { mountTiltMeter } from "./tilt-meter.js";
 import { createCaseStore } from "./store.js";
+import { compareMeasurements, agreementBadge, agreementLines } from "./agree.js";
+import { onDeviceEnabled, isLowMem, embedSize } from "./compute.js";
 
 const $ = (id) => document.getElementById(id);
 mountTiltMeter($("tiltMeter")); // live level over the camera; hidden without orientation sensors
@@ -87,16 +89,30 @@ async function getBackendMode() {
   } catch { /* unreachable: caller falls back to try-API-first */ }
   return null;
 }
-/* Low-memory phones default the outlining worker to CPU (see sam-worker.js):
- * name that state on the Mark screen so "slower but stable" reads as intent. */
+/* Low-memory phones (deviceMemory <= 4 GB, e.g. Samsung A32) OOM under heavy
+ * GPU work: unknown deviceMemory counts as low (fail safe, not fast). This is
+ * the single low-mem source; its value rides on every SAM embed message. */
 function isLowMemDevice() {
   // Safari has no navigator.deviceMemory, so iPhones/iPads never matched the
   // check below and embedded SlimSAM straight after the camera. Safari then
   // killed the tab, which reloads back to Home. Treat iOS/iPadOS (iPadOS
   // reports MacIntel + touch) as low-memory.
-  if (isAppleMobile()) return true;
-  const gb = Number(navigator.deviceMemory) || 0;
-  return gb > 0 && gb <= 4;
+  if (typeof isAppleMobile === "function" && isAppleMobile()) return true;
+}
+/* Cloud-by-default: no worker, no model bytes, unless Settings → Compute. */
+function onDeviceOn() {
+  try {
+    const s = typeof caseStore !== "undefined" ? caseStore.getSettings() : null;
+    return onDeviceEnabled(s);
+  } catch { return false; }
+}
+/* Deferred SAM embed (voice preempted it); retried when voice settles. */
+function maybeStartDeferredEmbed() {
+  if (samDeferred && onDeviceOn() && photo && !embeddings && !embedRunning) {
+    samDeferred = false;
+    try { startSamEmbed(); } catch { /* stays deferred until the next photo */ samDeferred = true; }
+  }
+  return isLowMem(typeof navigator !== "undefined" ? navigator.deviceMemory : undefined);
 }
 function isAppleMobile() {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
@@ -104,9 +120,10 @@ function isAppleMobile() {
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
 /* Offline honesty: the service worker never caches cross-origin responses, so
  * the jsDelivr/Hugging Face bytes behind sam-worker.js and voice-worker.js
- * need one online load. Name that state instead of a raw import error. */
+ * need one online load - but only when on-device processing is opted in. */
 function isOfflineNow() { return typeof navigator !== "undefined" && navigator.onLine === false; }
 function offlineModelMessage(kind) {
+  if (!onDeviceOn()) return `Cloud-only: ${kind} needs a connection (on-device processing is off - see Settings → Compute).`;
   return `On-device ${kind} model not available offline yet - reconnect once to download it, then it works offline.`;
 }
 /** Severity comes from the backend: allowlist it so it can never break out of
@@ -188,6 +205,138 @@ let coinLabel = "";
 let gateCoin = null; // {cx, cy, rr} in capture-still pixels + still size
 let photo = null;    // downscaled capture canvas for marking
 let stillDataUrl = "";
+/* ---------- three-shot capture (settings flag capture.multiShot) ----------
+ * Shot A and B are close-ups with the coin, measured as two independent
+ * /v1/measure calls; frame A is the headline. Shot C is a wider location
+ * frame at lower quality that is never measured and never sent anywhere -
+ * it only renders as a labeled plate on the report. Single-shot stays the
+ * default so the recorded demo assets keep working. */
+const MEASURE_SLOTS = ["a", "b"]; // the only slots ever measured; "context" never is
+const SHOT_COPY = {
+  a: "Close-up of the damage with the coin in frame.",
+  b: "Same framing again - a second close-up, coin in frame.",
+  context: "Wider frame - show where on the wall the damage sits. No coin needed.",
+};
+let shotStage = "idle"; // idle | a | b | context: the slot being captured now
+let frames = null;      // per-slot {still, gateCoin, noScale, coinManual, coinLabel, photo, dmg, payload, measurement}
+let measureB = null;    // frame B's independent readout, kept for the agreement badge
+let agreeVerdict = null;
+function multiShotOn() {
+  try {
+    const cap = typeof caseStore !== "undefined" ? caseStore.getSettings().capture : null;
+    return !!(cap && cap.multiShot);
+  } catch { return false; }
+}
+function multiShotActive() { return multiShotOn() && frames !== null && shotStage !== "idle"; }
+function newFrameSlot() {
+  return { still: null, gateCoin: null, noScale: false, coinManual: null, coinLabel: "", photo: null, dmg: null, payload: null, measurement: null };
+}
+function stashWorkingFrame() {
+  if (!frames || shotStage === "idle") return;
+  const s = frames[shotStage];
+  s.still = shotStage === "context" ? s.still : stillDataUrl;
+  s.gateCoin = gateCoin;
+  s.noScale = noScaleMode;
+  s.coinManual = coinManualPt;
+  s.coinLabel = coinLabel;
+  s.photo = photo;
+  s.dmg = dmg ? { ...dmg, points: dmg.points.slice(), pointMasks: dmg.pointMasks.slice() } : null;
+}
+function restoreFrameA() {
+  // After frame B is measured the working set goes back to A: the headline
+  // number, photo card, overlay tag, cross-check, skeptic and annexure all
+  // read the working globals, so they all report frame A from here on.
+  const A = frames && frames.a;
+  if (!A) return;
+  stillDataUrl = A.still;
+  gateCoin = A.gateCoin;
+  noScaleMode = A.noScale;
+  coinManualPt = A.coinManual;
+  coinLabel = A.coinLabel;
+  photo = A.photo;
+  dmg = A.dmg;
+  payloadObj = A.payload;
+  lastMeasurement = A.measurement;
+  samPhotoId++;
+  embeddings = null;
+  samEmbedStartedFor = -1;
+}
+function updateShotChrome() {
+  const on = multiShotActive();
+  $("shotTag").hidden = !on;
+  $("shotCopy").hidden = !on;
+  const isContext = on && shotStage === "context";
+  $("skipShot").hidden = !isContext;
+  if ($("noCoin")) $("noCoin").style.display = isContext ? "none" : "";
+  if (!on) return;
+  const n = shotStage === "a" ? "1 of 3" : shotStage === "b" ? "2 of 3" : "3 of 3";
+  $("shotTag").textContent = n;
+  $("shotCopy").textContent = SHOT_COPY[shotStage];
+  if (isContext) {
+    setLocked(false, "No coin needed - frame the location");
+    hint.textContent = "Wider frame - show where the damage sits";
+  }
+}
+function startShot(k) {
+  frames = frames || { a: newFrameSlot(), b: newFrameSlot(), context: newFrameSlot() };
+  // A retake only clears the slot being taken; the other slots are kept.
+  frames[k] = newFrameSlot();
+  shotStage = k;
+  backToCam();
+  updateShotChrome();
+  // Measured slots start from a clean gate; the location frame never touches
+  // the working set, so frame A (headline, photo card, overlay, checks) survives it.
+  if (k !== "context") {
+    coinSeen = false; smooth = null; coinLabel = ""; gateCoin = null; stillDataUrl = ""; noScaleMode = false;
+    setCoinSize(0);
+    history.length = 0;
+  } else {
+    coinSeen = false; smooth = null;
+    history.length = 0;
+  }
+  if (k === "context") setLocked(false, "No coin needed - frame the location");
+  else setLocked(true, "Add a coin for scale");
+  acquireCamera();
+  updateShotChrome(); // setLocked above rewrites the hint; restore the shot copy
+}
+function resetShots() {
+  shotStage = "idle";
+  frames = null;
+  measureB = null;
+  agreeVerdict = null;
+  const box = $("agreeBox");
+  if (box) { box.hidden = true; box.innerHTML = ""; }
+  const next = $("multiNext");
+  if (next) { next.hidden = true; next.onclick = null; }
+  const ft = $("frameTag");
+  if (ft) { ft.hidden = true; ft.textContent = ""; }
+  const toCheck = $("toCheck");
+  if (toCheck) toCheck.hidden = false;
+  updateShotChrome();
+}
+function firstFindingOf(m) { return (m && m.findings && m.findings[0]) || null; }
+function renderAgreeBox() {
+  const box = $("agreeBox");
+  if (!box || !agreeVerdict) return;
+  const lines = agreementLines(agreeVerdict);
+  box.hidden = false;
+  box.innerHTML =
+    `<p style="margin:12px 0 6px"><span class="badge ${agreeVerdict.verdict === "AGREE" ? "ok" : "fail"}">${esc(agreementBadge(agreeVerdict))}</span></p>` +
+    `<ul style="margin:6px 0 0;padding-left:20px;font-size:13px;color:var(--slate)">${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>`;
+}
+function showMultiNext(label, fn) {
+  $("toCheck").hidden = true;
+  const next = $("multiNext");
+  next.hidden = false;
+  next.textContent = label;
+  next.onclick = fn;
+}
+function hideMultiNext() {
+  $("toCheck").hidden = false;
+  const next = $("multiNext");
+  next.hidden = true;
+  next.onclick = null;
+}
 
 function setLocked(locked, label) {
   fab.classList.toggle("locked", locked);
@@ -330,6 +479,7 @@ function identifyCoin() {
 function scan() {
   if (!camStream) return; // camera left: never spin the detector in the background
   if (document.hidden) { setTimeout(scan, 1000); return; } // background tab: idle, no edge-detect
+  if (embedRunning) { setTimeout(scan, 500); return; } // embed posts pixels: don't contend for the frame
   if (!feed.videoWidth) { setTimeout(scan, 500); return; }
   try {
     scanFrame();
@@ -534,13 +684,25 @@ fab.addEventListener("click", () => {
     const vw = feed.videoWidth, vh = feed.videoHeight;
     if (vw) {
       const cap = document.createElement("canvas");
-      const side = Math.max(vw, vh) > 1024 ? 1024 / Math.max(vw, vh) : 1;
+      // Location frame C is never measured: smaller and lighter. A/B keep full quality.
+      const isContext = multiShotActive() && shotStage === "context";
+      const longEdge = isContext ? 960 : 1024;
+      const quality = isContext ? 0.72 : 0.85;
+      const side = Math.max(vw, vh) > longEdge ? longEdge / Math.max(vw, vh) : 1;
       cap.width = Math.round(vw * side); cap.height = Math.round(vh * side);
       cap.getContext("2d").drawImage(feed, 0, 0, cap.width, cap.height);
-      stillDataUrl = cap.toDataURL("image/jpeg", 0.85);
-      document.getElementById("shotFull").src = stillDataUrl;
+      const dataUrl = cap.toDataURL("image/jpeg", quality);
+      document.getElementById("shotFull").src = dataUrl;
+      if (isContext) {
+        // C never touches the working still: the photo card, overlay, checks
+        // and annexure keep reading frame A from here on.
+        frames.context.still = dataUrl;
+      } else {
+        stillDataUrl = dataUrl;
+        if (multiShotActive()) frames[shotStage].still = dataUrl;
+      }
       // coin circle in still pixels for the scale reference later
-      if (smooth) {
+      if (smooth && !isContext) {
         const sx = cap.width / vw, sy = cap.height / vh;
         gateCoin = { cx: smooth.cx, cy: smooth.cy, rr: smooth.rr, fw: SW, fh: Math.round((SW * vh) / vw), sw: cap.width, sh: cap.height, sx, sy };
       }
@@ -552,6 +714,9 @@ fab.addEventListener("click", () => {
   setTimeout(() => { show("sReview"); flash.classList.remove("go"); }, 160);
 });
 $("retake").onclick = () => {
+  releaseSam(); releaseVoice();
+  // In a multi-shot set a retake only re-takes the current slot; A is kept.
+  if (multiShotActive()) { startShot(shotStage); return; }
   backToCam();
   coinSeen = false; smooth = null; coinLabel = ""; gateCoin = null; stillDataUrl = ""; noScaleMode = false;
   restoreCoinSize();
@@ -560,7 +725,23 @@ $("retake").onclick = () => {
   acquireCamera();
 };
 $("usePhoto").onclick = () => {
+  // The location frame is context only: it skips marking and measuring and
+  // goes straight to the transcript. It is never sent to observe/measure.
+  if (multiShotActive() && shotStage === "context") {
+    hideMultiNext();
+    show("sSay");
+    startListening();
+    return;
+  }
   show("sMark"); setupMarkPhoto();
+};
+$("skipShot").onclick = () => {
+  // Skipping is only legal on shot C: no location plate, same single headline.
+  if (!(multiShotActive() && shotStage === "context")) return;
+  frames.context.still = null;
+  hideMultiNext();
+  show("sSay");
+  startListening();
 };
 $("backCam").onclick = () => { $("retake").onclick(); };
 $("altEntry").onclick = () => { loadSample(); };
@@ -581,14 +762,23 @@ $("camFile").addEventListener("change", () => {
   const img = new Image();
   img.onload = () => {
     URL.revokeObjectURL(url);
-    const side = Math.max(img.width, img.height) > 1024 ? 1024 / Math.max(img.width, img.height) : 1;
+    const isContext = multiShotActive() && shotStage === "context";
+    const longEdge = isContext ? 960 : 1024;
+    const quality = isContext ? 0.72 : 0.85;
+    const side = Math.max(img.width, img.height) > longEdge ? longEdge / Math.max(img.width, img.height) : 1;
     const cap = document.createElement("canvas");
     cap.width = Math.round(img.width * side); cap.height = Math.round(img.height * side);
     cap.getContext("2d").drawImage(img, 0, 0, cap.width, cap.height);
-    stillDataUrl = cap.toDataURL("image/jpeg", 0.85); // canvas redraw strips EXIF
-    $("shotFull").src = stillDataUrl;
-    gateCoin = null; noScaleMode = true; coinLabel = "";
-    restoreCoinSize();
+    const dataUrl = cap.toDataURL("image/jpeg", quality); // canvas redraw strips EXIF
+    $("shotFull").src = dataUrl;
+    if (isContext) {
+      frames.context.still = dataUrl;
+    } else {
+      stillDataUrl = dataUrl;
+      if (multiShotActive()) frames[shotStage].still = dataUrl;
+      gateCoin = null; noScaleMode = true; coinLabel = "";
+      setCoinSize(0);
+    }
     stopCamera();
     show("sReview");
   };
@@ -628,7 +818,12 @@ function circleRle(cx, cy, r, w, h) {
 // ~30 s embedding never freezes the page. A worker that fails only disables outlining.
 let samWorker = null, samPhotoId = 0, samDecodeId = 0;
 const samPending = new Map();
+let samLoading = false, voiceLoading = false, embedRunning = false, voiceBusy = false;
 function sam() {
+  // Cloud-by-default: constructing the worker fetches its code; the embed
+  // then pulls transformers + the model. None of that happens unless opted in.
+  if (!onDeviceOn()) throw new Error("on-device processing is off - enable it in Settings → Compute");
+  if (voiceLoading || voiceBusy) throw new Error("speech model is busy - wait for it to finish");
   if (samWorker) return samWorker;
   // ?device=wasm|webgpu on the page URL forces the worker's backend, for comparisons.
   const url = new URL("./sam-worker.js", import.meta.url);
@@ -636,6 +831,7 @@ function sam() {
   const device = new URLSearchParams(location.search).get("device") ?? (isLowMemDevice() ? "wasm" : null);
   if (device) url.searchParams.set("device", device);
   samWorker = new Worker(url, { type: "module" });
+  samLoading = true;
   samWorker.onmessage = ({ data }) => {
     if (data.type === "decoded") {
       const p = samPending.get(data.id);
@@ -647,14 +843,42 @@ function sam() {
     if (data.type === "progress") $("tfState").textContent = `Downloading the outlining model… ${data.percent}%`;
     else if (data.type === "ready") {
       embeddings = true;
+      embedRunning = false;
+      samLoading = false;
       $("tfState").textContent = "";
       console.info(`[sam] embedded on ${data.device} in ${data.embedMs} ms`);
     } else if (data.type === "error") {
+      embedRunning = false;
+      samLoading = false;
       $("status").textContent = isOfflineNow() ? offlineModelMessage("outlining") : `Outlining unavailable (${data.message}). Check the connection and retry.`;
     }
   };
-  samWorker.onerror = (e) => { $("status").textContent = isOfflineNow() ? offlineModelMessage("outlining") : `Outlining failed to start (${e.message ?? "worker error"}). Check the connection and retry.`; };
+  samWorker.onerror = (e) => {
+    embedRunning = false;
+    samLoading = false;
+    $("status").textContent = isOfflineNow() ? offlineModelMessage("outlining") : `Outlining failed to start (${e.message ?? "worker error"}). Check the connection and retry.`;
+  };
   return samWorker;
+}
+/** Terminate the outlining worker and drop its state: photos are cheap,
+ *  resident models are not. Called on retake / new claim. */
+function releaseSam() {
+  try { samWorker?.terminate(); } catch { /* already gone */ }
+  samWorker = null;
+  samLoading = false;
+  embedRunning = false;
+  embeddings = null;
+  samEmbedStartedFor = -1;
+  samDeferred = false;
+  for (const p of samPending.values()) { try { p?.reject(new Error("outlining released for a new photo")); } catch { /* settle-only */ } }
+  samPending.clear();
+}
+/** Same for the speech worker. */
+function releaseVoice() {
+  try { voiceWorker?.terminate(); } catch { /* already gone */ }
+  voiceWorker = null;
+  voiceLoading = false;
+  voiceBusy = false;
 }
 function setupMarkPhoto() {
   sampleRun = false;
@@ -678,45 +902,46 @@ function setupMarkPhoto() {
     embeddings = null;
     samPhotoId++;
     samEmbedStartedFor = -1;
-    samArmed = false;
-    // Low-memory phones (<=4 GB): the on-device model OOM-kills the whole
-    // browser (LMK took Chrome at 2.2 GB GPU / WASM alike on a Galaxy A32).
-    // Never auto-load it there - the API path is tried first, and on-device
-    // only starts after an explicit second tap (see the tap handler).
-    if (isLowMemDevice()) {
-      samDeferred = true;
-      $("tfState").textContent = "Low-memory phone - automatic outlining first, on-device only if you retry.";
-    } else {
-      samDeferred = false;
-      startSamEmbed();
+    embedRunning = false;
+    samDeferred = false;
+    // Opt-in only: the embed pulls transformers + SlimSAM onto the phone.
+    // Cloud-only is the default, so low-tier phones never see a download here.
+    if (onDeviceOn()) {
+      try { startSamEmbed(); } catch (e) { console.info(`[sam] embed not started: ${e.message ?? e}`); }
+    }
+    $("tfState").textContent = "";
+    // Multi-shot labels which close-up is being marked; single-shot hides it.
+    const ft = $("frameTag");
+    if (ft) {
+      if (multiShotActive() && shotStage === "a") { ft.hidden = false; ft.textContent = "Frame A — close-up 1 of 2"; }
+      else if (multiShotActive() && shotStage === "b") { ft.hidden = false; ft.textContent = "Frame B — close-up 2 of 2"; }
+      else { ft.hidden = true; ft.textContent = ""; }
     }
   };
   img.src = stillDataUrl;
 }
-let samDeferred = false, samArmed = false, samEmbedStartedFor = -1;
+let samDeferred = false, samEmbedStartedFor = -1;
+/* Opt-in embed: capped input, paused detector, single low-mem source passed
+ * to the worker. Voice preempts (it is an explicit user action); the embed
+ * retries when voice settles. */
 function startSamEmbed() {
-  if (!photo || samEmbedStartedFor === samPhotoId) return;
+  if (!photo || samEmbedStartedFor === samPhotoId || embedRunning) return;
+  if (!onDeviceOn()) return;
+  if (voiceLoading || voiceBusy) { samDeferred = true; return; }
   samEmbedStartedFor = samPhotoId;
-  const image = photo.getContext("2d").getImageData(0, 0, photo.width, photo.height);
-  sam().postMessage({ type: "embed", photoId: samPhotoId, image: { data: image.data, width: image.width, height: image.height } }, [image.data.buffer]);
-}
-/** Low-mem second-tap gate: returns true when the caller may proceed on-device
- * (worker already loading/ready, or user just armed the retry). Pops the point
- * and names the state otherwise. */
-function gateLowMemOnDevice() {
-  if (!samDeferred) return true;
-  if (samEmbedStartedFor === samPhotoId) return true; // loading or ready
-  if (!samArmed) {
-    samArmed = true;
-    dmg.points.pop();
-    $("status").textContent = "This phone is low on memory - close other tabs/apps, then tap again to load the slower on-device model.";
-    return false;
+  embedRunning = true;
+  const target = embedSize(photo.width, photo.height);
+  const small = document.createElement("canvas");
+  small.width = target.width; small.height = target.height;
+  small.getContext("2d").drawImage(photo, 0, 0, target.width, target.height);
+  const image = small.getContext("2d").getImageData(0, 0, target.width, target.height);
+  try {
+    sam().postMessage({ type: "embed", photoId: samPhotoId, image: { data: image.data, width: image.width, height: image.height }, lowMem: isLowMemDevice() }, [image.data.buffer]);
+  } catch (e) {
+    embedRunning = false;
+    samEmbedStartedFor = -1;
+    throw e;
   }
-  $("tfState").textContent = "Loading the on-device outlining model (one-time download)…";
-  $("status").textContent = "Loading on-device model…";
-  startSamEmbed();
-  dmg.points.pop();
-  return false;
 }
 // Cracks are thin, so the worker takes SAM's smallest confident candidate, not the wall
 // around it. Coins are compact, so they keep SAM's best-scoring candidate.
@@ -871,12 +1096,9 @@ $("undoBtn")?.addEventListener("click", async () => {
     } else if (await getBackendMode() !== "mock") {
       try { out = await segmentViaApi(dmg.points); }
       catch (e) {
-        console.info("[sam] undo re-segment failed, trying on-device", e);
-        if (embeddings) { dmg.pointMasks = []; try { out = await segmentOnDevice(); } catch { out = null; } }
+        console.info("[sam] undo re-segment failed", e);
+        out = null;
       }
-    } else if (embeddings) {
-      dmg.pointMasks = [];
-      try { out = await segmentOnDevice(); } catch { out = null; }
     }
     if (out) {
       dmg.mask = closeMask(out.mask, photo.width, photo.height, 2); dmg.iou = out.iou;
@@ -911,23 +1133,35 @@ $("markCanvas").addEventListener("pointerdown", async (ev) => {
   $("status").textContent = "Outlining…";
   markBusy = true;
   drawMark();
-  // SAM 3.1 API first; the on-device model only when the API call fails.
-  // In mock mode the API path is unwired by design (backend invents no masks),
-  // so skip the doomed request and go straight on-device.
-  let out = null, source = "api";
-  if (await getBackendMode() === "mock") {
-    source = "device";
-    if (!embeddings) { if (!gateLowMemOnDevice()) { markBusy = false; drawMark(); return; } dmg.points.pop(); $("status").textContent = isOfflineNow() ? offlineModelMessage("outlining") : "Outlining model still loading…"; markBusy = false; drawMark(); return; }
-    try { out = await segmentOnDevice(); } catch { out = null; }
-  } else {
-  try {
-    out = await segmentViaApi(dmg.points);
-  } catch (e) {
-    console.info("[sam] API failed, using on-device", e);
-    source = "device";
-    if (!embeddings) { if (!gateLowMemOnDevice()) { markBusy = false; drawMark(); return; } dmg.points.pop(); $("status").textContent = isOfflineNow() ? offlineModelMessage("outlining") : "Outlining model still loading…"; markBusy = false; drawMark(); return; }
-    try { out = await segmentOnDevice(); } catch { out = null; }
+  // API-first, always. On-device is an explicit opt-in fallback, never silent:
+  // the status line names which side drew the outline.
+  let out = null; let source = "api";
+  const mock = (await getBackendMode()) === "mock";
+  if (mock && !onDeviceOn()) {
+    $("status").textContent = "Connect a live backend in Settings → Backend to outline. Sample flow still works from Home.";
+    markBusy = false; drawMark(); return;
   }
+  try {
+    out = mock ? null : await segmentViaApi(dmg.points);
+  } catch (e) {
+    console.info("[sam] API segment failed", e);
+    out = null;
+  }
+  if (!out && onDeviceOn()) {
+    try {
+      const dev = await segmentOnDevice();
+      if (dev) { out = dev; source = "device"; }
+    } catch (e) {
+      console.info("[sam] on-device segment failed", e);
+    }
+  }
+  if (!out) {
+    if (!onDeviceOn()) {
+      $("status").textContent = isOfflineNow() ? offlineModelMessage("outlining") : "Outlining failed - check the connection and retry. (On-device outlining is off: Settings → Compute.)";
+    } else {
+      $("status").textContent = isOfflineNow() ? offlineModelMessage("outlining") : "Outlining failed on both sides - check the connection and retry.";
+    }
+    markBusy = false; drawMark(); return;
   }
   if (out) {
     // Bridge hairline gaps (≤4 px) so one crack reads as one region, not
@@ -1031,6 +1265,33 @@ $("measureBtn").onclick = async () => {
     if (!mres.ok || !measured.ok) throw new Error(measured.error ?? mres.status);
     payloadObj = j.result;
     lastMeasurement = measured.result;
+    // Multi-shot: frame A is stashed and the set continues on the camera;
+    // frame B is compared against A, A is restored as the working headline,
+    // and the location frame comes next. Single-shot flows straight to Say.
+    if (multiShotActive() && MEASURE_SLOTS.includes(shotStage)) {
+      stashWorkingFrame();
+      frames[shotStage].payload = payloadObj;
+      frames[shotStage].measurement = lastMeasurement;
+      if (shotStage === "a") {
+        showMeasured(lastMeasurement);
+        showMultiNext("Capture frame B →", () => { hideMultiNext(); startShot("b"); });
+        return;
+      }
+      // Frame B measured: the headline stays A; the badge shows agreement.
+      measureB = lastMeasurement;
+      const fa = firstFindingOf(frames.a.measurement);
+      const fb = firstFindingOf(measureB);
+      agreeVerdict = compareMeasurements(
+        { crackLengthMm: fa?.crackLengthMm ?? null, percent: fa?.percent },
+        { crackLengthMm: fb?.crackLengthMm ?? null, percent: fb?.percent },
+      );
+      restoreFrameA();
+      showMeasured(lastMeasurement);
+      renderAgreeBox();
+      showMultiNext("Capture location shot →", () => { hideMultiNext(); startShot("context"); });
+      return;
+    }
+    hideMultiNext();
     showMeasured(lastMeasurement);
     show("sSay");
     startListening();
@@ -1432,11 +1693,11 @@ async function finishListening(landed) {
     const src = off.createBufferSource(); src.buffer = decoded; src.connect(off.destination); src.start(0, 0, Math.min(decoded.duration, 10));
     const rendered = await off.startRendering();
     ctx.close().catch(() => {});
-    // Server transcriber first when online (Muse auto-detects any language);
-    // on-device Whisper is the fallback for offline use or a keyless /
-    // erroring backend. Either side returning no words falls through to the
-    // other before giving up. Mock backends invent no transcripts (they 400
-    // without fixtureTranscript), so skip the doomed request there.
+    // Server transcriber first when online (Muse auto-detects any language).
+    // Mock backends invent no transcripts (they 400 without fixtureTranscript),
+    // so skip the doomed request there. On-device Whisper is an explicit
+    // opt-in fallback, never silent: cloud-only is the default.
+    const allowDevice = onDeviceOn();
     if (!isOfflineNow() && (await getBackendMode()) !== "mock") {
       try {
         const wav = encodeWav(rendered.getChannelData(0), 16000);
@@ -1453,8 +1714,14 @@ async function finishListening(landed) {
         const j = await res.json().catch(() => ({}));
         const text = res.ok && j.ok ? String(j.result?.transcript ?? "").trim() : "";
         if (text) { landTranscript(text); return; }
-        console.info(`[voice] server returned no words (HTTP ${res.status}), trying on-device`);
-      } catch (e) { console.info(`[voice] server transcribe failed, trying on-device: ${e.message ?? e}`); }
+        console.info(`[voice] server returned no words (HTTP ${res.status})${allowDevice ? ", trying on-device" : ""}`);
+      } catch (e) { console.info(`[voice] server transcribe failed${allowDevice ? ", trying on-device" : ""}: ${e.message ?? e}`); }
+    }
+    if (!allowDevice) {
+      // Cloud-only: name the failure instead of downloading a model.
+      setPill("idle", "Idle");
+      showVoiceError("Transcription failed", isOfflineNow() ? "You're offline - new measurements need a connection. Or type the line below." : "Server transcription failed - check the connection, or type the line below.");
+      return;
     }
     setPill("busy", "Transcribing");
     try {
@@ -1486,8 +1753,19 @@ function landTranscript(text) {
   syncSend();
 }
 let voiceWorker = null, voiceId = 0;
-/** Mono 16 kHz samples → text, on the device. Empty string means nothing heard. */
+/** Mono 16 kHz samples → text, on the device. Empty string means nothing heard.
+ * Explicit opt-in only; throws when cloud-only so callers show a named error. */
 function transcribeOnDevice(audio) {
+  if (!onDeviceOn()) throw new Error("on-device speech is off - enable it in Settings → Compute");
+  // Voice is an explicit user action, so it preempts a SAM download; the
+  // embed retries when voice settles. Never load both models at once.
+  if (samLoading || embedRunning) {
+    releaseSam();
+    samDeferred = !!photo;
+  }
+  voiceLoading = true;
+  voiceBusy = true;
+  const done = () => { voiceLoading = false; voiceBusy = false; maybeStartDeferredEmbed(); };
   voiceWorker ??= new Worker(new URL("./voice-worker.js", import.meta.url), { type: "module" });
   const w = voiceWorker;
   const id = voiceId++;
@@ -1501,12 +1779,14 @@ function transcribeOnDevice(audio) {
         if (id === voiceId - 1) setPill("busy", `Getting speech model… ${data.percent}%`);
       } else if (data.type === "transcribed" && data.id === id) {
         cleanup();
+        done();
         if (data.error) reject(new Error(data.error));
         else resolve(data.text);
       }
     };
     const onError = (e) => {
       cleanup();
+      done();
       reject(new Error(e.message ?? "speech worker failed to start"));
     };
     w.addEventListener("message", onMessage);
@@ -1521,7 +1801,12 @@ $("voiceRetry").onclick = () => { hideVoiceError(); startListening(); };
 $("voiceType").onclick = () => transcriptBox.focus();
 syncSend();
 $("backMark").onclick = () => show("sReview");
-$("backSay").onclick = () => show("sMark");
+$("backSay").onclick = () => {
+  // After the location frame there is no mark screen to go back to:
+  // back re-takes the location frame, keeping the typed transcript.
+  if (multiShotActive()) { startShot("context"); return; }
+  show("sMark");
+};
 
 /* ---------- report / skeptic / render ---------- */
 let reportBusy = false;
@@ -1670,17 +1955,10 @@ async function runXcheck(auto) {
   checkState.xcheck = "loading";
   renderCheckCard(); updateReportGate();
   try {
-    // Cross-check against the model that did NOT draw the mask: API mask vs on-device, or the reverse.
+    // Cloud-only: cross-check is an independent API re-prompt in the mask's own
+    // bounding box, never an on-device comparison.
     let other;
-    if (dmg.source === "api") {
-      if (!embeddings) {
-        if (samDeferred && samEmbedStartedFor !== samPhotoId) throw new Error("On-device comparison needs more free memory - close other tabs/apps, tap the damage to load it, then retry.");
-        throw new Error(isOfflineNow() ? offlineModelMessage("outlining") : "On-device model still loading - retry in a moment.");
-      }
-      const dev = await segmentOnDevice();
-      if (!dev) throw new Error("The on-device model found nothing at those taps.");
-      other = encodeRle(dev.mask, photo.width, photo.height);
-    } else {
+    {
       // Mock backend has no SAM to check against - say so without a doomed fetch.
       if (await getBackendMode() === "mock") throw new Error("mock segment unavailable - SAM 3.1 is unwired in mock mode");
       // The measured mask's own bounding box constrains the re-prompt, so a
@@ -1782,6 +2060,16 @@ function fillReportDoc(ok) {
   if (ok) { gate.textContent = "Gate pass"; gate.className = "badge ok"; }
   else { gate.textContent = "Pending"; gate.className = "badge wait"; }
   if (stillDataUrl) { const p = $("docPhoto"); p.src = stillDataUrl; p.style.display = "block"; }
+  // The location frame renders as a labeled plate only: never a finding,
+  // never a receipt, never annexure input.
+  const locStill = frames && frames.context && frames.context.still;
+  const plate = $("locPlate");
+  if (plate) {
+    if (locStill) {
+      plate.hidden = false;
+      $("locPhoto").src = locStill;
+    } else plate.hidden = true;
+  }
   const t = $("transcriptBox").value.trim();
   const q = $("docQuote");
   if (t) { q.hidden = false; q.textContent = `“${t}”`; } else q.hidden = true;
@@ -1821,6 +2109,8 @@ $("newClaimBtn").onclick = () => {
   currentCaseId = null;
   autoChecksFor = null;
   payloadObj = null; lastMeasurement = null;
+  releaseSam(); releaseVoice();
+  resetShots();
   dmg = { points: [], pointMasks: [], mask: null, iou: 0, source: null };
   gateCoin = null; stillDataUrl = ""; noScaleMode = false; coinLabel = "";
   restoreCoinSize();
@@ -1838,7 +2128,7 @@ $("newClaimBtn").onclick = () => {
   $("docMeta").textContent = "Not generated yet";
   $("docPhoto").style.display = "none";
   $("docQuote").hidden = true;
-  $("docRows").innerHTML = `<tr><th>Measurement</th><td>Generate the report to fill this in.</td></tr>`;
+  if ($("locPlate")) $("locPlate").hidden = true;  $("docRows").innerHTML = `<tr><th>Measurement</th><td>Generate the report to fill this in.</td></tr>`;
   $("reportState").textContent = "";
   setShareCopyEnabled(false);
   resetCheckState();
@@ -1900,6 +2190,8 @@ $("renderBtn").onclick = async () => {
 
 /* ---------- sample (no camera) ---------- */
 async function loadSample() {
+  // The sample is always single-shot: it bypasses the three-shot set.
+  resetShots();
   const sample = {
     component: { id: "wall-panel-north", areaPx: 480000, confidence: 0.93 },
     masks: [
@@ -1941,6 +2233,17 @@ function download(name, text, type = "application/json") {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
+function isSafePhotoUrl(v) {
+  return typeof v === "string" && /^data:image\/(png|jpeg|webp);base64,/.test(v);
+}
+/** Primary display still: frame A, else B, else context, else the legacy v1 photo. */
+function casePhoto(c) {
+  const ph = (c && c.photos) || {};
+  return [ph.a, ph.b, ph.context, c && c.photo].find(isSafePhotoUrl) ?? null;
+}
+function casePhotoDropped(c) {
+  return !!((c && c.dropped && c.dropped.length) || (c && c.photoDropped));
+}
 function caseItem(c) {
   const b = document.createElement("button");
   b.type = "button"; b.className = "caseitem";
@@ -1956,8 +2259,9 @@ function caseItem(c) {
   const small = document.createElement("small");
   small.textContent = meta;
   span.append(name, small);
-  if (typeof c.photo === "string" && /^data:image\/(png|jpeg|webp);base64,/.test(c.photo)) {
-    img.src = c.photo;
+  const thumb = casePhoto(c);
+  if (thumb) {
+    img.src = thumb;
     b.append(img, span);
   } else {
     b.append(span);
@@ -1987,7 +2291,7 @@ async function updateStoreInfo() {
     const est = await navigator.storage?.estimate?.();
     if (est?.quota) quota = ` of ~${Math.round(est.quota / 1048576)} MB available to this site`;
   } catch { /* estimate is advisory */ }
-  $("storeInfo").textContent = `Storage: ${n} case${n === 1 ? "" : "s"} · ~${kb} KB used${quota}. Saved cases and capture work offline; measuring and reports need a connection. Tapping damage sends the photo to the backend for outlining (falls back to on-device once its model has downloaded); cross-check and report attach also upload. First use contacts Google Fonts, jsDelivr and Hugging Face for fonts and on-device models.`;
+  $("storeInfo").textContent = `Storage: ${n} case${n === 1 ? "" : "s"} · ~${kb} KB used${quota}. Saved cases and capture work offline; measuring and reports need a connection. Tapping damage sends the photo to the backend for outlining${onDeviceOn() ? " (falls back to on-device once its model has downloaded)" : " (cloud only)"}; cross-check and report attach also upload. First use contacts Google Fonts${onDeviceOn() ? ", jsDelivr and Hugging Face for fonts and on-device models" : " for fonts"}.`;
   $("sc-store-meter").style.width = `${Math.min(100, (caseStore.bytesUsed() / (5 * 1048576)) * 100)}%`;
 }
 function showTab(id) {
@@ -2004,6 +2308,13 @@ function showTab(id) {
 }
 function startCapture() {
   currentCaseId = null;
+  releaseSam(); releaseVoice();
+  if (multiShotOn()) {
+    resetShots();
+    startShot("a");
+    return;
+  }
+  resetShots();
   backToCam();
   setLocked(true, "Add a coin for scale");
   acquireCamera();
@@ -2028,15 +2339,23 @@ function openCase(id) {
   $("dlgProp").value = c.property ?? "";
   $("dlgNotes").value = c.notes ?? "";
   $("dlgPhotos").replaceChildren();
-  if (typeof c.photo === "string" && /^data:image\/(png|jpeg|webp);base64,/.test(c.photo)) {
+  const primary = casePhoto(c);
+  if (primary) {
     const img = document.createElement("img");
-    img.src = c.photo;
+    img.src = primary;
     img.alt = "Case photo";
     $("dlgPhotos").append(img);
+    const ctxStill = c.photos && c.photos.context;
+    if (isSafePhotoUrl(ctxStill) && ctxStill !== primary) {
+      const loc = document.createElement("img");
+      loc.src = ctxStill;
+      loc.alt = "Location context (not measured)";
+      $("dlgPhotos").append(loc);
+    }
   } else {
     const div = document.createElement("div");
     div.className = "empty";
-    div.textContent = c.photoDropped ? "Photo was dropped to fit device storage." : "No photo saved for this case.";
+    div.textContent = casePhotoDropped(c) ? "Photo was dropped to fit device storage." : "No photo saved for this case.";
     $("dlgPhotos").append(div);
   }
   $("caseDlg").showModal();
@@ -2073,10 +2392,13 @@ $("dlgFile").addEventListener("change", () => {
     const cap = document.createElement("canvas");
     cap.width = Math.round(img.width * side); cap.height = Math.round(img.height * side);
     cap.getContext("2d").drawImage(img, 0, 0, cap.width, cap.height);
-    const saved = caseStore.save({ id: dlgCaseId, photo: cap.toDataURL("image/jpeg", 0.85), photoDropped: false });
+    const keep = caseStore.get(dlgCaseId);
+    const keepPhotos = (keep && keep.photos && typeof keep.photos === "object") ? keep.photos : {};
+    const photoStill = cap.toDataURL("image/jpeg", 0.85);
+    const saved = caseStore.save({ id: dlgCaseId, photos: { ...keepPhotos, a: photoStill } });
     openCase(saved.id);
     renderCases();
-    toast(saved.photoDropped ? "Photo too large for device storage - case kept without it" : "Photo updated");
+    toast(saved.dropped?.length ? "Photo too large for device storage - case kept without it" : "Photo updated");
   };
   img.src = url;
 });
@@ -2106,6 +2428,49 @@ for (const [id, v] of [["sc-theme-light", "light"], ["sc-theme-auto", "auto"], [
   };
 }
 paintThemeButtons();
+/* capture settings: three-shot stays off unless explicitly enabled, so the
+   recorded demo assets (single shot) keep working by default. */
+function syncMultiShotBox() {
+  const box = $("setMultiShot");
+  if (!box) return;
+  try {
+    const cap = caseStore.getSettings().capture;
+    box.checked = !!(cap && cap.multiShot);
+  } catch { box.checked = false; }
+}
+syncMultiShotBox();
+$("setMultiShot")?.addEventListener("change", (e) => {
+  const on = e.target.checked;
+  let cap = {};
+  try { cap = caseStore.getSettings().capture ?? {}; } catch { /* fresh settings */ }
+  caseStore.setSettings({ capture: { ...cap, multiShot: on } });
+  if (!on) resetShots();
+  toast(on ? "Three-shot capture on: two close-ups plus a location frame" : "Single-shot capture");
+});
+/* Compute: cloud-only by default; on-device is an explicit opt-in. Existing
+   users have no key stored, which reads as OFF - no prompt, no auto-enable. */
+function syncOnDeviceBox() {
+  const box = $("setOnDevice");
+  if (!box) return;
+  try { box.checked = onDeviceEnabled(caseStore.getSettings()); }
+  catch { box.checked = false; }
+}
+syncOnDeviceBox();
+$("setOnDevice")?.addEventListener("change", (e) => {
+  const on = e.target.checked;
+  caseStore.setSettings({ onDevice: on });
+  if (!on) {
+    releaseSam(); releaseVoice();
+    const tf = $("tfState");
+    if (tf) tf.textContent = "";
+    syncOfflineBar();
+    toast("Cloud-only processing");
+  } else {
+    if (photo && !embeddings && !embedRunning) { try { startSamEmbed(); } catch { /* next photo arms */ } }
+    syncOfflineBar();
+    toast("On-device processing on - experimental, may crash low-memory phones");
+  }
+});
 /* settings: backend (single input), health, updates */
 syncBackendInputs();
 $("baseUrl2").addEventListener("input", () => {
@@ -2157,21 +2522,35 @@ $("updateBtn").onclick = async () => {
 function saveCaseFromReport() {
   const f = (lastMeasurement?.findings ?? [])[0];
   if (!f) return;
+  // Three-shot stills ride under explicit keys; a single-shot claim stores
+  // frame A only. Context is display-only: it never reaches findings,
+  // receipts, observe, measure or the skeptic - only this plate and the case.
+  const stills = frames
+    ? { a: frames.a?.still ?? null, b: frames.b?.still ?? null, context: frames.context?.still ?? null }
+    : { a: stillDataUrl || null, b: null, context: null };
   const saved = caseStore.save({
     id: currentCaseId ?? undefined,
     name: `${String(f.label).charAt(0).toUpperCase() + String(f.label).slice(1)} - ${new Date().toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`,
     transcript: $("transcriptBox").value.trim(),
     label: String(f.label), percent: f.percent, severity: String(f.severity),
     crackLengthMm: f.crackLengthMm ?? null, areaCm2: f.areaCm2 ?? null,
-    mode: lastMeasurement?.mode ?? "", photo: stillDataUrl || null,
+    mode: lastMeasurement?.mode ?? "", photos: stills,
   });
   currentCaseId = saved.id;
   renderCases();
-  toast(saved.photoDropped ? "Case saved without photo (device storage full)" : "Case saved on this device");
+  toast(saved.dropped?.length ? "Case saved without photo (device storage full)" : "Case saved on this device");
 }
 
 /* ---------- offline banner + service-worker update flow ---------- */
-function syncOfflineBar() { $("offlineBar").hidden = navigator.onLine; syncNetPill(); }
+function syncOfflineBar() {
+  // Cloud-only is the default: without a connection there are no models to
+  // fall back to, so say what needs the network. Opted-in phones keep the
+  // one-online-load-first story for their downloaded models.
+  $("offlineBar").textContent = onDeviceOn()
+    ? "You're offline. Saved cases and capture still work here - new measurements, reports and checks need a connection. On-device outlining and voice need one online load first to download their models."
+    : "You're offline. Saved cases and capture still work here - new measurements, reports and checks need a connection.";
+  $("offlineBar").hidden = navigator.onLine; syncNetPill();
+}
 window.addEventListener("online", syncOfflineBar);
 window.addEventListener("offline", syncOfflineBar);
 syncOfflineBar();

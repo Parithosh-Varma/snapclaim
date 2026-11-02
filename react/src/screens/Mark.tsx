@@ -5,8 +5,13 @@ import { checkPhoto } from "../lib/photo-check";
 import { findCoins } from "../../../src/vision/coin-detect.js";
 import { circleRle, encodeRle } from "../lib/rle";
 import { closeMask } from "../lib/mask";
+<<<<<<< HEAD
 import { segmentViaApi, type SamClient } from "../lib/sam";
 import { COIN_GROUPS, COIN_OPTIONS, resetDmg, saveLastCoin, type SamMask, type Session } from "../lib/session";
+=======
+import { segmentCoinViaApi, segmentViaApi, type SamClient } from "../lib/sam";
+import { COIN_GROUPS, COIN_OPTIONS, freshAngleSlot, pickWinnerAngle, resetDmg, type AngleSlot, type SamMask, type Session } from "../lib/session";
+>>>>>>> fix/rate-limits-vulns-part2
 import { BackButton, Stepper } from "../lib/ui";
 
 /** Custom coin-size dropdown: the native select cannot be styled square or
@@ -203,6 +208,7 @@ export default function Mark() {
   const [coinCorrect, setCoinCorrect] = useState(false);
   const [coinFixHint, setCoinFixHint] = useState("");
   const [taped, setTaped] = useState(s.coinTaped);
+  const [angle, setAngle] = useState<1 | 2>(() => s.resumeAngle ?? 1);
   const [coinOpen, setCoinOpen] = useState(false);
   const [coinActive, setCoinActive] = useState<number | null>(null);
   const dropRef = useRef<HTMLDivElement>(null);
@@ -226,6 +232,8 @@ export default function Mark() {
   const drawMark = useCallback(() => {
     const c = canvasRef.current;
     const photo = s.photo;
+    // Mirror undo order for the draft snapshotter; it reads this, not the ref.
+    s.workingHist = histRef.current.slice();
     if (!c || !photo) return;
     c.width = photo.width;
     c.height = photo.height;
@@ -366,29 +374,32 @@ export default function Mark() {
   /* Undo order: the last tap undone first, crack or coin. Entries land when
      a tap takes effect; a fresh photo clears the slate with the taps. */
   const histRef = useRef<("crack" | "coin")[]>([]);
+  /* Two angles, one screen: angle tabs swap the working fields with the
+     per-angle bundle, so every tap/undo/measure below keeps working on the
+     visible photo. The other angle's canvas, mask and coin wait in its slot. */
 
-  /* build the marking photo; the on-device model embeds only on demand
-     (coin outline, cloud fallback, cross-check) - never on entry */
-  useEffect(() => {    sam.onProgress = ({ percent }) => setTfState(`Downloading the outlining model… ${percent}%`);
-    sam.onReady = (device, embedMs) => {
-      embeddings.current = true;
-      setTfState("");
-      console.info(`[sam] embedded on ${device} in ${embedMs} ms`);
+  const stillFor = (k: 1 | 2): string => (k === 1 ? s.stillA || s.stillDataUrl : s.still2DataUrl);
+
+  const saveBundle = (k: 1 | 2): void => {
+    const b: AngleSlot = {
+      photo: s.photo,
+      photoFor: s.photoFor,
+      dmg: s.dmg,
+      coinManualPt: s.coinManualPt,
+      coinMask: s.coinMask,
+      coinIou: s.coinIou,
+      gateCoin: s.gateCoin,
+      taped,
+      hist: histRef.current.slice(),
     };
-    sam.onError = (message) => {
-      setTfState("");
-      setStatus(navigator.onLine === false
-        ? "On-device outlining model not available offline yet - reconnect once to download it, then it works offline."
-        : `Outlining unavailable (${message}). Check the connection and retry.`);
-    };
-    if (s.photo && s.photoFor === s.stillDataUrl) {
-      setReady(true);
-      drawMark();
-      return;
-    }
-    // New photo: drop the previous photo's taps and mask immediately, so a
-    // slow or failed load can never leave a stale outline behind the button.
-    // The button stays disabled until the new photo is outlined (hasMask).
+    if (k === 1) s.bundleA = b;
+    else s.bundleB = b;
+  };
+
+  /* Rebuild the marking photo from its still. `restore` re-applies a draft
+     (or stashed bundle) after the canvas lands: masks are kept only when
+     their dimensions still match the rebuilt photo. */
+  const buildPhoto = useCallback((still: string, restore?: AngleSlot) => {
     resetDmg(s);
     histRef.current = [];
     s.coinManualPt = null;
@@ -403,10 +414,9 @@ export default function Mark() {
     setStatus("Select crack to continue.");
     drawMark();
     const img = new Image();
-    const still = s.stillDataUrl;
     if (!still) {
       setReady(false);
-      setStatus("No photo loaded - go back and take or pick one.");
+      setStatus("Take the second photo first - back up to capture.");
       return;
     }
     // A stalled decode (huge image, throttled phone) fires neither onload
@@ -442,13 +452,42 @@ export default function Mark() {
         }
       } catch { /* validation is best-effort; the photo still shows */ }
       s.photo = photo;
-      s.photoFor = s.stillDataUrl;
+      s.photoFor = still;
       resetDmg(s);
       // A manual coin tap is pixel coords of the previous photo - never reuse it.
       s.coinManualPt = null;
       s.coinMask = null;
       s.coinIou = 0;
       embeddings.current = false;
+      // A draft restore re-applies here, once the canvas dimensions are
+      // known: anything that no longer fits the rebuilt photo is dropped.
+      if (restore) {
+        const fits = (m: Uint8Array | null) => !!m && m.length === photo.width * photo.height;
+        s.dmg = {
+          points: restore.dmg.points.filter(
+            (p): p is [number, number] =>
+              Array.isArray(p) && p.length === 2 && p.every((n) => typeof n === "number"),
+          ),
+          pointMasks: [],
+          mask: fits(restore.dmg.mask) ? (restore.dmg.mask as Uint8Array) : null,
+          iou: fits(restore.dmg.mask) ? restore.dmg.iou : 0,
+          source: fits(restore.dmg.mask) ? restore.dmg.source : (restore.dmg.points.length ? "api" : null),
+        };
+        s.coinManualPt = restore.coinManualPt;
+        s.coinMask = fits(restore.coinMask) ? restore.coinMask : null;
+        s.coinIou = fits(restore.coinMask) ? restore.coinIou : 0;
+        s.gateCoin = restore.gateCoin;
+        setTaped(restore.taped);
+        histRef.current = restore.hist.filter((x) => x === "crack" || x === "coin");
+        setTapCount(s.dmg.points.length);
+        setHasMask(!!s.dmg.mask);
+        setCoinFixHint(
+          s.coinManualPt && !s.coinMask ? "Coin tap restored - confirm its size below." : "",
+        );
+        if (s.dmg.mask) {
+          setStatus(`Outlined (${Math.round(s.dmg.iou * 100)}% sure) - restored from draft.`);
+        }
+      }
       setReady(true);
       drawMark();
       // The gate missed the coin: propose centres now (free, same thread),
@@ -467,14 +506,103 @@ export default function Mark() {
       setReady(false);
       setStatus("That photo could not be read - go back and take it again.");
     };
-    img.src = s.stillDataUrl;
+    img.src = still;
+  }, [drawMark, s]);
+
+  const loadAngle = useCallback((k: 1 | 2) => {
+    let still = k === 1 ? s.stillA || s.stillDataUrl : s.still2DataUrl;
+    if (k === 1 && !s.stillA && still) s.stillA = still;
+    s.stillDataUrl = still;
+    s.activeAngle = k;
+    const slot = (k === 1 ? s.bundleA : s.bundleB) ?? freshAngleSlot();
+    s.photo = slot.photo;
+    s.photoFor = slot.photoFor;
+    s.dmg = slot.dmg;
+    s.coinManualPt = slot.coinManualPt;
+    s.coinMask = slot.coinMask;
+    s.coinIou = slot.coinIou;
+    s.gateCoin = slot.gateCoin;
+    setTaped(slot.taped);
+    histRef.current = slot.hist.filter((x) => x === "crack" || x === "coin");
+    setTapCount(slot.dmg.points.length);
+    setHasMask(!!slot.dmg.mask);
+    setCoinCorrect(false);
+    setCoinFixHint(slot.coinManualPt && !slot.coinMask ? "Coin tap saved - confirm its size below." : "");
+    setTfState("");
+    huntRef.current = null;
+    setMeasureBusy(false);
+    if (slot.photo && slot.photoFor === still && still) {
+      setReady(true);
+      setStatus(slot.dmg.mask ? `Outlined (${Math.round(slot.dmg.iou)}% sure).` : "Select crack to continue.");
+      drawMark();
+      // Rebuild the free coin hunt a revisit lost: no download, just Hough.
+      if (!s.gateCoin && !s.coinManualPt) {
+        try {
+          const px = slot.photo.getContext("2d", { willReadFrequently: true })?.getImageData(0, 0, slot.photo.width, slot.photo.height);
+          const found = px ? findCoins({ data: px.data, width: px.width, height: px.height }) : [];
+          huntRef.current = found.length ? { points: found.slice(0, 3), photo: slot.photo } : null;
+        } catch { huntRef.current = null; }
+      }
+      return;
+    }
+    setReady(false);
+    setStatus(still ? (slot.dmg.mask || slot.dmg.points.length ? "Restoring draft…" : "Select crack to continue.") : "Take the second photo first - back up to capture.");
+    // No canvas (fresh reload after a draft restore) but stashed taps: the
+    // still rebuilds the photo and the slot re-applies on top of it.
+    if (still) buildPhoto(still, slot.photoFor === still &&
+      (slot.dmg.points.length > 0 || !!slot.dmg.mask || !!slot.coinManualPt) ? slot : undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buildPhoto, drawMark, s]);
+
+  /* Angle tabs: persist the working photo into its slot, then load the other. */
+  const switchAngle = (next: 1 | 2) => {
+    if (next === angle || markBusy || measureBusy) return;
+    saveBundle(angle);
+    setAngle(next);
+    loadAngle(next);
+  };
+
+  /* Make an angle's bundle the working state (used for the winning angle
+     before leaving for Say, and when re-opening an already-marked angle). */
+  const applyWinner = (k: 1 | 2) => {
+    const slot = (k === 1 ? s.bundleA : s.bundleB) ?? freshAngleSlot();
+    const still = k === 1 ? s.stillA || s.stillDataUrl : s.still2DataUrl;
+    s.stillDataUrl = still;
+    s.photo = slot.photo;
+    s.photoFor = slot.photoFor;
+    s.dmg = slot.dmg;
+    s.coinManualPt = slot.coinManualPt;
+    s.coinMask = slot.coinMask;
+    s.coinIou = slot.coinIou;
+    s.gateCoin = slot.gateCoin;
+    setTaped(slot.taped);
+    histRef.current = slot.hist.filter((x) => x === "crack" || x === "coin");
+    setTapCount(slot.dmg.points.length);
+    setHasMask(!!slot.dmg.mask);
+    drawMark();
+  };
+
+  /* build the marking photo; cloud-only, so no model ever loads on entry */
+  useEffect(() => {    sam.onProgress = ({ percent }) => setTfState(`Downloading the outlining model… ${percent}%`);
+    sam.onReady = (device, embedMs) => {
+      embeddings.current = true;
+      setTfState("");
+      console.info(`[sam] embedded on ${device} in ${embedMs} ms`);
+    };
+    sam.onError = (message) => {
+      setTfState("");
+      setStatus(navigator.onLine === false
+        ? "On-device outlining model not available offline yet - reconnect once to download it, then it works offline."
+        : `Outlining unavailable (${message}). Check the connection and retry.`);
+    };
+    loadAngle(s.resumeAngle ?? 1);
+    s.resumeAngle = null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* The build effect above calls drawMark() before setReady(true) paints the
      canvas into the DOM, so that first paint lands on nothing and the canvas
-     keeps its default black until the next tap. Repaint once ready flips. */
-  useEffect(() => {
+     keeps its default black until the next tap. Repaint once ready flips. */  useEffect(() => {
     if (ready) drawMark();
   }, [ready, drawMark]);
 
@@ -515,52 +643,58 @@ export default function Mark() {
         return;
       }
     } catch { /* health failed: measure reports the real error below */ }
+    // Scale needs a coin outline with a chosen size, or an explicit
+    // percent-only choice - never a guessed circle.
+    if ((s.coinManualPt || s.gateCoin) && !(s.coinKindMm > 0)) {
+      setStatus("Choose the reference size first.");
+      setMeasureBusy(false);
+      return;
+    }
+    if (!s.coinManualPt && !s.gateCoin && !s.noScaleMode) {
+      setStatus("Tap the coin to set the scale, or mark percent-only below.");
+      setMeasureBusy(false);
+      return;
+    }
     ctx.setMeasuring(true);
     go("sNum");
     const body: Record<string, unknown> = {
       masks: [{ id: "damage-1", label: s.dmgLabel, rle: encodeRle(s.dmg.mask, w, h), confidence: s.dmg.iou || 0.8 }],
     };
-    let circleRef: Record<string, unknown> | null = null;
-    // Manual coin tap wins over the gate - taped coin or missed detection.
-    const coinCxCyR = (() => {
-      if (s.coinManualPt) {
-        const estR = Math.max(10, w * 0.035);
-        return {
-          cx: s.coinManualPt[0],
-          cy: s.coinManualPt[1],
-          r: s.gateCoin ? Math.max(3, (s.gateCoin.rr / s.gateCoin.fw) * (w / s.gateCoin.sw)) : estR,
-        };
-      }
-      if (!s.gateCoin) return null;
+    // The coin is whatever SAM outlined at the user's tap - same as the crack.
+    // No gate geometry, no guessed radius: without an outline there is no scale.
+    if (s.coinManualPt && s.coinMask) {
+      body.reference = { id: "coin", rle: encodeRle(s.coinMask, w, h), knownMm: s.coinKindMm, confidence: s.coinIou };
+    } else if (s.coinManualPt) {
+      // Tap landed but the outline missed (or is still running): never measure
+      // a guessed circle - it would silently bias every millimetre.
+      go("sMark");
+      setStatus("Tap the coin again - the last outline missed the coin.");
+      ctx.setMeasuring(false);
+      setMeasureBusy(false);
+      return;
+    } else if (s.gateCoin) {
+      // Legacy draft restore: a gate-measured circle from before manual flow.
       const kx = w / s.gateCoin.sw;
       const ky = h / s.gateCoin.sh;
-      return {
-        cx: (s.gateCoin.cx / s.gateCoin.fw) * s.gateCoin.sw * kx,
-        cy: (s.gateCoin.cy / s.gateCoin.fh) * s.gateCoin.sh * ky,
-        r: Math.max(3, (s.gateCoin.rr / s.gateCoin.fw) * s.gateCoin.sw * kx),
+      body.reference = {
+        id: "coin",
+        rle: circleRle(
+          (s.gateCoin.cx / s.gateCoin.fw) * s.gateCoin.sw * kx,
+          (s.gateCoin.cy / s.gateCoin.fh) * s.gateCoin.sh * ky,
+          Math.max(3, (s.gateCoin.rr / s.gateCoin.fw) * s.gateCoin.sw * kx),
+          w,
+          h,
+        ),
+        knownMm: s.coinKindMm,
+        confidence: 0.85,
       };
-    })();
-    if (coinCxCyR) {
-      const { cx, cy, r } = coinCxCyR;
-      circleRef = { id: "coin", rle: circleRle(cx, cy, r, w, h), knownMm: s.coinKindMm, confidence: s.coinManualPt ? 0.9 : 0.85 };
-      // Tap-to-outline, same as the crack: the tap already traced the coin,
-      // so measure exactly the green fill shown. Otherwise trace now (gate
-      // circle or a tap that landed before the model loaded).
-      const stored = s.coinManualPt && s.coinMask ? { mask: s.coinMask, iou: s.coinIou } : null;
-      const traced = stored ?? await traceCoin(cx, cy, r, w, h);
-      body.reference = traced ? { ...circleRef, rle: encodeRle(traced.mask, w, h), confidence: traced.iou } : circleRef;
     } else if (s.noScaleMode) body.note = "percent-only requested";
     setStatus("");
     try {
       let { res, j } = await apiPost(base, "/v1/observe", body);
       if (stale()) return;
-      // a traced outline the backend refuses (not coin-shaped) falls back to the gate's circle
-      if (res.status === 422 && circleRef && body.reference !== circleRef) {
-        console.info(`[coin] traced outline refused (${j.error}); using the detected circle`);
-        body.reference = circleRef;
-        ({ res, j } = await apiPost(base, "/v1/observe", body));
-        if (stale()) return;
-      }
+      // The reference IS the traced outline now - no circle to fall back to.
+      // A refusal means the outline was not coin-shaped: the user re-taps.
       if (!res.ok || !j.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
       const m = await apiPost(base, "/v1/measure", j.result);
       if (stale()) return;
@@ -597,48 +731,22 @@ export default function Mark() {
       s.coinManualPt = [x, y];
       s.coinMask = null;
       s.coinIou = 0;
+      s.noScaleMode = false;
       histRef.current.push("coin");
       setCoinCorrect(false);
       setCoinFixHint("Outlining coin…");
       setMarkBusy(true);
       drawMark();
-      // Same mechanism as the crack: trace now so the green fill shown is
-      // exactly what gets measured. The model downloads on this first need,
-      // not on entry. Falls back to the estimated circle when it fails.
-      setCoinFixHint("Loading the coin model…");
-      if (s.photo) {
-        let ok = false;
-        try {
-          ok = await sam.ensureEmbedded(s.photo);
-        } catch {
-          ok = false;
-        }
-        if (!ok) {
-          embeddings.current = false;
-          setCoinFixHint("Coin model failed to load - using the circle; pick its size");
-          setMarkBusy(false);
-          drawMark();
-          return;
-        }
-      }
-      if (embeddings.current && s.photo) {
-        const w = s.photo.width;
-        const h = s.photo.height;
-        const rr = s.gateCoin ? Math.max(3, (s.gateCoin.rr / s.gateCoin.fw) * (w / s.gateCoin.sw)) : Math.max(10, w * 0.035);
-        try {
-          const traced = await traceCoin(x, y, rr, w, h);
-          if (traced) {
-            s.coinMask = traced.mask;
-            s.coinIou = traced.iou;
-            setCoinFixHint(`Coin outlined (${Math.round(traced.iou * 100)}% sure) - pick its size`);
-          } else {
-            setCoinFixHint("Coin outline unclear - using the circle; pick its size");
-          }
-        } catch {
-          setCoinFixHint("Coin outline unclear - using the circle; pick its size");
-        }
-      } else {
-        setCoinFixHint("Coin marked - outlines when the model loads; pick its size");
+      // Same mechanism as the crack: the tap goes to SAM 3.1 and the traced
+      // outline is what gets measured. No guessed radius, ever.
+      try {
+        if (!s.photo) throw new Error("Photo not ready - try again.");
+        const traced = await segmentCoinViaApi(base, s.photo, [x, y]);
+        s.coinMask = traced.mask;
+        s.coinIou = traced.iou;
+        setCoinFixHint(`Coin outlined (${Math.round(traced.iou * 100)}% sure) - pick its size`);
+      } catch (e) {
+        setCoinFixHint(e instanceof Error ? e.message : "Coin outline failed - tap again.");
       }
       setMarkBusy(false);
       drawMark();
@@ -647,39 +755,21 @@ export default function Mark() {
     s.dmg.points.push([x, y]);
     setStatus("Outlining…");
     setMarkBusy(true);
-    // SAM 3.1 API first; the on-device model only when the API call fails.
+    // Cloud-only: SAM 3.1 API is the only outlining path. No on-device fallback,
+    // so low-tier phones never download or load a model here.
     let out: SamMask | null = null;
-    let source: "api" | "device" = "api";
+    const source: "api" | "device" = "api";
     try {
       out = await segmentViaApi(base, s.photo, s.dmg.points);
     } catch (e) {
-      console.info("[sam] API failed, using on-device", e);
-      source = "device";
-      if (!embeddings.current) {
-        setStatus("Loading the on-device outlining model…");
-        let ready = false;
-        try {
-          ready = s.photo ? await sam.ensureEmbedded(s.photo) : false;
-        } catch {
-          ready = false;
-        }
-        if (!ready) {
-          s.dmg.points.pop();
-          setStatus(sam.lastError
-            ? `Outlining model failed to load (${sam.lastError}) - retry.`
-            : navigator.onLine === false
-              ? "On-device outlining model not available offline yet - reconnect once to download it, then it works offline."
-              : "Outlining model failed to load - check the connection and retry.");
-          setMarkBusy(false);
-          drawMark();
-          return;
-        }
-      }
-      try {
-        out = await segmentOnDevice(sam, s);
-      } catch {
-        out = null;
-      }
+      console.info("[sam] API segment failed", e);
+      const msg = e instanceof Error ? e.message : String(e);
+      setStatus(navigator.onLine === false
+        ? "Outlining needs a connection - reconnect and retry."
+        : `Outlining failed (${msg}). Check the connection and retry.`);
+      setMarkBusy(false);
+      drawMark();
+      return;
     }
     if (out) {
       // Bridge hairline gaps (≤4 px) so one crack reads as one region, not
@@ -688,16 +778,7 @@ export default function Mark() {
       s.dmg.iou = out.iou;
       s.dmg.source = source;
       histRef.current.push("crack");
-      setStatus(`Outlined (${Math.round(out.iou * 100)}% sure) via ${source === "api" ? "SAM 3.1 API" : "on-device"}.`);
-      // Crack selected: now verify the stashed coin candidates (if any):
-      // the first download happens here, never before first tap. Otherwise
-      // warm the model quietly for the coin outline and cross-check.
-      const pending = huntRef.current;
-      if (pending && pending.photo === s.photo && !s.gateCoin && !s.coinManualPt) {
-        void huntCoin(pending.points, pending.photo);
-      } else if (source === "api" && s.photo && !embeddings.current) {
-        void sam.ensureEmbedded(s.photo, true);
-      }
+      setStatus(`Outlined (${Math.round(out.iou * 100)}% sure) via SAM 3.1 API.`);
     } else {
       s.dmg.mask = null;
       s.dmg.source = null;
@@ -755,15 +836,8 @@ export default function Mark() {
         try {
           out = await segmentViaApi(base, s.photo, s.dmg.points);
         } catch (e) {
-          console.info("[sam] undo re-segment failed, trying on-device", e);
-          if (embeddings.current) {
-            s.dmg.pointMasks = [];
-            try {
-              out = await segmentOnDevice(sam, s);
-            } catch {
-              out = null;
-            }
-          }
+          console.info("[sam] undo re-segment failed", e);
+          out = null;
         }
       }
       if (out) {
@@ -788,12 +862,13 @@ export default function Mark() {
     }
   }, [base, coinCorrect, drawMark, embeddings, markBusy, s, sam]);
 
-  const coinState = s.coinManualPt ? (s.coinMask ? "manual-ok" : "manual") : s.gateCoin ? "auto" : "none";
+  const coinState = s.noScaleMode ? "none" : s.coinManualPt ? (s.coinMask ? "manual-ok" : "manual") : s.gateCoin ? "auto" : "none";
   const coinStateText =
-    coinState === "auto" ? "Coin auto-detected - confirm its size."
+    s.noScaleMode ? "Percent-only - no millimetres."
+    : coinState === "auto" ? "Coin auto-detected - confirm its size."
     : coinState === "manual-ok" ? "Coin outlined from your tap - confirm its size."
     : coinState === "manual" ? "Coin tap saved - confirm its size below."
-    : "No coin yet - add one, or measure percent-only.";
+    : "No coin yet - tap it, or measure percent-only.";
   const needSize = Boolean(s.gateCoin || s.coinManualPt) && s.coinKindMm <= 0;
 
   return (
@@ -802,7 +877,7 @@ export default function Mark() {
         <BackButton label="Camera" onClick={() => go("capture")} />
         <Stepper step={2} />
         <h1 id="h-mark">Tap the damage.</h1>
-        <p className="sub">One tap on the crack. The coin is already outlined from the gate.</p>
+        <p className="sub">One tap on the crack, one tap on the coin.</p>
         {!ready ? (
           <>
             <div className="skel" role="status" aria-label="Loading photo" />
@@ -920,6 +995,25 @@ export default function Mark() {
               {coinCorrect ? "Cancel" : s.coinManualPt ? "Re-tap coin" : "Tap coin to correct"}
             </button>
             <span id="coinFixHint" className="coinhint">{coinFixHint}</span>
+          </div>
+          <div className="coinrow">
+            <button
+              id="markNoCoin"
+              className="btn-quiet"
+              type="button"
+              disabled={markBusy || !!s.coinManualPt}
+              onClick={() => {
+                s.noScaleMode = true;
+                s.coinManualPt = null;
+                s.coinMask = null;
+                s.coinIou = 0;
+                setCoinFixHint("");
+                setStatus("Percent-only - no millimetres.");
+                drawMark();
+              }}
+            >
+              {s.noScaleMode ? "Percent-only ✓" : "No coin in frame - percent-only"}
+            </button>
           </div>
           <label className="switchcard">
             <input

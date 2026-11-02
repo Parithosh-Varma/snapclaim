@@ -6,7 +6,7 @@ export function luminanceAt(data, i) {
   return 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
 }
 
-/** Variance of the Laplacian response — low means soft/blurry. Heuristic, not a diagnosis. */
+/** Variance of the Laplacian response - low means soft/blurry. Heuristic, not a diagnosis. */
 export function laplacianVariance(pixels) {
   const { width, height, data } = pixels;
   if (width < 3 || height < 3) return 0;
@@ -41,9 +41,9 @@ export function checkPhoto(pixels, originalSide = 0, thresholds = {}) {
     if (l > 235) bright++;
   }
   const mean = sum / n;
-  if (mean < 40 || dark / n > 0.6) notes.push("This photo is very dark — add light and retake it.");
-  else if (mean > 215 || bright / n > 0.6) notes.push("This photo is blown out — move out of direct light and retake it.");
-  if (laplacianVariance(pixels) < blurBelow) notes.push("This photo looks blurry — hold steady and retake it.");
-  if (originalSide > 0 && originalSide < 800) notes.push("This photo is low resolution — move closer instead of zooming.");
+  if (mean < 40 || dark / n > 0.6) notes.push("This photo is very dark - add light and retake it.");
+  else if (mean > 215 || bright / n > 0.6) notes.push("This photo is blown out - move out of direct light and retake it.");
+  if (laplacianVariance(pixels) < blurBelow) notes.push("This photo looks blurry - hold steady and retake it.");
+  if (originalSide > 0 && originalSide < 800) notes.push("This photo is low resolution - move closer instead of zooming.");
   return notes;
 }

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SnapClaim proof: measured vs guessed</title>
+<style>
+:root{color-scheme:light dark}
+body{font-family:system-ui,-apple-system,sans-serif;max-width:720px;margin:2rem auto;padding:0 1rem;line-height:1.5}
+table{border-collapse:collapse;width:100%;margin:1rem 0}
+th,td{border:1px solid #8884;text-align:left;padding:.4rem .6rem;font-variant-numeric:tabular-nums}
+.badge{display:inline-block;padding:.1rem .5rem;border:1px solid currentColor;border-radius:999px;font-size:.85em}
+img{max-width:100%;height:auto;border-radius:8px}
+.mono{font-family:ui-monospace,monospace;font-size:.9em}
+</style>
+</head>
+<body>
+<h1>Measured, not generated.</h1>
+<p>Same-photo check, updated <span id="d">2026-11-01</span>. Every measured cell below is the deterministic engine (<span class="mono">npm run eval</span>, 7 pass / 0 fail today) — no model in the loop.</p>
+<table>
+<tr><th>Case</th><th>Measured (code)</th><th>Tape / Spark-only guess</th></tr>
+<tr><td>terrace-slab, 2 Nov <b>(real ground truth)</b></td><td><b>218.5&nbsp;mm</b> [R005] — err 8.5 mm (3.7%), <b>inside ±10%</b></td><td>Spark photo-alone <b>315&nbsp;mm</b> — err 88 mm (38.8%), outside. Truth: tape <b>227&nbsp;mm</b></td></tr>
+<tr><td>wall-crack fixture</td><td><b>5.17% / 85.9&nbsp;mm</b> (significant) + stain 1.29% percent-only</td><td><span class="badge">NOT RUN</span> — no <span class="mono">bench/model-only/</span> file, <span class="mono">bench:gap</span> prints UNSCORED</td></tr>
+<tr><td>tilted-wall fixture</td><td><b>0.27% / 66.8&nbsp;mm</b> (cosmetic, tilt-corrected)</td><td><span class="badge">NOT RUN</span></td></tr>
+<tr><td>facade-crack (real photo)</td><td><b>0.74%</b> percent-only — refused mm with no scale reference</td><td><span class="badge">NOT RUN</span></td></tr>
+</table>
+<p>Team photo, coin in plane, ground truth pending tape measurement — accuracy stays UNSCORED until the wall is measured:</p>
+<img src="./samples/dsc_0688.jpg" alt="Team wall crack photo with coin for scale">
+<h2>Live backend</h2>
+<p id="live">checking…</p>
+<ul>
+<li>Worker: <a href="https://snapclaim-backend.parithosh.workers.dev/v1/health">snapclaim-backend.parithosh.workers.dev/v1/health</a></li>
+<li>Repo: <a href="https://github.com/Parithosh-Varma/snapclaim">github.com/Parithosh-Varma/snapclaim</a></li>
+<li>App: <a href="/">snapclaim.pages.dev</a></li>
+</ul>
+<script>
+fetch("https://snapclaim-backend.parithosh.workers.dev/v1/health").then(r=>r.json()).then(j=>{
+document.getElementById("live").innerHTML='Worker <span class="badge">LIVE</span> <span class="mono">'+JSON.stringify(j.result||j)+"</span>";
+}).catch(e=>{document.getElementById("live").textContent="Worker unreachable from here ("+e+"). Mode badge lives in the app.";
+document.getElementById("d").textContent="2026-11-01";
+});
+</script>
+</body>
+</html>

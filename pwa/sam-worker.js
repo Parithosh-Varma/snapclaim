@@ -14,7 +14,7 @@ const MODEL_ID = "Xenova/slimsam-77-uniform";
 const MIN_FINE_SCORE = 0.3;
 const MIN_FINE_AREA = 20;
 // A damage mask covering more than half the frame is the wall, not the
-// damage — return null so the tap retries instead of measuring the room.
+// damage - return null so the tap retries instead of measuring the room.
 const WALL_FRACTION = 0.5;
 
 let tf = null, model = null, processor = null, device = null;
@@ -30,7 +30,11 @@ let forcedCpu = false; // set after a GPU run fails, for the rest of the session
 // ?device=webgpu explicitly forces the GPU path.
 const forced = new URL(self.location.href).searchParams.get("device");
 const deviceMemGB = typeof navigator !== "undefined" ? Number(navigator.deviceMemory) || 0 : 0;
-const lowMemDevice = deviceMemGB > 0 && deviceMemGB <= 4;
+// Single low-memory source: the page computes it once (unknown counts as low)
+// and passes lowMem on every embed. The worker's own reading is the fallback
+// for older shells that do not send one.
+let msgLowMem = null;
+const lowMemDevice = () => (msgLowMem !== null ? msgLowMem : (deviceMemGB > 0 && deviceMemGB <= 4));
 
 async function hasWebGpu() {
   try {
@@ -47,7 +51,7 @@ async function loadModel() {
   // Harmless (shape ops pinned to CPU on purpose) but noisy, so drop to errors only.
   try { tf.env.logLevel = "error"; } catch { /* older transformers build */ }
   // Native ORT EP warnings ("Some nodes were not assigned...") bypass logLevel
-  // and spam console.error. Harmless (shape ops pinned to CPU on purpose) — try
+  // and spam console.error. Harmless (shape ops pinned to CPU on purpose) - try
   // the backend knob too; unknown keys are ignored inside try/catch.
   try { tf.env.backends.onnx.logLevel = "error"; } catch { /* no onnx backend knob */ }
   try { tf.env.backends.onnx.verbose = false; } catch { /* no verbose knob */ }
@@ -55,7 +59,7 @@ async function loadModel() {
     if (p.status === "progress") postMessage({ type: "progress", photoId: progressPhotoId, percent: Math.round(p.progress) });
   };
   processor ??= await tf.AutoProcessor.from_pretrained(MODEL_ID, { progress_callback });
-  if (!lowMemDevice && !forcedCpu && forced !== "wasm" && (forced === "webgpu" || (await hasWebGpu()))) {
+  if (!lowMemDevice() && !forcedCpu && forced !== "wasm" && (forced === "webgpu" || (await hasWebGpu()))) {
     try {
       model = await tf.SamModel.from_pretrained(MODEL_ID, { device: "webgpu", dtype: "fp32", progress_callback });
       device = "webgpu";
@@ -77,9 +81,10 @@ function fallBackToCpu() {
   return true;
 }
 
-async function embed({ photoId, image }) {
+async function embed({ photoId, image, lowMem }) {
   currentPhoto = photoId;
   progressPhotoId = photoId;
+  if (typeof lowMem === "boolean") msgLowMem = lowMem;
   embeddings = null;
   try {
     await loadModel();

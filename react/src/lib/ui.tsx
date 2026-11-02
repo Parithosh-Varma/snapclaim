@@ -36,12 +36,34 @@ export function BackButton({ label, onClick }: { label: string; onClick(): void 
   );
 }
 
-export function receiptChips(receipts: Receipt[] | undefined) {
-  return (receipts ?? []).slice(0, 12).map((r) => (
-    <code key={r.id}>
-      {r.id} · {String(r.output?.value ?? "")} {r.output?.unit ?? ""}
-    </code>
-  ));
+function fmtReceipt(r: Receipt): string {
+  const raw = r.output?.value;
+  const num = typeof raw === "number" ? String(Math.abs(raw) < 10 ? Math.round(raw * 100) / 100 : Math.round(raw * 10) / 10) : String(raw ?? "");
+  switch (r.output?.unit) {
+    case "percent": return `${num}%`;
+    case "mm": return `${num} mm`;
+    case "cm2": return `${num} cm²`;
+    case "mm_per_px": return `scale ${num}`;
+    case "count": return `${num} region${num === "1" ? "" : "s"}`;
+    case "band": return `${num}`;
+    default: return r.output?.unit ? `${num} ${r.output.unit}` : num;
+  }
+}
+
+/** Evidence receipts, humanized and collapsed: one copy, never a raw dump. */
+export function receiptDetails(receipts: Receipt[] | undefined) {
+  const list = receipts ?? [];
+  if (!list.length) return null;
+  return (
+    <details className="receipts-detail">
+      <summary>Evidence · {list.length} receipt{list.length === 1 ? "" : "s"}</summary>
+      <div className="receipts" aria-label="Receipts">
+        {list.slice(0, 12).map((r) => (
+          <code key={r.id}>{r.id} · {fmtReceipt(r)}</code>
+        ))}
+      </div>
+    </details>
+  );
 }
 
 export function MetricCards({ f }: { f: Finding }) {
@@ -56,7 +78,7 @@ export function MetricCards({ f }: { f: Finding }) {
           <span>Of the wall</span>
         </div>
         <div className="metric">
-          <b>{f.crackLengthMm == null ? "—" : `${String(f.crackLengthMm)} mm`}</b>
+          <b>{f.crackLengthMm == null ? "-" : `${String(f.crackLengthMm)} mm`}</b>
           <span>Length</span>
         </div>
         <div className="metric">
@@ -84,7 +106,7 @@ export function MetricCards({ f }: { f: Finding }) {
   );
 }
 
-/** Image with a shimmer placeholder until it decodes — no empty boxes. */
+/** Image with a shimmer placeholder until it decodes - no empty boxes. */
 export function LoadImg({ src, alt, className }: { src: string; alt: string; className?: string }) {
   const [done, setDone] = useState(false);
   return (

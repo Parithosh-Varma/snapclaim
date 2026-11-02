@@ -1,10 +1,17 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/snapclaim-mark-dark.png">
+  <img src="assets/snapclaim-mark.png" width="128" alt="SnapClaim logo — viewfinder corners around a measured crack, with a green measuring ruler">
+</picture>
+
 # SnapClaim
 
-> Point your phone at damage, speak one line about it — get a claim-ready report where every number is measured, cited, and checked before it ships. **Computed, not generated.**
+> Point your phone at damage, speak one line about it - get a claim-ready report where every number is measured, cited, and checked before it ships. **Computed, not generated.**
 
-[![tests](https://img.shields.io/badge/tests-297%20passing-brightgreen)](./tests)
+[![tests](https://github.com/Parithosh-Varma/snapclaim/actions/workflows/ci.yml/badge.svg)](https://github.com/Parithosh-Varma/snapclaim/actions/workflows/ci.yml)
 [![node](https://img.shields.io/badge/node-%3E%3D22.18-339933)](./package.json)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](./LICENSE)
+
+[Try the live app](https://snapclaim.pages.dev) · [Marketing site](https://landing.snapclaim.pages.dev) · [Field case study](https://landing.snapclaim.pages.dev/#case-study)
 
 SnapClaim turns a damage photo plus a one-line description into a replayable evidence package: calibrated measurements (% damaged, crack length/width, area in cm²), each backed by a machine-checkable receipt, with AI-written findings that the server refuses to ship unless every number cites its receipt.
 
@@ -42,7 +49,7 @@ What this does not show yet: how well SAM finds the crack on a real photo. `benc
 
 ## Quickstart
 
-Requirements: Node.js ≥ 22.18. No keys needed — the default mode runs fully offline at $0.
+Requirements: Node.js ≥ 22.18. No keys needed - the default mode runs fully offline at $0.
 
 ```bash
 npm install
@@ -51,7 +58,7 @@ npm run typecheck
 npm run backend:start   # http://127.0.0.1:8787
 ```
 
-Then open `pwa/index.html` (or serve `pwa/` with any static server) and press **Use sample measurement** — the full loop runs in one tap: measure → gated findings → skeptic → SVG annexure. No photo needed.
+Then open `pwa/index.html` (or serve `pwa/` with any static server) and press **Use sample measurement** - the full loop runs in one tap: measure → gated findings → skeptic → SVG annexure. No photo needed.
 
 ```bash
 npm run eval        # deterministic measurement bench
@@ -61,27 +68,29 @@ npm run backend:smoke   # end-to-end smoke against a running backend
 
 ## How it works
 
+![How SnapClaim works: photo plus coin, tap to mask, deterministic measure, receipted values, gated findings; field proof 227 mm tape vs 218.5 mm measured vs 315 mm guess](docs/images/how-it-works.svg)
+
 ```
 photo (+ coin for scale)  +  one spoken line
    ↓
-MASKS — tap damage + coin: on-device SlimSAM preview, or live SAM 3.1
+MASKS - tap damage + coin: on-device SlimSAM preview, or live SAM 3.1
    point prompts; every mask becomes pixel statistics (area, skeleton,
    region count) with no model in the loop
    ↓
-MATH — deterministic measurement engine
+MATH - deterministic measurement engine
    % damaged · crack length (mm) · mean crack width (mm) · area (cm²)
    no scale reference → percentages only, clearly labeled, never upgraded
    ↓
-RECEIPTS — every value carries its formula, inputs, confidence and id
+RECEIPTS - every value carries its formula, inputs, confidence and id
    (R001…), serializable for replay
    ↓
-FINDINGS — Muse Spark drafts sentences; the evidence gate ships them only if
+FINDINGS - Muse Spark drafts sentences; the evidence gate ships them only if
    every number cites its receipt (else HTTP 422 with named failures)
    ↓
-SKEPTIC — Spark Open re-checks the findings; unreproducible ones are
+SKEPTIC - Spark Open re-checks the findings; unreproducible ones are
    printed DISPUTED, never hidden
    ↓
-ANNEXURE — code-drawn SVG: mask outlines, findings, receipts table
+ANNEXURE - code-drawn SVG: mask outlines, findings, receipts table
 ```
 
 Three principles run through all of it:
@@ -101,18 +110,18 @@ Three principles run through all of it:
 
 The health badge reports the mode: `GET /v1/health` → `{mode: "mock" | "live" | "config-error"}`.
 
-For local development, Settings → Developer → **Open admin panel** flips the running backend between mock and live without a restart. It calls `POST /v1/admin/mode` with `Authorization: Bearer $ADMIN_TOKEN`; the token is kept in `sessionStorage` only. The override lives in memory, so a restart or redeploy returns to the `MOCK_MODE` env default. Leave `ADMIN_TOKEN` unset on the public Worker — admin writes then return 403.
+For local development, Settings → Developer → **Open admin panel** flips the running backend between mock and live without a restart. It calls `POST /v1/admin/mode` with `Authorization: Bearer $ADMIN_TOKEN`; the token is kept in `sessionStorage` only. The override lives in memory, so a restart or redeploy returns to the `MOCK_MODE` env default. Leave `ADMIN_TOKEN` unset on the public Worker - admin writes then return 403.
 
 ### Meta models used
 
 | Role | Model | Where |
 |---|---|---|
-| Perception — damage masks | **SAM 3.1** | `https://api.meta.ai/v1` |
-| Reasoning — evidence-gated findings | **Muse Spark 1.3** | `https://api.meta.ai/v1/chat/completions` |
+| Perception - damage masks | **SAM 3.1** | `https://api.meta.ai/v1` |
+| Reasoning - evidence-gated findings | **Muse Spark 1.3** | `https://api.meta.ai/v1/chat/completions` |
 | Independent skeptic (open weights) | **Spark Open** | `https://inference.baseten.co/v1` · `meta-models/muse-spark-open-1026` |
 | Voice intake (any language; auto-detected, optional `languageBias`) | **Muse Voice Transcribe** | `POST https://api.meta.ai/v1/asr/transcribe` (file) · `wss://api.meta.ai/v1/asr/realtime` (live) |
 
-No image generation anywhere: every visual is drawn in code from the masks and the math. (Muse Image is unavailable in our region under Meta's Geographic Use Policy — the receipts pattern turns that constraint into a design principle, not a product boundary.)
+No image generation anywhere: every visual is drawn in code from the masks and the math. (Muse Image is unavailable in our region under Meta's Geographic Use Policy - the receipts pattern turns that constraint into a design principle, not a product boundary.)
 
 ## API reference
 
@@ -120,11 +129,11 @@ All replies are enveloped: `{ok: true, requestId, durationMs, result}`. Errors: 
 
 | Method & path | Input | Output |
 |---|---|---|
-| `GET /v1/health` | — | `{version, time, mode}` |
-| `GET /v1/spend` | — | `{spentUsd, remainingUsd, limitUsd, entries}` |
+| `GET /v1/health` | - | `{version, time, mode}` |
+| `GET /v1/spend` | - | `{spentUsd, remainingUsd, limitUsd, entries}` |
 | `POST /v1/measure` | `{component, masks, scaleReference?, thresholds?}` · keyless | `{findings, receipts, mode: "absolute" \| "percent-only"}` |
-| `POST /v1/observe` | `{masks: [{id, label, rle, confidence}], component?, reference?}` (COCO RLE) · keyless | `{component, masks, scaleReference}` — feeds `/v1/report` |
-| `POST /v1/crosscheck` | `{a, b}` COCO RLE masks of one frame, `threshold?` (default 0.5) · keyless | `{intersection, union, iou, dice, verdict: AGREED/DISPUTED, threshold}` — SlimSAM-vs-SAM check |
+| `POST /v1/observe` | `{masks: [{id, label, rle, confidence}], component?, reference?}` (COCO RLE) · keyless | `{component, masks, scaleReference}` - feeds `/v1/report` |
+| `POST /v1/crosscheck` | `{a, b}` COCO RLE masks of one frame, `threshold?` (default 0.5) · keyless | `{intersection, union, iou, dice, verdict: AGREED/DISPUTED, threshold}` - SlimSAM-vs-SAM check |
 | `POST /v1/report` | measure fields + `transcript?` (+ optional `drafts[]` to test the gate) | `{measurement, findings, gate}` |
 | `POST /v1/segment` | demo: `{imageId, labels, fixture}` · live: `{imageUrl, width, height, points[1–16]}` | demo: `{component, masks}` · live: `{records: [{objectId, box, confidence, rle}]}` |
 | `POST /v1/transcribe` | demo: `{fixtureTranscript}` · live: `{audioBase64, languageBias?, keywords?}` (mono WAV) | `{transcript, audioDurationMs, turns}` |
@@ -134,7 +143,7 @@ All replies are enveloped: `{ok: true, requestId, durationMs, result}`. Errors: 
 
 **The evidence gate** (`src/findings/evidence-gate.ts`) enforces, per finding: at least one cited measured number; every number matches a cited receipt within rounding tolerance (normalizing shorthand IDs like `r1` → `R001`); `%` numbers match `percent` receipts, `mm` numbers match calibrated-length receipts, and `cm²` numbers match calibrated-area receipts; severity words match the cited severity receipt; all citations belong to one mask; ISO dates never count as evidence. Violations throw `EvidenceError` (HTTP 422), listing each failure.
 
-**Measurement rules.** Reference confidence below `MIN_REFERENCE_CONFIDENCE` (default 0.6) drops the report to percent-only with a `scale_rejected` receipt. Default severity bands: cosmetic below 1% damaged, moderate up to 5%, significant above — escalated by crack length ≥ 150 mm or ≥ 3 disconnected regions. Thresholds are configurable per call and printed in the report.
+**Measurement rules.** Reference confidence below `MIN_REFERENCE_CONFIDENCE` (default 0.6) drops the report to percent-only with a `scale_rejected` receipt. Default severity bands: cosmetic below 1% damaged, moderate up to 5%, significant above - escalated by crack length ≥ 150 mm or ≥ 3 disconnected regions. Thresholds are configurable per call and printed in the report.
 
 ## Configuration
 
@@ -143,9 +152,9 @@ Copy `.env.example` to `.env` (never commit it). Every variable is optional; uns
 | Variable | Default | Effect |
 |---|---|---|
 | `MOCK_MODE` | unset (= demo) | Set `0` for live calls; live routes fail closed without keys |
-| `META_API_KEY` | — | Muse Spark findings, SAM 3.1 segment, voice transcribe |
+| `META_API_KEY` | - | Muse Spark findings, SAM 3.1 segment, voice transcribe |
 | `META_API_BASE` | `https://api.meta.ai/v1` | Override for proxies / debugging |
-| `BASETEN_API_KEY` | — | Spark Open skeptic |
+| `BASETEN_API_KEY` | - | Spark Open skeptic |
 | `BASETEN_API_BASE` | `https://inference.baseten.co/v1` | Override for proxies / debugging |
 | `SPEND_GUARD_USD` | `5` | Hard cap on live spend; 429 at $0 remaining |
 | `MIN_REFERENCE_CONFIDENCE` | `0.6` | Below this, reports stay percent-only |
@@ -161,7 +170,7 @@ npx wrangler secret put META_API_KEY
 npx wrangler secret put BASETEN_API_KEY   # when Baseten access is granted
 ```
 
-**PWA** — any static host serves `pwa/` (no build step). Point the Backend URL box at the Worker. Installable via `manifest.webmanifest`; the service worker caches the shell and never caches `/v1`.
+**PWA** - any static host serves `pwa/` (no build step). Point the Backend URL box at the Worker. Installable via `manifest.webmanifest`; the service worker caches the shell and never caches `/v1`.
 
 **Pages site** (public app, gated admin):
 
@@ -170,7 +179,7 @@ npm --prefix react run build
 npx wrangler pages deploy react/dist --project-name snapclaim
 ```
 
-Production is <https://snapclaim.pages.dev> — open to anyone. Only the dev panel at <https://snapclaim.pages.dev/admin> sits behind Cloudflare Access: anonymous requests there get a 302 to the team login, and only these three emails can get in (one-time PIN, no Cloudflare account or WARP client, 24-hour session):
+Production is <https://snapclaim.pages.dev> - open to anyone. Only the dev panel at <https://snapclaim.pages.dev/admin> sits behind Cloudflare Access: anonymous requests there get a 302 to the team login, and only these three emails can get in (one-time PIN, no Cloudflare account or WARP client, 24-hour session):
 
 - `parithvrmo@gmail.com`
 - `therealtariqkhalif@gmail.com`
@@ -197,6 +206,8 @@ The app keeps one strict backend policy in places that must stay in sync: the `<
 
 Per-claim live cost at current pricing: SAM 3.1 ≈ $0.0025/image, voice ≈ $0.0005 per 10 s line, skeptic per Baseten token rates, Spark findings metered at $0 until Meta publishes pricing. The default $5 cap covers well over a thousand full live claims.
 
+![One $5 hard cap versus about $0.003 per live claim: SAM segment plus voice line, findings metered at $0](docs/images/cost-per-claim.svg)
+
 Hard limits: 50 masks per call (chunk above), 1–16 point prompts per segment call, 1 MB JSON body on Node, 4 MB audio uploads, 10 s voice clips, 512 px PWA photo side. The spend guard is per-process (per-isolate on Workers — use Durable Objects/D1 for a global cap).
 
 ## Privacy and security
@@ -210,7 +221,25 @@ Hard limits: 50 masks per call (chunk above), 1–16 point prompts per segment c
 
 ## Evaluation
 
+### What is measured today
+
+All three commands are free and deterministic; run them yourself.
+
+| Check | Command | Result on `main` |
+|---|---|---|
+| Measurement code vs known answers (54 scenes drawn in code, coin scale, some on tilted walls) | `npm run bench:truth` | length median error 1.4%, 100% within ±10%; width median error 4.0%, 96.3% within ±10%; 3/3 no-scale refusals held |
+| Regression on dev mask fixtures | `npm run eval` | 7 pass, 0 skip, 0 fail |
+| Live pipeline on held-out real photos | `npm run bench` | 11 cases, 0 archived runs yet (all UNRUN, so the command exits 1 on purpose) |
+
+What this does not show yet: how well SAM finds the crack on a real photo. `bench:truth` checks the maths given a mask, not the mask itself. No real crack has been tape-measured yet, so `npm run bench:gap` (pipeline vs model-only guess against a tape) still prints UNSCORED. We would rather show that gap than fill it with a number we cannot back.
+
 - `npm run eval` — deterministic bench over `fixtures/masks/*.json` vs `fixtures/expected/` (missing expected file = SKIP, never a pass). Current: wall-crack 5.17% / 85.9 mm / 2.6 mm wide / 2.19 cm² (significant), stain 1.29% percent-only (moderate).
+<img src="docs/images/terrace-slab.jpg" width="560" alt="Terrace-slab crack with a taped ₹2 coin; a yellow measuring tape runs alongside as ground truth">
+*Our own field photo: the crack, a taped coin for scale, and the tape as ground truth — [full case-study report](https://landing.snapclaim.pages.dev/assets/case-study/terrace-slab.pdf).*
+
+- Field case (terrace slab, Nov 2026): measured 218.5 mm against a 227 mm tape (inside ±10%); photo-alone guess 315 mm (outside ±10%). Full report: [terrace-slab.pdf](https://landing.snapclaim.pages.dev/assets/case-study/terrace-slab.pdf).
+
+![Bar chart: tape 227 mm as ground truth, SnapClaim measured 218.5 mm inside ±10%, photo-alone guess 315 mm outside ±10%](docs/images/measured-vs-guessed.svg)
 - `bench/split.json` — dev/held-out split, frozen before tuning. Held-out has 11 cases: 4 public no-scale photos that must stay percent-only, and 7 team photos with a 2 INR coin (no tape measurement yet, so they test detection and refusals).
 - `npm run bench:truth` (`bench/truth.ts`) — 54 scenes with exactly known crack length/width, run through the same measurement code a photo goes through. Tests the maths, not SAM.
 - `bench/score.ts` — skeptic DISPUTED scoring with missing-label accounting.
@@ -250,7 +279,7 @@ tests/          297 tests, mock by default, live paths with stubbed fetch
 - **Documentation, not advice.** No coverage decisions, no legal claims, no approval predictions. A human decides; SnapClaim produces the evidence package.
 - **Measurement ≠ causation.** The chain proves what was measured, not who broke it.
 - **Staged photos are a known limit.** Receipts make measurement replayable and partly tamper-evident; they do not prove provenance.
-- No medical, health, or insurance-advice functionality. No image generation — every visual is drawn in code. SVG only (no PDF).
+- No medical, health, or insurance-advice functionality. No image generation - every visual is drawn in code. SVG only (no PDF).
 - No geo-circumvention, no VPN. Credits claimed only with each builder's own registration email; no pooling. Build-time tooling disclosed in `DEV-LOG.md`.
 
 ## Provenance and license
