@@ -188,6 +188,32 @@ if (toggle) {
   }
 
   setText("outcome", cs.outcome);
+  const pdfview = slot("pdfview");
+  if (pdfview) {
+    pdfview.textContent = "";
+    if (cs.reportPdf) {
+      const h = document.createElement("h3");
+      h.className = "doc-sec";
+      h.textContent = "Full report";
+      pdfview.appendChild(h);
+      const obj = document.createElement("object");
+      obj.className = "cs-pdfview";
+      obj.data = String(cs.reportPdf);
+      obj.type = "application/pdf";
+      obj.setAttribute("aria-label", "Case study report PDF");
+      const fallback = document.createElement("p");
+      fallback.textContent = "Your browser can't show the PDF here — ";
+      const a = document.createElement("a");
+      a.href = String(cs.reportPdf);
+      a.textContent = "download the full report (PDF)";
+      fallback.appendChild(a);
+      fallback.appendChild(document.createTextNode("."));
+      obj.appendChild(fallback);
+      pdfview.appendChild(obj);
+    } else {
+      pdfview.remove();
+    }
+  }
   if (cs.reportPdf) {
     const body = slot("outcome");
     if (body) {
