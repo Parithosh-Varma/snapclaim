@@ -333,3 +333,108 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   .foot-cols { grid-template-columns: 1fr; gap: 32px; }
   .closer .actions .btn { width: 100%; }
 }
+
+/* NYT design system — scoped to the case study only. Nothing below
+   leaks out: every rule starts with #case-study. Cheltenham-like serif
+   headlines and body, Franklin-like sans kickers and labels, hairline
+   rules, black and white. The panel stays paper-white in dark mode,
+   like a printed clipping. */
+#case-study {
+  font-family: Georgia, "Times New Roman", "Nimbus Roman", serif;
+  color: #121212;
+  background: #fff;
+  border-top: 1px solid #121212;
+  border-bottom: 1px solid #dfdfdf;
+  padding-block: 48px 56px;
+  padding-inline: clamp(20px, 5vw, 64px);
+}
+#case-study .nyt-kicker {
+  font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: #121212;
+  border-bottom: 1px solid #dfdfdf;
+  padding-bottom: 12px; margin: 0 0 20px;
+}
+#case-study h2 {
+  font-weight: 700; letter-spacing: 0;
+  font-size: clamp(2rem, 4.5vw, 3rem); line-height: 1.04;
+  max-width: 20ch; text-wrap: balance;
+  margin: 0;
+}
+#case-study .sub {
+  font-style: italic; font-size: 1.125rem; line-height: 1.5;
+  color: #555; max-width: 44ch;
+  margin-top: 12px;
+}
+#case-study .cs-photos { margin-top: 28px; }
+#case-study .cs-photos img { border-radius: 0; }
+#case-study .cs-photos figcaption {
+  font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 0.8125rem; line-height: 1.45; color: #666;
+  border-bottom: 1px solid #dfdfdf;
+  padding-bottom: 10px;
+}
+#case-study .cs-grid { margin-top: 32px; }
+#case-study .doc-sec {
+  font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  border-top: 1px solid #121212;
+  padding-top: 10px; margin: 28px 0 10px;
+}
+#case-study .cs-grid > div > h3.doc-sec:first-child { margin-top: 0; }
+#case-study .doc-said {
+  font-size: 1.375rem; font-style: normal; line-height: 1.4;
+  color: #121212;
+  border-top: 1px solid #dfdfdf;
+  border-bottom: 1px solid #dfdfdf;
+  padding: 16px 0; margin: 0;
+}
+#case-study .doc-said span {
+  font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase; color: #666;
+}
+#case-study .doc-method, #case-study .doc-checks,
+#case-study .cs-grid p { color: #333; font-size: 1.0625rem; line-height: 1.65; }
+#case-study .doc-method::first-letter {
+  float: left; font-size: 3.4em; line-height: 0.85;
+  padding-right: 8px; padding-top: 4px; font-weight: 700;
+}
+#case-study table { border-top: 2px solid #121212; margin-top: 4px; }
+#case-study th, #case-study td {
+  border-bottom: 1px solid #dfdfdf;
+  padding: 10px 12px 10px 0;
+  font-size: 0.9375rem;
+}
+#case-study thead th {
+  font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 0.6875rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; color: #666;
+}
+#case-study td { font-variant-numeric: tabular-nums; white-space: nowrap; }
+#case-study td:last-child { text-align: right; }
+#case-study .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+#case-study .pill {
+  font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  background: none; color: #121212;
+  border: 1px solid #121212; border-radius: 0;
+  font-size: 0.6875rem; letter-spacing: 0.08em;
+  padding: 3px 8px;
+}
+#case-study .cs-stat { border: 0; border-top: 1px solid #121212; border-radius: 0; padding: 10px 0 0; background: none; }
+#case-study .cs-stat small {
+  font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: #666;
+}
+#case-study .cs-stat b { font-size: 2rem; font-weight: 700; letter-spacing: 0; }
+#case-study .cs-stat span { color: #555; font-size: 0.9375rem; }
+#case-study .btn {
+  font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  background: #121212; border-color: #121212; color: #fff;
+  border-radius: 0; text-transform: uppercase;
+  letter-spacing: 0.08em; font-size: 0.75rem; font-weight: 700;
+}
+#case-study .btn:hover { background: #333; border-color: #333; }
+#case-study .cs-pdfview { border: 1px solid #dfdfdf; border-radius: 0; background: #f7f7f5; }
