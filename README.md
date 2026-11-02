@@ -1,3 +1,5 @@
+<img src="assets/logo.svg" width="128" alt="SnapClaim logo — viewfinder corners around a measured crack">
+
 # SnapClaim
 
 > Point your phone at damage, speak one line about it — get a claim-ready report where every number is measured, cited, and checked before it ships. **Computed, not generated.**
