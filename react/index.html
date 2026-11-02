@@ -72,24 +72,27 @@
       </div>
 
       <figure class="phone-stage">
-        <div class="phone" role="img" aria-label="SnapClaim on a phone: a cracked wall with a coin for scale, measured at 85.9 mm and marked significant">
+        <div class="phone" role="img" aria-label="SnapClaim on a phone: the Get the numbers screen — a crack tagged Crack · 5.17% · 85.9 mm, marked significant">
           <div class="screen">
-            <div class="app-bar"><span>Bedroom, north wall</span><span class="app-time">Today, 4:12 pm</span></div>
+            <div class="eyebrow">04 / 06 <span class="dashes" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span></div>
             <div class="shot">
               <img src="assets/sample-wall.jpg" alt="" width="800" height="1000">
-              <span class="tag">Crack · 85.9 mm</span>
+              <span class="tag">Crack · 5.17% · 85.9 mm</span>
+              <span class="chip"><i aria-hidden="true"></i>Measured</span>
             </div>
             <div class="result">
               <div class="result-head">
-                <span class="sev">Significant</span>
-                <span class="checked"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9"/></svg>Double-checked</span>
+                <span class="pill pill-ok">Measured</span>
+                <span class="pill pill-ok">Gate pass</span>
               </div>
+              <p class="found">Crack found</p>
               <dl class="measures">
+                <div><dt>Of the wall</dt><dd>5.17%</dd></div>
                 <div><dt>Length</dt><dd>85.9 mm</dd></div>
-                <div><dt>Area</dt><dd>5.17 %</dd></div>
-                <div><dt>Pieces</dt><dd>1</dd></div>
+                <div><dt>Region</dt><dd>1</dd></div>
               </dl>
-              <span class="fake-btn">Share report</span>
+              <div class="sevbar"><span>Significant</span><small>severity band</small></div>
+              <span class="fake-btn fake-dark">Check it twice →</span>
             </div>
           </div>
         </div>
@@ -118,7 +121,7 @@
         <li>
           <div class="step-art">
             <img src="assets/sample-wall.jpg" alt="" width="800" height="1000" loading="lazy">
-            <span class="tag">85.9 mm</span>
+            <span class="tag">Crack · 5.17% · 85.9 mm</span>
           </div>
           <h3><span class="n">2</span>We measure it</h3>
           <p>SnapClaim outlines the damage and measures it from the photo: how long, how much of the surface, how many pieces. The coin sets the scale.</p>
@@ -130,7 +133,7 @@
               <span class="mini-row"><i>Crack length</i><i>85.9 mm</i></span>
               <span class="mini-row"><i>Surface affected</i><i>5.17 %</i></span>
               <span class="mini-row"><i>Severity</i><i>Significant</i></span>
-              <span class="mini-ok"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9"/></svg>Checked by a second AI</span>
+              <span class="mini-ok"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9"/></svg>Gate pass · every number cited</span>
             </div>
           </div>
           <h3><span class="n">3</span>Get your report</h3>
@@ -176,32 +179,44 @@
       <article class="doc" aria-label="Sample SnapClaim damage report">
         <header class="doc-head">
           <div>
+            <p class="doc-brand">SnapClaim</p>
             <p class="doc-title">Damage report</p>
-            <p class="doc-sub">Bedroom, north wall · Apt 4B</p>
+            <p class="doc-sub">Ref SC-4F8A1C9E</p>
+            <p class="doc-sub">Generated Nov 2026 · 1 finding</p>
+            <p class="doc-note">Device-clock time, not verified evidence time.</p>
           </div>
-          <img class="mark" src="assets/snapclaim-mark.png" alt="" width="34" height="32">
+          <span class="pill pill-ok">Gate pass</span>
         </header>
         <div class="doc-body">
+          <h3 class="doc-sec">1 · Observed damage</h3>
           <div class="doc-photo">
             <img src="assets/sample-wall.jpg" alt="Weathered wall with a long vertical crack and a coin taped beside it for scale" width="800" height="1000" loading="lazy">
           </div>
           <div class="doc-findings">
+            <p class="doc-cap">Figure 1 — the captured photo. In the app, the measured outlines are drawn onto it when the report is generated.</p>
             <p class="doc-said"><span>In the tenant's words</span>“This crack was already here when I moved in.”</p>
+            <h3 class="doc-sec">2 · Measurements</h3>
             <table>
               <caption class="visually-hidden">Measurements</caption>
+              <thead>
+                <tr><th scope="col">Item</th><th scope="col">Value</th><th scope="col">Evidence</th><th scope="col"><span class="visually-hidden">Status</span></th></tr>
+              </thead>
               <tbody>
-                <tr><th scope="row">Crack length</th><td>85.9 mm</td><td class="ok">Confirmed</td></tr>
-                <tr><th scope="row">Surface affected</th><td>5.17 %</td><td class="ok">Confirmed</td></tr>
-                <tr><th scope="row">Separate cracks</th><td>1</td><td class="ok">Confirmed</td></tr>
-                <tr><th scope="row">Severity</th><td>Significant</td><td class="flag">Disputed</td></tr>
+                <tr><th scope="row">Crack length</th><td>85.9 mm</td><td class="mono">—</td><td><span class="pill pill-ok">Confirmed</span></td></tr>
+                <tr><th scope="row">Surface affected</th><td>5.17 %</td><td class="mono">—</td><td><span class="pill pill-ok">Confirmed</span></td></tr>
+                <tr><th scope="row">Severity</th><td>Significant</td><td class="mono">—</td><td><span class="pill pill-ok">Confirmed</span></td></tr>
               </tbody>
             </table>
-            <p class="doc-flag"><b>Why disputed:</b> the second check rates this as moderate, because the crack is narrow along most of its length.</p>
+            <h3 class="doc-sec">3 · Method</h3>
+            <p class="doc-method">Outlines measured from photo pixels, scaled by the coin diameter (tilt-corrected from its ellipse). Every number cites its evidence receipt.</p>
+            <h3 class="doc-sec">4 · Verification</h3>
+            <p class="doc-checks">Evidence gate: passed · Independent skeptic: verified · Mask cross-check: verified</p>
           </div>
         </div>
         <footer class="doc-foot">
           <p><b>How the length was measured:</b> 913 px along the crack × 0.094077 mm per px. The scale comes from the 27 mm coin in the fixture set.</p>
-          <p class="doc-note">Sample layout. Numbers from the repo's wall-crack fixture.</p>
+          <p>Generated on this device by SnapClaim · Ref SC-4F8A1C9E</p>
+          <p class="doc-note">Sample layout. Numbers from the repo's wall-crack fixture; evidence receipts omitted.</p>
         </footer>
       </article>
     </section>

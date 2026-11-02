@@ -175,11 +175,36 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .measures dt { font-size: 0.75rem; color: var(--ink-3); }
 .measures dd { margin: 0; white-space: nowrap; font-weight: 720; font-size: 1.0625rem; letter-spacing: -0.01em; }
 .fake-btn { display: grid; place-items: center; min-height: 44px; border-radius: 10px; background: var(--go); color: #fff; font-weight: 640; font-size: 0.9375rem; }
+.fake-btn.fake-dark { background: var(--ink); color: var(--bg); }
 .phone-stage figcaption { font-size: 0.8125rem; color: var(--ink-3); margin-top: 48px; text-align: center; }
 
-/* The one authored moment: the crack outline sweeps down the photo */
+/* App-mirror: the phone shows the real Get-the-numbers screen */
+.screen .eyebrow { display: flex; align-items: center; gap: 8px; padding: 16px 18px 0; font-size: 0.75rem; font-weight: 700; color: var(--go-ink); }
+.screen .eyebrow .dashes { display: inline-flex; gap: 4px; }
+.screen .eyebrow .dashes i { width: 20px; height: 4px; border-radius: 2px; background: var(--line); }
+.screen .eyebrow .dashes i.on { background: var(--go); }
+.shot .tag { left: 32%; top: 40%; }
+.shot .chip { position: absolute; left: 12px; bottom: 12px; display: inline-flex; align-items: center; gap: 7px; background: #fff; color: #0b2557; font-size: 0.75rem; font-weight: 700; padding: 6px 10px; border-radius: 999px; box-shadow: var(--shadow-sm); }
+.shot .chip i { width: 8px; height: 8px; border-radius: 50%; background: var(--damage); }
+.step-art .tag { left: auto; right: 14px; top: 14px; }
+.pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.6875rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
+.pill-ok { background: var(--go-tint); color: var(--go-ink); }
+.found { font-size: 1.25rem; font-weight: 800; letter-spacing: -0.02em; margin: 0; }
+.sevbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--damage-tint); color: var(--damage-ink); border-radius: 10px; padding: 10px 12px; font-weight: 800; font-size: 0.9375rem; }
+.sevbar small { font-weight: 600; font-size: 0.75rem; opacity: 0.8; }
+.doc-brand { font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+.doc-head .pill { align-self: start; }
+.doc-body > .doc-sec { grid-column: 1 / -1; }
+.doc-body > .doc-sec:first-child { margin-top: 0; }
+.doc-sec { font-size: 0.9375rem; font-weight: 760; margin: 18px 0 8px; }
+.doc-cap, .doc-method, .doc-checks { font-size: 0.875rem; color: var(--ink-2); }
+.doc-cap { margin: 0 0 12px; }
+.doc table thead th { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.doc table td:last-child { text-align: right; }
+.doc .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.8125rem; }
+
+/* The tag rises once the photo is in view */
 @media (prefers-reduced-motion: no-preference) {
-  .shot .mask { animation: trace 1.6s 0.5s var(--ease) both; }
   .shot .tag { animation: rise 0.6s 1.7s var(--ease) both; }
 }
 @keyframes trace { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
