@@ -277,7 +277,9 @@ export class CoinGate {
         this.coinLabel = def ? `${def.label} · ${def.diam} mm dia` : best.label;
         this.coinMm = def?.diam ?? 0;
         this.cb.onCoinIdentified(this.coinLabel, this.coinMm);
-        this.cb.onHint(`${this.coinLabel} (${Math.round(best.confidence * 100)}%) — hold steady…`);
+        // A colour-only guess (often wrong between silver coins): keep it out
+        // of the hint so nobody reads it as the coin size the scale will use.
+        this.cb.onHint("Coin found — hold steady…");
       } else {
         this.coinLabel = "";
         this.coinMm = 0;
