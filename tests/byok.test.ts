@@ -1,7 +1,7 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
 import { handleRequest } from "../backend/app.ts";
-import { citingDrafts, loadWallFixture, modelFetch, wallSession } from "./helpers.ts";
+import { citingDrafts, loadWallFixture, modelFetch, wallSession, LIVE_ENV } from "./helpers.ts";
 import { byokHeaders } from "../react/src/lib/api.ts";
 
 // --- client: byokHeaders unit tests (local main) ---
@@ -127,4 +127,62 @@ test("byok: an oversized key is rejected before any call", async () => {
   });
   assert.equal(res.status, 400);
   assert.equal(tokens.length, 0);
+});
+
+test("apiGet merges byok headers like apiPost", async () => {
+  storageWith(JSON.stringify({ basetenKey: "k-base" }));
+  let seen: Record<string, string> = {};
+  (globalThis as Record<string, unknown>).fetch = (async (_url: unknown, init: { headers?: unknown }) => {
+    seen = { ...(init.headers as Record<string, string>) };
+    return { ok: true, status: 200, json: async () => ({ ok: true }) };
+  }) as unknown as typeof fetch;
+  const { apiGet } = await import("../react/src/lib/api.ts");
+  const out = await apiGet("http://127.0.0.1:8787", "/v1/health");
+  assert.equal(out.res.status, 200);
+  assert.equal(seen["x-baseten-key"], "k-base");
+  assert.equal(seen["x-meta-key"], undefined);
+  delete (globalThis as Record<string, unknown>).fetch;
+  clearStorage();
+});
+
+test("apiPost extraHeaders win over stored byok keys (explicit override)", async () => {
+  storageWith(JSON.stringify({ metaKey: "k-stored" }));
+  let seen: Record<string, string> = {};
+  (globalThis as Record<string, unknown>).fetch = (async (_url: unknown, init: { headers?: unknown }) => {
+    seen = { ...(init.headers as Record<string, string>) };
+    return { ok: true, status: 200, json: async () => ({ ok: true }) };
+  }) as unknown as typeof fetch;
+  const { apiPost } = await import("../react/src/lib/api.ts");
+  await apiPost("http://127.0.0.1:8787", "/v1/health", {}, undefined, { "x-meta-key": "k-explicit" });
+  assert.equal(seen["x-meta-key"], "k-explicit");
+  delete (globalThis as Record<string, unknown>).fetch;
+  clearStorage();
+});
+
+test("byok: whitespace-only caller key is dropped, worker secret used", async () => {
+  const { fetchFn, tokens } = recordingFetch();
+  const res = await handleRequest({
+    method: "POST",
+    path: "/v1/report",
+    body: payload(),
+    env: { ...LIVE_ENV },
+    headers: { "x-meta-key": "   " },
+    fetchFn,
+  });
+  assert.equal(res.status, 200);
+  assert.ok(tokens.every((t) => t === `Bearer ${LIVE_ENV.META_API_KEY}`));
+});
+
+test("byok: caller key wins when both caller and worker keys set", async () => {
+  const { fetchFn, tokens } = recordingFetch();
+  const res = await handleRequest({
+    method: "POST",
+    path: "/v1/report",
+    body: payload(),
+    env: { ...LIVE_ENV },
+    headers: { "x-meta-key": "caller-key-123" },
+    fetchFn,
+  });
+  assert.equal(res.status, 200);
+  assert.ok(tokens.every((t) => t === "Bearer caller-key-123"));
 });

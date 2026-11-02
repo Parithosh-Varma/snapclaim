@@ -98,7 +98,7 @@ function severityWords(statement: string): string[] {
  * gate advertises severity agreement - the canonical bands are the only
  * verifiable severity vocabulary.
  */
-const UNVERIFIABLE_SEVERITY = /\b(severe|severely|critical|catastrophic|destroyed|total\s+loss|write-?off|minor|major|negligible|extensive|serious|badly\s+damaged)\b/i;
+const UNVERIFIABLE_SEVERITY = /\b(severe|severely|critical|catastrophic|destroyed|total\s+loss|write-?off|minor|major|negligible|extensive|serious|badly\s+damaged|demolish|demolition|evacuate|evacuation|condemned|collapse|uninhabitable)\b/i;
 
 function maskIdsOf(cited: Receipt[]): string[] {
   const ids: string[] = [];

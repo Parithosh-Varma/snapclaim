@@ -20,7 +20,7 @@ export default function Capture() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const gateRef = useRef<CoinGate | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const [hint, setHint] = useState("Add a coin for scale");
+  const [hint, setHint] = useState("");
   const [ring, setRing] = useState<{ left: number; top: number; size: number } | null>(null);
   const [locked, setLocked] = useState(true);
   const [count, setCount] = useState<number | null>(null);
@@ -75,14 +75,18 @@ export default function Capture() {
         ? "Percentages only — no millimetres"
         : tapMsg ?? (locked ? "Place a coin next to the damage" : "Coin found – fit damage + coin in frame");
 
+  const shotBusy = useRef(false);
   const onShutterTap = () => {
+    if (shotBusy.current) return;
     if (locked) {
       setTapMsg("Hold a coin in front of the camera");
       if (tapTimer.current) clearTimeout(tapTimer.current);
       tapTimer.current = setTimeout(() => setTapMsg(null), 4000);
       return;
     }
+    shotBusy.current = true;
     captureStill();
+    setTimeout(() => { shotBusy.current = false; }, 1000);
   };
 
   /* bottom-sheet drag to dismiss */
@@ -284,11 +288,13 @@ export default function Capture() {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
             </button>
             <div id="camStep" className="step-tag">01 / 06 · Capture</div>
+            {!enableCam && (
             <button id="tipsBtn" type="button" onClick={() => setTipsOpen(true)}>
               Coin tips
             </button>
+          )}
           </div>
-          <div id="coinHint" role="status">{statusLine}</div>
+          <div id="coinHint" role="status">{statusLine}{hint ? ` \u00b7 ${hint}` : ""}</div>
           <input
             ref={fileRef}
             type="file"
