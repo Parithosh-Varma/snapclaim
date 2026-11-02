@@ -90,8 +90,16 @@ async function getBackendMode() {
 /* Low-memory phones default the outlining worker to CPU (see sam-worker.js):
  * name that state on the Mark screen so "slower but stable" reads as intent. */
 function isLowMemDevice() {
+  // Safari has no navigator.deviceMemory, so iPhones/iPads never matched the
+  // check below and embedded SlimSAM straight after the camera. Safari then
+  // killed the tab, which reloads back to Home. Treat iOS/iPadOS (iPadOS
+  // reports MacIntel + touch) as low-memory.
+  if (isAppleMobile()) return true;
   const gb = Number(navigator.deviceMemory) || 0;
   return gb > 0 && gb <= 4;
+}
+function isAppleMobile() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 }
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
 /* Offline honesty: the service worker never caches cross-origin responses, so
@@ -621,7 +629,8 @@ function sam() {
   if (samWorker) return samWorker;
   // ?device=wasm|webgpu on the page URL forces the worker's backend, for comparisons.
   const url = new URL("./sam-worker.js", import.meta.url);
-  const device = new URLSearchParams(location.search).get("device");
+  // The worker can't see the page's UA-based iOS check, so low-memory phones pass wasm here.
+  const device = new URLSearchParams(location.search).get("device") ?? (isLowMemDevice() ? "wasm" : null);
   if (device) url.searchParams.set("device", device);
   samWorker = new Worker(url, { type: "module" });
   samWorker.onmessage = ({ data }) => {
