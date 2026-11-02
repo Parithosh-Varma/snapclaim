@@ -194,6 +194,8 @@ The app keeps one strict backend policy in places that must stay in sync: the `<
 
 Per-claim live cost at current pricing: SAM 3.1 ≈ $0.0025/image, voice ≈ $0.0005 per 10 s line, skeptic per Baseten token rates, Spark findings metered at $0 until Meta publishes pricing. The default $5 cap covers well over a thousand full live claims.
 
+![One $5 hard cap versus about $0.003 per live claim: SAM segment plus voice line, findings metered at $0](docs/images/cost-per-claim.svg)
+
 Hard limits: 50 masks per call (chunk above), 1–16 point prompts per segment call, 1 MB JSON body on Node, 4 MB audio uploads, 10 s voice clips, 512 px PWA photo side. The spend guard is per-process (per-isolate on Workers — use Durable Objects/D1 for a global cap).
 
 ## Privacy and security
@@ -224,6 +226,8 @@ What this does not show yet: how well SAM finds the crack on a real photo. `benc
 *Our own field photo: the crack, a taped coin for scale, and the tape as ground truth — [full case-study report](https://landing.snapclaim.pages.dev/assets/case-study/terrace-slab.pdf).*
 
 - Field case (terrace slab, Nov 2026): measured 218.5 mm against a 227 mm tape (inside ±10%); photo-alone guess 315 mm (outside ±10%). Full report: [terrace-slab.pdf](https://landing.snapclaim.pages.dev/assets/case-study/terrace-slab.pdf).
+
+![Bar chart: tape 227 mm as ground truth, SnapClaim measured 218.5 mm inside ±10%, photo-alone guess 315 mm outside ±10%](docs/images/measured-vs-guessed.svg)
 - `bench/split.json` — dev/held-out split, frozen before tuning. Held-out has 11 cases: 4 public no-scale photos that must stay percent-only, and 7 team photos with a 2 INR coin (no tape measurement yet, so they test detection and refusals).
 - `npm run bench:truth` (`bench/truth.ts`) — 54 scenes with exactly known crack length/width, run through the same measurement code a photo goes through. Tests the maths, not SAM.
 - `bench/score.ts` — skeptic DISPUTED scoring with missing-label accounting.
