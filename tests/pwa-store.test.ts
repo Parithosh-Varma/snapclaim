@@ -48,8 +48,9 @@ test("case store drops the photo instead of losing the case on quota", () => {
   // getItem always null means each write starts empty; the photo makes it exceed.
   const store = createCaseStore(small, { makeId: () => "q1" });
   const saved = store.save({ name: "Big photo", photo: `data:image/jpeg;base64,${"A".repeat(500)}` });
-  assert.equal(saved.photo, null);
-  assert.equal(saved.photoDropped, true);
+  assert.equal(saved.photos?.a, null);
+  assert.ok(saved.dropped?.includes("a"));
+  assert.equal(saved.name, "Big photo");
 });
 
 test("case store settings round-trip and survive case wipe", () => {
@@ -57,11 +58,11 @@ test("case store settings round-trip and survive case wipe", () => {
   const store = createCaseStore(storage);
   assert.deepEqual(store.getSettings(), {});
   store.setSettings({ theme: "dark" });
-  store.setSettings({ donate: true });
-  assert.deepEqual(store.getSettings(), { theme: "dark", donate: true });
+  store.setSettings({ sharePhotos: true });
+  assert.deepEqual(store.getSettings(), { theme: "dark", sharePhotos: true });
   store.save({ name: "C" });
   store.clear();
-  assert.deepEqual(store.getSettings(), { theme: "dark", donate: true }, "wipe clears cases, not settings");
+  assert.deepEqual(store.getSettings(), { theme: "dark", sharePhotos: true }, "wipe clears cases, not settings");
 });
 
 test("case store tolerates corrupt stored JSON", () => {

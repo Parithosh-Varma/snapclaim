@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useApp } from "../App";
 import { MASK_COLORS, type Session } from "../lib/session";
-import { BackButton, Badge, MetricCards, Stepper, receiptChips } from "../lib/ui";
+import { BackButton, Badge, MetricCards, Stepper, receiptDetails } from "../lib/ui";
 
 /** Bounding box of the on pixels, or null when the mask is empty. */
 function maskBox(mask: Uint8Array, w: number, h: number) {
@@ -143,7 +143,7 @@ export default function Numbers() {
         )}
         {s.stillDataUrl && (
           <div className="rowbtns" style={{ marginBottom: 12 }}>
-            <button id="sc-mask-toggle-num" className="btn btn-ghostline" type="button" onClick={() => setMaskOn((v) => !v)}>
+            <button id="sc-mask-toggle-num" className="btn-ghostline" type="button" onClick={() => setMaskOn((v) => !v)}>
               Mask {maskOn ? "on" : "off"}
             </button>
           </div>
@@ -170,7 +170,7 @@ export default function Numbers() {
                       <li key={i}>
                         <p className="found">{label.charAt(0).toUpperCase() + label.slice(1)} found</p>
                         <b>{String(f.percent)}%</b> <small>of the wall</small> ·{" "}
-                        <b>{f.crackLengthMm === null ? "—" : `${String(f.crackLengthMm)} mm`}</b> <small>length</small> ·{" "}
+                        <b>{f.crackLengthMm === null ? "-" : `${String(f.crackLengthMm)} mm`}</b> <small>length</small> ·{" "}
                         {String(f.regionCount ?? 1)} region{(f.regionCount ?? 1) === 1 ? "" : "s"} ·{" "}
                         <Badge kind="ok">{String(f.severity)}</Badge>
                         {f.statement ? (
@@ -184,7 +184,7 @@ export default function Numbers() {
                   })}
                 </ul>
               )}
-              <div className="receipts" aria-label="Receipts">{receiptChips(m.receipts)}</div>
+              {receiptDetails(m.receipts)}
             </>
           ) : null}
         </div>
@@ -206,7 +206,6 @@ export default function Numbers() {
             <>
               <Badge kind="ok">GATE PASS</Badge>
               <p style={{ margin: "10px 0 0", fontWeight: 600 }}>{s.reportStatement}</p>
-              <div className="receipts" aria-label="Receipts">{receiptChips(m?.receipts)}</div>
             </>
           ) : null}
         </div>
@@ -223,6 +222,15 @@ export default function Numbers() {
             }}
           >
             Check it twice →
+          </button>
+          <button
+            id="skipChecks"
+            className="link-btn"
+            type="button"
+            style={{ width: "100%" }}
+            onClick={() => go("sReport")}
+          >
+            or skip straight to the report
           </button>
         </div>
       </div>

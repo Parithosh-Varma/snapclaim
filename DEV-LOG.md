@@ -2,7 +2,7 @@
 
 Honest, dated build log. Mock mode by default; every live API call gets recorded here with its cost.
 
-## 2026-10-27 — Day 1: the deterministic core
+## 2026-10-27 - Day 1: the deterministic core
 
 **Shipped**
 
@@ -16,93 +16,93 @@ Honest, dated build log. Mock mode by default; every live API call gets recorded
 
 **Not done yet**
 
-- Real model calls (SAM 3.1, Muse Spark, Spark Open, voice transcription) — no keys in the repo, none needed for mock CI.
+- Real model calls (SAM 3.1, Muse Spark, Spark Open, voice transcription) - no keys in the repo, none needed for mock CI.
 - PWA capture UI and the SVG/PDF annexure renderer.
 - Real damage photos.
 
 **Spend:** $0.00 (mock mode only).
 
-Credits claim ✅ — billing verified, $150 active on 2026-10-27.
+Credits claim ✅ - billing verified, $150 active on 2026-10-27.
 
 **Next:** live adapters behind the spend guard; real-photo intake; then the renderer.
 
-## 2026-10-27 — Day 1 (cont.): backend
+## 2026-10-27 - Day 1 (cont.): backend
 
 **Shipped**
 
-- `backend/` — one router (`handleRequest`) running on Node (`server.ts`, :8787) and Cloudflare Workers (`worker.ts` + `wrangler.toml`), zero dependencies.
-- Routes: `GET /v1/health` (version + mode), `POST /v1/measure` (deterministic, keyless), `POST /v1/report` (measure → findings → Evidence Gate; uncited numbers return 422 with failures), `POST /v1/segment` (mock requires a supplied fixture — backend invents no masks; live SAM returns 501 until its request shape is verified), `POST /v1/findings` (live Muse Spark via chat completions, gated after drafting).
+- `backend/` - one router (`handleRequest`) running on Node (`server.ts`, :8787) and Cloudflare Workers (`worker.ts` + `wrangler.toml`), zero dependencies.
+- Routes: `GET /v1/health` (version + mode), `POST /v1/measure` (deterministic, keyless), `POST /v1/report` (measure → findings → Evidence Gate; uncited numbers return 422 with failures), `POST /v1/segment` (mock requires a supplied fixture - backend invents no masks; live SAM returns 501 until its request shape is verified), `POST /v1/findings` (live Muse Spark via chat completions, gated after drafting).
 - Live routes fail closed: `503` when `MOCK_MODE=0` without `META_API_KEY`. Mock stays the default; 50-mask cap, 1 MB body cap, verbose enveloped errors.
 - 31 tests green (7 new backend tests), `tsc --noEmit` clean, smoke script passes against a live local boot. $0 spent.
 
 **Next:** verify SAM 3.1 live request shape with one guarded call; PWA capture; SVG/PDF renderer.
 
-## 2026-10-28 — PWA capture (mock)
+## 2026-10-28 - PWA capture (mock)
 
 **Shipped**
 
-- `pwa/index.html` + `pwa/app.js` — zero-deps static page: backend URL + health check, photo preview (preview only in mock), masks JSON box preloaded with wall-crack fixture, transcript line, `POST /v1/report`, findings + gate badges, schematic SVG bars (proportional, labeled schematic — not a photo overlay), raw JSON.
+- `pwa/index.html` + `pwa/app.js` - zero-deps static page: backend URL + health check, photo preview (preview only in mock), masks JSON box preloaded with wall-crack fixture, transcript line, `POST /v1/report`, findings + gate badges, schematic SVG bars (proportional, labeled schematic - not a photo overlay), raw JSON.
 - Serve: any static server in `pwa/` (e.g. `npx serve pwa`), backend at `:8787`. E2E verified mock: 2 findings, gate pass. $0 spent.
 
 **Next:** real SAM masks replace pasted JSON; SVG photo overlay + PDF annexure.
 
-## 2026-10-28 — SVG annexure renderer
+## 2026-10-28 - SVG annexure renderer
 
 **Shipped**
 
-- `src/render/svg.ts` — deterministic code-drawn annexure: findings with severity colors, receipts table with formulas, mode badge, transcript, replay note. Escapes hostile input. Exported from `src/index.ts`.
-- `POST /v1/render` — runs gated report then returns `{svg, gate}`. Gated failures stay `422`.
+- `src/render/svg.ts` - deterministic code-drawn annexure: findings with severity colors, receipts table with formulas, mode badge, transcript, replay note. Escapes hostile input. Exported from `src/index.ts`.
+- `POST /v1/render` - runs gated report then returns `{svg, gate}`. Gated failures stay `422`.
 - PWA render button + inline SVG + download link.
-- 34 tests green, `tsc` clean, live render E2E `gate:true`. $0 spent. No PDF — per no-docs constraint, SVG only.
+- 34 tests green, `tsc` clean, live render E2E `gate:true`. $0 spent. No PDF - per no-docs constraint, SVG only.
 
 **Next:** one guarded live Spark findings call; real-photo intake; Worker deploy.
 
-## 2026-10-28 — Spend wiring (no key needed)
+## 2026-10-28 - Spend wiring (no key needed)
 
 **Shipped**
 
-- `backend/spend.ts` — process-singleton `SpendGuard` from `SPEND_GUARD_USD`, `GET /v1/spend` ledger. Mock calls charge nothing.
-- `backend/providers.ts` — live Spark path pre-checks `remainingUsd` (`429` at $0) and records `in=/out=` token usage at `$0` until pricing is confirmed. No hardcoded prices.
-- 37 tests green (3 new spend tests), `tsc` clean, smoke asserts `spend $0`. Live still blocked on `.env` (`NO_ENV` verified) — SAM `501` untouched.
+- `backend/spend.ts` - process-singleton `SpendGuard` from `SPEND_GUARD_USD`, `GET /v1/spend` ledger. Mock calls charge nothing.
+- `backend/providers.ts` - live Spark path pre-checks `remainingUsd` (`429` at $0) and records `in=/out=` token usage at `$0` until pricing is confirmed. No hardcoded prices.
+- 37 tests green (3 new spend tests), `tsc` clean, smoke asserts `spend $0`. Live still blocked on `.env` (`NO_ENV` verified) - SAM `501` untouched.
 
 **Next:** real-photo intake (3–5 with coin/ruler); one live Spark smoke once key lands; Worker deploy.
 
-## 2026-10-28 — First live Spark call ($0)
+## 2026-10-28 - First live Spark call ($0)
 
 **Shipped**
 
 - Live boot verified: `GET /v1/health` → `mode:live`, `GET /v1/spend` → `$10` cap, `$0` spent.
-- One guarded `POST /v1/findings` on the wall-crack fixture: `200`, gate `ok:true`, 8 atomic findings (one per receipt — live model splits finer than the 2-statement mock). Usage recorded: `in=381 out=2658` tokens at `$0` (Meta pricing unconfirmed, no guessed rates).
+- One guarded `POST /v1/findings` on the wall-crack fixture: `200`, gate `ok:true`, 8 atomic findings (one per receipt - live model splits finer than the 2-statement mock). Usage recorded: `in=381 out=2658` tokens at `$0` (Meta pricing unconfirmed, no guessed rates).
 
-**Spend:** $0.00. SAM stays `501` — shape still unverified, no call attempted.
+**Spend:** $0.00. SAM stays `501` - shape still unverified, no call attempted.
 
 **Next:** real-photo intake; Worker deploy; Spark Open skeptic via Baseten.
 
-## 2026-10-28 — Skeptic wired, both live paths probed
+## 2026-10-28 - Skeptic wired, both live paths probed
 
 **Shipped**
 
 - Corrected open-weights id to `meta-models/muse-spark-open` (verified live in Baseten `/v1/models`; the `-1026` suffix does not exist). Pricing verified from the same listing: prompt $0.00000125 / completion $0.00000425 per token (`SPARK_OPEN_PRICE`), charged for real via `estimateCostUsd`.
-- `POST /v1/skeptic` — Baseten chat-completions skeptic with independent system prompt, gated, spend-recorded. Mock-safe; `503` without key; `429` at $0.
+- `POST /v1/skeptic` - Baseten chat-completions skeptic with independent system prompt, gated, spend-recorded. Mock-safe; `503` without key; `429` at $0.
 - 40 tests green, `tsc` clean. $0 new spend.
 
 **Verified live (no guessing)**
 
-- SAM 3.1: not on `/chat/completions` (explicit 404: "Use /v1/responses"). On `/v1/responses` it returns `200 completed` with `images_processed:1` but empty text — mask output shape unresolved. `/v1/segment` stays `501`; never fakes a mask.
-- Skeptic: key valid for `/v1/models` (`200`, 19 models) but inference returns `403 "please check the api-key"`. Access pending — likely the unsubmitted Baseten form / workspace grant. Code complete; live smoke waits on access.
+- SAM 3.1: not on `/chat/completions` (explicit 404: "Use /v1/responses"). On `/v1/responses` it returns `200 completed` with `images_processed:1` but empty text - mask output shape unresolved. `/v1/segment` stays `501`; never fakes a mask.
+- Skeptic: key valid for `/v1/models` (`200`, 19 models) but inference returns `403 "please check the api-key"`. Access pending - likely the unsubmitted Baseten form / workspace grant. Code complete; live smoke waits on access.
 
 **Next:** submit the Baseten form for `meta-models/muse-spark-open`; real-photo intake; Worker deploy.
 
-## 2026-10-28 — Text-first PWA + skeptic view
+## 2026-10-28 - Text-first PWA + skeptic view
 
 **Shipped**
 
 - PWA section 4: "ask skeptic" sends last gated measurement + same transcript text to `/v1/skeptic`, renders AGREED vs DISPUTED badges with citations. Text input is the primary path; voice deferred (no voice UI, no transcribe call).
-- Mock skeptic verified `200` with gated drafts. Live skeptic still `403`-blocked on Baseten access — PWA surfaces the `503` hint inline.
+- Mock skeptic verified `200` with gated drafts. Live skeptic still `403`-blocked on Baseten access - PWA surfaces the `503` hint inline.
 
 **Next:** voice transcribe probe once text demo lands; real photos; Worker deploy.
 
-## 2026-10-28 — Backend finished (honest scope)
+## 2026-10-28 - Backend finished (honest scope)
 
 **Complete and verified**
 
@@ -114,28 +114,28 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 
 **Explicitly out (documented in backend README, not silently missing)**
 
-- SAM masks (`501`), voice transcribe (shape unresolved), skeptic inference (`403` pending form), D1 (stub), PDF (per no-docs constraint — SVG only).
+- SAM masks (`501`), voice transcribe (shape unresolved), skeptic inference (`403` pending form), D1 (stub), PDF (per no-docs constraint - SVG only).
 
-**Spend:** $0.00 recorded (Meta pricing unconfirmed; Baseten pricing verified but unused — no successful inference yet).
+**Spend:** $0.00 recorded (Meta pricing unconfirmed; Baseten pricing verified but unused - no successful inference yet).
 
-## 2026-10-28 — Worker deployed (mock, $0)
+## 2026-10-28 - Worker deployed (mock, $0)
 
-- URL: `https://snapclaim-backend.parithosh.workers.dev` — `GET /v1/health` → `mock`, `POST /v1/report` → 2 findings, gate ok, absolute mode.
+- URL: `https://snapclaim-backend.parithosh.workers.dev` - `GET /v1/health` → `mock`, `POST /v1/report` → 2 findings, gate ok, absolute mode.
 - Mock by default (no secrets on the Worker). Live keys stay local only.
 
-## 2026-10-28 — PWA defaults to Worker + eval bench live
+## 2026-10-28 - PWA defaults to Worker + eval bench live
 
 - PWA backend field now defaults to `https://snapclaim-backend.parithosh.workers.dev` (localhost still typeable). Shareable demo on any phone.
-- `npm run eval` — deterministic guessed-vs-measured bench. Wall-crack locked as regression baseline (2 pass). Missing expected file = SKIP. README in `eval/` for Constantine.
+- `npm run eval` - deterministic guessed-vs-measured bench. Wall-crack locked as regression baseline (2 pass). Missing expected file = SKIP. README in `eval/` for Constantine.
 - 40 tests green, `tsc` clean, eval 2 pass. $0.
 
-## 2026-10-28 — Benchmark hardening (9s push)
+## 2026-10-28 - Benchmark hardening (9s push)
 
 **Shipped**
 
 - Evidence gate hardened: every finding must cite a measured number (qualitative-only sentences fail); dates/times stripped before number extraction (`2026-10-28` no longer reads as -10/-28); per-unit backing (% ↔ percent receipt, mm ↔ calibrated-length receipt); one-mask-per-finding rule; severity words must match the cited severity receipt (contradictions fail). 4 new gate tests.
 - Measurement grown up: calibrated area (cm², `areaPx × mmPerPx² / 100`) and mean crack width (mm, `areaPx / skeletonPx × mmPerPx`) with `calibrated_area` / `calibrated_width` receipts; wall-crack now reports 5.17% / 85.9 mm / 2.6 mm wide / 2.19 cm² (11 receipts, was 8).
-- SAM 3.1 live path real: `src/vision/sam.ts` — point/box prompt builder, full output-text parser (frames, sparse ids, confidence, both encodings), mask decode via official `@meta-sam/parser`, frame pasting + COCO RLE encode. Payloads in tests are real official-encoder outputs. `POST /v1/segment` live takes `{imageUrl, width, height, points}` and returns `{records: [{objectId, box, confidence, rle}]}`; empty output throws, never fakes. The one deliberate dependency; everything else stays zero-dep.
+- SAM 3.1 live path real: `src/vision/sam.ts` - point/box prompt builder, full output-text parser (frames, sparse ids, confidence, both encodings), mask decode via official `@meta-sam/parser`, frame pasting + COCO RLE encode. Payloads in tests are real official-encoder outputs. `POST /v1/segment` live takes `{imageUrl, width, height, points}` and returns `{records: [{objectId, box, confidence, rle}]}`; empty output throws, never fakes. The one deliberate dependency; everything else stays zero-dep.
 - Voice intake real: `POST /v1/transcribe` proxies to `{META_API_BASE}/asr/transcribe` (multipart, PUSH_TO_TALK, Hindi/Telugu/English bias + claim keywords), $0.18/hr ledgered; mock needs `fixtureTranscript`. PWA hold-to-speak records, resamples to mono 16 kHz WAV on-device (OfflineAudioContext), posts base64, fills the transcript box. Mock shows a fixture hint; 503 shows a key hint.
 - PWA trust fixes: `escapeHtml` on all finding/gate rendering (XSS closed); CSP meta; Indian coins (₹10/5/2/1 first); **Use sample** one-tap measurement (wall-crack fixture, no photo needed); service worker (shell offline, `/v1` never cached); installable manifest.
 - Proof artifacts: `npm run replay` reproduces findings + receipts + mode (MATCH/DRIFT, exit codes); `docs/eval-report.md` filled with bench table, frozen split, baselines protocol and stated gaps; `bench/split.json` frozen 2026-10-28.
@@ -146,11 +146,11 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 
 **Next:** set Worker secrets + demo token and flip the badge to live; capture 12–20 ruler-measured photos; one live SAM photo; one live Hindi/Telugu clip; record the video.
 
-## 2026-10-28 — Self-improvement batch 2 (prod push)
+## 2026-10-28 - Self-improvement batch 2 (prod push)
 
 **Shipped**
 
-- `POST /v1/crosscheck` — IoU + Dice agreement between two same-frame RLE masks with AGREED/DISPUTED verdict at a caller threshold (default 0.5). Keyless, deterministic. The planned SlimSAM-vs-SAM 3.1 skeptic check now has a live route, not just a utility.
+- `POST /v1/crosscheck` - IoU + Dice agreement between two same-frame RLE masks with AGREED/DISPUTED verdict at a caller threshold (default 0.5). Keyless, deterministic. The planned SlimSAM-vs-SAM 3.1 skeptic check now has a live route, not just a utility.
 - Eval 2 → 5 pass: `door-peel` (no-scale) and `wall-crack-noscale` fixtures pin the percent-only refusal in CI.
 - Worker body-size guard (1 MB, same as Node) + Worker routing tests.
 - PWA photo quality notes (dark/blown-out/blurry/low-res, calibrated Laplacian threshold 150) sharing one tested module with the suite; no-scale percent-only toggle.
@@ -159,7 +159,7 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 
 **Spend:** $0.00.
 
-## 2026-10-28 — Self-improvement batch 3 (prod hardening)
+## 2026-10-28 - Self-improvement batch 3 (prod hardening)
 
 **Shipped**
 
@@ -170,7 +170,7 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 
 **Spend:** $0.00.
 
-## 2026-10-28 — On-device CV: masks to outlines, coin scale, tilt
+## 2026-10-28 - On-device CV: masks to outlines, coin scale, tilt
 
 **Shipped** (PRs #8, #10–12, #14, #21–25, #29, combined in #30)
 
@@ -183,7 +183,7 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 
 **Spend:** $0.00.
 
-## 2026-10-29 — Two PWAs merged into one, then driven in a browser
+## 2026-10-29 - Two PWAs merged into one, then driven in a browser
 
 **Shipped**
 
@@ -197,7 +197,7 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 **Spend:** $0.00.
 
 **Next:** real phone test; 3–5 real crack photos with a coin (one at an angle) for the eval; record the video.
-## 2026-10-29 — SAM 3.1 is the primary segmenter (main)
+## 2026-10-29 - SAM 3.1 is the primary segmenter (main)
 
 **Shipped**
 
@@ -208,23 +208,23 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 
 **Spend:** $0.0025 (1 live call on main).
 
-## 2026-10-29 — Baseten hackathon key live, skeptic unblocked
+## 2026-10-29 - Baseten hackathon key live, skeptic unblocked
 
 **Shipped**
 
-- Swapped `BASETEN_API_KEY` in `.env` (local only, gitignored) for the Meta hackathon key. The previous key was dead — `403 "please check the api-key you provided"` on every model.
+- Swapped `BASETEN_API_KEY` in `.env` (local only, gitignored) for the Meta hackathon key. The previous key was dead - `403 "please check the api-key you provided"` on every model.
 - Corrects the 2026-10-28 entry above: `meta-models/muse-spark-open-1026` **does** exist. It is listed in `/v1/models` as `name: "[HACKATHON] Muse Spark Open"`, `description: "Muse spark open intended for Meta hackathon, not publicly available"`. The plain `meta-models/muse-spark-open` is the public id and returns `403` for a hackathon key, so `config.models.sparkOpen` now points at the `-1026` id.
 - Capped `max_tokens: 8192` on the skeptic call. Muse Spark Open always reasons and the request set no ceiling on a model whose `max_completion_tokens` is 1,048,576.
 
 **Verified live (no guessing)**
 
 - Key valid end-to-end via the real `BasetenSkepticProvider`, not just curl: `200` in 7.2s → 2 drafts, `r1` cited on the reproducible length, percent correctly `DISPUTED` as underivable.
-- Reasoning dominates output: **1,824 reasoning tokens of 1,930 completion tokens** (95%) for a 289-token prompt. Budget-sane (~$0.009/call) but `max_tokens` must stay generous — at `max_tokens: 64` the model returns `content: null` with `finish_reason: "length"`. The no-content error now reports the finish reason instead of hiding it.
+- Reasoning dominates output: **1,824 reasoning tokens of 1,930 completion tokens** (95%) for a 289-token prompt. Budget-sane (~$0.009/call) but `max_tokens` must stay generous - at `max_tokens: 64` the model returns `content: null` with `finish_reason: "length"`. The no-content error now reports the finish reason instead of hiding it.
 - Also confirmed working on the hackathon model: streaming, tool calls, vision (read a generated image correctly), `response_format: json_object`, and prompt caching (128 cached tokens on repeats). Pricing as previously recorded.
 
 **Spend:** ~$0.02 of the $100 hackathon credit on probe calls. Metred guard untouched. 121 tests green, `tsc` clean.
 
-## 2026-10-29 — Worker skeptic live (fetch binding + redeploy)
+## 2026-10-29 - Worker skeptic live (fetch binding + redeploy)
 
 **Shipped**
 
@@ -232,17 +232,17 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 - Fixed a Workers-only crash: bare global `fetch` passed as `fetchFn` throws illegal-invocation. `worker.ts` and `server.ts` now pass a bound wrapper. Verified on the Worker: `POST /v1/skeptic` → `ok:true`, gate pass, cited drafts.
 - 121 tests green, `tsc` clean.
 
-## 2026-10-29 — Voice endpoint verified live ($0.0001)
+## 2026-10-29 - Voice endpoint verified live ($0.0001)
 
 **Shipped**
 
-- The `?` on the README voice row is resolved: Muse Voice Transcribe lives at `POST /v1/asr/transcribe` (multipart file) and `wss://v1/asr/realtime` (live socket) — not chat/completions, not /v1/responses. Model `muse-voice-transcribe-1.0`, WAV mono 16-bit 24kHz, `PUSH_TO_TALK`, `languageBias: [English]`.
+- The `?` on the README voice row is resolved: Muse Voice Transcribe lives at `POST /v1/asr/transcribe` (multipart file) and `wss://v1/asr/realtime` (live socket) - not chat/completions, not /v1/responses. Model `muse-voice-transcribe-1.0`, WAV mono 16-bit 24kHz, `PUSH_TO_TALK`, `languageBias: [English]`.
 - Probe: 1.5s macOS `say` clip ("wall crack after the rain") → `200`, transcript "wall crack after after the rain." (~$0.0001 at $0.18/hr audio). Hindi/Telugu/code-switch biasing is a documented `languageBias` feature, not yet probed with real speech.
-- README model table corrected. No backend proxy on `main` yet — PWA voice path still unwired; that is the next step if voice makes the demo.
+- README model table corrected. No backend proxy on `main` yet - PWA voice path still unwired; that is the next step if voice makes the demo.
 
 **Spend:** ~$0.0001.
 
-## 2026-10-29 — #30 brought up to date with main
+## 2026-10-29 - #30 brought up to date with main
 
 **Shipped**
 
@@ -252,7 +252,7 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 
 **Spend:** $0.00.
 
-## 2026-10-30 — Trust + error-handling hardening (uncommitted batch)
+## 2026-10-30 - Trust + error-handling hardening (uncommitted batch)
 
 **Shipped**
 
@@ -264,27 +264,27 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 - Removed dead 501 stub in `visionProvider` (live `/v1/segment` runs through `segmentBody` + `segmentWithSam`, verified 2026-10-29); the unreachable branch now says so.
 - 214 tests green, `tsc` clean, eval 7 pass, `bench` UNRUN ×4 (strict exit 1, honest). Smoke green on alternate port (local :8787 is macOS msgsrvr).
 
-## 2026-10-30 — Audit round: dead code, byte caps, parity
+## 2026-10-30 - Audit round: dead code, byte caps, parity
 
 **Shipped**
 
 - PWA coin radius: removed dead `coinSrc` (squared scale, unused) and dead `r` (`... > 1 ? 1 : 1`, unused). The manual red ring now uses `manualCoinRadius()`, the same gate-derived / 3.5%-fallback radius `measure()` sends, so the ring shows what gets measured. `tests/pwa-shell.test.ts` pins it.
-- Worker body cap now counts bytes (`TextEncoder`), not UTF-16 units — parity with the Node streaming cap. `tests/crosscheck.test.ts` covers the multibyte bypass (400k CJK chars under 1M units, over 1M bytes → 400).
+- Worker body cap now counts bytes (`TextEncoder`), not UTF-16 units - parity with the Node streaming cap. `tests/crosscheck.test.ts` covers the multibyte bypass (400k CJK chars under 1M units, over 1M bytes → 400).
 - `react/src/screens/Tabs.tsx` uses shared `DEFAULT_BACKEND_HOST` instead of a hardcoded host string.
 - `pwa/sw.js` CACHE v9 → v10 (shell changed).
-- Full audit: no TODOs, no secrets in tree, `.env` untracked, XSS paths escaped (`esc` + `escSeverity` allowlist), caps (50 masks, 1MB both servers, RLE runs, statement chars), CORS allowlist + rate limit on both servers, allowlist/CSP/offline-copy/skeptic-payload parity PWA↔React (React lacks manual coin correction — PWA-only, noted not ported).
+- Full audit: no TODOs, no secrets in tree, `.env` untracked, XSS paths escaped (`esc` + `escSeverity` allowlist), caps (50 masks, 1MB both servers, RLE runs, statement chars), CORS allowlist + rate limit on both servers, allowlist/CSP/offline-copy/skeptic-payload parity PWA↔React (React lacks manual coin correction - PWA-only, noted not ported).
 
-## 2026-10-30 — React coin-correction port + stale-tap fix
+## 2026-10-30 - React coin-correction port + stale-tap fix
 
 **Shipped**
 
 - React `Mark.tsx` now mirrors the PWA: tap-coin-to-correct (red ring, wins in `measure()` at 0.9 confidence), tape-halo checkbox with the lenient trace margins, shared `manualCoinRadius()` so the ring shows what gets measured. `session.ts` carries `coinManualPt` (cleared on a new photo) + `coinTaped`.
-- Real bug fixed in both apps: a manual coin tap is pixel coords of its photo. The PWA never cleared it — retaking the photo kept the old tap and measured the wrong reference. `setupMarkPhoto` (PWA) and the Mark photo build (React) now clear it; back-nav from Say keeps it.
+- Real bug fixed in both apps: a manual coin tap is pixel coords of its photo. The PWA never cleared it - retaking the photo kept the old tap and measured the wrong reference. `setupMarkPhoto` (PWA) and the Mark photo build (React) now clear it; back-nav from Say keeps it.
 - `pwa/sw.js` CACHE v11 (shell changed). 214 tests green, `tsc` clean, eval 7 pass, React build clean.
 
 **Spend:** $0.00.
 
-## 2026-10-31 — Global defaults (no India-shaped intake)
+## 2026-10-31 - Global defaults (no India-shaped intake)
 
 **Shipped**
 
@@ -296,7 +296,7 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 
 **Spend:** $0.00.
 
-## 2026-10-31 — Voice order: server first, on-device fallback
+## 2026-10-31 - Voice order: server first, on-device fallback
 
 **Shipped**
 
@@ -305,3 +305,24 @@ Credits claim ✅ — billing verified, $150 active on 2026-10-27.
 - 244 tests green, both typechecks clean, React build clean.
 
 **Spend:** $0.00.
+
+## 2026-11-02 - First tape ground truth (terrace slab)
+
+**Shipped**
+
+- Builder tape-measured the terrace-slab crack with a 2 INR coin in frame; pipeline Ref SC-25D35C5E measured 218.5 mm (R005) against tape ~223 mm → err 4.5 mm (2.0%), inside ±10%.
+- New held-out case `terrace-slab-tape-01` in `bench/split.json` with `groundTruth {maskId damage-1, 223 mm}` (tape read from the photo; replace if the physical reading differs >2 mm) plus `bench/runs/terrace-slab-tape-01.json`. Adding a case needs no digest change (digests pin the 4 public cases only).
+- `npm run bench:gap` now scores its first row: `measured scored=1 medianAbsErrorMm=4.5 within10pct=100%`; model-only still missing (one Spark photo-alone guess needed). 30 bench tests green.
+- `/proof.html` carries the real row (measured vs tape); redeployed to the branch preview.
+
+**Spend:** $0.00.
+
+## 2026-11-02 - Gap bench fully scored (model-only arm lands)
+
+**Shipped**
+
+- Builder confirmed physical tape 22.5–23 cm → ground truth recorded 227 mm (midpoint) on `terrace-slab-tape-01` (`fixtures/photos/DSC_0711.JPG`); guess shown `DSC_0710.JPG` (same crack, tape not legible).
+- Spark photo-alone guess via `muse-spark-1.3` chat completions (downscaled 1024px, `response_format json_object`): first attempt `max_tokens 2000` returned `content: null` (`finish_reason length`, reasoning ate all 2000); retry at 8192 → `{"crackLengthMm": 315}` in 15.4s, 3,110 tokens. Archived to `bench/model-only/terrace-slab-tape-01.json`.
+- `npm run bench:gap` exit 0: measured err 8.5 mm (3.7%, in) vs model-only err 88 mm (38.8%, out). `/proof.html` second column filled; rebuilt + redeployed.
+
+**Spend:** $0.00 recorded (Spark pricing unconfirmed; 3,110 tokens metered at $0).

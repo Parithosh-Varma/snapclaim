@@ -1,4 +1,4 @@
-# Competitor leaderboard — Meta Global AI Developer Hackathon
+# Competitor leaderboard - Meta Global AI Developer Hackathon
 
 Sourced from the `#intros` channel: **1,733 messages** (full-history export
 `fixtures/intros-discord-20261031-1031.json`, pulled 2026-10-31) plus the
@@ -12,7 +12,7 @@ scraped from outside the channel.
 - With ≥2 reactions: 41
 - Named projects catalogued below: ~70
 
-## ⚠️ Watch list — closest to SnapClaim (photo in → measurement/assessment out)
+## ⚠️ Watch list - closest to SnapClaim (photo in → measurement/assessment out)
 
 | # | Project | Builder | Why it matters | Signal |
 |---|---|---|---|---|
@@ -49,14 +49,14 @@ scraped from outside the channel.
 
 Also at 3 reacts: AgroGenesis (Walter, farm-manager agents), SPT-TXN (Rudi, privacy-preserving tx triage), Wrytely student agent (Murtazo/Akbar), architect review for built environment (Natasha Newbold), Hedgeling (AnnieBear).
 
-## 📋 Directory — every named project verified from intros
+## 📋 Directory - every named project verified from intros
 
 | Project | Builder | Track | What it does | Reacts |
 |---|---|---|---|---|
-| Snapdesk | Ruthwik | — | Damage photo → measure → refund/repair decision | 1 |
+| Snapdesk | Ruthwik | - | Damage photo → measure → refund/repair decision | 1 |
 | SnapPart | Bibek + Bhashwati | Indie | Photo + coin → sub-mm → printable STL | 0 |
 | LoadMaster | Ryan Cotten | Indie | Trailer photo → securement check | 2 |
-| AI Fixit | David Ch | — | Broken-thing photo → action plan | 2 |
+| AI Fixit | David Ch | - | Broken-thing photo → action plan | 2 |
 | Maqet | Romeo M. | Indie | Floor-plan photo → measured DXF | 3 |
 | Shop AI Copilot | kscooby | Indie | Car photo → ID + verdict + listing | 4 |
 | Topo agent | Yuzuki Kondo | Indie | Wall photo + tap → hold detection | 1 |
@@ -65,26 +65,26 @@ Also at 3 reacts: AgroGenesis (Walter, farm-manager agents), SPT-TXN (Rudi, priv
 | Athos | Matías | Indie | Portable agent know-how | 4 |
 | Not Alone | Stuart | Indie | POD photo cutouts + listings | 4 |
 | Burotu | Michaël | Indie | Methylation → cancer signal | 3 |
-| AgroGenesis | Walter | — | Farm-manager agent vs humans | 3 |
+| AgroGenesis | Walter | - | Farm-manager agent vs humans | 3 |
 | SPT-TXN | Rudi Coetzee | Startup | Privacy tx authorization layer | 3 |
-| Wrytely agent | Murtazo + Akbar | — | Student "Jarvis" organizer | 3 |
-| Blindspot Engine | Lori (Mabbit143) | — | Evidence-contradiction researcher | 2 |
+| Wrytely agent | Murtazo + Akbar | - | Student "Jarvis" organizer | 3 |
+| Blindspot Engine | Lori (Mabbit143) | - | Evidence-contradiction researcher | 2 |
 | RadMesh AI Mode | Miguel (angaritarad) | Startup | Conversational RIS/PACS resident | 2 |
 | synqdash authoring | Christopher (Emotional Damage) | Startup | NL → automation canvas on Muse | 2 |
-| ExtBrain | Tingyi (Ainovo) | — | Chat-history insight extractor | 2 |
-| VerbaGPT | Syed | — | NL → SQL/Python + charts, image-repro | 2 |
+| ExtBrain | Tingyi (Ainovo) | - | Chat-history insight extractor | 2 |
+| VerbaGPT | Syed | - | NL → SQL/Python + charts, image-repro | 2 |
 | Road to 5K | Benny Rodriguez | Indie | Rehab coach for Ray-Ban Display | 2 |
 | BlinkFlow | Sorin (Samoxis) | Indie | Robot-failure rewind + fix + replay | 2 |
 | Omni Agent | Edward Obi | Indie | Autonomous web agent, jobs first | 2 |
-| Physical MCP | Pam Villalon | — | Webcam + SAM → servo presses buttons | 2 |
+| Physical MCP | Pam Villalon | - | Webcam + SAM → servo presses buttons | 2 |
 | Duka Books | Adam (ManFondo) | Indie | WhatsApp ledger/receipt bookkeeper | 2 |
-| VibeGuard | Mayank Soni | — | Scanner for vibe-coded app flaws | 2 |
+| VibeGuard | Mayank Soni | - | Scanner for vibe-coded app flaws | 2 |
 | ClassPrep Autopilot | Kevin Richards | Indie | Course → verified prep bundle | 1 |
 | Carpathron | Mircea Rusu | Startup | Talk-to/drive/become robots + desktop AI | 0 |
-| VirtuRide | Ferdinand (JayDadRobot) | — | Rider-safety HUD on Ray-Ban Display | 0 |
-| iVibe | Niky (Nikylogic) | — | Show bug on screen → fix prompt | 0 |
+| VirtuRide | Ferdinand (JayDadRobot) | - | Rider-safety HUD on Ray-Ban Display | 0 |
+| iVibe | Niky (Nikylogic) | - | Show bug on screen → fix prompt | 0 |
 | Vaultio | Emmanuel (Nuel) | Startup | Technical-hiring assessment layer | 0 |
-| SiliconShield | 117iit | — | Hardware security with Meta models | 0 |
+| SiliconShield | 117iit | - | Hardware security with Meta models | 0 |
 | BacktestAI | mouad | Indie | Agent writes/compiles/backtests MQS5 | 1 |
 | ClipQuery | Indranil | Indie | NL search over camera footage (SAM open-vocab) | 0 |
 | GridSense | Abu Maheer (htech) | Indie | Hausa/English outage assistant + photo inspect | 0 |
@@ -92,69 +92,69 @@ Also at 3 reacts: AgroGenesis (Walter, farm-manager agents), SPT-TXN (Rudi, priv
 | SiteSense | Barbara Ackles | Indie | Inspection severity work orders | 0 |
 | EmberWalk | Deacon Roswell | Indie | Wildfire home checkup | 0 |
 | TEMPO | Jan (Wolv) | Indie | Time-blindness keeper agent + camera invites | 0 |
-| FindIt | Dileep | — | Glasses remember where things are | 0 |
-| SimForge AI | Brian Penrod | — | Simulated robot workbench | 0 |
+| FindIt | Dileep | - | Glasses remember where things are | 0 |
+| SimForge AI | Brian Penrod | - | Simulated robot workbench | 0 |
 | ConVía pickup verify | Juanda | Indie | SAM tracks car + plate read | 0 |
 | Dukaan Saathi | Nagasai | Indie | Ledger photo → digitized + voice Q&A | 0 |
 | SayLedger | Raj (Lexcore) | Startup | Voice + vision ledger, maths in code | 0 |
-| Khet Saathi | Rafat (Royal Bengal AI) | — | Autonomous farm agent | 0 |
+| Khet Saathi | Rafat (Royal Bengal AI) | - | Autonomous farm agent | 0 |
 | Hermes (agronomic) | Franco (Kore Labs) | Startup | Weekly field-work copilot | 0 |
 | PayMind Voice | Jorge (Joarciniegas) | Startup | Bilingual voice for used-car dealers | 0 |
-| Medina Academy | Fathiya Yoosef | — | Teacher-prep assistant | 0 |
+| Medina Academy | Fathiya Yoosef | - | Teacher-prep assistant | 0 |
 | Deja Vu | Vamshi Kanderao | Indie | Personal agents that remember | 0 |
-| OpenLoop | Ritik Joshi | — | (agent infra — detail in thread) | 0 |
+| OpenLoop | Ritik Joshi | - | (agent infra - detail in thread) | 0 |
 | navfail | Manju Jay | Indie | Automates a slow manual engineering step | 0 |
 | Onuron OS | Joysriram Sarkar | Indie | Private open-source AI OS | 0 |
-| Buzzard Code | Balaharish | — | Agent runtime: tool execution + safety | 0 |
-| XMemo | Han (Yonro) | — | Memory layer for AI tools | 0 |
-| PostOrca | Nika Aung | — | Social manager that reads your commits | 0 |
-| AIRA Companion | Deeman (TechLabID) | — | Spatial AI companion | 0 |
-| OmniGuide | Mahfoud | — | OS-level visual guidance overlay | 0 |
+| Buzzard Code | Balaharish | - | Agent runtime: tool execution + safety | 0 |
+| XMemo | Han (Yonro) | - | Memory layer for AI tools | 0 |
+| PostOrca | Nika Aung | - | Social manager that reads your commits | 0 |
+| AIRA Companion | Deeman (TechLabID) | - | Spatial AI companion | 0 |
+| OmniGuide | Mahfoud | - | OS-level visual guidance overlay | 0 |
 | Lantern | palakura | Indie | Private companion + glasses link | 1 |
-| MotherTongue Books | Sahaj | — | Kids' books in mother tongue, tap-to-learn words | 0 |
+| MotherTongue Books | Sahaj | - | Kids' books in mother tongue, tap-to-learn words | 0 |
 | Fraction Comp | Vinay Krishna | Indie | (detail in thread) | 0 |
 | Agrisense | Tracy | Indie | (teaming up solicit) | 0 |
-| YourMove | Joshua | — | (detail in thread) | 0 |
-| Gol | Ashish Adhikari | — | Shop-owner backend over chat | 0 |
+| YourMove | Joshua | - | (detail in thread) | 0 |
+| Gol | Ashish Adhikari | - | Shop-owner backend over chat | 0 |
 | Wokadi | Dami (Damilare) | Indie | Invoice photos → stock records | 0 |
-| Nexora | Smatt | — | Decentralized health database | 0 |
-| MAVIS | Ephyni Ferreras | — | Personal productivity assistant | 0 |
-| Kinaiya | Rogie (DinoBocchi) | — | Voice-agent platform, modular interaction | 0 |
-| SMILE | Kristoffer (CodeSphere PH) | — | Gamified tourism landmarks | 0 |
+| Nexora | Smatt | - | Decentralized health database | 0 |
+| MAVIS | Ephyni Ferreras | - | Personal productivity assistant | 0 |
+| Kinaiya | Rogie (DinoBocchi) | - | Voice-agent platform, modular interaction | 0 |
+| SMILE | Kristoffer (CodeSphere PH) | - | Gamified tourism landmarks | 0 |
 | Mythree | Vijaya Meda | Startup | Live cross-language video interpreter | 0 |
-| Orbit | Akshay (Qook) | — | Workspace (closed-beta follow-up) | 0 |
-| BendLab | YASHH | — | Phototropism simulation + clustering | 0 |
-| ShieldPocket | Joseph (josephmadden121) | — | Pocket CVE triage analyst | 0 |
-| PocketBench | Stanescu | — | Windows repair investigator | 0 |
-| Nerve.rs | Alex (digitBF) | — | Open-source controllable AI runtime | 0 |
-| AONE BP | Yusuff Olufemi | — | WhatsApp salon/shop assistant | 0 |
-| Quantura Studio | Tamzid (royalty) | — | Frontier-agent studio intro | 0 |
-| Enheduanna | Priyanshu (M3TAM0RPH0S1S) | — | Screen-memory desktop intelligence on Muse | 0 |
-| Taskflow OS | Denis (whoisladleo) | — | Enterprise ops + automation | 0 |
-| ContextGuide | Tajudeen Ahmad | — | Visual aid for visually impaired | 0 |
-| Playfellow | Hesham Aboul-Fetouh | — | (detail in thread) | 0 |
-| Lably | Mardav (Dawn) | — | Sentence → interactive science experiment | 0 |
+| Orbit | Akshay (Qook) | - | Workspace (closed-beta follow-up) | 0 |
+| BendLab | YASHH | - | Phototropism simulation + clustering | 0 |
+| ShieldPocket | Joseph (josephmadden121) | - | Pocket CVE triage analyst | 0 |
+| PocketBench | Stanescu | - | Windows repair investigator | 0 |
+| Nerve.rs | Alex (digitBF) | - | Open-source controllable AI runtime | 0 |
+| AONE BP | Yusuff Olufemi | - | WhatsApp salon/shop assistant | 0 |
+| Quantura Studio | Tamzid (royalty) | - | Frontier-agent studio intro | 0 |
+| Enheduanna | Priyanshu (M3TAM0RPH0S1S) | - | Screen-memory desktop intelligence on Muse | 0 |
+| Taskflow OS | Denis (whoisladleo) | - | Enterprise ops + automation | 0 |
+| ContextGuide | Tajudeen Ahmad | - | Visual aid for visually impaired | 0 |
+| Playfellow | Hesham Aboul-Fetouh | - | (detail in thread) | 0 |
+| Lably | Mardav (Dawn) | - | Sentence → interactive science experiment | 0 |
 | RealityLab | Muhammad Sameer | Indie | Object scan → blueprints + Build Mode (see watch list) | 0 |
 | Kirimin ID | Maftuh (Maff) | Startup | Business-tool platform + Meta AI | 2 |
-| Anukriti AI | Abhimanyu R B | — | Drug-risk genetics tools | 2 |
+| Anukriti AI | Abhimanyu R B | - | Drug-risk genetics tools | 2 |
 | Hypa Intelligence | Chris Ibe | Startup | Multilingual speech + language models | 0 |
-| mmData spatial investigator | Melissa | — | Quest 3 investigation environment | 2 |
-| Nexentra | Sumedha G | — | Agentic banking platform | 2 |
-| Mind (Cognitiva) | reas015 | — | Metacognitive memory agents | 2 |
-| Agora | Taylor (Baltor.AI) | — | Architecture doc site, team-seeking | 0 |
-| AdStatus | Hadrien (Hadi) | — | Ad-platform watcher (shipped) | 0 |
-| Vee Vee | Wayne Levi | — | Instruction-core exam 89/89 on Wonder | 0 |
+| mmData spatial investigator | Melissa | - | Quest 3 investigation environment | 2 |
+| Nexentra | Sumedha G | - | Agentic banking platform | 2 |
+| Mind (Cognitiva) | reas015 | - | Metacognitive memory agents | 2 |
+| Agora | Taylor (Baltor.AI) | - | Architecture doc site, team-seeking | 0 |
+| AdStatus | Hadrien (Hadi) | - | Ad-platform watcher (shipped) | 0 |
+| Vee Vee | Wayne Levi | - | Instruction-core exam 89/89 on Wonder | 0 |
 
 ## 🌍 #build-for-your-world scan (1,162 messages, export `fixtures/build-for-your-world-discord-20261031-1559.json`)
 
-Second channel pulled with the same exporter. Smaller and further along: working repos, live demos, shipped apps. Headline finding: **SnapClaim's philosophy is not unique — there is a rigor school.** Five projects independently landed on measured-vs-guessed numbers, deterministic checks, and receipts. That validates the thesis and raises the bar at once: the moat is no longer "we do evidence", it's "we do it most completely (live backend, 121 tests, human-baseline gap table)".
+Second channel pulled with the same exporter. Smaller and further along: working repos, live demos, shipped apps. Headline finding: **SnapClaim's philosophy is not unique - there is a rigor school.** Five projects independently landed on measured-vs-guessed numbers, deterministic checks, and receipts. That validates the thesis and raises the bar at once: the moat is no longer "we do evidence", it's "we do it most completely (live backend, 121 tests, human-baseline gap table)".
 
-### The rigor school — members ranked by completeness
+### The rigor school - members ranked by completeness
 
 | Project | Builder | Their evidence practice | Ship state | Threat |
 |---|---|---|---|---|
 | **SproutVision: Crop Scout** | Farrah (FandomGames), Indie, solo | Quest 3 HUD: photo → SAM segments plants/tray → coverage = mask ÷ mask → Spark verdict *from the measurement*. Publishes the full triad: guessed 35% (Spark-only AND Gemini) vs measured 54/51% vs eye 70%. Golden validation commit, verdict trace w/ SHA-256, confirmation gate, cost caps, 241 tests green. | Public repo, in-headset verified | 🔴 **Highest.** Same gap-table move, same mask-math, shipped with tests. The mirror match. |
-| **CourtSense** | Alperen (AlperenGT) | Tennis video → SAM tracks both players, 4-click court calibration → Spark answers from data, **checks every number against the data, marks uncertain values** (±0.1 m near, rougher far — stated). | Demo + repo, organizer-cleared | 🔴 Pixels-to-metres with stated error bands. Closest to our ruler pipeline. |
+| **CourtSense** | Alperen (AlperenGT) | Tennis video → SAM tracks both players, 4-click court calibration → Spark answers from data, **checks every number against the data, marks uncertain values** (±0.1 m near, rougher far - stated). | Demo + repo, organizer-cleared | 🔴 Pixels-to-metres with stated error bands. Closest to our ruler pipeline. |
 | **Quetzal AOI Briefing** | Xava | Every result labelled **measured / computed / inferred, with receipt**. Rules Adherence Agent gates every commit/demo. | Public repo, day-1 updates | 🟠 Same receipts language, different domain (seismic). |
 | **Ithaca** | Halo (ALO) | "Numbers never come from the model. A deterministic engine counts every minute and every won… checked against a ground-truth checklist." | Repo live | 🟠 Deterministic-numbers doctrine, stated cleanly. |
 | **QorTime** | Contravious (ConWan), first hackathon | SAM tracks screen, Spark explains, **rule-based checks make the call**. Signed receipts, public VERIFIED match page, demo + repo. "The AI only explains." | Shipped w/ demo + repo | 🟠 Referee-pattern twin. |
@@ -180,12 +180,12 @@ Second channel pulled with the same exporter. Smaller and further along: working
 
 ### Already-shipped signals (this channel ships)
 
-Mythree (Vijaya) has a live try-it link with voice-clone deletion guarantees; Carpathron (Mircea) is **on the Microsoft Store**; iVibe (Niky) has downloadable Mac DMGs; SarafuPay submitted with a demo; Spider Engine is open-source. The bar here is "live link or it didn't happen" — our tunnel-tested PWA + live Worker belong in the same sentence.
+Mythree (Vijaya) has a live try-it link with voice-clone deletion guarantees; Carpathron (Mircea) is **on the Microsoft Store**; iVibe (Niky) has downloadable Mac DMGs; SarafuPay submitted with a demo; Spider Engine is open-source. The bar here is "live link or it didn't happen" - our tunnel-tested PWA + live Worker belong in the same sentence.
 
 ## Method note
 
 - Full-history channel exports via the new API exporter (no scroll gaps): every message above is verifiable by `id` in its fixture file.
 - The 1021 partial (30 latest messages at 10:21) is fully contained in the 1031 pull; nothing in it is newer than 04:04 UTC 10-31.
-- Reactions are a weak signal (social posts outrank pitches) — the watch list is ranked by product overlap with SnapClaim, not by reacts.
-- Track labels only where the author stated one; "—" means unstated or ambiguous.
+- Reactions are a weak signal (social posts outrank pitches) - the watch list is ranked by product overlap with SnapClaim, not by reacts.
+- Track labels only where the author stated one; "-" means unstated or ambiguous.
 - Next refresh: re-pull the channel and diff by message `id` (snowflakes sort chronologically).

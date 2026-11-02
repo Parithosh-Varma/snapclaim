@@ -68,7 +68,7 @@ for (const swPath of ["pwa/sw.js", "react/public/sw.js"]) {
 
     // CACHE untouched since HEAD, so every SHELL file must be byte-identical
     // to HEAD. A mismatch means the shell changed but phones would keep the
-    // old cached copy — bump CACHE (pwa: snapclaim-shell-vN+1).
+    // old cached copy - bump CACHE (pwa: snapclaim-shell-vN+1).
     const changed: string[] = [];
     for (const entry of shell) {
       const file = resolveShell(swPath, entry)!;

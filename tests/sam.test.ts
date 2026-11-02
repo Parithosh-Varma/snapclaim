@@ -16,7 +16,7 @@ import { decodeRle } from "../src/vision/mask.ts";
 // Real one_bit payloads generated once with the official encoder
 // (@meta-sam/parser mask-codec, range-coded; the alphabet excludes , ; < > | "
 // so `|>` always terminates a mask token). Decoded in src/ only by the
-// official `decodeMaskToRaster` — the repo never hand-decodes base85.
+// official `decodeMaskToRaster` - the repo never hand-decodes base85.
 function makeMaskToken(h: number, w: number, fill: (x: number, y: number) => number): string {
   const key = `${h}x${w}`;
   const payloads: Record<string, string> = {
@@ -34,7 +34,7 @@ function makeMaskToken(h: number, w: number, fill: (x: number, y: number) => num
   // Sanity: the canned raster really matches `fill` once decoded.
   void fill;
   // Canned payloads already carry their `!` marker (as the encoder emits
-  // them), so no extra marker is added here — same as the live wire format.
+  // them), so no extra marker is added here - same as the live wire format.
   return `data=${h},${w},${payload}`;
 }
 

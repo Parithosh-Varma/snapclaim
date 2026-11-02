@@ -14,7 +14,7 @@ const MODEL_ID = "Xenova/slimsam-77-uniform";
 const MIN_FINE_SCORE = 0.3;
 const MIN_FINE_AREA = 20;
 // A damage mask covering more than half the frame is the wall, not the
-// damage — return null so the tap retries instead of measuring the room.
+// damage - return null so the tap retries instead of measuring the room.
 const WALL_FRACTION = 0.5;
 
 let tf = null, model = null, processor = null, device = null;

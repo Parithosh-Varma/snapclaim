@@ -3,10 +3,10 @@
  *
  * Usage: `npm run replay -- request.json measurement.json`
  *
- * - request.json: {component, masks, scaleReference?} — the measured inputs.
+ * - request.json: {component, masks, scaleReference?} - the measured inputs.
  * - measurement.json: the `measurement` object ({findings, receipts, mode})
  *   from a /v1/report or /v1/measure call (or the array form {receipts} is
- *   rejected — store the full measurement).
+ *   rejected - store the full measurement).
  *
  * Re-runs `measureSession` and checks findings, receipts and mode match.
  * Receipts bind the request identity (component id/confidence sit in the

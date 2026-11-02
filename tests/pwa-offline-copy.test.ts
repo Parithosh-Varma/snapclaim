@@ -14,8 +14,12 @@ test("offline bar is honest about what works without a connection", () => {
     assert.ok(/saved cases/i.test(bar), `${path} offline bar says saved cases work offline`);
     assert.ok(/capture/i.test(bar), `${path} offline bar says capture works offline`);
     assert.ok(/measur/i.test(bar), `${path} offline bar says measuring needs a connection`);
-    assert.ok(/one online load first/i.test(bar), `${path} offline bar says on-device models need a first online load`);
   }
+  // Cloud-by-default: the PWA bar no longer promises an on-device fallback -
+  // new measurements need a connection, full stop. React keeps its own copy.
+  const pwaBar = read("pwa/index.html").match(/id="offlineBar"[\s\S]{0,600}/)?.[0] ?? "";
+  assert.ok(!/one online load first/i.test(pwaBar), "PWA offline bar names the connection, not a model download");
+  assert.ok(/one online load first/i.test(read("react/src/App.tsx")), "React offline bar still names the first online load");
 });
 
 test("settings copy names the third-party hosts contacted on first use", () => {
@@ -28,9 +32,19 @@ test("settings copy names the third-party hosts contacted on first use", () => {
 });
 
 test("on-device model failures say 'not available offline yet' instead of a raw error", () => {
-  for (const path of ["pwa/app.js", "react/src/screens/Mark.tsx", "react/src/screens/Check.tsx"]) {
+  for (const path of ["pwa/app.js", "react/src/screens/Mark.tsx"]) {
     assert.ok(read(path).includes("model not available offline yet"), `${path} names the offline-model state`);
   }
+  // Cloud-only: cross-check never touches an on-device model, so it names the
+  // connection requirement directly instead of a model-download state.
+  assert.ok(
+    read("react/src/screens/Check.tsx").includes("Cross-check needs a connection - reconnect and retry."),
+    "Check.tsx names the offline state without an on-device model",
+  );
+  assert.ok(
+    !read("react/src/screens/Check.tsx").includes("Loading the on-device model"),
+    "Check.tsx never shows an on-device loading state",
+  );
   for (const path of ["pwa/app.js", "react/src/screens/Say.tsx"]) {
     const src = read(path);
     assert.ok(

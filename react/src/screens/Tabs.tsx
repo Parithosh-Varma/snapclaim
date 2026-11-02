@@ -47,6 +47,7 @@ function CaseItem({ c, onOpen }: { c: SnapCase; onOpen: (id: string) => void }) 
 export function Home() {
   const ctx = useApp();
   const { store, casesVersion, startCapture, go } = ctx;
+  const { draft, resumeDraft, discardDraft } = ctx;
   const cases = store.list();
   void casesVersion;
   const [sampleErr, setSampleErr] = useState("");
@@ -71,13 +72,17 @@ export function Home() {
         <header className="home-top">
           <span className="brand">
             <span className="brand-mark" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="7" width="18" height="13" rx="3" /><circle cx="12" cy="13.5" r="3.4" /><circle cx="12" cy="13.5" r="0.6" fill="currentColor" /><path d="M8.5 7l1-2.2h5L15.5 7" /></svg>
+              <img className="mark-light" src="./snapclaim-mark.png" alt="" width={24} height={23} />
+              <img className="mark-dark" src="./snapclaim-mark-dark.png" alt="" width={24} height={23} />
             </span>
             <span className="brand-name">SnapClaim</span>
           </span>
+          <button type="button" className="iconbtn" aria-label="Settings" onClick={() => go("tSettings")}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
+          </button>
         </header>
         <h1 id="h-home">Damage, measured.</h1>
-        <p className="sub home-sub">Coin for scale, photo for proof — a report in minutes.</p>
+        <p className="sub home-sub">Coin for scale, photo for proof - a report in minutes.</p>
 
         <button id="ctaNew" className="hero-tap" type="button" onClick={startCapture} aria-describedby="heroSteps">
           <span className="hero-art" aria-hidden="true">
@@ -97,7 +102,7 @@ export function Home() {
             </span>
             <span className="hero-cta">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 8h3l2-2h6l2 2h3v11H4z" /><circle cx="12" cy="13" r="3.2" /></svg>
-              Take a photo
+              Start with a photo
             </span>
           </span>
         </button>
@@ -114,18 +119,32 @@ export function Home() {
         {sampleErr && <p role="alert" className="sample-err">{sampleErr}</p>}
         <SamplePicker open={pickerOpen} picking={picking} onClose={() => setPickerOpen(false)} onPick={(f) => void pickSample(f)} />
 
+        {draft && (
+          <div className="card" role="status" aria-label="Unfinished claim">
+            <p className="found">Unfinished claim</p>
+            <p className="sub">
+              {draft.step}{draft.taps > 0 ? ` · ${draft.taps} tap${draft.taps === 1 ? "" : "s"}` : ""} ·{" "}
+              {new Date(draft.savedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+            </p>
+            <div className="rowbtns">
+              <button type="button" className="btn-primary" onClick={resumeDraft}>Resume where I left off</button>
+              <button type="button" className="btn-ghostline" onClick={discardDraft}>Discard</button>
+            </div>
+          </div>
+        )}
+
         <div className="home-duo">
           <div className="tipcard">
             <p className="tipcard-title">Coin tips</p>
             <ul>
               <li>Lay the coin flat, touching the damage</li>
               <li>Keep coin + damage sharp, fill the frame</li>
-              <li>Flat light — no flash glare</li>
+              <li>Flat light - no flash glare</li>
             </ul>
           </div>
           <div className="tipcard">
             <p className="tipcard-title">How accuracy works</p>
-            <p className="tipcard-copy">The coin sets the millimetres. Tilt is corrected from its ellipse — no coin, percent-only report.</p>
+            <p className="tipcard-copy">The coin sets the millimetres. Tilt is corrected from its ellipse - no coin, percent-only report.</p>
           </div>
         </div>
 
@@ -150,7 +169,7 @@ export function Home() {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8h3l2-2h6l2 2h3v11H4z" /><circle cx="12" cy="13" r="3.2" /></svg>
             </span>
             <p className="empty-title">No cases yet</p>
-            <p className="empty-sub">Your first measured report will land here — photo, size, and status at a glance.</p>
+            <p className="empty-sub">Your first measured report will land here - photo, size, and status at a glance.</p>
             <button type="button" className="btn-primary empty-cta" onClick={startCapture}>Start your first claim</button>
           </div>
         )}
@@ -161,7 +180,7 @@ export function Home() {
 
 export function Cases() {
   const ctx = useApp();
-  const { store, casesVersion, bumpCases, toast } = ctx;
+  const { store, casesVersion, bumpCases, toast, go } = ctx;
   const cases = store.list();
   void casesVersion;
   const dlgRef = useRef<HTMLDialogElement>(null);
@@ -185,8 +204,13 @@ export function Cases() {
   return (
     <section className="screen tab on" aria-labelledby="h-cases">
       <div className="wrap">
-        <h1 id="h-cases" style={{ fontSize: 32 }}>Cases</h1>
-        <p className="sub">Saved on this device only. Export before deleting — there is no cloud copy.</p>
+        <header className="page-top">
+          <h1 id="h-cases">Cases</h1>
+          <button type="button" className="iconbtn" aria-label="Settings" onClick={() => go("tSettings")}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
+          </button>
+        </header>
+        <p className="sub">Saved on this device only. Export before deleting - there is no cloud copy.</p>
         <div id="caseList">
           {cases.map((c) => (
             <CaseItem key={c.id} c={c} onOpen={openCase} />
@@ -206,6 +230,11 @@ export function Cases() {
           ) : (
             <div className="empty">{dlg?.photoDropped ? "Photo was dropped to fit device storage." : "No photo saved for this case."}</div>
           )}
+          {isSafePhoto(dlg?.locationPhoto) ? (
+            <img src={dlg.locationPhoto as string} alt="Case location photo" style={{ marginTop: 8 }} />
+          ) : dlg?.locationDropped ? (
+            <div className="empty">Location photo was dropped to fit device storage.</div>
+          ) : null}
         </div>
         <div className="rowbtns">
           <button id="dlgAddPhoto" className="btn-ghostline" type="button" onClick={() => fileRef.current?.click()}>Replace photo</button>
@@ -230,7 +259,7 @@ export function Cases() {
                 cap.getContext("2d")?.drawImage(img, 0, 0, cap.width, cap.height);
                 const saved = store.save({ id: dlgId, photo: cap.toDataURL("image/jpeg", 0.85), photoDropped: false });
                 bumpCases();
-                toast(saved.photoDropped ? "Photo too large for device storage — case kept without it" : "Photo updated");
+                toast(saved.photoDropped ? "Photo too large for device storage - case kept without it" : "Photo updated");
               };
               img.src = url;
             }}
@@ -320,7 +349,7 @@ function validBackendUrl(v: string): string {
     }
     return POLICY_BACKEND_MESSAGE;
   } catch {
-    return "That URL does not parse — check for typos.";
+    return "That URL does not parse - check for typos.";
   }
 }
 
@@ -348,14 +377,17 @@ export function Settings() {
   const cases = store.list();
   void casesVersion;
   const [theme, setTheme] = useState(() => String(store.getSettings().theme ?? document.documentElement.dataset.theme ?? "auto"));
-  const [donate, setDonate] = useState(() => {
-    try { return !!localStorage.getItem("snapclaim.donatePhoto"); } catch { return false; }
-  });
   const [bytes, setBytes] = useState(0);
   const [quota, setQuota] = useState<number | null>(null);
   const [backend, setBackend] = useState<BackendState>({ kind: "idle" });
   const [urlDraft, setUrlDraft] = useState(base);
   const [urlError, setUrlError] = useState("");
+  const [metaDraft, setMetaDraft] = useState("");
+  const [basetenDraft, setBasetenDraft] = useState("");
+  const [keyMsg, setKeyMsg] = useState("");
+  const savedMeta = String(store.getSettings().metaKey ?? "");
+  const savedBaseten = String(store.getSettings().basetenKey ?? "");
+  const maskKey = (k: string) => (k.length <= 4 ? "••••" : `••••${k.slice(-4)}`);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [deleteText, setDeleteText] = useState("");
   const [lastChecked, setLastChecked] = useState(() => String(store.getSettings().updatesCheckedAt ?? ""));
@@ -391,16 +423,7 @@ export function Settings() {
     toast(v === "auto" ? "Theme follows your system" : `Theme: ${v}`);
   };
 
-  const setDonatePref = (v: boolean) => {
-    setDonate(v);
-    try {
-      if (v) localStorage.setItem("snapclaim.donatePhoto", "1");
-      else localStorage.removeItem("snapclaim.donatePhoto");
-    } catch { /* ignore */ }
-    toast(v ? "Photo sharing on — only with your tap" : "Photo sharing off");
-  };
-
-  const runBackendCheck = async () => {
+  const runBackendCheck = async (silent = false) => {
     const err = validBackendUrl(urlDraft);
     setUrlError(err);
     if (err) return;
@@ -412,11 +435,18 @@ export function Settings() {
       const { j } = await apiGet(clean, "/v1/health");
       const ms = Math.round(performance.now() - t0);
       setBackend({ kind: "ok", ms, version: `v${String(j.version ?? "?")} · ${String(j.mode ?? "live")}` });
-      toast("Backend connected");
+      if (!silent) toast("Backend connected");
     } catch {
-      setBackend({ kind: "error", detail: "Unreachable — check the URL and your connection." });
+      setBackend({ kind: "error", detail: "Unreachable - check the URL and your connection." });
     }
   };
+
+  /* Show live-vs-mock on entry, not only after a manual tap: a mock backend
+     invents every number, so its mode must never be a surprise. */
+  useEffect(() => {
+    void runBackendCheck(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const runUpdateCheck = async () => {
     setUpdating(true);
@@ -479,37 +509,10 @@ export function Settings() {
           </div>
         </Section>
 
-        <Section
-          label="Privacy"
-          icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l7 3v5c0 5-3.5 8-7 10-3.5-2-7-5-7-10V6z" /><path d="M9.5 12l2 2 3.5-4" /></svg>}
-        >
-          <div className="privacy-row">
-            <span className="privacy-text">
-              <b>Share photos to improve measurements</b>
-              <small>Off by default. Nothing uploads without your tap.</small>
-            </span>
-            <button
-              id="donateSetting"
-              type="button"
-              role="switch"
-              aria-checked={donate}
-              aria-label="Share photos to improve measurements"
-              className={`switch${donate ? " on" : ""}`}
-              onClick={() => setDonatePref(!donate)}
-            >
-              <span className="switch-knob" aria-hidden="true" />
-            </button>
-          </div>
-          <details className="learn">
-            <summary>Learn what&apos;s shared</summary>
-            <p>Only the photos you explicitly attach — never your whole library. Shared photos train damage measurement; names, notes and locations stay on this device and can be stripped before upload.</p>
-          </details>
-        </Section>
-
         {!installed && (
           <Section
             label="Install"
-            icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2.5" /><path d="M11 18.5h2" /></svg>}
+            icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="0" /><path d="M11 18.5h2" /></svg>}
           >
             <p className="install-copy" id="installHint">
               {isIos
@@ -590,6 +593,9 @@ export function Settings() {
             )}
           </div>
           {backend.kind === "ok" && <p className="fineprint mono" role="status">{backend.version}</p>}
+          {backend.kind === "ok" && backend.version.includes("mock") && (
+            <p className="fineprint danger-text" role="alert">Mock backend: every measurement would be invented. Use the SnapClaim cloud URL below.</p>
+          )}
           {backend.kind === "error" && <p className="fineprint danger-text" role="alert">{backend.detail}</p>}
           <details className="learn advanced">
             <summary>Advanced</summary>
@@ -615,7 +621,7 @@ export function Settings() {
                   try {
                     const t = await navigator.clipboard.readText();
                     if (t) { setUrlDraft(t.trim()); setUrlError(""); }
-                  } catch { toast("Clipboard blocked — paste manually"); }
+                  } catch { toast("Clipboard blocked - paste manually"); }
                 }}
               >
                 Paste
@@ -631,6 +637,95 @@ export function Settings() {
         </Section>
 
         <Section
+          label="Your API keys"
+          icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="10" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /><circle cx="12" cy="15" r="1.6" fill="currentColor" stroke="none" /></svg>}
+        >
+          <p className="fineprint" style={{ marginTop: 0 }}>
+            Optional. Blank means the shared backend keys. A key you save stays only on this device, travels only
+            to the backend above with each request, and is never stored server-side. Meta runs measuring, findings,
+            voice and describe; Baseten runs the skeptic cross-check.
+          </p>
+          <p className="fineprint mono" role="status">
+            Meta key: {savedMeta ? maskKey(savedMeta) : "not set"} · Baseten key: {savedBaseten ? maskKey(savedBaseten) : "not set"}
+          </p>
+          <label className="field" htmlFor="metaKeyInput">Meta API key</label>
+          <input
+            id="metaKeyInput"
+            className="text-input"
+            type="password"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            placeholder="Leave blank to keep the saved one"
+            value={metaDraft}
+            onChange={(e) => setMetaDraft(e.target.value)}
+          />
+          <label className="field" htmlFor="basetenKeyInput" style={{ marginTop: 12 }}>Baseten API key</label>
+          <input
+            id="basetenKeyInput"
+            className="text-input"
+            type="password"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            placeholder="Leave blank to keep the saved one"
+            value={basetenDraft}
+            onChange={(e) => setBasetenDraft(e.target.value)}
+          />
+          {keyMsg ? <p className="fineprint" role="status">{keyMsg}</p> : null}
+          <div className="rowbtns">
+            <button
+              id="byokSave"
+              className="btn-secondary"
+              type="button"
+              onClick={() => {
+                const patch: Record<string, string> = {};
+                const m = metaDraft.trim();
+                const b = basetenDraft.trim();
+                if (!m && !b) {
+                  setKeyMsg("Type a key first - nothing to save.");
+                  return;
+                }
+                if (m && m.length > 512) {
+                  setKeyMsg("Meta key too long - check for a paste error.");
+                  return;
+                }
+                if (b && b.length > 512) {
+                  setKeyMsg("Baseten key too long - check for a paste error.");
+                  return;
+                }
+                if (m) patch.metaKey = m;
+                if (b) patch.basetenKey = b;
+                store.setSettings(patch);
+                setMetaDraft("");
+                setBasetenDraft("");
+                bumpCases();
+                setKeyMsg("Saved on this device. New measurements use your key.");
+              }}
+            >
+              Save keys
+            </button>
+            <button
+              id="byokClear"
+              className="btn-secondary"
+              type="button"
+              disabled={!savedMeta && !savedBaseten}
+              onClick={() => {
+                store.setSettings({ metaKey: "", basetenKey: "" });
+                setMetaDraft("");
+                setBasetenDraft("");
+                bumpCases();
+                setKeyMsg("Cleared - back to the shared backend keys.");
+              }}
+            >
+              Clear saved keys
+            </button>
+          </div>
+        </Section>
+
+        <Section
           label="Developer"
           icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3M13 5l-2 14" /></svg>}
         >
@@ -643,7 +738,7 @@ export function Settings() {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 8h9M19 8h1M4 16h3M13 16h7" /><circle cx="16" cy="8" r="2.2" /><circle cx="10" cy="16" r="2.2" /></svg>
             Open admin panel
           </button>
-          <p className="fineprint">Mock vs live switch, backend presets, spend meter, and diagnostics — one screen.</p>
+          <p className="fineprint">Mock vs live switch, backend presets, spend meter, and diagnostics - one screen.</p>
         </Section>
 
         <Section
@@ -683,7 +778,7 @@ export function Settings() {
             </details>
             <details className="learn about-detail">
               <summary>Licenses</summary>
-              <p>SnapClaim · Apache-2.0. On-device models (SlimSAM, Whisper) ship under their own licenses — see the model cards on first download.</p>
+              <p>SnapClaim · Apache-2.0. On-device models (SlimSAM, Whisper) ship under their own licenses - see the model cards on first download.</p>
             </details>
             <a className="about-row about-link" href="mailto:parithvrmo@gmail.com?subject=SnapClaim%20feedback">
               <span>Send feedback</span><b aria-hidden="true">→</b>
@@ -704,7 +799,7 @@ export function Settings() {
           >
             <p className="sheet-title" id="sheetTitle">Delete all {cases.length} case{cases.length === 1 ? "" : "s"}?</p>
             <p className="sheet-desc" id="sheetDesc">
-              This is permanent — there is no cloud copy. Export first so you keep a backup.
+              This is permanent - there is no cloud copy. Export first so you keep a backup.
             </p>
             <button
               type="button"
@@ -712,7 +807,7 @@ export function Settings() {
               onClick={() => {
                 if (!cases.length) return;
                 downloadFile("snapclaim-cases.json", store.exportAll());
-                toast("Export ready — now confirm to delete");
+                toast("Export ready - now confirm to delete");
               }}
             >
               Export first

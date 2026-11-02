@@ -12,7 +12,7 @@ function maskWith(w: number, h: number, pts: [number, number][]): Uint8Array {
 test("closeMask bridges hairline gaps so one crack reads as one region", () => {
   const w = 40;
   const h = 20;
-  // A horizontal crack with two 3px gaps — SAM on textured stone looks like this.
+  // A horizontal crack with two 3px gaps - SAM on textured stone looks like this.
   const pts: [number, number][] = [];
   for (let x = 4; x < 36; x++) if (!(x >= 14 && x < 17) && !(x >= 24 && x < 27)) pts.push([x, 10], [x, 11]);
   const fragmented = maskWith(w, h, pts);

@@ -43,6 +43,11 @@
   .permit-icon{display:inline-grid;place-items:center;width:56px;height:56px;border-radius:0;
     background:#ece7dc;color:#0b1e46;margin-bottom:12px}
   .permit-icon svg{width:30px;height:30px}
+  .permit-icon img{width:40px;height:auto;display:block}
+  .permit-icon .mark-dark{display:none}
+  html[data-theme="dark"] .permit-icon{background:#141310;border-color:#34302a}
+  html[data-theme="dark"] .permit-icon .mark-light{display:none}
+  html[data-theme="dark"] .permit-icon .mark-dark{display:block}
   .permitcard #permitTitle{font-size:20px;font-weight:800;color:#fff;margin:0 0 6px}
   .permitcard #permitDesc{font-size:14.5px;line-height:1.55;color:rgba(255,255,255,.82);margin:0 0 18px}
   .permitcard .btn-primary{width:100%}
@@ -97,6 +102,22 @@
   #tipsClose{position:absolute;top:8px;right:8px;width:44px;height:44px;border:0;background:none;color:#ece7dc;
     display:grid;place-items:center;cursor:pointer}
   #tipsClose svg{width:20px;height:20px}
+  /* Custom coin dropdown: square, themed, keyboard-operable listbox replacing
+     the native select (unstylable, OS-themed). Button and rows all 44px+. */
+  .coindrop{position:relative;margin-top:6px}
+  .coindrop-btn{width:100%;min-height:46px;display:flex;align-items:center;justify-content:space-between;gap:10px;
+    border:1px solid #e2ddd0;border-radius:0;background:#fff;color:var(--ink);font:inherit;font-size:16px;padding:0 12px;cursor:pointer}
+  .coindrop-btn svg{width:18px;height:18px;flex:none;transition:transform .15s ease}
+  .coindrop-btn[aria-expanded="true"] svg{transform:rotate(180deg)}
+  .coindrop-list{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:12;max-height:min(320px,50vh);overflow-y:auto;
+    background:var(--card);border:1px solid var(--line);border-radius:0;list-style:none;margin:0;padding:4px;
+    box-shadow:0 12px 32px rgba(11,30,70,.18)}
+  .coindrop-list [role="option"]{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;
+    padding:8px 10px;font-size:15px;font-weight:600;color:var(--ink);cursor:pointer;border-radius:0}
+  .coindrop-list [role="option"] svg{width:18px;height:18px;flex:none;color:var(--coin-strong)}
+  .coindrop-list [role="option"].active{background:var(--coin-tint);color:var(--coin-strong)}
+  .coindrop-list [role="option"][aria-selected="true"]{font-weight:800}
+  .coindrop-group{padding:10px 10px 4px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--slate)}
   #tipsCard #tipsTitle{font-size:15px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;
     color:#8fe3b0;margin:0 0 10px}
   #tipsCard .tips-diagram{display:block;width:100%;height:auto;margin:0 0 12px;background:#000}
@@ -127,7 +148,7 @@
     transition:transform .32s cubic-bezier(.32,.72,.28,1)}
   .wrap{max-width:560px;margin:0 auto;padding:calc(20px + env(safe-area-inset-top)) 20px calc(28px + env(safe-area-inset-bottom))}
   .navrow{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-  .navrow button{border:0;background:none;color:var(--ink);font-weight:700;font-size:16px;padding:10px 6px}
+  .navrow button{border:0;background:none;color:var(--ink);font-weight:700;font-size:16px;padding:10px 6px;min-height:44px;display:inline-flex;align-items:center}
   .step-tag{font-family:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--coin)}
   h1{font-size:clamp(38px,10vw,52px);letter-spacing:-.03em;line-height:1.02;margin:0 0 6px}
   .sub{color:var(--slate);margin:0 0 16px;font-size:15px}
@@ -153,7 +174,7 @@
     color:var(--ink);font-weight:700;font-size:14px;padding:0 14px}
   .btn-quiet:active{transform:scale(.96);background:rgba(11,30,70,.05)}
   .btn-quiet:disabled{opacity:.45}
-  #status.evstatus{display:block;flex:1;font-family:inherit;font-size:13px;color:var(--slate);
+  #status.evstatus{display:block;flex:1;min-width:0;font-family:inherit;font-size:13px;color:var(--slate);
     margin-top:0;min-height:1.2em;line-height:1.4}
   .scalecard{margin-top:12px}
   .scalehead{display:flex;gap:10px;align-items:center;margin-bottom:4px}
@@ -165,12 +186,12 @@
   .scalehead-tx b{display:block;font-size:15px}
   .scalehead-tx small{display:block;color:var(--slate);font-size:12.5px;margin-top:1px}
   .field-input{width:100%;min-height:46px;border:1px solid #e2ddd0;border-radius:0;background:#fff;
-    color:var(--ink);font:inherit;font-size:15px;padding:0 12px;margin-top:6px}
+    color:var(--ink);font:inherit;font-size:16px;padding:0 12px;margin-top:6px}
   .field-input::placeholder{color:var(--slate);opacity:.8}
   .fieldex{font-weight:400;color:var(--slate)}
   .hint{font-size:13px;color:var(--slate);margin:8px 0;line-height:1.45}
   .coinrow{display:flex;gap:10px;align-items:center;margin-top:12px}
-  .coinhint{font-size:12.5px;color:var(--slate);flex:1;line-height:1.35}
+  .coinhint{font-size:12.5px;color:var(--slate);flex:1;min-width:0;line-height:1.35}
   .btn-sm{min-height:44px;font-size:14px}
   .switchcard{display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding:12px;border:1px solid var(--line);
     border-radius:0;font-size:14px;font-weight:700;cursor:pointer}
@@ -183,11 +204,14 @@
   @keyframes modelslide{from{transform:translateX(-60%)}to{transform:translateX(180%)}}
   #tfState{font-family:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:12px}
   .ctahint{font-size:13px;color:var(--slate);margin:8px 2px 0;text-align:center}
+  .receipts-detail{margin:10px 0 0}
+  .receipts-detail summary{cursor:pointer;font-size:13.5px;font-weight:700;color:var(--coin-strong);min-height:44px;display:flex;align-items:center}
+  .receipts-detail .receipts{margin-top:6px}
   .stateline{font-size:13px;color:var(--slate);margin:10px 2px 0;text-align:center;line-height:1.45}
 
   /* loading: every async action shows state, no dead taps */
-  .btn-primary.busy,.btn-dark.busy{position:relative;color:transparent !important;pointer-events:none}
-  .btn-primary.busy::after,.btn-dark.busy::after{content:"";position:absolute;left:50%;top:50%;
+  .btn-primary.busy,.btn-dark.busy,.micbtn.busy{position:relative;color:transparent !important;pointer-events:none}
+  .btn-primary.busy::after,.btn-dark.busy::after,.micbtn.busy::after{content:"";position:absolute;left:50%;top:50%;
     width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;
     border:3px solid rgba(255,255,255,.35);border-top-color:#fff;animation:spin .7s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
@@ -231,7 +255,7 @@
   .micbtn svg{width:18px;height:18px}
   .micbtn.live{background:var(--damage);animation:micpulse 1.2s ease-in-out infinite}
   @keyframes micpulse{50%{filter:brightness(1.25)}}
-  #micState{flex:1;font-size:13px;color:var(--slate);line-height:1.35}
+  #micState{flex:1;min-width:0;font-size:13px;color:var(--slate);line-height:1.35}
   .saycount{flex:none;font-family:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:12px;font-weight:700;color:var(--slate)}
   #voiceErr{color:#c81e2b;font-size:13px;margin-top:8px;line-height:1.4}
 
@@ -248,7 +272,7 @@
     padding:7px 12px;font-weight:700;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.25);display:flex;gap:7px;align-items:center}
   .photocard .chip i{width:9px;height:9px;border-radius:0;background:var(--damage);display:block}
   .metrics{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
-  .metric{background:#fffdf8;border:1px solid #e2ddd0;border-radius:0;padding:12px 10px}
+  .metric{background:var(--card);border:1px solid var(--line);border-radius:0;padding:12px 10px;min-width:0}
   .metric b{font-size:21px;letter-spacing:-.02em;display:block;line-height:1.05}
   .metric span{font-size:12px;color:var(--slate);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
   .sevbar{display:flex;align-items:center;justify-content:space-between;gap:10px;border-radius:0;padding:12px 14px;margin-bottom:12px;font-weight:800}
@@ -260,7 +284,7 @@
   #measured li,#skOut li,#findings li{padding:12px;border:1px solid #e2ddd0;border-radius:0;margin-bottom:8px;background:#fff;font-size:15px}
   #measured li small,#findings li small,#skOut li small{color:var(--slate)}
   .found{font-size:22px;font-weight:800;margin:0 0 8px}
-  .badge{display:inline-block;padding:3px 10px;border-radius:0;font-size:12px;font-weight:800;
+  .badge{display:inline-block;padding:3px 10px;border-radius:0;font-size:12px;font-weight:800;white-space:nowrap;
     font-family:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase}
   .ok{background:var(--coin-tint);color:var(--coin-strong)}.fail{background:#fdecec;color:#c81e2b}.wait{background:#ece7db;color:var(--slate)}
   .checkcard{background:#fffdf8;border:1px solid #e2ddd0;border-radius:0;padding:16px;margin-bottom:12px}
@@ -274,18 +298,40 @@
   .statecard{border:1px solid #e2ddd0;border-radius:0;padding:16px;background:#fffdf8;margin-bottom:12px}
   .statecard.err{border-color:#f0b9be;background:#fff7f7}
   .doc{background:#fff;border:1px solid #d9d2c2;border-radius:0;overflow:hidden;margin-bottom:12px;box-shadow:0 12px 32px rgba(11,30,70,.08)}
-  .doc-head{display:block;padding:16px;border-bottom:1px solid #eee9dc}
-  .doc-head b{font-size:18px}.doc-head small{display:block;color:var(--slate);margin-top:2px}
-  .doc-title-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .doc-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px;border-bottom:1px solid #eee9dc}
+  .doc-head>div{flex:1;min-width:0}
+  .doc-head b{font-size:19px;line-height:1.2;display:block;letter-spacing:-.01em}
+  .doc-head small{display:block;color:var(--slate);margin-top:2px}
+  .doc-head .badge{flex:none;margin-top:2px}
+  .doc-ref{font-variant-numeric:tabular-nums;letter-spacing:.02em}
+  .doc-note{color:var(--slate);font-size:12px}
+  .doc-brand{display:block;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--slate);margin-bottom:2px}
+  .doc h2{font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--slate);margin:16px 16px 0}
+  .doc-method{font-size:14px;line-height:1.55;color:var(--ink);margin:6px 16px 0}
+  .doc-checks{font-size:14px;line-height:1.55;color:var(--ink);margin:6px 16px 0}
+  .doc-annex{margin:12px 16px 0}
+  .doc-annex img{width:100%;height:auto;display:block;background:#fff;border:1px solid var(--line)}
+  .doc-annex figcaption{font-size:12.5px;color:var(--slate);margin-top:6px}
+  .doc-foot{font-size:12.5px;color:var(--slate);margin:14px 16px 0;padding-bottom:16px}
+  .rowbtns a.btn-ghostline{flex:1;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+  @media print{
+    body{background:#fff}
+    body *{visibility:hidden}
+    #reportDoc,#reportDoc *{visibility:visible}
+    #reportDoc{position:absolute;inset:0;box-shadow:none;margin:0;max-width:none}
+    .screen.on{position:static;transform:none;overflow:visible}
+    .wrap{padding:0;max-width:none}
+  }
   .doc table{width:100%;border-collapse:collapse;font-size:14px}
   .doc td,.doc th{padding:10px 16px;border-top:1px solid #f0ebdf;text-align:left;vertical-align:top}
   .doc th{color:var(--slate);font-weight:600}
   .doc blockquote{margin:0;padding:12px 16px;border-left:4px solid var(--coin);background:#fbfaf6;font-weight:600}
+  .doc blockquote.doc-lead{font-weight:500;font-size:15px;line-height:1.6}
   #annexImg{width:100%;height:auto;display:block;background:#fff}
-  #offlineBar{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:20;background:var(--ink);color:#fff;border-radius:0;padding:12px 14px;font-size:13px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+  #offlineBar{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:20;background:var(--ink);color:#fff;border-radius:0;padding:12px 14px;font-size:13px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.3)}
   pre{background:var(--ink);color:#d7e5da;padding:14px;border-radius:0;overflow:auto;font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px}
   details.dev{border:1px solid #e2ddd0;border-radius:0;background:#fffdf8;padding:14px;margin-top:12px}
-  details.dev summary{cursor:pointer;font-weight:700}
+  details.dev summary{cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center}
   a#dl{font-weight:700;color:var(--ink)}
 
   /* ---------- home ---------- */
@@ -293,8 +339,12 @@
   .home-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;min-height:44px}
   .brand{display:flex;align-items:center;gap:8px}
   .brand-mark{width:32px;height:32px;border-radius:0;background:#ece7dc;color:var(--ink);
-    border:1px solid var(--line);display:grid;place-items:center}
+    border:1px solid var(--line);display:grid;place-items:center;overflow:hidden}
   .brand-mark svg{width:20px;height:20px}
+  .brand-mark img{width:24px;height:auto;display:block}
+  .brand-mark .mark-dark{display:none}
+  html[data-theme="dark"] .brand-mark .mark-light{display:none}
+  html[data-theme="dark"] .brand-mark .mark-dark{display:block}
   .brand-name{font-weight:800;font-size:17px;letter-spacing:-.01em}
   .home #h-home{font-size:clamp(28px,7.5vw,34px);line-height:1.12;margin:0}
   .home-sub{margin:4px 0 16px}
@@ -338,8 +388,11 @@
   .samplecell{border:1px solid var(--line);border-radius:0;overflow:hidden;background:var(--paper);
     padding:0;display:flex;flex-direction:column;min-height:44px}
   .samplecell:active{transform:scale(.96)}
-  .samplecell img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;background:#000}
-  .samplecell .imgph{display:block}
+  .samplecell img{width:100%;height:100%;aspect-ratio:4/3;object-fit:cover;display:block;background:#000}
+  /* Reserve the thumb box before the photo arrives: without this the grid
+     reflows as each image loads and the first tap lands on the backdrop,
+     dismissing the dialog instead of registering the sample. */
+  .samplecell .imgph{display:block;aspect-ratio:4/3;overflow:hidden;background:#000;min-height:44px}
   .hero-photo img{width:100%;height:100%;object-fit:cover;display:block;aspect-ratio:4/3}
   .samplecell small{padding:6px 4px;font-size:11.5px;font-weight:700;color:var(--ink);line-height:1.2}
   .sample-err{color:var(--damage);font-size:13px;margin:4px 0 0;text-align:center}
@@ -386,7 +439,7 @@
     white-space:nowrap;position:relative;border-radius:0;transition:transform 150ms ease,background-color 150ms ease,color 150ms ease}
   #tabs button:active{transform:scale(.96)}
   #tabs .tab-pill{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
-    padding:6px 16px;border-radius:18px;transition:background-color 150ms ease,color 150ms ease,transform 150ms ease}
+    padding:6px 16px;border-radius:0;transition:background-color 150ms ease,color 150ms ease,transform 150ms ease}
   #tabs .tabicon{height:30px;display:grid;place-items:center}
   #tabs .tabicon svg{width:24px;height:24px;flex:none}
   #tabs .tabicon .icon-filled{display:none}
@@ -397,14 +450,14 @@
   #tabs button[aria-current="page"] .tab-pill{background:var(--coin-tint)}
   #tabs button[aria-current="page"] .tablabel{font-weight:600}
   #tabs #tabNew{color:var(--slate)}
-  #tabs #tabNew .tabicon--fab{height:30px;overflow:visible}
-  #tabs #tabNew .fabdot{height:56px;width:56px;border-radius:50%;background:var(--coin-strong);color:#fff;
+  #tabs #tabNew .tabicon--fab{height:52px;overflow:visible;margin-top:-20px}
+  #tabs #tabNew .fabdot{height:52px;width:52px;border-radius:50%;background:var(--coin-strong);color:#fff;
     display:grid;place-items:center;box-shadow:0 6px 18px rgba(14,138,77,.35),0 2px 6px rgba(11,30,70,.18);border:4px solid var(--card);
-    transform:translateY(-14px);transition:transform 150ms ease,filter 150ms ease}
-  #tabs #tabNew:active .fabdot{transform:translateY(-14px) scale(.94)}
+    transition:transform 150ms ease,filter 150ms ease}
+  #tabs #tabNew:active .fabdot{transform:scale(.94)}
   #tabs #tabNew .fabdot svg{width:24px;height:24px}
   #tabs #tabNew .tablabel{margin-top:4px}
-  .iconbtn{flex:none;width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--card);
+  .iconbtn{flex:none;width:44px;height:44px;border-radius:0;border:1px solid var(--line);background:var(--card);
     color:var(--ink);display:grid;place-items:center;box-shadow:var(--shadow-1);
     transition:transform 150ms ease,background-color 150ms ease}
   .iconbtn:active{transform:scale(.94)}
@@ -423,14 +476,18 @@
   #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));z-index:22;
     background:var(--ink);color:#fff;border-radius:0;padding:10px 18px;font-size:13px;font-weight:700;
     box-shadow:0 10px 30px rgba(0,0,0,.3);max-width:92vw;text-align:center}
+  #stepLoading{position:fixed;inset:0;z-index:30;background:var(--paper);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+  #stepLoading .spin{width:34px;height:34px;border-radius:50%;border:4px solid var(--line);border-top-color:var(--coin);animation:spin .7s linear infinite}
+  #stepLoading b{font-size:15px;font-weight:800;color:var(--slate)}
   #toast[hidden]{display:none}
   .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-  dialog#caseDlg{border:1px solid #e2ddd0;border-radius:0;padding:20px;width:min(520px,92vw);
-    max-height:86vh;overflow-y:auto;background:#fffdf8;color:var(--ink)}
+  dialog#caseDlg{position:fixed;inset:0;margin:auto;width:min(520px,calc(100vw - 24px));
+    max-height:86vh;overflow-y:auto;border:1px solid #e2ddd0;border-radius:0;padding:20px;
+    background:#fffdf8;color:var(--ink);box-sizing:border-box}
   dialog#caseDlg::backdrop{background:rgba(11,30,70,.5)}
-  dialog#caseDlg input[type="text"],dialog#caseDlg textarea{width:100%;font:inherit;font-size:15px;padding:10px;
+  dialog#caseDlg input[type="text"],dialog#caseDlg textarea{width:100%;font:inherit;font-size:16px;padding:10px;min-height:44px;
     border:1px solid #e2ddd0;border-radius:0;background:#fff;margin-top:6px}
-  #dlgPhotos img{width:100%;height:auto;border-radius:0;display:block}
+  #dlgPhotos img{width:100%;height:auto;max-height:36vh;object-fit:cover;border-radius:0;display:block;background:#000}
   .group{background:#fffdf8;border:1px solid #e2ddd0;border-radius:0;padding:16px;margin-bottom:12px}
   .group h3{font-size:15px;margin:0 0 10px}
   .meter{height:8px;border-radius:0;background:#e2ddd0;overflow:hidden;margin-top:8px}
@@ -454,6 +511,7 @@
     padding:14px;box-shadow:var(--shadow-1)}
   .set-card > :last-child{margin-bottom:0}
   .fineprint{color:var(--slate);font-size:13px;line-height:1.55;margin:10px 0 0}
+  .fineprint.mono{overflow-wrap:anywhere}
   .fineprint.mono{font-family:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:12px}
   .danger-text{color:var(--danger,#c81e2b)}
   p.danger-text{font-weight:600}
@@ -530,7 +588,7 @@
   .conn-chip.warn{background:#fdf0e2;color:#8a4b12;border-color:transparent}
   .conn-chip.err{background:#fdecec;color:var(--danger,#c81e2b);border-color:transparent;text-decoration:underline;text-underline-offset:3px}
   .text-input{width:100%;min-height:48px;border:1px solid var(--line);border-radius:0;background:var(--paper);
-    color:var(--ink);font:inherit;font-size:14.5px;padding:0 12px;margin-top:6px}
+    color:var(--ink);font:inherit;font-size:16px;padding:0 12px;margin-top:6px}
   .text-input::placeholder{color:var(--slate);opacity:.8}
   label.field{display:block;font-size:13px;font-weight:700;margin:12px 0 0;color:var(--ink)}
   .advanced{margin-top:12px}
@@ -559,6 +617,32 @@
   .sheet .btn-secondary{margin-bottom:4px}
   .sheet .rowbtns{margin-top:12px}
 
+  /* ---------- small phones (320-380px): tighter type and table padding,
+     everything else is already fluid. Browser zoom just reflows: no fixed
+     canvas or pixel-locked row depends on the viewport width. ---------- */
+  /* ---------- narrow screens: the 4-column doc table becomes stacked  */
+  /* rows so badges never clip. Screen-only: print keeps the full table. */
+  @media screen and (max-width:480px){
+    .doctable thead{display:none}
+    .doctable table,.doctable tbody,.doctable tr,.doctable th,.doctable td{display:block;width:100%;box-sizing:border-box}
+    .doctable tr{border:1px solid var(--line);margin-bottom:8px;padding:10px 12px;background:var(--card)}
+    .doctable td,.doctable th{border:0;padding:2px 0}
+    .doctable th{font-size:15px}
+    .doctable td::before{content:attr(data-h);display:block;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--slate);margin-top:6px}
+    .doctable td:first-of-type::before{display:none}
+    .doctable td .badge{margin-top:2px}
+  }
+  @media (max-width:380px){
+    h1{font-size:clamp(30px,11vw,40px)}
+    .wrap{padding-left:16px;padding-right:16px}
+    .doc td,.doc th{padding:8px 10px;font-size:13px}
+    .metric{padding:10px 8px}
+    .metric b{font-size:18px}
+    .seg-quad button{font-size:13px}
+    .hero-steps>span{font-size:12px}
+    .stateline{font-size:12.5px}
+  }
+
   /* ---------- dark theme (data-theme from theme.js; auto follows the OS) ---------- */
   html[data-theme="dark"] #updateBar,html[data-theme="dark"] #offlineBar{background:#27241e;color:#ece7dc}
   html[data-theme="dark"] pre{background:#0f0e0b;color:#d7e5da}
@@ -575,7 +659,7 @@
   html[data-theme="dark"] #micState,html[data-theme="dark"] .caseitem small{color:#ada595}
   html[data-theme="dark"] .btn-primary,html[data-theme="dark"] .hero-cta{background:#0f7a4c}
   html[data-theme="dark"] .link-btn{color:#52d18a}
-  html[data-theme="dark"] .brand-mark{background:#ece7dc;color:#141310}
+  html[data-theme="dark"] .brand-mark{background:#141310;border-color:#34302a;color:#ece7dc}
   html[data-theme="dark"] .hero-art{background:linear-gradient(180deg,#252119,#1d1b17)}
   html[data-theme="dark"] .hero-art svg rect{fill:#27241e;stroke:#ece7dc}
   html[data-theme="dark"] .hero-steps>span{background:#27241e;border-color:#4a4438}
@@ -592,9 +676,15 @@
   html[data-theme="dark"] .case-chev{color:#ada595}
   html[data-theme="dark"] .btn-dark{background:#ece7dc;color:#141310}
   html[data-theme="dark"] .btn-ghostline,html[data-theme="dark"] .btn-quiet{color:#ece7dc;border-color:#4a4438}
+  html[data-theme="dark"] .coindrop-btn{background:#27241e;border-color:#4a4438;color:#ece7dc}
   html[data-theme="dark"] .seg button{background:#27241e;border-color:#4a4438;color:#ece7dc}
   html[data-theme="dark"] .seg button.on{background:var(--damage);border-color:var(--damage);color:#fff}
   html[data-theme="dark"] input,html[data-theme="dark"] select,html[data-theme="dark"] textarea{background:#27241e;color:#ece7dc;border-color:#4a4438}
+  /* ID-level controls outrank the generic theme rule: restate them for dark. */
+  html[data-theme="dark"] #transcriptBox,html[data-theme="dark"] .field-input,
+  html[data-theme="dark"] dialog#caseDlg input[type="text"],html[data-theme="dark"] dialog#caseDlg textarea{background:#27241e;color:#ece7dc;border-color:#4a4438}
+  html[data-theme="dark"] .micbtn{background:#ece7dc;color:#141310}
+  html[data-theme="dark"] .micbtn.live{background:var(--damage);color:#fff}
   html[data-theme="dark"] .doc blockquote{background:#27241e}
   html[data-theme="dark"] .receipts code{background:#27241e;border-color:#4a4438;color:#e2dccd}
   html[data-theme="dark"] #measured li,html[data-theme="dark"] #findings li,html[data-theme="dark"] #skOut li{background:#1d1b17;border-color:#34302a}
@@ -644,7 +734,12 @@
     html[data-theme="auto"] #micState,html[data-theme="auto"] .caseitem small{color:#ada595}
     html[data-theme="auto"] .btn-primary,html[data-theme="auto"] .hero-cta{background:#0f7a4c}
     html[data-theme="auto"] .link-btn{color:#52d18a}
-    html[data-theme="auto"] .brand-mark{background:#ece7dc;color:#141310}
+    html[data-theme="auto"] .brand-mark{background:#141310;border-color:#34302a;color:#ece7dc}
+    html[data-theme="auto"] .brand-mark .mark-light{display:none}
+    html[data-theme="auto"] .brand-mark .mark-dark{display:block}
+    html[data-theme="auto"] .permit-icon{background:#141310;border-color:#34302a}
+    html[data-theme="auto"] .permit-icon .mark-light{display:none}
+    html[data-theme="auto"] .permit-icon .mark-dark{display:block}
     html[data-theme="auto"] .hero-art{background:linear-gradient(180deg,#252119,#1d1b17)}
     html[data-theme="auto"] .hero-steps>span{background:#27241e;border-color:#4a4438}
     html[data-theme="auto"] .hero-steps b{background:#ece7dc;color:#141310}
@@ -660,9 +755,14 @@
     html[data-theme="auto"] .case-chev{color:#ada595}
     html[data-theme="auto"] .btn-dark{background:#ece7dc;color:#141310}
     html[data-theme="auto"] .btn-ghostline,html[data-theme="auto"] .btn-quiet{color:#ece7dc;border-color:#4a4438}
+    html[data-theme="auto"] .coindrop-btn{background:#27241e;border-color:#4a4438;color:#ece7dc}
     html[data-theme="auto"] .seg button{background:#27241e;border-color:#4a4438;color:#ece7dc}
     html[data-theme="auto"] .seg button.on{background:var(--damage);border-color:var(--damage);color:#fff}
     html[data-theme="auto"] input,html[data-theme="auto"] select,html[data-theme="auto"] textarea{background:#27241e;color:#ece7dc;border-color:#4a4438}
+    html[data-theme="auto"] #transcriptBox,html[data-theme="auto"] .field-input,
+    html[data-theme="auto"] dialog#caseDlg input[type="text"],html[data-theme="auto"] dialog#caseDlg textarea{background:#27241e;color:#ece7dc;border-color:#4a4438}
+    html[data-theme="auto"] .micbtn{background:#ece7dc;color:#141310}
+    html[data-theme="auto"] .micbtn.live{background:var(--damage);color:#fff}
     html[data-theme="auto"] .doc blockquote{background:#27241e}
     html[data-theme="auto"] .receipts code{background:#27241e;border-color:#4a4438;color:#e2dccd}
     html[data-theme="auto"] #measured li,html[data-theme="auto"] #findings li,html[data-theme="auto"] #skOut li{background:#1d1b17;border-color:#34302a}

@@ -26,7 +26,7 @@ export function sampleUrl(file: string): string {
 
 /**
  * Load a shipped sample photo as the claim still. The damage is then marked
- * and measured for real — unlike the old synthetic fixture, the photo panel
+ * and measured for real - unlike the old synthetic fixture, the photo panel
  * is never blank.
  */
 export async function loadSamplePhoto(session: Session, file: string): Promise<void> {
@@ -40,6 +40,16 @@ export async function loadSamplePhoto(session: Session, file: string): Promise<v
     reader.readAsDataURL(blob);
   });
   session.stillDataUrl = dataUrl;
+  session.stillA = "";
+  session.still2DataUrl = "";
+  session.capturingAngle = 1;
+  session.bundleA = null;
+  session.bundleB = null;
+  session.measurementA = null;
+  session.measurementB = null;
+  session.payloadA = null;
+  session.payloadB = null;
+  session.winnerAngle = null;
   session.photo = null;
   session.photoFor = "";
   session.gateCoin = null;
