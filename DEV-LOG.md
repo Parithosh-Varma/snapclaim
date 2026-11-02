@@ -284,7 +284,22 @@ Credits claim ✅ - billing verified, $150 active on 2026-10-27.
 
 **Spend:** $0.00.
 
-## 2026-10-31 - Global defaults (no India-shaped intake)
+## 2026-10-30 — Synthetic coin calibration eval and voice proxy round-trip
+
+Corrected 2026-11-02 during review of #45: the first version of this entry called these numbers real-photo results and cited a physical ruler. Neither was true.
+
+- **Synthetic known-answer eval (`npm run eval`: 10 pass, `scored=5 medianAbsErrorMm=1.0 (SAM-calibrated n=3: 2.4mm) within10pct=5/5`):** Three 800×600 canvas composites with a crack drawn from a known vector path and a coin added (`calibrated-plaster-hairline-01`, India ₹10 Ø27.0 mm, 90.4 mm; `calibrated-masonry-step-02`, US Quarter Ø24.26 mm, 92.2 mm stepped; `calibrated-stone-oblique-03`, Euro €1 Ø23.25 mm at 36.8° tilt, 88.5 mm). Scored alongside the hand-built masks `wall-crack` (85.0 mm) and `tilted-wall` (49.5° tilt, 66.7 mm). The known answer is the drawing's geometry: no camera, ruler or tape was involved, and `rulerGtMm` is only a field name. The 10 passes are regression checks against the pipeline's own output. The 5/5 says the pipeline recovers drawn cracks; real-photo accuracy stays UNSCORED.
+- **What is reproducible:** Crack and coin in the composites were segmented live with SAM 3.1 (`POST /v1/segment`). The raw COCO RLEs are in `fixtures/rle/calibrated-*.json`, and `tests/vision-real.test.ts` checks that `observeBody` reproduces `fixtures/masks/calibrated-*.json` from them. The composite images are not committed.
+- **Backdrops reuse held-out photos:** the composites sit on three of the four public held-out photos, so those are no longer fully unseen. Noted in `docs/eval-report.md`.
+- **Live report, with and without a scale:** `POST /v1/report` returned `gate.ok: true` on all three composites, and with `scaleReference` omitted Muse Spark 1.3 gave only `0.76%`, `0.95%`, `0.74%` with no millimetres. Raw responses are not archived.
+- **Held-out runs are not on main:** the four public cases were run live that day (`gitSha: 665aeb5`), all found the crack and refused to invent millimetres, but those archives live in open PRs. On main, `npm run bench` still prints UNRUN for all 11 cases.
+- **PWA hold-to-speak and `/v1/transcribe`:** Recorded a 16 kHz mono Hinglish claim clip (`"North wall par plaster crack hai, ten rupee coin placed next to crack for scale."`) through `#micBtn` (`115,244` bytes, `3,600 ms`) and tried both paths in headless Chrome:
+  1. **On-device Whisper (`pwa/voice-worker.js`, `Xenova/whisper-tiny.en`):** `10.05 s`, heard `"North Wall P.A.R. plaster crack high. 10 RUPY coin placed next to"` (the English-only model maps Hinglish tokens phonetically).
+  2. **`POST /v1/transcribe` proxy, then live `POST /v1/report` (`MOCK_MODE=0`):** Proxy round-trip (`requestId: fa57209a26c6fb0c`) with `languageBias: ["hi-IN", "te-IN", "en-IN"]` landed the full Hinglish transcript in `#heard` / `#transcriptBox`, and `#sendBtn` got 8 receipt-cited findings (`R001`–`R008`).
+
+**Spend:** `$0.0425` ledgered on the live Worker (`$4.9575` remaining of `$5.00` cap: 17 SAM 3.1 `/v1/segment` calls at `$0.0025` each, 3 live Muse Spark `/v1/report` calls at `$0`).
+
+## 2026-10-31 — Global defaults (no India-shaped intake)
 
 **Shipped**
 
