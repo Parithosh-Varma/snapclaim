@@ -7,7 +7,7 @@
 
 > Point your phone at damage, speak one line about it — get a claim-ready report where every number is measured, cited, and checked before it ships. **Computed, not generated.**
 
-![Terrace-slab crack with a taped ₹2 coin; a yellow measuring tape runs alongside as ground truth](docs/images/terrace-slab.jpg)
+<img src="docs/images/terrace-slab.jpg" width="560" alt="Terrace-slab crack with a taped ₹2 coin; a yellow measuring tape runs alongside as ground truth">
 *Our own field photo: the crack, a taped coin for scale, and the tape as ground truth — [full case-study report](https://landing.snapclaim.pages.dev/assets/case-study/terrace-slab.pdf).*
 
 [![tests](https://github.com/Parithosh-Varma/snapclaim/actions/workflows/ci.yml/badge.svg)](https://github.com/Parithosh-Varma/snapclaim/actions/workflows/ci.yml)
@@ -19,18 +19,6 @@
 SnapClaim turns a damage photo plus a one-line description into a replayable evidence package: calibrated measurements (% damaged, crack length/width, area in cm²), each backed by a machine-checkable receipt, with AI-written findings that the server refuses to ship unless every number cites its receipt.
 
 **Try it:** <https://snapclaim.pages.dev> (no login needed).
-
-### What is measured today
-
-All three commands are free and deterministic; run them yourself.
-
-| Check | Command | Result on `main` |
-|---|---|---|
-| Measurement code vs known answers (54 scenes drawn in code, coin scale, some on tilted walls) | `npm run bench:truth` | length median error 1.4%, 100% within ±10%; width median error 4.0%, 96.3% within ±10%; 3/3 no-scale refusals held |
-| Regression on dev mask fixtures | `npm run eval` | 7 pass, 0 skip, 0 fail |
-| Live pipeline on held-out real photos | `npm run bench` | 11 cases, 0 archived runs yet (all UNRUN, so the command exits 1 on purpose) |
-
-What this does not show yet: how well SAM finds the crack on a real photo. `bench:truth` checks the maths given a mask, not the mask itself. No real crack has been tape-measured yet, so `npm run bench:gap` (pipeline vs model-only guess against a tape) still prints UNSCORED. We would rather show that gap than fill it with a number we cannot back.
 
 **Global by design:** the measurement engine assumes no currency, country, or language — a scale reference is any known-size object (coin, ruler, bank card), and the transcript is free text in any language. Voice is auto-detected by default; callers can still send an optional `languageBias`.
 
@@ -221,6 +209,18 @@ Hard limits: 50 masks per call (chunk above), 1–16 point prompts per segment c
 - EXIF/XMP metadata is stripped from photos on intake.
 
 ## Evaluation
+
+### What is measured today
+
+All three commands are free and deterministic; run them yourself.
+
+| Check | Command | Result on `main` |
+|---|---|---|
+| Measurement code vs known answers (54 scenes drawn in code, coin scale, some on tilted walls) | `npm run bench:truth` | length median error 1.4%, 100% within ±10%; width median error 4.0%, 96.3% within ±10%; 3/3 no-scale refusals held |
+| Regression on dev mask fixtures | `npm run eval` | 7 pass, 0 skip, 0 fail |
+| Live pipeline on held-out real photos | `npm run bench` | 11 cases, 0 archived runs yet (all UNRUN, so the command exits 1 on purpose) |
+
+What this does not show yet: how well SAM finds the crack on a real photo. `bench:truth` checks the maths given a mask, not the mask itself. No real crack has been tape-measured yet, so `npm run bench:gap` (pipeline vs model-only guess against a tape) still prints UNSCORED. We would rather show that gap than fill it with a number we cannot back.
 
 - `npm run eval` — deterministic bench over `fixtures/masks/*.json` vs `fixtures/expected/` (missing expected file = SKIP, never a pass). Current: wall-crack 5.17% / 85.9 mm / 2.6 mm wide / 2.19 cm² (significant), stain 1.29% percent-only (moderate).
 - Field case (terrace slab, Nov 2026): measured 218.5 mm against a 227 mm tape (inside ±10%); photo-alone guess 315 mm (outside ±10%). Full report: [terrace-slab.pdf](https://landing.snapclaim.pages.dev/assets/case-study/terrace-slab.pdf).
