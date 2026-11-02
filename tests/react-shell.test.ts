@@ -89,6 +89,9 @@ test("React port keeps backend, worker and privacy contracts", () => {
   assert.ok(mark.includes("manualCoinRadius"), "React manual ring shares the measured radius");
   assert.ok(mark.includes("Tap coin to correct"), "React offers the coin correction tap");
   assert.ok(mark.includes("coinTaped"), "React offers the taped-coin lenient outline");
+  const capture = read("react/src/screens/Capture.tsx");
+  assert.ok(!capture.includes("gate.coinMm"), "the colour-only coin guess never sets the scale");
+  assert.ok(capture.includes("applyLastCoin") && mark.includes("saveLastCoin"), "coin size defaults to the user's last confirmed pick");
   assert.ok(mark.includes("2.5"), "React tape halo uses the lenient outline margin");
   const session = read("react/src/lib/session.ts");
   assert.ok(session.includes("coinManualPt") && session.includes("coinTaped"), "session carries the correction");

@@ -3,7 +3,7 @@ import { useApp } from "../App";
 import { CoinGate } from "../lib/camera";
 import { loadSamplePhoto } from "../lib/sample";
 import { SamplePicker } from "./SamplePicker";
-import { resetDmg } from "../lib/session";
+import { applyLastCoin, resetDmg } from "../lib/session";
 
 const CAM_ERRORS: Record<string, string> = {
   NotAllowedError: "Camera permission is off — tap Enable camera",
@@ -119,8 +119,8 @@ export default function Capture() {
           sw: cap.width, sh: cap.height, sx: cap.width / vw, sy: cap.height / vh,
         };
       }
-      session.coinLabel = gate.coinLabel;
-      if (gate.coinMm > 0) session.coinKindMm = gate.coinMm;
+      // The gate's coin ID is a colour guess; it must not set the scale.
+      applyLastCoin(session);
     } catch { /* stills are best-effort */ }
     gate.stop();
     setFlash(true);
@@ -215,8 +215,7 @@ export default function Capture() {
       session.stillDataUrl = cap.toDataURL("image/jpeg", 0.85); // canvas redraw strips EXIF
       session.gateCoin = null;
       session.noScaleMode = true;
-      session.coinLabel = "";
-      session.coinKindMm = 0;
+      applyLastCoin(session);
       gateRef.current?.stop();
       go("sReview");
     };
