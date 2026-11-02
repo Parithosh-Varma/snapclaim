@@ -1,29 +1,47 @@
 {
-  "published": false,
+  "published": true,
 
-  "title": "The wall that settled it",
-  "sub": "Where · when · what was at stake, in one line. Example: Bedroom wall, rented flat — documented on move-in day, re-measured at move-out.",
+  "title": "Terrace-slab crack — measured vs guessed",
+  "sub": "Terrace slab · Nov 2026 · Ref SC-25D35C5E · 2 INR coin (25 mm) for scale",
 
   "photos": [
     {
-      "src": "assets/case-study/photos/01-crack-wide.jpg",
-      "alt": "Describe the photo for screen readers. Example: Long vertical crack with a coin taped beside it for scale.",
-      "caption": "Figure 1 — the captured photo, with the coin for scale."
+      "src": "assets/case-study/photos/DSC_0711.jpg",
+      "alt": "Vertical crack in a terrace slab with a taped coin beside it and a hand holding a yellow measuring tape along the crack",
+      "caption": "Figure 1 — photo with tape: the measuring tape held along the crack is the ground truth (227 mm)."
+    },
+    {
+      "src": "assets/case-study/photos/DSC_0710.jpg",
+      "alt": "The same terrace-slab crack with the taped coin, photographed for the app measurement",
+      "caption": "Figure 2 — photo used for the guess: the same crack as the app measured it, photo + coin."
     }
   ],
 
   "quote": {
-    "text": "What you (or the tenant) said, in one or two sentences.",
-    "cite": "In your words"
+    "text": "crack above the slab",
+    "cite": "In the tenant's words"
   },
 
   "measurements": [
-    { "item": "Crack length", "value": "85.9 mm", "evidence": "—", "status": "Confirmed" },
-    { "item": "Surface affected", "value": "5.17 %", "evidence": "—", "status": "Confirmed" },
-    { "item": "Severity", "value": "Significant", "evidence": "—", "status": "Confirmed" }
+    { "item": "Crack length", "value": "218.5 mm", "evidence": "R005", "status": "Confirmed" },
+    { "item": "Crack width", "value": "3 mm", "evidence": "R006", "status": "Confirmed" },
+    { "item": "Surface affected", "value": "0.73 %", "evidence": "R002", "status": "Confirmed" },
+    { "item": "Area", "value": "6.51 cm²", "evidence": "R004", "status": "Confirmed" },
+    { "item": "Severity", "value": "Significant", "evidence": "R007", "status": "Confirmed" }
   ],
 
-  "method": "One line on how it was measured. Example: Photo + coin for scale, measured in SnapClaim; tilt corrected from the coin's ellipse.",
-  "verification": "One line on the checks. Example: Evidence gate passed; independent skeptic verified; mask cross-check verified.",
-  "outcome": "What happened because of the report. Example: The landlord accepted the numbers and the deposit was returned in full."
+  "method": "Outlines measured from photo pixels, scaled by the coin diameter (tilt-corrected from its ellipse). Every number cites its evidence receipt.",
+  "verification": "Evidence gate: passed · Independent skeptic: not run · Mask cross-check: not run",
+
+  "compare": {
+    "heading": "Measured vs guessed",
+    "rows": [
+      { "label": "Tape truth", "value": "227 mm", "note": "ground truth, tape along the crack" },
+      { "label": "SnapClaim measured", "value": "218.5 mm", "note": "inside ±10% of the tape" },
+      { "label": "Photo-alone guess", "value": "315 mm", "note": "outside ±10% — no measurement" }
+    ]
+  },
+
+  "outcome": "The photo measurement landed inside ±10% of the tape; the photo-alone guess did not. Bench case terrace-slab-tape-01.",
+  "reportPdf": "assets/case-study/terrace-slab.pdf"
 }

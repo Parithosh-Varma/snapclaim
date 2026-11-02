@@ -2,31 +2,40 @@
 
 This folder is the source of truth for the **Case study** section on the
 landing page (`landing.snapclaim.pages.dev`). The page renders
-`case-study.json` automatically — no HTML edits needed, just fill in this
-folder and ask to rebuild + redeploy.
+`case-study.json` automatically — edit the JSON / swap the photos, then ask
+to rebuild + redeploy. No HTML edits needed.
 
-## How to add your case study
+## Provenance
 
-1. **Drop your photos** into `photos/` (JPG, any size — the page crops
-   with `object-fit: cover`).
-   - Name them clearly, e.g. `01-crack-wide.jpg`, `02-coin-scale.jpg`.
-   - Use photos **you took**. Never add stock or other people's photos here.
-2. **Fill in `case-study.json`** (open it — every field is explained).
-   - Keep numbers exactly as the app measured them.
-   - `evidence`: paste the receipt id from the app report if you have it,
-     otherwise leave `"—"`.
-3. **Flip `"published"` to `true`.**
-4. Tell the agent to **rebuild + redeploy the landing page**, then check
-   `https://landing.snapclaim.pages.dev/#case-study`.
+Content mapped from `snapclaim-marketing/site/case-study/` (owner's bench
+case `terrace-slab-tape-01`): numbers, receipts, method, verification,
+`terrace-slab.pdf`, and both photos are copied verbatim from there. The
+landing page shows a strict subset — nothing is reworded or rounded.
 
-## While `published` is `false`
+## Files
 
-The Case study nav link and section stay hidden, so the live page is
-untouched. Nothing half-finished ever ships.
+- `case-study.json` — everything the page shows. `"published": true` means
+  the section + nav links are visible. Flip to `false` to hide them again.
+- `photos/` — your own photos only. Referenced by relative path
+  (`assets/case-study/photos/<file>`).
+- `terrace-slab.pdf` — full report, linked from the section.
+
+## `case-study.json` fields
+
+| field | what it is |
+|---|---|
+| `title`, `sub` | heading + one-line context (place · date · ref · scale) |
+| `photos[]` | `src` (path), `alt` (screen-reader description), `caption` |
+| `quote` | `{text, cite}` — the tenant's own words |
+| `measurements[]` | `{item, value, evidence, status}` — `evidence` is the app receipt id |
+| `method`, `verification` | one line each, app wording |
+| `compare` | `{heading, rows[{label, value, note}]}` — measured-vs-guessed strip |
+| `outcome` | what happened because of the report (facts only) |
+| `reportPdf` | path to the downloadable full report, or omit |
 
 ## Checklist before publishing
 
 - [ ] Photos are yours, show the damage + the coin/ruler for scale
-- [ ] Numbers match the app report (length, %, severity)
+- [ ] Numbers match the app report (length, %, severity, receipts)
 - [ ] No names, addresses, or other people's private details in text or photos
 - [ ] `published: true`

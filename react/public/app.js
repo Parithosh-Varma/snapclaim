@@ -152,7 +152,55 @@ if (toggle) {
 
   setText("method", cs.method);
   setText("verification", cs.verification);
+
+  const compare = slot("compare");
+  if (compare) {
+    compare.textContent = "";
+    const rows = (cs.compare && cs.compare.rows) || [];
+    if (rows.length) {
+      const h = document.createElement("h3");
+      h.className = "doc-sec";
+      h.textContent = (cs.compare && cs.compare.heading) || "Measured vs guessed";
+      compare.appendChild(h);
+      const strip = document.createElement("div");
+      strip.className = "cs-compare";
+      for (const r of rows) {
+        if (!r || !r.label) continue;
+        const stat = document.createElement("div");
+        stat.className = "cs-stat";
+        const lab = document.createElement("small");
+        lab.textContent = String(r.label);
+        const val = document.createElement("b");
+        val.textContent = String(r.value || "—");
+        stat.appendChild(lab);
+        stat.appendChild(val);
+        if (r.note) {
+          const note = document.createElement("span");
+          note.textContent = String(r.note);
+          stat.appendChild(note);
+        }
+        strip.appendChild(stat);
+      }
+      compare.appendChild(strip);
+    } else {
+      compare.remove();
+    }
+  }
+
   setText("outcome", cs.outcome);
+  if (cs.reportPdf) {
+    const body = slot("outcome");
+    if (body) {
+      const p = document.createElement("p");
+      p.className = "cs-pdf";
+      const a = document.createElement("a");
+      a.className = "btn btn-go btn-sm";
+      a.href = String(cs.reportPdf);
+      a.textContent = "Download the full report (PDF)";
+      p.appendChild(a);
+      body.after(p);
+    }
+  }
 
   section.hidden = false;
   document.querySelectorAll("[data-case-link]").forEach((a) => { a.hidden = false; });
