@@ -593,6 +593,9 @@ $("camFile").addEventListener("change", () => {
 const MAX_SIDE = 512;
 let embeddings = null; // true once the worker has embedded the current photo
 let dmg = { points: [], pointMasks: [], mask: null, iou: 0, source: null };
+// True while the no-camera sample is on screen: its masks are precomputed, so there is no
+// drawn mask to cross-check. Cleared as soon as a real photo reaches the Mark screen.
+let sampleRun = false;
 let dmgLabel = "crack";
 const MASK_COLORS = { crack: "#c0392b", stain: "#f39c12", peel: "#2980b9", dent: "#8e44ad", coin: "#0f7a36" };
 
@@ -646,6 +649,7 @@ function sam() {
   return samWorker;
 }
 function setupMarkPhoto() {
+  sampleRun = false;
   const img = new Image();
   img.onload = () => {
     const scale = Math.min(1, MAX_SIDE / Math.max(img.width, img.height));
@@ -1639,6 +1643,18 @@ async function runSkeptic(auto, retried = false) {
 }
 async function runXcheck(auto) {
   if (checkState.xcheck === "loading") return;
+  if (sampleRun && !dmg.mask) {
+    // The sample has no drawn mask; returning early here used to leave the report
+    // button on "Run both checks to continue" forever. Resolve it and say why.
+    const x = $("xStatus");
+    x.innerHTML = "";
+    const chip = document.createElement("span");
+    chip.className = "badge ok";
+    chip.textContent = "Sample · masks precomputed, nothing to cross-check";
+    x.appendChild(chip);
+    setCheck("xcheck", "ok");
+    return;
+  }
   if (!dmg.mask || !photo) { if (!auto) $("xStatus").textContent = "Mark the damage first."; return; }
   checkState.xcheck = "loading";
   renderCheckCard(); updateReportGate();
@@ -1886,6 +1902,8 @@ async function loadSample() {
     const measured = await mres.json();
     if (!mres.ok || !measured.ok) throw new Error(measured.error ?? mres.status);
     payloadObj = sample;
+    sampleRun = true;
+    dmg = { points: [], pointMasks: [], mask: null, iou: 0, source: null };
     fillPhotoCard();
     showMeasured(measured.result);
     show("sSay");
