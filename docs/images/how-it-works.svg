@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 648" width="1200" height="648" role="img" aria-label="How SnapClaim works, with field proof numbers">
+<rect x="8" y="8" width="1184" height="632" rx="24" fill="#ffffff" stroke="#e4ded2" stroke-width="2"/>
+<text x="64" y="84" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="34" font-weight="700" fill="#0b2557" text-anchor="start" letter-spacing="0">SnapClaim</text>
+<text x="64" y="112" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" font-weight="400" fill="#3d4a66" text-anchor="start" letter-spacing="0">photo in, evidence out</text>
+<rect x="952" y="52" width="184" height="44" rx="22" fill="#0f7a36"/>
+<text x="1044" y="80" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle" letter-spacing="0">computed, not generated</text>
+<rect x="69" y="150" width="190" height="170" rx="14" fill="#fbfaf7" stroke="#e4ded2" stroke-width="2"/>
+<circle cx="99" cy="186" r="16" fill="#e3f2e8"/><text x="99" y="192" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="16" font-weight="700" fill="#0f7a36" text-anchor="middle">1</text>
+<text x="123" y="192" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" font-weight="700" fill="#0b2557" text-anchor="start" letter-spacing="0">Photo + coin</text>
+<text x="89" y="230" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" fill="#3d4a66" text-anchor="start" letter-spacing="0">One photo,</text>
+<text x="89" y="250" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" fill="#3d4a66" text-anchor="start" letter-spacing="0">coin for scale</text>
+<path d="M263 235 h20 m-7 -7 l7 7 l-7 7" stroke="#5d6880" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="287" y="150" width="190" height="170" rx="14" fill="#fbfaf7" stroke="#e4ded2" stroke-width="2"/>
+<circle cx="317" cy="186" r="16" fill="#e3f2e8"/><text x="317" y="192" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="16" font-weight="700" fill="#0f7a36" text-anchor="middle">2</text>
+<text x="341" y="192" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" font-weight="700" fill="#0b2557" text-anchor="start" letter-spacing="0">Masks</text>
+<text x="307" y="230" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" fill="#3d4a66" text-anchor="start" letter-spacing="0">Tap to</text>
+<text x="307" y="250" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" fill="#3d4a66" text-anchor="start" letter-spacing="0">outline damage</text>
+<path d="M481 235 h20 m-7 -7 l7 7 l-7 7" stroke="#5d6880" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="505" y="150" width="190" height="170" rx="14" fill="#fbfaf7" stroke="#e4ded2" stroke-width="2"/>
+<circle cx="535" cy="186" r="16" fill="#e3f2e8"/><text x="535" y="192" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="16" font-weight="700" fill="#0f7a36" text-anchor="middle">3</text>
+<text x="559" y="192" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" font-weight="700" fill="#0b2557" text-anchor="start" letter-spacing="0">Measure</text>
+<text x="525" y="230" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" fill="#3d4a66" text-anchor="start" letter-spacing="0">% · mm · cm²,</text>
+<text x="525" y="250" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" fill="#3d4a66" text-anchor="start" letter-spacing="0">deterministic</text>
+<path d="M699 235 h20 m-7 -7 l7 7 l-7 7" stroke="#5d6880" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="723" y="150" width="190" height="170" rx="14" fill="#fbfaf7" stroke="#e4ded2" stroke-width="2"/>
+<circle cx="753" cy="186" r="16" fill="#e3f2e8"/><text x="753" y="192" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="16" font-weight="700" fill="#0f7a36" text-anchor="middle">4</text>
+<text x="777" y="192" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" font-weight="700" fill="#0b2557" text-anchor="start" letter-spacing="0">Receipts</text>
+<text x="743" y="230" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" fill="#3d4a66" text-anchor="start" letter-spacing="0">Every value</text>
+<text x="743" y="250" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" fill="#3d4a66" text-anchor="start" letter-spacing="0">cites R001…</text>
+<path d="M917 235 h20 m-7 -7 l7 7 l-7 7" stroke="#5d6880" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="941" y="150" width="190" height="170" rx="14" fill="#fbfaf7" stroke="#e4ded2" stroke-width="2"/>
+<circle cx="971" cy="186" r="16" fill="#e3f2e8"/><text x="971" y="192" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="16" font-weight="700" fill="#0f7a36" text-anchor="middle">5</text>
+<text x="995" y="192" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="18" font-weight="700" fill="#0b2557" text-anchor="start" letter-spacing="0">Gated report</text>
+<text x="961" y="230" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" fill="#3d4a66" text-anchor="start" letter-spacing="0">Gate + skeptic,</text>
+<text x="961" y="250" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" fill="#3d4a66" text-anchor="start" letter-spacing="0">then ship</text>
+<rect x="69" y="352" width="1062" height="176" rx="14" fill="#fff8e1" stroke="#e6c34a" stroke-width="2"/>
+<text x="97" y="388" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14" font-weight="700" fill="#8a6d1a" text-anchor="start" letter-spacing="0.06em">FIELD PROOF — TERRACE SLAB · NOV 2026 · REF SC-25D35C5E</text>
+<text x="97" y="430" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14" font-weight="700" fill="#8a6d1a" text-anchor="start" letter-spacing="0.08em">TAPE</text>
+<text x="97" y="470" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="34" font-weight="700" fill="#3d4a66" text-anchor="start" letter-spacing="0">227 mm</text>
+<text x="97" y="494" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" fill="#5d6880" text-anchor="start" letter-spacing="0">ground truth</text>
+<text x="451" y="430" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14" font-weight="700" fill="#8a6d1a" text-anchor="start" letter-spacing="0.08em">MEASURED</text>
+<text x="451" y="470" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="34" font-weight="700" fill="#0f7a36" text-anchor="start" letter-spacing="0">218.5 mm</text>
+<text x="451" y="494" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" fill="#5d6880" text-anchor="start" letter-spacing="0">inside ±10%</text>
+<text x="805" y="430" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14" font-weight="700" fill="#8a6d1a" text-anchor="start" letter-spacing="0.08em">GUESS</text>
+<text x="805" y="470" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="34" font-weight="700" fill="#c41f29" text-anchor="start" letter-spacing="0">315 mm</text>
+<text x="805" y="494" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" fill="#5d6880" text-anchor="start" letter-spacing="0">outside ±10%</text>
+<text x="69" y="600" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" fill="#5d6880" text-anchor="start" letter-spacing="0">Receipts R001–R007 · evidence gate passed · skeptic + cross-check not run</text>
+<text x="1131" y="600" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="700" fill="#0b2557" text-anchor="end" letter-spacing="0">snapclaim.pages.dev</text>
+</svg>

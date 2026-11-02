@@ -2,9 +2,14 @@
 
 > Point your phone at damage, speak one line about it — get a claim-ready report where every number is measured, cited, and checked before it ships. **Computed, not generated.**
 
-[![tests](https://img.shields.io/badge/tests-258%20passing-brightgreen)](./tests)
+![Terrace-slab crack with a taped ₹2 coin; a yellow measuring tape runs alongside as ground truth](docs/images/terrace-slab.jpg)
+*Our own field photo: the crack, a taped coin for scale, and the tape as ground truth — [full case-study report](https://landing.snapclaim.pages.dev/assets/case-study/terrace-slab.pdf).*
+
+[![tests](https://github.com/Parithosh-Varma/snapclaim/actions/workflows/ci.yml/badge.svg)](https://github.com/Parithosh-Varma/snapclaim/actions/workflows/ci.yml)
 [![node](https://img.shields.io/badge/node-%3E%3D22.18-339933)](./package.json)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](./LICENSE)
+
+[Try the live app](https://snapclaim.pages.dev) · [Marketing site](https://landing.snapclaim.pages.dev) · [Field case study](https://landing.snapclaim.pages.dev/#case-study)
 
 SnapClaim turns a damage photo plus a one-line description into a replayable evidence package: calibrated measurements (% damaged, crack length/width, area in cm²), each backed by a machine-checkable receipt, with AI-written findings that the server refuses to ship unless every number cites its receipt.
 
@@ -46,6 +51,8 @@ npm run backend:smoke   # end-to-end smoke against a running backend
 ```
 
 ## How it works
+
+![How SnapClaim works: photo plus coin, tap to mask, deterministic measure, receipted values, gated findings; field proof 227 mm tape vs 218.5 mm measured vs 315 mm guess](docs/images/how-it-works.svg)
 
 ```
 photo (+ coin for scale)  +  one spoken line
@@ -197,6 +204,7 @@ Hard limits: 50 masks per call (chunk above), 1–16 point prompts per segment c
 ## Evaluation
 
 - `npm run eval` — deterministic bench over `fixtures/masks/*.json` vs `fixtures/expected/` (missing expected file = SKIP, never a pass). Current: wall-crack 5.17% / 85.9 mm / 2.6 mm wide / 2.19 cm² (significant), stain 1.29% percent-only (moderate).
+- Field case (terrace slab, Nov 2026): measured 218.5 mm against a 227 mm tape (inside ±10%); photo-alone guess 315 mm (outside ±10%). Full report: [terrace-slab.pdf](https://landing.snapclaim.pages.dev/assets/case-study/terrace-slab.pdf).
 - `bench/split.json` — dev/held-out split, frozen before tuning. Held-out cases are public no-scale photos that must stay percent-only.
 - `bench/score.ts` — skeptic DISPUTED scoring with missing-label accounting.
 - Full write-up, baselines protocol and open gaps: [`docs/eval-report.md`](./docs/eval-report.md).
@@ -216,7 +224,7 @@ pwa/            capture app: photo, tap-to-mask, hold-to-speak, report, skeptic,
 eval/           bench + replay CLI
 bench/          held-out split + dispute scorer
 fixtures/       masks, expected outputs, scale references (photos gitignored)
-tests/          258 tests, mock by default, live paths with stubbed fetch
+tests/          286 tests, mock by default, live paths with stubbed fetch
 ```
 
 ## Development
