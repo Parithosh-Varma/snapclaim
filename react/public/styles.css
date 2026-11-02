@@ -300,6 +300,12 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   .stats-grid { grid-template-columns: 1fr 1fr; }
 }
 
+/* Page-open fade: every new page fades in on load */
+@media (prefers-reduced-motion: no-preference) {
+  main { animation: pagefade 0.45s ease both; }
+}
+@keyframes pagefade { from { opacity: 0; } to { opacity: 1; } }
+
 /* FAQ */
 .faq { padding-block: 32px 112px; display: grid; grid-template-columns: 0.85fr 1.15fr; gap: 72px; }
 .faq-list { border-top: 1px solid var(--line); }
