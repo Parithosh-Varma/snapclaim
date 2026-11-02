@@ -2,6 +2,18 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://landing.snapclaim.pages.dev/</loc>
-    <lastmod>2026-10-28</lastmod>
+    <lastmod>2026-11-02</lastmod>
+  </url>
+  <url>
+    <loc>https://landing.snapclaim.pages.dev/how.html</loc>
+    <lastmod>2026-11-02</lastmod>
+  </url>
+  <url>
+    <loc>https://landing.snapclaim.pages.dev/case-study.html</loc>
+    <lastmod>2026-11-02</lastmod>
+  </url>
+  <url>
+    <loc>https://landing.snapclaim.pages.dev/faq.html</loc>
+    <lastmod>2026-11-02</lastmod>
   </url>
 </urlset>
