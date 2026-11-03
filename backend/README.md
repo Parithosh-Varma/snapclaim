@@ -6,7 +6,7 @@ Zero-dependency TypeScript. Same router (`app.ts:handleRequest`) runs on Node an
 
 ```bash
 npm install
-npm test         # 105 tests, mock mode, $0 spend
+npm test         # 364 tests, mock mode, $0 spend
 npm run typecheck
 npm run eval       # deterministic bench
 npm run replay -- request.json measurement.json
@@ -20,6 +20,7 @@ npm run replay -- request.json measurement.json
 | `POST /v1/measure` | any | Deterministic math only: masks in, findings + receipts out. No model, no keys. |
 | `POST /v1/observe` | any | Pixel masks (COCO RLE) → component/masks/scaleReference that `/v1/report` takes. No model, no keys. |
 | `POST /v1/report` | mock default | measure → findings draft → Evidence Gate. Uncited numbers return `422` with `details[]`. Client may pass `drafts[]` to test the gate. |
+| `POST /v1/claim` | mock (masks) / live (photo) | One-call pipeline: `masks` (COCO RLE) or `imageUrl` + `damage[]` taps (+ optional `coin`) → `{measurement, findings, gate, overlay, svg?, replay, segmentation?}`. Composes segment → observe → report → render without re-billing the second report. See `docs/API.md`. |
 | `POST /v1/segment` | mock/live | Mock requires `body.fixture {component, masks}` — the backend invents no masks. Live calls SAM 3.1 point prompts (`imageUrl` + `width/height` + `points[1..16]`), parses the Responses output text and decodes masks with `@meta-sam/parser`; returns `{records: [{objectId, box, confidence, rle}]}` with full-frame RLE, `$0.0025`/image metered. Empty output throws, never fakes. |
 | `POST /v1/crosscheck` | any | `{a, b}` COCO RLE masks of one frame, `threshold?` — IoU + Dice agreement with AGREED/DISPUTED verdict. Keyless, deterministic. |
 | `POST /v1/transcribe` | mock/live | Spoken line to text via Muse Voice Transcribe (`/asr/transcribe`, multipart, `PUSH_TO_TALK`, optional caller-supplied `languageBias` + claim keywords). Mock requires `body.fixtureTranscript`. Audio priced at $0.18/hr on the ledger. |
