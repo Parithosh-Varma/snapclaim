@@ -218,16 +218,6 @@ export default function App() {
     setDraft(null);
     const s = sessionRef.current;
     s.currentCaseId = null;
-    s.capturingAngle = 1;
-    s.stillA = "";
-    s.still2DataUrl = "";
-    s.bundleA = null;
-    s.bundleB = null;
-    s.measurementA = null;
-    s.measurementB = null;
-    s.payloadA = null;
-    s.payloadB = null;
-    s.winnerAngle = null;
     resetDmg(s);
     go("capture");
   }, [go]);

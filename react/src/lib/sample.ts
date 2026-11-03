@@ -40,16 +40,6 @@ export async function loadSamplePhoto(session: Session, file: string): Promise<v
     reader.readAsDataURL(blob);
   });
   session.stillDataUrl = dataUrl;
-  session.stillA = "";
-  session.still2DataUrl = "";
-  session.capturingAngle = 1;
-  session.bundleA = null;
-  session.bundleB = null;
-  session.measurementA = null;
-  session.measurementB = null;
-  session.payloadA = null;
-  session.payloadB = null;
-  session.winnerAngle = null;
   session.photo = null;
   session.photoFor = "";
   session.gateCoin = null;

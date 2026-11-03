@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "../App";
 import { loadSamplePhoto } from "../lib/sample";
 import { SamplePicker } from "./SamplePicker";
-import { freshAngleSlot, resetDmg } from "../lib/session";
+import { resetDmg } from "../lib/session";
 
 const CAM_ERRORS: Record<string, string> = {
   NotAllowedError: "Camera permission is off - tap Enable camera",
@@ -197,18 +197,9 @@ export default function Capture() {
     try {
       const cap = best.cap;
       const still = cap.toDataURL("image/jpeg", 0.85);
-      const angle = session.capturingAngle === 2 ? 2 : 1;
       // No detection gate: the coin is tapped on the photo in Mark, exactly
       // like the crack. Scale is confirmed there, never here.
-      if (angle === 1) {
-        session.stillDataUrl = still;
-        session.stillA = still;
-        session.bundleA = { ...freshAngleSlot() };
-      } else {
-        session.stillDataUrl = still;
-        session.still2DataUrl = still;
-        session.bundleB = { ...freshAngleSlot() };
-      }
+      session.stillDataUrl = still;
       session.gateCoin = null;
     } catch { /* stills are best-effort */ }
     stopStream();
@@ -240,25 +231,14 @@ export default function Capture() {
   }, [screen]);
 
   const retake = () => {
-    // Retake re-shoots the current angle only: clear its still and its
-    // marking bundle so no stale outline survives the new photo.
-    if (session.capturingAngle === 2) {
-      session.still2DataUrl = "";
-    } else {
-      session.stillDataUrl = "";
-      session.stillA = "";
-    }
+    // Retake re-shoots the photo: clear its still so no stale outline
+    // survives the new photo.
     session.stillDataUrl = "";
     session.gateCoin = null;
     session.coinLabel = "";
     session.coinKindMm = 0;
     session.noScaleMode = false;
     resetDmg(session);
-    if (session.capturingAngle === 2) {
-      session.bundleB = { ...freshAngleSlot() };
-    } else {
-      session.bundleA = { ...freshAngleSlot() };
-    }
     setEnableCam(false);
     setBlocked(false);
     setNoScale(false);
@@ -269,18 +249,7 @@ export default function Capture() {
   };
 
   const usePhoto = () => {
-    // Two angles: after the first photo goes back behind the camera for the
-    // second; after the second, on to marking.
-    if (session.capturingAngle !== 2) {
-      session.capturingAngle = 2;
-      setEnableCam(false);
-      setBlocked(false);
-      setNoScale(false);
-      setAcquiring(true);
-      go("capture");
-      void acquire();
-      return;
-    }
+    // One photo, then straight on to marking.
     go("sMark");
   };
 
@@ -298,13 +267,6 @@ export default function Capture() {
       cap.getContext("2d")?.drawImage(img, 0, 0, cap.width, cap.height);
       const still = cap.toDataURL("image/jpeg", 0.85); // canvas redraw strips EXIF
       session.stillDataUrl = still;
-      if ((session.capturingAngle ?? 1) === 2) {
-        session.still2DataUrl = still;
-        session.bundleB = { ...freshAngleSlot() };
-      } else {
-        session.stillA = still;
-        session.bundleA = { ...freshAngleSlot() };
-      }
       session.gateCoin = null;
       session.noScaleMode = true;
       session.coinLabel = "";
