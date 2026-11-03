@@ -1,16 +1,25 @@
-// Mobile menu: close on outside click, Escape, or choosing a link.
-const menu = document.querySelector(".menu");
-if (menu) {
+// Mobile menu: button toggles the link list; closes on outside click, Escape, or link choice.
+const menuBtn = document.getElementById("menuBtn");
+const menuList = document.getElementById("menuList");
+if (menuBtn && menuList) {
+  const setOpen = (open) => {
+    menuBtn.setAttribute("aria-expanded", String(open));
+    menuList.hidden = !open;
+  };
+  menuBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    setOpen(menuList.hidden);
+  });
   document.addEventListener("click", (e) => {
-    if (menu.open && !menu.contains(e.target)) menu.open = false;
+    if (!menuList.hidden && !e.target.closest(".menu")) setOpen(false);
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && menu.open) {
-      menu.open = false;
-      menu.querySelector("summary").focus();
+    if (e.key === "Escape" && !menuList.hidden) {
+      setOpen(false);
+      menuBtn.focus();
     }
   });
-  menu.querySelectorAll("a").forEach((a) => a.addEventListener("click", () => { menu.open = false; }));
+  menuList.querySelectorAll("a").forEach((a) => a.addEventListener("click", () => setOpen(false)));
 }
 
 // Theme toggle: flips between light and dark, starting from whatever is showing now.
