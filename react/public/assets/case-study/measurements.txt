@@ -1,0 +1,35 @@
+SnapClaim measured report — Ref SC-25D35C5E
+Terrace-slab crack, Nov 2026. Transcript: "crack above the slab"
+Scale: 2 INR coin (25 mm), taped beside the crack, same plane.
+
+MEASUREMENTS (all Confirmed, all cite evidence receipts)
+  Crack length      218.5 mm   [R005]
+  Crack width       3 mm       [R006]
+  Surface affected  0.73 %     [R002]
+  Area              6.51 cm2   [R004]
+  Severity          significant [R007]
+  Regions           1          [R003]
+
+RECEIPTS (7) — computed, not generated; every number cites one or the gate fails
+  R001  scale_calibration       0.712074 mm_per_px   knownMm / referenceLengthPx
+  R002  area_ratio              0.73 percent         damageAreaPx / componentAreaPx * 100
+  R003  region_count            1 count              count of disconnected mask components
+  R004  calibrated_area         6.51 cm2             damageAreaPx * mmPerPx^2 / 100
+  R005  calibrated_length       218.5 mm             skeletonPx * mmPerPx
+  R006  calibrated_width        3 mm                 damageAreaPx / skeletonPx * mmPerPx
+  R007  severity_classification significant band    area ratio + calibrated length + region count vs printed thresholds
+
+METHOD
+  Outlines measured from photo pixels, scaled by the coin diameter
+  (tilt-corrected from its ellipse).
+
+VERIFICATION
+  Evidence gate: passed - Independent skeptic: not run - Mask cross-check: not run
+
+GROUND TRUTH
+  Builder's physical tape 22.5-23 cm along the crack, midpoint 227 mm.
+  Tape 227 mm vs measured 218.5 mm -> err 8.5 mm (3.7%), inside +-10%.
+  Spark photo-alone guess 315 mm -> err 88 mm (38.8%), outside.
+  Bench case terrace-slab-tape-01. Replay from request + receipts.
+
+Source: your signed report SC-25D35C5E (2 Nov 2026). Generated for file storage.
