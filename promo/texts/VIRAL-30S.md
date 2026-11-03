@@ -1,5 +1,24 @@
 # 30 s viral cut: resume point (2026-11-02)
 
+## Latest state (read this first; it replaces "Nothing is built" and the Script below if Tariq says yes)
+
+Built: `promo/viral30/make.py` (the script below), silent preview in `promo/viral30/out/`. Voices were
+fetched with Plusky's ElevenLabs key, which Tariq approved by name for this video; load it into the process only,
+never print it. Final video not rendered, not posted. The phone ask about the key is answered, ignore it.
+
+Tariq then asked if this would really go viral. Answer given: probably not as written. **Waiting on his
+answer**, do not rebuild until he gives it. Proposed changes:
+1. Open on the crack at frame 0 with "Landlord wants $1,400 for this".
+2. End on "Would you pay?" (a hairline crack at that price splits people; "Who pays?" has one obvious answer).
+3. Shorten the app section: keep coin and number, cut the "receipt" exchange, drop the ₹ label (a ₹2 coin
+   beside a $1,400 dispute looks fake; the coin's 25 mm stays accurate). Also fixes the weak logic: one
+   measurement today cannot show a crack didn't grow.
+4. End with "Reply with your crack and a coin. I'll measure it." and measure replies with the app through Nov 8.
+   If Tariq won't answer replies, drop this and end on "Would you pay?".
+
+Unchanged lines reuse cached voices (key is index + speaker + text, so a reordered line refetches). Then: `--sheet`, render, must be
+30 s or under (0.95 to 1.0 voice speed is the last lever), watch the first 3 s on mute, hand to Tariq.
+
 Tariq asked for a 30 s SnapClaim video in a viral format, researched first. Research is done and
 the format is picked. **Nothing is built or rendered yet.**
 
