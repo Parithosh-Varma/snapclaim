@@ -1095,6 +1095,67 @@ export function toSavedSession(body: unknown): SavedSession {
 const CORS_METHODS = "GET, POST, OPTIONS";
 const CORS_HEADERS = "content-type, authorization, x-meta-key, x-baseten-key";
 
+/** Default allowlist when ALLOWED_ORIGINS is unset or empty. No path, no
+ * wildcard, exact origins only. Requests without an Origin header (curl,
+ * server-to-server) are never blocked by this check — this is not
+ * authentication, only a browser-spend guard. */
+export const DEFAULT_ALLOWED_ORIGINS: readonly string[] = [
+  "https://snapclaim.pages.dev",
+  "http://localhost:8787",
+  "http://127.0.0.1:8787",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+];
+
+/** Normalise one allowlist entry: trim, lowercase scheme+host, strip a single
+ * trailing slash. Returns null for malformed entries (path, query, hash,
+ * wildcard, unparseable) so the caller can ignore them with a warning. */
+export function normalizeAllowedOrigin(entry: string): string | null {
+  const t = entry.trim();
+  if (t === "" || t.includes("*")) return null;
+  let url: URL;
+  try {
+    url = new URL(t);
+  } catch {
+    return null;
+  }
+  if (url.username !== "" || url.password !== "") return null;
+  if (url.search !== "" || url.hash !== "") return null;
+  if (url.pathname !== "" && url.pathname !== "/") return null;
+  const scheme = url.protocol.toLowerCase();
+  if (scheme !== "http:" && scheme !== "https:") return null;
+  const host = url.host.toLowerCase();
+  if (host === "") return null;
+  return `${scheme}//${host}`;
+}
+
+/** Effective allowlist: normalised ALLOWED_ORIGINS, or the default when unset,
+ * empty, or fully malformed. Malformed entries are ignored with a warning. */
+export function getAllowedOrigins(env: Env = {}): string[] {
+  const raw = env.ALLOWED_ORIGINS ?? "";
+  const out: string[] = [];
+  for (const part of raw.split(",")) {
+    const t = part.trim();
+    if (t === "") continue;
+    const n = normalizeAllowedOrigin(t);
+    if (n === null) {
+      console.warn(`[cors] ignoring malformed ALLOWED_ORIGINS entry: ${t}`);
+      continue;
+    }
+    if (!out.includes(n)) out.push(n);
+  }
+  if (out.length > 0) return out;
+  return [...DEFAULT_ALLOWED_ORIGINS];
+}
+
+/** Exact-match check after normalising the incoming Origin header. */
+export function isOriginAllowed(origin: string | null | undefined, env: Env = {}): boolean {
+  if (origin === null || origin === undefined || origin === "") return false;
+  const n = normalizeAllowedOrigin(origin);
+  if (n === null) return false;
+  return getAllowedOrigins(env).includes(n);
+}
+
 export function corsHeaders(): Record<string, string> {
   return {
     "access-control-allow-origin": "*",
@@ -1107,31 +1168,22 @@ export function corsHeaders(): Record<string, string> {
 }
 
 /**
- * Origin-restricted CORS for the public demo. Set ALLOWED_ORIGINS to a
- * comma-separated list (e.g. your Pages URL) and browsers outside it can no
- * longer spend your SPEND_GUARD_USD from a web page.
- * - No allowlist + mock mode: "*" (local dev, $0 spend).
- * - No allowlist + live mode: no ACAO header (deny by default; curl unaffected).
- * - Allowlist set: echo the caller only on exact match, otherwise omit ACAO
- *   (fail closed - never fall back to the first allowlisted origin).
+ * Exact-match CORS. ALLOWED_ORIGINS is a comma-separated list; entries are
+ * normalised (trim, lowercase scheme+host, no trailing slash). Entries with
+ * paths or wildcards are ignored. Unset or empty uses the default list
+ * (Pages + localhost/127.0.0.1 :8787/:5173). Live mode never falls back to
+ * "*". Echoes only the exact matching origin, no suffix or prefix matching.
  */
 export function corsHeadersFor(origin: string | null, env: Env = {}): Record<string, string> {
-  const raw = env.ALLOWED_ORIGINS ?? "";
-  const allowed = raw
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter((entry) => entry !== "");
-  if (allowed.length === 0) {
-    const mockMode = effectiveMockMode(env);
-    if (mockMode) return corsHeaders();
+  const allowed = getAllowedOrigins(env);
+  const n = origin === null ? null : normalizeAllowedOrigin(origin);
+  if (n !== null && allowed.includes(n)) {
     return {
+      "access-control-allow-origin": n,
       "access-control-allow-methods": CORS_METHODS,
       "access-control-allow-headers": CORS_HEADERS,
       vary: "Origin, x-meta-key, x-baseten-key",
     };
-  }
-  if (origin !== null && allowed.includes(origin)) {
-    return { ...corsHeaders(), "access-control-allow-origin": origin };
   }
   // Mismatch (or missing Origin): omit ACAO so the browser blocks the read.
   return {
@@ -1140,6 +1192,18 @@ export function corsHeadersFor(origin: string | null, env: Env = {}): Record<str
     vary: "Origin, x-meta-key, x-baseten-key",
   };
 }
+
+/** Expensive (billable) routes for REQUIRE_ORIGIN_FOR_EXPENSIVE. */
+export const EXPENSIVE_ROUTE_PATHS: readonly string[] = [
+  "/v1/claim",
+  "/v1/report",
+  "/v1/segment",
+  "/v1/transcribe",
+  "/v1/describe",
+  "/v1/findings",
+  "/v1/skeptic",
+  "/v1/render",
+];
 
 export interface HandledResponse {
   status: number;
@@ -1332,11 +1396,31 @@ export async function handleRequest(input: {
   store?: Store;
   headers?: RequestHeaders;
   clientIp?: string;
+  /** Browser Origin header, if present. Enforced before any cost. */
+  origin?: string | null;
 }): Promise<HandledResponse> {
   const requestId = newRequestId();
   const store = input.store ?? defaultStore;
   const headers = input.headers ?? {};
   let env = input.env ?? {};
+  const origin: string | null =
+    input.origin !== undefined ? input.origin : (headers.origin ?? headers.Origin ?? null);
+  // Exact-match origin allowlist: enforced before rate limiting, spend holds,
+  // body parsing or any provider call. No Origin (curl, server-to-server) is
+  // not blocked here — this is a browser-spend guard, not authentication.
+  if (origin !== null && origin !== "") {
+    if (!isOriginAllowed(origin, env)) {
+      return {
+        status: 403,
+        body: { ok: false, error: "origin not allowed", code: "origin_not_allowed", requestId },
+      };
+    }
+  } else if (env.REQUIRE_ORIGIN_FOR_EXPENSIVE === "1" && (EXPENSIVE_ROUTE_PATHS as readonly string[]).includes(input.path)) {
+    return {
+      status: 403,
+      body: { ok: false, error: "origin required", code: "origin_not_allowed", requestId },
+    };
+  }
   // Defense in depth: when callers pass clientIp (server/worker do), enforce
   // the per-route tier here too so direct handleRequest callers get the same
   // protection as the edge.

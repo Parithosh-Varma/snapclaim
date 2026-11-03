@@ -64,8 +64,14 @@ npx wrangler secret put BASETEN_API_KEY    # Spark Open skeptic (when access gra
 ```
 
 Optional guardrails: set `SPEND_GUARD_USD` (default 5) and `MIN_REFERENCE_CONFIDENCE`
-(default 0.6) as Worker vars; restrict the PWA origin if you replace the
-open-CORS default. Health badge flips `mock` → `live` when `MOCK_MODE=0` plus a key.
+(default 0.6) as Worker vars; set `ALLOWED_ORIGINS` to a comma-separated exact-match
+list (default: `https://snapclaim.pages.dev`, `http://localhost:8787`,
+`http://127.0.0.1:8787`, `http://localhost:5173`, `http://127.0.0.1:5173`).
+Entries are normalised (trim, lowercase scheme/host, strip trailing slash);
+entries with paths or wildcards are ignored. A browser Origin not on the list
+gets `403 origin_not_allowed` before any cost; requests without Origin (curl,
+server-to-server) are not blocked. Set `REQUIRE_ORIGIN_FOR_EXPENSIVE=1` to also
+reject no-Origin on expensive routes. Health badge flips `mock` → `live` when `MOCK_MODE=0` plus a key.
 
 ## Deploy (PWA)
 

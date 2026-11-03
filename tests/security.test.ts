@@ -3,15 +3,29 @@ import { test } from "node:test";
 import { corsHeadersFor, handleRequest } from "../backend/app.ts";
 import worker from "../backend/worker.ts";
 
-test("CORS is open by default for local development (mock mode)", () => {
-  assert.equal(corsHeadersFor(null, {} as never)["access-control-allow-origin"], "*");
-  assert.equal(corsHeadersFor("https://anything.test", {} as never)["access-control-allow-origin"], "*");
+test("CORS uses the default allowlist in mock mode (never '*')", () => {
+  // Unset ALLOWED_ORIGINS falls back to the default list (Pages + localhost),
+  // even in mock mode. Unknown origins get no ACAO.
+  assert.equal(corsHeadersFor(null, {} as never)["access-control-allow-origin"], undefined);
+  assert.equal(corsHeadersFor("https://anything.test", {} as never)["access-control-allow-origin"], undefined);
+  assert.equal(
+    corsHeadersFor("https://snapclaim.pages.dev", {} as never)["access-control-allow-origin"],
+    "https://snapclaim.pages.dev",
+  );
+  assert.equal(
+    corsHeadersFor("http://localhost:8787", {} as never)["access-control-allow-origin"],
+    "http://localhost:8787",
+  );
 });
 
-test("CORS denies by default in live mode without an allowlist", () => {
+test("CORS denies by default in live mode without an allowlist (uses default list)", () => {
   const live = { MOCK_MODE: "0" } as never;
   assert.equal(corsHeadersFor(null, live)["access-control-allow-origin"], undefined);
   assert.equal(corsHeadersFor("https://anything.test", live)["access-control-allow-origin"], undefined);
+  assert.equal(
+    corsHeadersFor("https://snapclaim.pages.dev", live)["access-control-allow-origin"],
+    "https://snapclaim.pages.dev",
+  );
 });
 
 test("ALLOWED_ORIGINS echoes the caller and blocks others", () => {

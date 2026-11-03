@@ -184,6 +184,10 @@ Copy `.env.example` to `.env` (never commit it). Every variable is optional; uns
 | `SPEND_GUARD_USD` | `5` | Hard cap on live spend; 429 at $0 remaining |
 | `MIN_REFERENCE_CONFIDENCE` | `0.6` | Below this, reports stay percent-only |
 | `PORT` | `8787` | Node server port |
+| `ALLOWED_ORIGINS` | Pages + localhost (see below) | Exact-match browser allowlist; disallowed Origin → 403 `origin_not_allowed` before any cost. Requests without Origin (curl) are not blocked. |
+| `REQUIRE_ORIGIN_FOR_EXPENSIVE` | unset (off) | Set `1` to also reject no-Origin on expensive routes (`/v1/claim`, `/v1/report`, `/v1/segment`, `/v1/transcribe`, `/v1/describe`, `/v1/findings`, `/v1/skeptic`, `/v1/render`) |
+
+Default allowlist (when `ALLOWED_ORIGINS` is unset or empty): `https://snapclaim.pages.dev`, `http://localhost:8787`, `http://127.0.0.1:8787`, `http://localhost:5173`, `http://127.0.0.1:5173`. Entries are normalised (trim, lowercase scheme/host, no trailing slash); entries with paths or wildcards are ignored. Matching is exact only — no suffix/prefix matching.
 
 ## Deploying
 

@@ -1,4 +1,4 @@
-import { checkRouteRateLimit, corsHeadersFor, handleRequest, securityHeaders } from "./app.ts";
+import { EXPENSIVE_ROUTE_PATHS, checkRouteRateLimit, corsHeadersFor, handleRequest, isOriginAllowed, securityHeaders } from "./app.ts";
 import { D1Store, type D1Database } from "./store.ts";
 
 export interface Env {
@@ -24,14 +24,47 @@ export default {
     const { DB, ...rest } = workerEnv;
     const env: Record<string, string | undefined> = {};
     for (const [k, v] of Object.entries(rest)) if (typeof v === "string") env[k] = v;
+    const origin = request.headers.get("origin");
+    // Exact-match origin allowlist first: before rate limiting, spend holds,
+    // body parsing or any provider call. No Origin (curl) is not blocked.
+    const noAcao = {
+      "content-type": "application/json",
+      "x-content-type-options": "nosniff",
+      "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+      ...securityHeaders(),
+      "access-control-allow-methods": "GET, POST, OPTIONS",
+      "access-control-allow-headers": "content-type, authorization, x-meta-key, x-baseten-key",
+      vary: "Origin, x-meta-key, x-baseten-key",
+    };
+    if (origin !== null && origin !== "") {
+      if (!isOriginAllowed(origin, env)) {
+        return Response.json(
+          { ok: false, error: "origin not allowed", code: "origin_not_allowed", requestId: "unknown" },
+          { status: 403, headers: noAcao },
+        );
+      }
+    } else if (env.REQUIRE_ORIGIN_FOR_EXPENSIVE === "1" && (EXPENSIVE_ROUTE_PATHS as readonly string[]).includes(new URL(request.url).pathname)) {
+      return Response.json(
+        { ok: false, error: "origin required", code: "origin_not_allowed", requestId: "unknown" },
+        { status: 403, headers: noAcao },
+      );
+    }
     const headers = {
       "content-type": "application/json",
       "x-content-type-options": "nosniff",
       "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
       ...securityHeaders(),
-      ...corsHeadersFor(request.headers.get("origin"), env),
+      ...corsHeadersFor(origin, env),
     };
-    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
+    if (request.method === "OPTIONS") {
+      if (origin !== null && origin !== "" && !isOriginAllowed(origin, env)) {
+        return Response.json(
+          { ok: false, error: "origin not allowed", code: "origin_not_allowed", requestId: "unknown" },
+          { status: 403, headers: noAcao },
+        );
+      }
+      return new Response(null, { status: 204, headers });
+    }
     // cf-connecting-ip is set by Cloudflare's edge and cannot be spoofed by
     // the client; X-Forwarded-For can, so it is ignored for rate limiting.
     const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
@@ -116,6 +149,7 @@ export default {
       env,
       fetchFn,
       store: DB ? new D1Store(DB) : undefined,
+      origin,
       headers: {
         authorization: request.headers.get("authorization") ?? undefined,
         "x-meta-key": request.headers.get("x-meta-key") ?? undefined,
