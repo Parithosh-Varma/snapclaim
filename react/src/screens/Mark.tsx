@@ -6,7 +6,7 @@ import { findCoins } from "../../../src/vision/coin-detect.js";
 import { closeMask } from "../lib/mask";
 import { segmentCoinViaApi, segmentViaApi, type SamClient } from "../lib/sam";
 import { buildObserveBody, completeMeasureJob, failMeasureJob, invalidateMeasure, startMeasureJob } from "../lib/measure-job";
-import { COIN_GROUPS, COIN_OPTIONS, freshAngleSlot, pickWinnerAngle, resetDmg, type AngleSlot, type SamMask, type Session } from "../lib/session";
+import { COIN_GROUPS, COIN_OPTIONS, freshAngleSlot, pickWinnerAngle, resetDmg, saveLastCoin, type AngleSlot, type SamMask, type Session } from "../lib/session";
 import { BackButton, Stepper } from "../lib/ui";
 
 /** Custom coin-size dropdown: the native select cannot be styled square or
@@ -964,6 +964,7 @@ export default function Mark() {
                 s.coinKindMm = v;
                 s.coinLabel = v > 0 ? label.replace(/ · (\d+(?:\.\d+)?) mm$/, " · $1 mm dia") : "";
                 touchInputs();
+                saveLastCoin(s.coinKindMm, s.coinLabel);
               }}
             />
           </label>
@@ -992,6 +993,7 @@ export default function Mark() {
                   s.coinLabel = "";
                 }
                 touchInputs();
+                if (mm > 0) saveLastCoin(s.coinKindMm, s.coinLabel);
               }}
             />
           </label>

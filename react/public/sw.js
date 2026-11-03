@@ -10,8 +10,8 @@
 // new hashed bundle the old HTML never referenced, so the app looked frozen
 // no matter how many times it was reloaded. The HTML is the one file whose
 // URL never changes, so it must come from the network when there is one.
-const CACHE = "snapclaim-react-v21";
-const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./hero-crack.jpg", "./snapclaim-mark.png", "./snapclaim-mark-dark.png",
+const CACHE = "snapclaim-react-v22";
+const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./hero-crack.jpg",
   "./coin-model.js", "./theme.js", "./sam-worker.js", "./voice-worker.js",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/maskable-512.png", "./icons/apple-touch-icon.png"];
 

@@ -93,7 +93,11 @@ async function getBackendMode() {
  * GPU work: unknown deviceMemory counts as low (fail safe, not fast). This is
  * the single low-mem source; its value rides on every SAM embed message. */
 function isLowMemDevice() {
-  return isLowMem(typeof navigator !== "undefined" ? navigator.deviceMemory : undefined);
+  // Safari has no navigator.deviceMemory, so iPhones/iPads never matched the
+  // check below and embedded SlimSAM straight after the camera. Safari then
+  // killed the tab, which reloads back to Home. Treat iOS/iPadOS (iPadOS
+  // reports MacIntel + touch) as low-memory.
+  if (typeof isAppleMobile === "function" && isAppleMobile()) return true;
 }
 /* Cloud-by-default: no worker, no model bytes, unless Settings → Compute. */
 function onDeviceOn() {
@@ -108,6 +112,10 @@ function maybeStartDeferredEmbed() {
     samDeferred = false;
     try { startSamEmbed(); } catch { /* stays deferred until the next photo */ samDeferred = true; }
   }
+  return isLowMem(typeof navigator !== "undefined" ? navigator.deviceMemory : undefined);
+}
+function isAppleMobile() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 }
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
 /* Offline honesty: the service worker never caches cross-origin responses, so
@@ -188,14 +196,11 @@ const fab = $("shutter");
 const SW = 224; // detection width: cheaper beats sticking to 256
 const work = document.createElement("canvas");
 const wctx = work.getContext("2d", { willReadFrequently: true });
-const full = document.createElement("canvas");
-const fctx = full.getContext("2d", { willReadFrequently: true });
 const history = [];
 let coinSeen = false, smooth = null, camStream = null, noScaleMode = false;
 let assistPt = null, assistAt = 0, scanCount = 0, lastDetAt = 0;
 let captureTimer = null, countdownTimer = null;
 const countEl = $("count");
-const clf = new CoinModel.Classifier();
 let coinLabel = "";
 let gateCoin = null; // {cx, cy, rr} in capture-still pixels + still size
 let photo = null;    // downscaled capture canvas for marking
@@ -430,6 +435,26 @@ function updateCoinHintMark() {
   else if (!hasCoin) el.textContent = "No coin yet - tap “Tap coin to correct” to add one, or measure percent-only.";
   else el.textContent = "";
 }
+const LAST_COIN_KEY = "snapclaim.lastCoin";
+function rememberCoin(mm, label) {
+  try {
+    if (mm > 0 && mm <= 200) localStorage.setItem(LAST_COIN_KEY, JSON.stringify({ mm, label }));
+    else localStorage.removeItem(LAST_COIN_KEY);
+  } catch { /* storage may be unavailable; the claim flow must not break */ }
+}
+/** Default the coin size to the user's last confirmed pick (or none). */
+function restoreCoinSize() {
+  let last = null;
+  try { last = JSON.parse(localStorage.getItem(LAST_COIN_KEY) || "null"); } catch { /* ignore */ }
+  const mm = Number(last?.mm);
+  if (mm > 0 && mm <= 200) {
+    setCoinSize(mm, "Custom");
+    coinLabel = typeof last.label === "string" ? last.label : "";
+  } else {
+    setCoinSize(0);
+    coinLabel = "";
+  }
+}
 /** Select a known diameter, adding a one-off option when the coin is outside the preset list. */
 function setCoinSize(mm, label) {
   const sel = $("coinKind");
@@ -445,24 +470,13 @@ function setCoinSize(mm, label) {
   sel.value = String(mm);
   updateCoinHintMark();
 }
-function identifyCoin(det, fw, fh) {
-  try {
-    const vw = feed.videoWidth, vh = feed.videoHeight;
-    if (!vw) return;
-    const k = Math.min(1, 640 / Math.max(vw, vh));
-    full.width = Math.round(vw * k); full.height = Math.round(vh * k);
-    fctx.drawImage(feed, 0, 0, full.width, full.height);
-    const img = fctx.getImageData(0, 0, full.width, full.height);
-    const kx = (full.width / fw) * det.cx, ky = (full.height / fh) * det.cy, kr = (full.width / fw) * det.rr;
-    const fv = CoinModel.extractFeatures(img.data, full.width, full.height, { x: kx, y: ky, r: kr });
-    const best = clf.predict(fv)[0];
-    if (best && best.label !== "unknown") {
-      const def = CoinModel.DB.find((d) => d.id === best.label);
-      coinLabel = def ? `${def.label} · ${def.diam} mm dia` : best.label;
-      if (def) setCoinSize(def.diam, def.label);
-      hint.textContent = `${coinLabel} (${Math.round(best.confidence * 100)}%) - hold steady…`;
-    } else { coinLabel = ""; hint.textContent = "Coin found - hold steady…"; }
-  } catch { /* ID is advisory; the gate stands on geometry */ }
+/* The coin classifier is a colour-only guess: silver coins look alike without
+ * absolute scale. On 16 real photos of a 25 mm coin it named six different
+ * coins (20-27 mm) at 33-38% confidence, and writing that guess into the
+ * scale put lengths off by -20% to +8%. So the gate only says a coin is there;
+ * the size comes from the user's own pick (remembered from their last claim). */
+function identifyCoin() {
+  hint.textContent = "Coin found - hold steady…";
 }
 function scan() {
   if (!camStream) return; // camera left: never spin the detector in the background
@@ -629,7 +643,7 @@ function scanFrame() {
       rr: smooth.rr + (d.rr - smooth.rr) * 0.35, score: d.score,
     } : { ...d };
     placeRing(smooth, fw, fh);
-    if (!coinSeen) { coinSeen = true; identifyCoin(smooth, fw, fh); setLocked(false); armCapture(); }
+    if (!coinSeen) { coinSeen = true; identifyCoin(); setLocked(false); armCapture(); }
   } else if (coinSeen && recent.length < 3) {
     cancelCapture();
     coinSeen = false; smooth = null; coinLabel = ""; assistPt = null;
@@ -709,7 +723,7 @@ $("retake").onclick = () => {
   if (multiShotActive()) { startShot(shotStage); return; }
   backToCam();
   coinSeen = false; smooth = null; coinLabel = ""; gateCoin = null; stillDataUrl = ""; noScaleMode = false;
-  setCoinSize(0);
+  restoreCoinSize();
   history.length = 0;
   setLocked(true, "Add a coin for scale");
   acquireCamera();
@@ -780,6 +794,9 @@ $("camFile").addEventListener("change", () => {
 const MAX_SIDE = 512;
 let embeddings = null; // true once the worker has embedded the current photo
 let dmg = { points: [], pointMasks: [], mask: null, iou: 0, source: null };
+// True while the no-camera sample is on screen: its masks are precomputed, so there is no
+// drawn mask to cross-check. Cleared as soon as a real photo reaches the Mark screen.
+let sampleRun = false;
 let dmgLabel = "crack";
 const MASK_COLORS = { crack: "#c0392b", stain: "#f39c12", peel: "#2980b9", dent: "#8e44ad", coin: "#0f7a36" };
 
@@ -814,7 +831,8 @@ function sam() {
   if (samWorker) return samWorker;
   // ?device=wasm|webgpu on the page URL forces the worker's backend, for comparisons.
   const url = new URL("./sam-worker.js", import.meta.url);
-  const device = new URLSearchParams(location.search).get("device");
+  // The worker can't see the page's UA-based iOS check, so low-memory phones pass wasm here.
+  const device = new URLSearchParams(location.search).get("device") ?? (isLowMemDevice() ? "wasm" : null);
   if (device) url.searchParams.set("device", device);
   samWorker = new Worker(url, { type: "module" });
   samLoading = true;
@@ -867,6 +885,7 @@ function releaseVoice() {
   voiceBusy = false;
 }
 function setupMarkPhoto() {
+  sampleRun = false;
   const img = new Image();
   img.onload = () => {
     const scale = Math.min(1, MAX_SIDE / Math.max(img.width, img.height));
@@ -1164,6 +1183,7 @@ $("coinKind").addEventListener("change", () => {
   // The user's confirmation wins over the gate's size guess (it can name a
   // coin outside this list, e.g. a nickel, while the scale uses this value).
   coinLabel = opt && Number(opt.value) > 0 ? opt.textContent.replace(/ · (\d+(?:\.\d+)?) mm$/, " · $1 mm dia") : "";
+  rememberCoin(Number(opt?.value) || 0, coinLabel);
   updateCoinHintMark();
 });
 $("coinCustomMm")?.addEventListener("input", () => {
@@ -1171,11 +1191,13 @@ $("coinCustomMm")?.addEventListener("input", () => {
   if (mm > 0) {
     $("coinKind").value = "0";
     coinLabel = `Custom · ${mm} mm dia`;
+    rememberCoin(mm, coinLabel);
   } else {
     coinLabel = "";
   }
   updateCoinHintMark();
 });
+restoreCoinSize();
 for (const [id, label] of [["chipCrack", "crack"], ["chipStain", "stain"], ["chipPeel", "peel"], ["chipDent", "dent"]]) {
   $(id).onclick = () => {
     dmgLabel = label;
@@ -2038,6 +2060,18 @@ async function runSkeptic(auto, retried = false) {
 }
 async function runXcheck(auto) {
   if (checkState.xcheck === "loading") return;
+  if (sampleRun && !dmg.mask) {
+    // The sample has no drawn mask; returning early here used to leave the report
+    // button on "Run both checks to continue" forever. Resolve it and say why.
+    const x = $("xStatus");
+    x.innerHTML = "";
+    const chip = document.createElement("span");
+    chip.className = "badge ok";
+    chip.textContent = "Sample · masks precomputed, nothing to cross-check";
+    x.appendChild(chip);
+    setCheck("xcheck", "ok");
+    return;
+  }
   if (!dmg.mask || !photo) { if (!auto) $("xStatus").textContent = "Mark the damage first."; return; }
   checkState.xcheck = "loading";
   renderCheckCard(); updateReportGate();
@@ -2201,7 +2235,7 @@ $("newClaimBtn").onclick = () => {
   resetShots();
   dmg = { points: [], pointMasks: [], mask: null, iou: 0, source: null };
   gateCoin = null; stillDataUrl = ""; noScaleMode = false; coinLabel = "";
-  setCoinSize(0);
+  restoreCoinSize();
   history.length = 0; smooth = null; coinSeen = false;
   $("transcriptBox").value = ""; $("heard").textContent = "";
   $("voiceErr").textContent = ""; $("raw").textContent = "{}";
@@ -2294,6 +2328,8 @@ async function loadSample() {
     const measured = await mres.json();
     if (!mres.ok || !measured.ok) throw new Error(measured.error ?? mres.status);
     payloadObj = sample;
+    sampleRun = true;
+    dmg = { points: [], pointMasks: [], mask: null, iou: 0, source: null };
     fillPhotoCard();
     showMeasured(measured.result);
     show("sSay");

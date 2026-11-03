@@ -5,6 +5,17 @@
 import type { SamMask } from "./session.ts";
 import { decodeRle, encodeRle, type Rle } from "./rle.ts";
 import { unionMasks } from "./mask.ts";
+import { onDeviceAllowed } from "./compute.ts";
+
+/** Why on-device work is currently refused, for honest error surfaces. */
+function onDeviceBlockedReason(): string {
+  try {
+    const gb = typeof navigator !== "undefined" ? (navigator as unknown as { deviceMemory?: unknown }).deviceMemory : undefined;
+    const n = Number(gb);
+    if (!(n > 0) || n <= 4) return "this device is low-memory";
+  } catch { /* fall through to the settings reason */ }
+  return "on-device outlining is off - enable it in Settings → Compute";
+}
 
 export interface SamProgress {
   percent: number;
@@ -25,6 +36,11 @@ export class SamClient {
 
   private ensure(): Worker {
     if (this.worker) return this.worker;
+    // Cloud-by-default: never create the worker (and its ~100-300 MB model
+    // download) unless the user opted in AND the device can hold it. This is
+    // the OOM guard: an A32-class phone dies loading the model otherwise.
+    if (!onDeviceAllowed()) throw new Error(`on-device outlining unavailable (${onDeviceBlockedReason()}) - tap outlines via the cloud instead`);
+    if (typeof window === "undefined" || typeof Worker === "undefined") throw new Error("no Worker runtime - tap outlines via the cloud instead");
     const url = new URL("sam-worker.js", window.location.href);
     // ?device=wasm|webgpu on the page URL forces the worker's backend, for comparisons.
     const device = new URLSearchParams(window.location.search).get("device");
@@ -114,6 +130,11 @@ export class SamClient {
    * coin outline, the offline fallback and the cross-check - never on entry.
    */
   ensureEmbedded(photo: HTMLCanvasElement, quiet = false): Promise<boolean> {
+    // Fail fast before touching the photo: no worker, no download, no OOM.
+    if (!onDeviceAllowed()) {
+      this.lastError = `on-device outlining unavailable (${onDeviceBlockedReason()}) - using cloud instead`;
+      return Promise.resolve(false);
+    }
     const hit = this.embedCache.get(photo);
     if (hit) return hit;
     // A newer photo supersedes any in-flight embed: settle it instead of hanging.
@@ -162,7 +183,17 @@ export class SamClient {
     const id = this.decodeId++;
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
-      this.ensure().postMessage({ type: "decode", id, photoId: this.photoId, point, preferSmallest });
+      let w: Worker;
+      try {
+        w = this.ensure();
+      } catch (e) {
+        // On-device refused (opt-out or low-mem): callers fall back to cloud.
+        this.pending.delete(id);
+        this.lastError = e instanceof Error ? e.message : String(e);
+        resolve(null);
+        return;
+      }
+      w.postMessage({ type: "decode", id, photoId: this.photoId, point, preferSmallest });
     });
   }
 

@@ -135,6 +135,8 @@ export class MetaFindingsProvider implements FindingsProvider {
       label: String((f as { label?: unknown }).label ?? "").slice(0, 64),
       percent: (f as { percent?: unknown }).percent,
       crackLengthMm: (f as { crackLengthMm?: unknown }).crackLengthMm,
+      areaCm2: (f as { areaCm2?: unknown }).areaCm2,
+      crackWidthMm: (f as { crackWidthMm?: unknown }).crackWidthMm,
       severity: (f as { severity?: unknown }).severity,
       receiptIds: (f as { receiptIds?: unknown }).receiptIds,
     }));
@@ -257,6 +259,8 @@ export class BasetenSkepticProvider implements FindingsProvider {
       label: String((f as { label?: unknown }).label ?? "").slice(0, 64),
       percent: (f as { percent?: unknown }).percent,
       crackLengthMm: (f as { crackLengthMm?: unknown }).crackLengthMm,
+      areaCm2: (f as { areaCm2?: unknown }).areaCm2,
+      crackWidthMm: (f as { crackWidthMm?: unknown }).crackWidthMm,
       severity: (f as { severity?: unknown }).severity,
       receiptIds: (f as { receiptIds?: unknown }).receiptIds,
     }));
@@ -342,9 +346,15 @@ export class BasetenSkepticProvider implements FindingsProvider {
   }
 }
 
-export function parseFindingDrafts(content: string, source = "Meta findings"): FindingDraft[] {  let parsed: unknown;
+export function parseFindingDrafts(content: string, source = "Meta findings"): FindingDraft[] {
+  const cleaned = content
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "")
+    .trim();
+  let parsed: unknown;
   try {
-    parsed = JSON.parse(content);
+    parsed = JSON.parse(cleaned);
   } catch {
     throw new HttpError(502, `${source} did not return JSON`);
   }

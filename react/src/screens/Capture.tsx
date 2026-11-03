@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "../App";
 import { loadSamplePhoto } from "../lib/sample";
 import { SamplePicker } from "./SamplePicker";
-import { freshAngleSlot, resetDmg } from "../lib/session";
+import { applyLastCoin, freshAngleSlot, resetDmg } from "../lib/session";
 
 const CAM_ERRORS: Record<string, string> = {
   NotAllowedError: "Camera permission is off - tap Enable camera",
@@ -210,6 +210,8 @@ export default function Capture() {
         session.bundleB = { ...freshAngleSlot() };
       }
       session.gateCoin = null;
+      // The gate's coin ID is a colour guess; it must not set the scale.
+      applyLastCoin(session);
     } catch { /* stills are best-effort */ }
     stopStream();
     setFlash(true);
@@ -307,8 +309,7 @@ export default function Capture() {
       }
       session.gateCoin = null;
       session.noScaleMode = true;
-      session.coinLabel = "";
-      session.coinKindMm = 0;
+      applyLastCoin(session);
       stopStream();
       go("sReview");
     };

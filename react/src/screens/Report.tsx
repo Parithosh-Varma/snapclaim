@@ -362,6 +362,9 @@ export default function Report() {
         <Stepper step={6} />
         <h1 id="h-send">Send the report.</h1>
         <p className="sub">To your landlord or insurer, in one tap.</p>
+        {s.measurement?.verdict === "no-damage" && (
+          <p className="stateline" role="status">No crack found — the marked region is not damage. Nothing to send.</p>
+        )}
 
         <article className="doc" id="reportDoc" aria-label="Damage report preview">
           <header className="doc-head">
@@ -455,6 +458,13 @@ export default function Report() {
                     <td data-h="Status"><Badge kind="ok">Confirmed</Badge></td>
                   </tr>
                 </>
+              ) : s.measurement?.verdict === "no-damage" && gateOk ? (
+                <tr>
+                  <th>Measurement</th>
+                  <td data-h="Value">No crack found — the marked region is not damage.</td>
+                  <td data-h="Evidence" className="mono">refuted</td>
+                  <td data-h="Status"><Badge kind="ok">Verified</Badge></td>
+                </tr>
               ) : (
                 <tr>
                   <th>Measurement</th>

@@ -282,3 +282,35 @@ export const COIN_GROUPS: { name: string; options: CoinOption[] }[] = (() => {
     .map((name) => ({ name, options: COIN_OPTIONS.filter((o) => o.group === name) }))
     .filter((g) => g.options.length);
 })();
+
+/* The coin size the user last confirmed. The on-device coin classifier is a
+ * colour-only guess (silver coins all look alike without absolute scale), so
+ * its guess never sets the scale: on 16 real photos of a 25 mm coin it named
+ * six different coins, 20-27 mm, at 33-38% confidence. The user's own last
+ * pick is the default instead, and the Mark screen still asks them to confirm. */
+const LAST_COIN_KEY = "snapclaim.lastCoin";
+
+export function loadLastCoin(): { mm: number; label: string } | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(LAST_COIN_KEY) ?? "null") as { mm?: unknown; label?: unknown } | null;
+    const mm = Number(v?.mm);
+    if (!(mm > 0 && mm <= 200)) return null;
+    return { mm, label: typeof v?.label === "string" ? v.label : "" };
+  } catch {
+    return null;
+  }
+}
+
+export function saveLastCoin(mm: number, label: string): void {
+  try {
+    if (mm > 0 && mm <= 200) localStorage.setItem(LAST_COIN_KEY, JSON.stringify({ mm, label }));
+    else localStorage.removeItem(LAST_COIN_KEY);
+  } catch { /* storage may be unavailable; the claim flow must not break */ }
+}
+
+/** Put the user's last confirmed coin size (or none) on the session. */
+export function applyLastCoin(s: Pick<Session, "coinKindMm" | "coinLabel">): void {
+  const last = loadLastCoin();
+  s.coinKindMm = last?.mm ?? 0;
+  s.coinLabel = last?.label ?? "";
+}
