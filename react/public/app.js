@@ -63,6 +63,7 @@ if (toggle) {
     for (const p of cs.photos || []) {
       if (!p || !p.src) continue;
       const fig = document.createElement("figure");
+      if (p.wide === true) fig.style.gridColumn = "1 / -1";
       const img = document.createElement("img");
       img.src = String(p.src);
       img.alt = String(p.alt || "");

@@ -25,7 +25,7 @@ landing page shows a strict subset — nothing is reworded or rounded.
 | field | what it is |
 |---|---|
 | `title`, `sub` | heading + one-line context (place · date · ref · scale) |
-| `photos[]` | `src` (path), `alt` (screen-reader description), `caption` |
+| `photos[]` | `src` (path), `alt` (screen-reader description), `caption`, optional `wide: true` to span both columns (charts) |
 | `quote` | `{text, cite}` — the tenant's own words |
 | `measurements[]` | `{item, value, evidence, status}` — `evidence` is the app receipt id |
 | `method`, `verification` | one line each, app wording |
