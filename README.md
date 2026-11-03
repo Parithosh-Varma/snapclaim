@@ -1,8 +1,14 @@
 # SnapClaim
 
-> Point your phone at damage, speak one line about it - get a claim-ready report where every number is measured, cited, and checked before it ships. **Computed, not generated.**
+> Point your phone at damage, speak one line about it - get a claim-ready report where every shipped number cites a machine-checkable receipt. **Computed, not generated.**
 
-[![tests](https://img.shields.io/badge/tests-258%20passing-brightgreen)](./tests)
+> Live: <https://snapclaim.pages.dev> — open to anyone. Admin panel (`/admin`) is behind team login.
+
+> Accuracy status: **n = 1 thread-and-tape-measured case** (terrace slab: pipeline 237.5 mm [R005, 25 mm coin] vs thread 238.8 mm ±4, err 1.3 mm / 0.5% inside ±10%; straight span 227 mm [225–230], span err 10.5 mm printed, never scored; photo-alone guess 315 mm, err 76.2 mm / 32% outside). The 23 mm-coin run read 218.5 mm. Width 3.2 mm is unverified (no width ground truth). Engine recompute 2026-11-03; `bench:gap` INCOMPLETE on this branch (missing `bench/runs/` + `bench/model-only/`). The 54-scene bench tests the maths given a mask, not phone capture. Treat “measured” as receipt-backed, not tape-proven, until the 10–20 tape set lands. 2D in-plane only (no depth/volume). Documentation, not advice.
+
+> What is real vs mocked: **Measurement (`/v1/measure`, `/v1/observe`, receipts, gate) is keyless and deterministic — runs offline, $0. Live findings / skeptic / SAM / voice use our keys with a spend cap (`SPEND_GUARD_USD`, default $5). Photos stay on the phone except two explicit taps: Cross-check sends the photo once to SAM 3.1 via the backend, and Render attaches it to the annexure.** Demo defaults to mock ($0, no keys).
+
+[![tests](https://img.shields.io/badge/tests-319%20passing-brightgreen)](./tests)
 [![node](https://img.shields.io/badge/node-%3E%3D22.18-339933)](./package.json)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](./LICENSE)
 
@@ -156,11 +162,7 @@ npm --prefix react run build
 npx wrangler pages deploy react/dist --project-name snapclaim
 ```
 
-Production is <https://snapclaim.pages.dev> - open to anyone. Only the dev panel at <https://snapclaim.pages.dev/admin> sits behind Cloudflare Access: anonymous requests there get a 302 to the team login, and only these three emails can get in (one-time PIN, no Cloudflare account or WARP client, 24-hour session):
-
-- `parithvrmo@gmail.com`
-- `therealtariqkhalif@gmail.com`
-- `rizgarozan7@gmail.com`
+Production is <https://snapclaim.pages.dev> - open to anyone. Only the dev panel at <https://snapclaim.pages.dev/admin> sits behind Cloudflare Access: anonymous requests there get a 302 to the team login, and only allow-listed team emails can get in (one-time PIN, no Cloudflare account or WARP client, 24-hour session). Admin emails are managed in the Zero Trust dashboard (Access → Applications → `SnapClaim admin`), not in this repo.
 
 `react/public/_redirects` rewrites `/admin/*` to the app shell; `react/src/App.tsx` boots straight into the admin screen when the path starts with `/admin`, and Settings → Developer → *Open admin panel* navigates there as a real page load so Access can challenge it.
 
@@ -196,8 +198,9 @@ Hard limits: 50 masks per call (chunk above), 1–16 point prompts per segment c
 
 ## Evaluation
 
-- `npm run eval` - deterministic bench over `fixtures/masks/*.json` vs `fixtures/expected/` (missing expected file = SKIP, never a pass). Current: wall-crack 5.17% / 85.9 mm / 2.6 mm wide / 2.19 cm² (significant), stain 1.29% percent-only (moderate).
-- `bench/split.json` - dev/held-out split, frozen before tuning. Held-out cases are public no-scale photos that must stay percent-only.
+- `npm run eval` - deterministic bench over `fixtures/masks/*.json` vs `fixtures/expected/` (missing expected file = SKIP, never a pass). Current: wall-crack 5.17% / 85.9 mm / 2.6 mm wide (unverified — no width ground truth) / 2.19 cm² (significant), stain 1.29% percent-only (moderate).
+- `npm run bench:gap` - thread-and-tape check. Status: **n=1, INCOMPLETE on this branch** (`terrace-slab-tape-01`: engine 237.5 mm [R005, 25 mm coin] vs thread 238.8 mm ±4, err 1.3 mm / 0.5% in; straight span 227 mm [225–230] printed, span err 10.5 mm / 4.6%, never scored; Spark photo-alone 315 mm, err 76.2 mm / 32% out). Scale: nominal 25 mm (same coin ruler-read 24 mm ±0.5 — sensitivity at 24 mm: 228.0 mm / 3.1 mm / 7.09 cm²). Width 3.2 mm unverified. Run + guess pending in `bench/runs/` + `bench/model-only/`; photos stay gitignored. Phone capture: **not yet tested on a real phone** (Chrome + synthetic camera only as of 2026-10-29).
+- `bench/split.json` - dev/held-out split, frozen before tuning. Held-out cases are public no-scale photos that must stay percent-only plus one scaled thread-and-tape case.
 - `bench/score.ts` - skeptic DISPUTED scoring with missing-label accounting.
 - Full write-up, baselines protocol and open gaps: [`docs/eval-report.md`](./docs/eval-report.md).
 
@@ -208,15 +211,17 @@ src/engine/     measurement math, severity bands, session + receipts
 src/vision/     RLE masks, skeletonize, observe, coin calibration, SAM 3.1 adapter
 src/findings/   evidence gate (EvidenceError)
 src/receipts/   receipt ledger (deterministic ids, JSONL replay)
-src/render/     code-drawn SVG annexure
+src/render/     code-drawn SVG annexure (server); React client also offers on-device PDF export (react/src/lib/pdf.ts)
 src/adapters/   deterministic mock vision + findings
 src/config/     env config, spend guard
 backend/        one router (Node server + Cloudflare Worker), providers, transcribe proxy
-pwa/            capture app: photo, tap-to-mask, hold-to-speak, report, skeptic, annexure
+react/          canonical app (capture → mark → say → report). Use this for new work.
+pwa/            legacy capture app, frozen — bug fixes only; parity tests pin shared behavior
 eval/           bench + replay CLI
 bench/          held-out split + dispute scorer
 fixtures/       masks, expected outputs, scale references (photos gitignored)
-tests/          258 tests, mock by default, live paths with stubbed fetch
+docs/           eval report + phone test plan
+tests/          mock by default, live paths with stubbed fetch, $0
 ```
 
 ## Development
@@ -235,7 +240,7 @@ tests/          258 tests, mock by default, live paths with stubbed fetch
 - **Documentation, not advice.** No coverage decisions, no legal claims, no approval predictions. A human decides; SnapClaim produces the evidence package.
 - **Measurement ≠ causation.** The chain proves what was measured, not who broke it.
 - **Staged photos are a known limit.** Receipts make measurement replayable and partly tamper-evident; they do not prove provenance.
-- No medical, health, or insurance-advice functionality. No image generation - every visual is drawn in code. SVG only (no PDF).
+- No medical, health, or insurance-advice functionality. No image generation - every visual is drawn in code. Server annexure is SVG; the React client additionally offers an on-device PDF export (`react/src/lib/pdf.ts`).
 - No geo-circumvention, no VPN. Credits claimed only with each builder's own registration email; no pooling. Build-time tooling disclosed in `DEV-LOG.md`.
 
 ## Provenance and license

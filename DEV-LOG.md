@@ -326,3 +326,17 @@ Credits claim ✅ - billing verified, $150 active on 2026-10-27.
 - `npm run bench:gap` exit 0: measured err 8.5 mm (3.7%, in) vs model-only err 88 mm (38.8%, out). `/proof.html` second column filled; rebuilt + redeployed.
 
 **Spend:** $0.00 recorded (Spark pricing unconfirmed; 3,110 tokens metered at $0).
+
+## 2026-11-03 - Release candidate truth pass (25 mm nominal, n = 1, no live calls)
+
+**Corrected (all figures from `src/engine/measure.ts` run 2026-11-03 or the values below, never invented)**
+
+- Coin: nominal 25 mm issue spec, user-confirmed 2026-11-03; same physical coin ruler-read 24 mm (+/-0.5). Presets fixed 23→25 mm (`pwa/coin-model.js`, `react/public/coin-model.js`, `pwa/index.html`, `react/src/lib/session.ts`); sizes vary by issue, type your measured diameter. Sensitivity at 24 mm from the same engine run: R005 228.0 mm / R006 3.1 mm / R004 7.09 cm².
+- Terrace slab (`bench/split.json:terrace-slab-tape-01`, `fixtures/photos/DSC_0711.JPG`, n = 1): engine at 25 mm → R001 0.773994 mm/px, R004 7.69 cm², R005 237.5 mm, R006 3.2 mm (unverified — no width ground truth), R007 significant. Old 23 mm-coin run SC-25D35C5E R005 218.5 mm retained for history, superseded.
+- Ground truth: thread path 238.8 mm (9.4 in × 25.4, +/-4 mm uncertainty, end readings blank, confirm) + tape span 227 mm (range 225–230, midpoint, +/-2.5). Pipeline measures path, not span.
+- Errors (n = 1): vs thread 238.8 ±4 → err 1.3 mm (0.5%, inside ±10%, within thread ±4); vs span 227 → err 10.5 mm (4.6%, printed, never scored); Spark photo-alone 315 mm vs thread err 76.2 mm (31.9%, outside). `bench/gap.ts` now scores `pathMm` primary, prints `spanMm` labelled.
+- Width: 3.2 mm (terrace) + 2.6 mm (wall-crack fixture) marked unverified everywhere (annexure `src/render/svg.ts`, `react/src/screens/Report.tsx`, `react/src/screens/Shared.tsx`, `tests/width-unverified.test.ts`, golden hash `cc12e41c…`).
+- Stale claims removed: "tape not legible" for DSC_0710 (same crack, no legibility claim); "SVG only (no PDF)" → server SVG + React on-device PDF (`react/src/lib/pdf.ts`).
+- Bench status on this branch: `npm run eval` 7 pass; `npm run bench:gap` INCOMPLETE (exit 1, truth 238.8 path, measured/modelOnly missing — `bench/runs/terrace-slab-tape-01.json` + `bench/model-only/terrace-slab-tape-01.json` absent, not fabricated; regenerate via `npm run bench:archive -- <caseId> <input.json>` with `{ provenance, measurement: { findings, receipts } }` from a live pipeline result, plus a Spark photo-alone guess file). `npm test` 319 pass, `tsc` clean. No live API calls, no deploy on this branch.
+
+**Spend:** $0.00.
