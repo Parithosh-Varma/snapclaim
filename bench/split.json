@@ -184,20 +184,17 @@
       "coin": {
         "id": "coin-2inr",
         "knownMm": 25.0,
-        "knownMmNote": "nominal 25 mm issue spec, user-confirmed 2026-11-03; same physical coin ruler-read 24 mm (+/-0.5) — sizes vary by issue, type your measured diameter",
-        "note": "2 INR coin taped beside the crack, same plane; run SC-25D35C5E used 23 mm, corrected to 25 mm nominal (R001 0.773994, R004 7.69 cm², R005 237.5 mm, R006 3.2 mm unverified — no width ground truth; engine recompute 2026-11-03, n = 1)"
+        "knownMmNote": "25 mm user-supplied 2026-11-04 (+/-0.5); 23 mm was a mistake, do not use",
+        "note": "2 INR coin taped beside the crack, same plane; engine recompute at 25 mm (R001 0.773994, R004 7.69 cm², R005 237.5 mm, R006 3.2 mm unverified — no width ground truth; n = 1)"
       },
       "groundTruth": {
         "maskId": "damage-1",
-        "pathMm": 238.8,
-        "pathUncertaintyMm": 4,
-        "pathNote": "thread laid along the crack, read against an inch tape ~9.4 in (9.4*25.4=238.76), 2026-11-03; end readings blank, confirm",
         "spanMm": 227,
         "spanRangeMm": [225, 230],
         "spanNote": "straight tape span ~127 cm to ~149.5-150 cm, midpoint; pipeline measures path, not span"
       },
       "expected": "one crack, coin in the crack's plane, millimetre length with coin receipts",
-      "note": "First tape ground truth, n = 1. Builder tape 2026-11-02: crack spans ~127 cm to ~149.5-150 cm = 22.5-23 cm; recorded 227 mm span (midpoint, range 225-230, +/-2.5). Thread path 238.8 mm (9.4 in, +/-4) supplied 2026-11-03; gap bench scores pipeline path length against thread and prints span comparison labelled. Pipeline corrected to R005 237.5 mm vs thread err 1.3 mm (0.5%, inside ±10%, within thread ±4); vs span err 10.5 mm (4.6%, printed, never scored); Spark photo-alone 315 mm vs thread err 76.2 mm (31.9%, outside). Width 3.2 mm unverified (no width ground truth). Old 23 mm-coin run read R005 218.5 mm. maskId damage-1 is the tap-mask id the PWA sends (pwa/app.js). Model-only guess shown DSC_0710.JPG (same crack)."
+      "note": "First tape ground truth, n = 1. Builder tape 2026-11-02: crack spans ~127 cm to ~149.5-150 cm = 22.5-23 cm; recorded 227 mm span (midpoint, range 225-230, +/-2.5). Pipeline at 25 mm coin: R005 237.5 mm vs span err +10.5 mm (+4.6%, span is context, never scored); coin uncertainty +/-0.5 mm scales all mm values +/-2%. Width 3.2 mm unverified (no width ground truth). maskId damage-1 is the tap-mask id the PWA sends (pwa/app.js). Model-only guess shown DSC_0710.JPG (same crack)."
     }
   ]
 }
