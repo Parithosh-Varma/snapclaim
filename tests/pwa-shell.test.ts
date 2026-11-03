@@ -50,7 +50,7 @@ test("PWA shell is installable and honest", () => {
   for (const id of ["tHome","netPill","nextTitle","nextSub","ctaNew","ctaSample","recentList","recentEmpty",
     "tCases","caseList","caseEmpty","tSettings","sc-theme-light","sc-theme-auto","sc-theme-dark",
     "installHint","updateBtn","storeInfo","sc-store-meter","exportAllBtn","wipeBtn","baseUrl2","setCheck","setHealth",
-    "caseDlg","dlgName","dlgProp","dlgNotes","dlgPhotos","dlgAddPhoto","dlgFile","dlgSave","dlgExport","dlgDelete","dlgClose",
+    "caseDlg","dlgName","dlgPhotos","dlgAddPhoto","dlgFile","dlgSave","dlgExport","dlgDelete","dlgClose",
     "tabs","toast","appLive","doneHome"]) {
     assert.ok(html.includes(`id="${id}"`), `tab/case element ${id} exists`);
   }

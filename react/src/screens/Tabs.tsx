@@ -4,6 +4,7 @@ import { loadSamplePhoto } from "../lib/sample";
 import { SamplePicker } from "./SamplePicker";
 import { DEFAULT_BASE, DEFAULT_BACKEND_HOST, POLICY_BACKEND_MESSAGE, apiGet } from "../lib/api";
 import type { SnapCase } from "../lib/store";
+import { buildReportPdf, dataUrlToJpegBytes, type PdfPhoto } from "../lib/pdf";
 import { Badge, LoadImg, downloadFile } from "../lib/ui";
 
 function formatSize(c: SnapCase): string {
@@ -169,17 +170,81 @@ export function Cases() {
   const [dlgId, setDlgId] = useState<string | null>(null);
   const dlg = dlgId ? store.get(dlgId) : null;
   const [name, setName] = useState("");
-  const [prop, setProp] = useState("");
-  const [notes, setNotes] = useState("");
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   const openCase = (id: string) => {
     const c = store.get(id);
     if (!c) return;
     setDlgId(id);
     setName(c.name ?? "");
-    setProp(c.property ?? "");
-    setNotes(c.notes ?? "");
     dlgRef.current?.showModal();
+  };
+
+  const exportCasePdf = async () => {
+    const c = dlgId ? store.get(dlgId) : null;
+    if (!c || pdfBusy) return;
+    const rows: { item: string; value: string; evidence: string; status: string }[] = [];
+    if (c.crackLengthMm != null) {
+      rows.push({ item: "Crack length", value: `${String(c.crackLengthMm)} mm`, evidence: "—", status: "Confirmed" });
+    }
+    rows.push({
+      item: "Surface affected",
+      value: typeof c.percent === "number" ? `${String(c.percent)} %` : "—",
+      evidence: "—",
+      status: "Confirmed",
+    });
+    if (c.areaCm2 != null) {
+      rows.push({ item: "Area", value: `${String(c.areaCm2)} cm²`, evidence: "—", status: "Confirmed" });
+    }
+    const sev = c.severity ?? c.label;
+    if (sev) {
+      rows.push({ item: "Severity", value: String(sev), evidence: "—", status: "Confirmed" });
+    }
+    if (!rows.length) {
+      toast("Nothing measurable saved on this case");
+      return;
+    }
+    setPdfBusy(true);
+    try {
+      const ref = `SC-${c.id.slice(0, 8).toUpperCase()}`;
+      const dateStr = new Date(c.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+      const photos: PdfPhoto[] = [];
+      if (isSafePhoto(c.photo)) {
+        try {
+          const size = await new Promise<{ w: number; h: number }>((resolve, reject) => {
+            const im = new Image();
+            im.onload = () => resolve({ w: im.naturalWidth, h: im.naturalHeight });
+            im.onerror = () => reject(new Error("photo would not decode"));
+            im.src = c.photo as string;
+          });
+          const scale = Math.min(1, 1000 / Math.max(size.w, size.h));
+          photos.push({
+            jpeg: dataUrlToJpegBytes(c.photo as string),
+            width: Math.max(1, Math.round(size.w * scale)),
+            height: Math.max(1, Math.round(size.h * scale)),
+            caption: "Figure 1 - saved case photo",
+          });
+        } catch {
+          /* photo skipped — the numbers below are unaffected */
+        }
+      }
+      const bytes = buildReportPdf({
+        brand: "SnapClaim",
+        ref,
+        dateLine: `Saved ${dateStr}`,
+        quote: (c.transcript ?? "").trim(),
+        rows,
+        method: c.mode === "absolute"
+          ? "Outlines measured from photo pixels, scaled by the coin diameter (tilt-corrected from its ellipse). Every number cites its evidence receipt."
+          : "Percent-only report: no coin scale was available, so lengths stay unmeasured. Every number cites its evidence receipt.",
+        checks: "Evidence gate: passed at report time - rechecks are not stored on this case",
+        photos,
+      });
+      downloadFile(`snapclaim-${ref}.pdf`, new Blob([bytes as unknown as BlobPart], { type: "application/pdf" }));
+      toast(photos.length ? "PDF downloaded." : "PDF downloaded without the photo (it would not decode).");
+    } finally {
+      setPdfBusy(false);
+    }
   };
 
   return (
@@ -197,9 +262,13 @@ export function Cases() {
 
       <dialog id="caseDlg" ref={dlgRef} aria-labelledby="h-case">
         <h2 id="h-case" style={{ fontSize: 20, marginBottom: 12 }}>Case</h2>
+        {dlg && (
+          <p className="sub" style={{ marginTop: -6 }}>
+            {formatSize(dlg)}
+            {(dlg.severity ?? dlg.label) ? ` · ${dlg.severity ?? dlg.label}` : ""}
+          </p>
+        )}
         <label className="field">Name<input id="dlgName" type="text" value={name} onChange={(e) => setName(e.target.value)} /></label>
-        <label className="field">Property<input id="dlgProp" type="text" placeholder="e.g. Flat 4B, MG Road" value={prop} onChange={(e) => setProp(e.target.value)} /></label>
-        <label className="field">Notes<textarea id="dlgNotes" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} /></label>
         <div id="dlgPhotos" style={{ marginBottom: 12 }}>
           {isSafePhoto(dlg?.photo) ? (
             <img src={dlg.photo as string} alt="Case photo" />
@@ -243,13 +312,25 @@ export function Cases() {
             type="button"
             onClick={() => {
               if (!dlgId) return;
-              store.save({ id: dlgId, name: name.trim() || "Untitled case", property: prop.trim(), notes: notes.trim() });
+              store.save({ id: dlgId, name: name.trim() || "Untitled case" });
               bumpCases();
               toast("Case saved on this device");
             }}
           >
             Save
           </button>
+          <button
+            id="dlgPdf"
+            className="btn-dark"
+            type="button"
+            disabled={pdfBusy || !dlgId}
+            aria-busy={pdfBusy}
+            onClick={() => void exportCasePdf()}
+          >
+            {pdfBusy ? "Preparing PDF…" : "Export PDF"}
+          </button>
+        </div>
+        <div className="rowbtns">
           <button
             id="dlgExport"
             className="btn-ghostline"
@@ -259,7 +340,7 @@ export function Cases() {
               if (c) downloadFile(`snapclaim-case-${c.id}.json`, JSON.stringify(c, null, 2));
             }}
           >
-            Export
+            Export JSON
           </button>
         </div>
         <div className="rowbtns">

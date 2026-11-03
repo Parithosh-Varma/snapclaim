@@ -2025,8 +2025,6 @@ function openCase(id) {
   if (!c) return;
   dlgCaseId = id;
   $("dlgName").value = c.name ?? "";
-  $("dlgProp").value = c.property ?? "";
-  $("dlgNotes").value = c.notes ?? "";
   $("dlgPhotos").replaceChildren();
   if (typeof c.photo === "string" && /^data:image\/(png|jpeg|webp);base64,/.test(c.photo)) {
     const img = document.createElement("img");
@@ -2044,7 +2042,7 @@ function openCase(id) {
 $("dlgClose").onclick = () => $("caseDlg").close();
 $("dlgSave").onclick = () => {
   if (!dlgCaseId) return;
-  caseStore.save({ id: dlgCaseId, name: $("dlgName").value.trim() || "Untitled case", property: $("dlgProp").value.trim(), notes: $("dlgNotes").value.trim() });
+  caseStore.save({ id: dlgCaseId, name: $("dlgName").value.trim() || "Untitled case" });
   renderCases();
   toast("Case saved on this device");
 };
