@@ -102,7 +102,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .btn-sm { min-height: 40px; padding: 0 16px; font-size: 0.9375rem; }
 .btn-go { background: var(--go); border-color: var(--go); color: #fff; box-shadow: var(--shadow-sm); }
 .btn-go:hover { background: var(--go-deep); border-color: var(--go-deep); }
-.nav-cta { background: var(--go); border-color: var(--go); color: #fff; }
+.nav-cta { background: var(--go); border-color: var(--go); color: #fff; white-space: nowrap; padding: 12px 20px; }
 .nav-cta:hover { background: var(--go-deep); border-color: var(--go-deep); }
 .btn-light { background: #fff; border-color: #fff; color: var(--deep); }
 .btn-light:hover { background: #e3e9f3; border-color: #e3e9f3; }
@@ -118,8 +118,8 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .nav { display: flex; align-items: center; gap: 32px; min-height: 72px; position: relative; }
 .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 760; font-size: 1.25rem; letter-spacing: -0.02em; color: var(--ink); }
 .brand b { color: var(--go-ink); font-weight: 760; }
-.navlinks { display: flex; gap: 4px; margin-left: auto; }
-.navlinks a { display: block; padding: 8px 12px; border-radius: 8px; text-decoration: none; font-weight: 560; font-size: 0.9375rem; color: var(--ink-2); transition: color 0.15s, background-color 0.15s; }
+.navlinks { display: flex; gap: 28px; margin-left: auto; }
+.navlinks a { display: block; padding: 8px 12px; border-radius: 8px; text-decoration: none; font-weight: 560; font-size: 0.9375rem; line-height: 1; white-space: nowrap; color: var(--ink-2); transition: color 0.15s, background-color 0.15s; }
 .navlinks a:hover { color: var(--ink); background: var(--sand); }
 .menu { display: none; }
 .theme-toggle { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); cursor: pointer; }
@@ -134,9 +134,9 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   :root:not([data-theme="light"]) .theme-toggle .moon { display: block; }
   :root:not([data-theme="light"]) img.mark { content: url("assets/snapclaim-mark-dark.png"); }
 }
-.menu summary { list-style: none; cursor: pointer; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 10px; color: var(--ink); }
-.menu summary::-webkit-details-marker { display: none; }
-.menu[open] summary { background: var(--sand); }
+.menu > button { list-style: none; cursor: pointer; display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); padding: 0; font: inherit; }
+.menu > button:hover { background: var(--sand); }
+.menu ul[hidden] { display: none; }
 .menu ul {
   position: absolute; right: 0; top: calc(100% + 8px); width: min(280px, calc(100vw - 32px));
   background: var(--paper); border-radius: 14px; box-shadow: var(--shadow-lg); padding: 8px;
@@ -388,10 +388,13 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   .who-list { grid-template-columns: 1fr; gap: 36px; }
   .who-list article, .who-list article + article { padding: 0; border: 0; }
 }
+@media (max-width: 900px) {
+  .navlinks { display: none; }
+  .menu { display: block; }
+}
 @media (max-width: 640px) {
   .wrap { width: calc(100% - 32px); }
-  .navlinks, .nav-cta { display: none; }
-  .menu { display: block; }
+  .nav-cta { display: none; }
   .theme-toggle { margin-left: auto; }
   .nav { gap: 8px; }
   .nav { min-height: 64px; }
