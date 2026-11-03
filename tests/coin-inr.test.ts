@@ -47,7 +47,7 @@ test("INR coin diameters agree across pickers and coin-model tables", () => {
   }
   for (const [name, table] of Object.entries(sources)) {
     assert.equal(table.get("2"), 25, `${name}: INR-2 is 25 mm nominal`);
-    assert.equal(table.get("5"), 27, `${name}: INR-5 is 27 mm measured`);
+    assert.equal(table.get("5"), 25, `${name}: INR-5 is 25 mm nominal, unverified — measure a physical coin`);
   }
   for (const d of denoms) {
     const values = new Set(Object.values(sources).map((t) => t.get(d)));

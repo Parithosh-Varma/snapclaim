@@ -43,7 +43,7 @@
     // terrace coin ruler-read 24 mm, so sizes vary by issue - measure your coin)
     { id: 'INR-1',   country: 'INR',   label: '₹1',  diam: 22.00, color: 'silver' },
     { id: 'INR-2',   country: 'INR',   label: '₹2',  diam: 25.00, color: 'silver', note: 'varies by issue' },
-    { id: 'INR-5',   country: 'INR',   label: '₹5',  diam: 27.00, color: 'silver' },
+    { id: 'INR-5',   country: 'INR',   label: '₹5',  diam: 25.00, color: 'silver', note: 'nominal — verify yours' },
     { id: 'INR-10',  country: 'INR',   label: '₹10', diam: 27.00, color: 'bimetal' },
     // Japan (¥5 and ¥50 have centre holes - detection is less reliable)
     { id: 'JPY-1',   country: 'JPY',   label: '¥1',   diam: 20.00, color: 'silver-light', note: 'aluminium' },
