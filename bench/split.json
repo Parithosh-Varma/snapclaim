@@ -184,7 +184,7 @@
       "coin": {
         "id": "coin-2inr",
         "knownMm": 25.0,
-        "knownMmNote": "25 mm user-supplied 2026-11-04 (+/-0.5); 23 mm was a mistake, do not use",
+        "knownMmNote": "25 mm user-supplied 2026-11-04 (+/-0.5); replaces a mistaken prior value, do not use it",
         "note": "2 INR coin taped beside the crack, same plane; engine recompute at 25 mm (R001 0.773994, R004 7.69 cm², R005 237.5 mm, R006 3.2 mm unverified — no width ground truth; n = 1)"
       },
       "groundTruth": {

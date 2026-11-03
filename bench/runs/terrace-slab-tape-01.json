@@ -27,7 +27,8 @@
     "value": 0.773994,
     "unit": "mm_per_px"
    },
-   "formula": "knownMm / referenceLengthPx"
+   "formula": "knownMm / referenceLengthPx",
+   "unit": "mm_per_px"
   },
   {
    "id": "R002",
@@ -45,7 +46,8 @@
     "value": 0.73,
     "unit": "percent"
    },
-   "formula": "damageAreaPx / componentAreaPx * 100"
+   "formula": "damageAreaPx / componentAreaPx * 100",
+   "unit": "percent"
   },
   {
    "id": "R003",
@@ -57,7 +59,8 @@
     "value": 1,
     "unit": "count"
    },
-   "formula": "count of disconnected mask components"
+   "formula": "count of disconnected mask components",
+   "unit": "count"
   },
   {
    "id": "R004",
@@ -72,7 +75,8 @@
     "value": 7.69,
     "unit": "cm2"
    },
-   "formula": "damageAreaPx * mmPerPx^2 / 100"
+   "formula": "damageAreaPx * mmPerPx^2 / 100",
+   "unit": "cm2"
   },
   {
    "id": "R005",
@@ -87,7 +91,8 @@
     "value": 237.5,
     "unit": "mm"
    },
-   "formula": "skeletonPx * mmPerPx"
+   "formula": "skeletonPx * mmPerPx",
+   "unit": "mm"
   },
   {
    "id": "R006",
@@ -103,7 +108,8 @@
     "value": 3.2,
     "unit": "mm"
    },
-   "formula": "damageAreaPx / skeletonPx * mmPerPx"
+   "formula": "damageAreaPx / skeletonPx * mmPerPx",
+   "unit": "mm"
   },
   {
    "id": "R007",
@@ -122,7 +128,8 @@
     "value": "significant",
     "unit": "band"
    },
-   "formula": "area ratio + calibrated length + region count vs printed thresholds"
+   "formula": "area ratio + calibrated length + region count vs printed thresholds",
+   "unit": "band"
   }
  ]
 }
