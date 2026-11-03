@@ -326,3 +326,15 @@ Credits claim ✅ - billing verified, $150 active on 2026-10-27.
 - `npm run bench:gap` exit 0: measured err 8.5 mm (3.7%, in) vs model-only err 88 mm (38.8%, out). `/proof.html` second column filled; rebuilt + redeployed.
 
 **Spend:** $0.00 recorded (Spark pricing unconfirmed; 3,110 tokens metered at $0).
+
+## 2026-11-03 - Measurement now overlaps the Describe step
+
+**Shipped**
+
+- React: tapping "Measure damage" validates everything up front (mask, coin outline, size, mock-backend refusal) exactly as before, then starts the observe+measure chain as a background job on the session (`s.measureJob = { promise, seq, state }`) and navigates to Describe immediately. Say awaits the job before `/v1/report` with an honest "Finishing the measurement…" status; a finished job behaves exactly as the old sequential flow. Failures return to Mark (not Numbers) with the real "Measuring failed (...)" message, keeping taps and transcript.
+- Staleness: the old component-level `measureSeq` moved onto the session with an input snapshot (photo, taps, coin, label); new measures, tap/coin/photo edits, angle switches, and new cases supersede the old job, and late landings are discarded. New `react/src/lib/measure-job.ts` carries the shared body builder (maths unchanged) plus the job lifecycle.
+- PWA mirrors the change for the single-shot path (`pwa/app.js` background job, Say awaits, failure back to Mark); multi-shot stays sequential since frame B needs frame A on camera. New-case/retake/sample paths invalidate the job.
+- Parity: `tests/measure-overlap.test.ts` proves a stale job landing late is discarded and the observe/report bodies are byte-identical between the sequential and overlapping flows for the same inputs; `tests/react-shell.test.ts` pins the new state machine.
+- Housekeeping: React SW `snapclaim-react-v20` → `v21`, PWA `snapclaim-shell-v26` → `v27` (app.js changed); 323 tests green, both typechecks clean, React build clean.
+
+**Spend:** $0.00.
