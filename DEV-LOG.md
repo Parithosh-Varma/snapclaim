@@ -361,3 +361,16 @@ Credits claim ✅ - billing verified, $150 active on 2026-10-27.
 - Bench status on this branch: `npm run eval` 7 pass; `npm run bench:gap` INCOMPLETE (exit 1, truth 238.8 path, measured/modelOnly missing — `bench/runs/terrace-slab-tape-01.json` + `bench/model-only/terrace-slab-tape-01.json` absent, not fabricated; regenerate via `npm run bench:archive -- <caseId> <input.json>` with `{ provenance, measurement: { findings, receipts } }` from a live pipeline result, plus a Spark photo-alone guess file). `npm test` 319 pass, `tsc` clean. No live API calls, no deploy on this branch.
 
 **Spend:** $0.00.
+
+## 2026-11-04 - Terrace final: 25 mm user-supplied, span-only truth, no thread
+
+**Shipped**
+
+- Coin is 25 mm, final, user-supplied (+/-0.5). The 23 mm read was a mistake: the 2026-11-02 SC-25D35C5E run (R005 218.5 mm) is void, not superseded. No 23, no 24 anywhere in the case.
+- Thread 238.8 mm removed from `terrace-slab-tape-01`: the string crack is not confirmed to be the terrace crack, so it must not validate it. Ground truth is the tape span 227 mm [225–230] only, context, never scored.
+- Engine re-run (`src/engine/measure.ts`, signed-report scalars, self-reported — no RLE in repo, pixel provenance pending masks): R001 0.773994, R004 7.69 cm², R005 237.5 mm, R006 3.2 mm (unverified, no width ground truth), R007 significant. Archived run replaced with the full receipted result (coin 25).
+- Error vs span: +10.5 mm (+4.6%, span context, never scored); coin +/-0.5 mm scales mm values +/-2%; width 3.2 mm unverified.
+- `npm run bench:gap` now prints UNSCORED (exit 0): with no path truth the case has no validated accuracy claim. `npm test` green.
+- Landing case-study text (other branch) needs the same swap: 237.5 vs span 227, no thread — corrected text supplied, not pushed.
+
+**Spend:** $0.00.

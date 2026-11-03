@@ -10,7 +10,7 @@
 [![tests](https://github.com/Parithosh-Varma/snapclaim/actions/workflows/ci.yml/badge.svg)](https://github.com/Parithosh-Varma/snapclaim/actions/workflows/ci.yml)
 > Live: <https://snapclaim.pages.dev> — open to anyone. Admin panel (`/admin`) is behind team login.
 
-> Accuracy status: **n = 1 thread-and-tape-measured case** (terrace slab: pipeline 237.5 mm [R005, 25 mm coin] vs thread 238.8 mm ±4, err 1.3 mm / 0.5% inside ±10%; straight span 227 mm [225–230], span err 10.5 mm printed, never scored; photo-alone guess 315 mm, err 76.2 mm / 32% outside). The 23 mm-coin run read 218.5 mm. Width 3.2 mm is unverified (no width ground truth). Engine recompute 2026-11-03. The 54-scene bench tests the maths given a mask, not phone capture. Treat “measured” as receipt-backed, not tape-proven, until the 10–20 tape set lands. 2D in-plane only (no depth/volume). Documentation, not advice.
+> Accuracy status: **n = 1 tape-span case** (terrace slab: pipeline 237.5 mm [R005, 25 mm user-supplied coin] vs span 227 mm [225–230], err +10.5 mm / +4.6% (span is context, never scored); photo-alone guess 315 mm (outside). Width 3.2 mm is unverified (no width ground truth). Coin ±0.5 mm scales all mm values ±2%. The 54-scene bench tests the maths given a mask, not phone capture. Treat “measured” as receipt-backed, not tape-proven, until the 10–20 tape set lands. 2D in-plane only (no depth/volume). Documentation, not advice.
 
 > What is real vs mocked: **Measurement (`/v1/measure`, `/v1/observe`, receipts, gate) is keyless and deterministic — runs offline, $0. Live findings / skeptic / SAM / voice use our keys with a spend cap (`SPEND_GUARD_USD`, default $5). Photos stay on the phone except two explicit taps: Cross-check sends the photo once to SAM 3.1 via the backend, and Render attaches it to the annexure.** Demo defaults to mock ($0, no keys).
 
@@ -64,7 +64,7 @@ npm run backend:smoke   # end-to-end smoke against a running backend
 
 ## How it works
 
-![How SnapClaim works: photo plus coin, tap to mask, deterministic measure, receipted values, gated findings; field proof 227 mm tape vs 218.5 mm measured vs 315 mm guess](docs/images/how-it-works.svg)
+![How SnapClaim works: photo plus coin, tap to mask, deterministic measure, receipted values, gated findings; field proof 227 mm span vs 237.5 mm measured vs 315 mm guess](docs/images/how-it-works.svg)
 
 ```
 photo (+ coin for scale)  +  one spoken line
@@ -262,11 +262,11 @@ What this does not show yet: how well SAM finds the crack on a real photo. `benc
 <img src="docs/images/terrace-slab.jpg" width="560" alt="Terrace-slab crack with a taped ₹2 coin; a yellow measuring tape runs alongside as ground truth">
 *Our own field photo: the crack, a taped coin for scale, and the tape as ground truth — [full case-study report](https://landing.snapclaim.pages.dev/assets/case-study/terrace-slab.pdf).*
 
-- Field case (terrace slab, Nov 2026, n = 1, coin 25 mm nominal): pipeline 237.5 mm [R005] vs thread 238.8 mm ±4 (err 1.3 mm / 0.5%, in) vs span 227 mm [225–230] (span err 10.5 mm, printed, never scored); photo-alone guess 315 mm (err 76.2 mm / 32%, out). Width 3.2 mm unverified. Old 23 mm-coin run read 218.5 mm (superseded). Sensitivity at ruler 24 mm: 228.0 mm. Full report: [terrace-slab.pdf](https://landing.snapclaim.pages.dev/assets/case-study/terrace-slab.pdf).
+- Field case (terrace slab, Nov 2026, n = 1, coin 25 mm user-supplied): pipeline 237.5 mm [R005] vs span 227 mm [225–230] (err +10.5 mm / +4.6%, span context, never scored); photo-alone guess 315 mm (outside). Width 3.2 mm unverified. Full report: [terrace-slab.pdf](https://landing.snapclaim.pages.dev/assets/case-study/terrace-slab.pdf).
 
-![Bar chart: thread 238.8 mm path vs span 227 mm, SnapClaim 237.5 mm inside ±10%, photo-alone guess 315 mm outside ±10%](docs/images/measured-vs-guessed.svg)
-- `npm run bench:gap` — thread-and-tape check (`terrace-slab-tape-01`: engine 237.5 mm [R005, 25 mm coin] vs thread 238.8 mm ±4, err 1.3 mm / 0.5% in; span 227 mm [225–230] printed, span err 10.5 mm / 4.6%, never scored; Spark 315 mm out). Scale 25 mm nominal (ruler 24 mm ±0.5; sensitivity 228.0 mm / 3.1 mm / 7.09 cm²). Width unverified. Photos stay gitignored. Phone capture: **not yet tested on a real phone**.
-- `bench/split.json` — dev/held-out split, frozen before tuning. Held-out has 12 cases: 4 public no-scale photos that must stay percent-only, 7 team photos with a 2 INR coin (no tape yet, detection/refusals), and 1 scaled thread-and-tape case.
+![Bar chart: span 227 mm, SnapClaim 237.5 mm (+4.6%), photo-alone guess 315 mm outside](docs/images/measured-vs-guessed.svg)
+- `npm run bench:gap` — span-only check (`terrace-slab-tape-01`: engine 237.5 mm [R005, 25 mm user-supplied coin] vs span 227 mm [225–230] (err +10.5 mm / +4.6%, context, never scored); Spark 315 mm guess unscored without path truth; no validated accuracy claim — gap prints UNSCORED). Coin ±0.5 mm scales all mm values ±2%. Width unverified. Photos stay gitignored. Phone capture: **not yet tested on a real phone**.
+- `bench/split.json` — dev/held-out split, frozen before tuning. Held-out has 12 cases: 4 public no-scale photos that must stay percent-only, 7 team photos with a 2 INR coin (no tape yet, detection/refusals), and 1 span-only tape case.
 - `npm run bench:truth` (`bench/truth.ts`) — 54 scenes with exactly known crack length/width, run through the same measurement code a photo goes through. Tests the maths, not SAM.
 - `bench/score.ts` — skeptic DISPUTED scoring with missing-label accounting.
 - Full write-up, baselines protocol and open gaps: [`docs/eval-report.md`](./docs/eval-report.md).

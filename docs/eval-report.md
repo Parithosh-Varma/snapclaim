@@ -12,7 +12,7 @@ Cases and their split live in `bench/split.json`. The held-out split is frozen b
 
 Dev: one synthetic wall-crack fixture with a coin scale reference.
 
-Held-out: 12 cases. Four public photos with no scale reference in the crack's plane test whether the pipeline refuses to invent millimetres. Seven team photos with a coin joined on 2026-10-30 (see below); none has a tape measurement yet, so they test detection/refusals. One scaled accuracy case exists (`terrace-slab-tape-01`: Rs 2 coin in frame, thread path 238.8 mm ±4 + tape span 227 mm [225–230], n = 1, coin 25 mm nominal); the 10–20-case set is still missing.
+Held-out: 12 cases. Four public photos with no scale reference in the crack's plane test whether the pipeline refuses to invent millimetres. Seven team photos with a coin joined on 2026-10-30 (see below); none has a tape measurement yet, so they test detection/refusals. One span-only tape case exists (`terrace-slab-tape-01`: Rs 2 coin in frame, tape span 227 mm [225–230], n = 1, coin 25 mm user-supplied); the 10–20-case set is still missing.
 
 | Case | Surface | Source license |
 | --- | --- | --- |
@@ -57,6 +57,7 @@ Scored by `scoreDisputes` in `bench/score.ts`, with DISPUTED as the positive cla
 | 2026-10-30 | 7 pass, 0 skip, 0 fail | dev fixtures grown (door-peel, facade-crack, tilted-wall, noscale); held-out still 0 archived runs (UNRUN ×4, strict exit 1) | tilted-wall: 0.27% / 66.8 mm cosmetic; facade-crack: 0.74% percent-only significant |
 | 2026-11-02 | 7 pass, 0 skip, 0 fail; gap INCOMPLETE (no runs yet) | — | `terrace-slab-tape-01`: builder slab DSC_0711.JPG, Ref SC-25D35C5E with wrong 23 mm coin read R005 218.5 mm (superseded — see 2026-11-03) |
 | 2026-11-03 | 7 pass, 0 skip, 0 fail; gap exit 0, both arms scored | — | `terrace-slab-tape-01`, n = 1: archived run R005 237.5 mm (25 mm nominal, engine recompute R001 0.773994, R004 7.69 cm²) vs thread 238.8 mm ±4 (err 1.3, 0.5%, in) vs Spark photo-alone 315 mm (err 76.2, 31.9%, out); span 227 mm [225–230] printed, span err 10.5 mm / 4.6%, never scored; width 3.2 mm unverified; sensitivity at ruler 24 mm: R005 228.0 mm / R006 3.1 mm / R004 7.09 cm². Run + guess in `bench/runs/` + `bench/model-only/`. No new live calls (run is deterministic recompute; guess reuses 2026-11-02 Spark 315 mm). |
+| 2026-11-04 | 7 pass, 0 skip, 0 fail; gap UNSCORED (span-only truth, never scored) | — | `terrace-slab-tape-01`, n = 1, final: coin confirmed 25 mm user-supplied (23 mm was a mistake — the 2026-11-02 218.5 mm run is void, not superseded); thread 238.8 mm removed from the case (unconfirmed string crack, must not validate this crack). Engine re-run in `src/engine/measure.ts` at 25 mm from signed-report scalars: R001 0.773994, R004 7.69 cm², R005 237.5 mm, R006 3.2 mm (unverified, no width ground truth). Vs tape span 227 mm [225–230]: err +10.5 mm (+4.6%, context, never scored); coin ±0.5 mm scales mm values ±2%. Archived run replaced with the full receipted result (self-reported scalars, no RLE in repo — pixel provenance pending masks). No live calls, no push. |
 
 ## Failures and misses
 
@@ -67,7 +68,7 @@ Scored by `scoreDisputes` in `bench/score.ts`, with DISPUTED as the positive cla
 
 ## Datasets and licenses
 
-The four held-out photos above are the public external set. Photo files stay local; source URLs are in `bench/split.json`. The scaled case `terrace-slab-tape-01` (team-internal slab DSC_0711.JPG, coin in frame, thread 238.8 mm ±4 + span 227 mm [225–230], n = 1) is the first tape ground truth; its photo stays local (gitignored).
+The four held-out photos above are the public external set. Photo files stay local; source URLs are in `bench/split.json`. The scaled case `terrace-slab-tape-01` (team-internal slab DSC_0711.JPG, coin in frame, tape span 227 mm [225–230], n = 1, coin 25 mm user-supplied) is the first tape ground truth; its photo stays local (gitignored).
 
 Seven team photos (Parithosh, DSLR, 2026-10-29, a 2 INR coin in the crack's plane) joined the held-out set on 2026-10-30 as `team-coin-*`: two with no crack, three full-frame cracks, two cracks that leave the frame. They are team-internal and not redistributed. None has a measured crack length yet, so they test detection and refusal behaviour; accuracy on them stays UNSCORED until the wall is measured.
 
