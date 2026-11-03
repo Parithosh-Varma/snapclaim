@@ -308,6 +308,49 @@ export function saveLastCoin(mm: number, label: string): void {
   } catch { /* storage may be unavailable; the claim flow must not break */ }
 }
 
+/** Custom diameter typed by the user: 15–40 mm, at most one decimal place. */
+export function parseCustomCoinMm(raw: string): number | null {
+  const t = raw.trim();
+  if (t === "") return null;
+  if (!/^\d+(\.\d)?$/.test(t)) return null;
+  const mm = Number(t);
+  if (!Number.isFinite(mm) || mm < 15 || mm > 40) return null;
+  return mm;
+}
+
+/** Inline message for the custom field: null when empty or valid. */
+export function customCoinError(raw: string): string | null {
+  if (raw.trim() === "") return null;
+  if (parseCustomCoinMm(raw) !== null) return null;
+  return "Enter 15–40 mm, one decimal at most.";
+}
+
+const LAST_CUSTOM_COIN_KEY = "snapclaim.lastCustomCoin";
+
+/** Last custom diameter, remembered the same way as the last-coin pick. */
+export function loadLastCustomCoin(): number | null {
+  try {
+    const raw = localStorage.getItem(LAST_CUSTOM_COIN_KEY);
+    if (raw === null) return null;
+    const v = JSON.parse(raw) as { mm?: unknown } | number | null;
+    const mm = typeof v === "number" ? v : Number((v as { mm?: unknown } | null)?.mm);
+    if (!Number.isFinite(mm) || mm < 15 || mm > 40) return null;
+    if (!/^\d+(\.\d)?$/.test(String(mm))) return null;
+    return mm;
+  } catch {
+    return null;
+  }
+}
+
+export function saveLastCustomCoin(raw: string): void {
+  try {
+    if (raw.trim() === "") return;
+    const mm = parseCustomCoinMm(raw);
+    if (mm === null) return;
+    localStorage.setItem(LAST_CUSTOM_COIN_KEY, JSON.stringify({ mm }));
+  } catch { /* storage may be unavailable; the claim flow must not break */ }
+}
+
 /** Put the user's last confirmed coin size (or none) on the session. */
 export function applyLastCoin(s: Pick<Session, "coinKindMm" | "coinLabel">): void {
   const last = loadLastCoin();

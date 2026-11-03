@@ -419,16 +419,38 @@ function placeRing(det, fw, fh) {
   ring.style.left = cx - r + "px"; ring.style.top = cy - r + "px";
   ring.style.width = r * 2 + "px"; ring.style.height = r * 2 + "px";
 }
-/** Diameter in mm from the custom field (wins) or the preset select. */
+/** Custom diameter: 15–40 mm, at most one decimal place. Null when empty/invalid. */
+function parseCustomCoinMm(raw) {
+  const t = String(raw ?? "").trim();
+  if (t === "") return null;
+  if (!/^\d+(\.\d)?$/.test(t)) return null;
+  const mm = Number(t);
+  if (!Number.isFinite(mm) || mm < 15 || mm > 40) return null;
+  return mm;
+}
+/** Inline message for the custom field: null when empty or valid. */
+function customCoinError(raw) {
+  if (String(raw ?? "").trim() === "") return null;
+  if (parseCustomCoinMm(raw) !== null) return null;
+  return "Enter 15–40 mm, one decimal at most.";
+}
+/** Diameter in mm from the custom field (wins when valid) or the preset select. */
 function getCoinSizeMm() {
-  const custom = Number($("coinCustomMm")?.value);
-  if (custom > 0 && custom <= 200) return custom;
+  const customRaw = $("coinCustomMm")?.value ?? "";
+  if (customRaw.trim() !== "") {
+    const mm = parseCustomCoinMm(customRaw);
+    if (mm !== null) return mm;
+    return 0;
+  }
   return Number($("coinKind")?.value) || 0;
 }
 /** Hint under the coin picker: what the user must do next for scale. */
 function updateCoinHintMark() {
   const el = $("coinHintMark");
   if (!el) return;
+  const customRaw = $("coinCustomMm")?.value ?? "";
+  const err = customCoinError(customRaw);
+  if (err) { el.textContent = err; return; }
   const hasCoin = !!(gateCoin || coinManualPt);
   const mm = getCoinSizeMm();
   if (hasCoin && !(mm > 0)) el.textContent = "Choose the reference size so the scale is known.";
@@ -436,14 +458,46 @@ function updateCoinHintMark() {
   else el.textContent = "";
 }
 const LAST_COIN_KEY = "snapclaim.lastCoin";
+const LAST_CUSTOM_COIN_KEY = "snapclaim.lastCustomCoin";
 function rememberCoin(mm, label) {
   try {
     if (mm > 0 && mm <= 200) localStorage.setItem(LAST_COIN_KEY, JSON.stringify({ mm, label }));
     else localStorage.removeItem(LAST_COIN_KEY);
   } catch { /* storage may be unavailable; the claim flow must not break */ }
 }
+function loadLastCustomCoinMm() {
+  try {
+    const raw = localStorage.getItem(LAST_CUSTOM_COIN_KEY);
+    if (raw === null) return null;
+    const v = JSON.parse(raw);
+    const mm = typeof v === "number" ? v : Number(v?.mm);
+    if (!Number.isFinite(mm) || mm < 15 || mm > 40) return null;
+    if (!/^\d+(\.\d)?$/.test(String(mm))) return null;
+    return mm;
+  } catch { return null; }
+}
+function saveLastCustomCoinMm(raw) {
+  try {
+    if (String(raw ?? "").trim() === "") return;
+    const mm = parseCustomCoinMm(raw);
+    if (mm === null) return;
+    localStorage.setItem(LAST_CUSTOM_COIN_KEY, JSON.stringify({ mm }));
+  } catch { /* storage may be unavailable; the claim flow must not break */ }
+}
 /** Default the coin size to the user's last confirmed pick (or none). */
 function restoreCoinSize() {
+  const customMm = loadLastCustomCoinMm();
+  if (customMm !== null) {
+    const custom = $("coinCustomMm");
+    if (custom) custom.value = String(customMm);
+    setCoinSizeKeepCustom(customMm, "Custom");
+    let last = null;
+    try { last = JSON.parse(localStorage.getItem(LAST_COIN_KEY) || "null"); } catch { /* ignore */ }
+    coinLabel = `Custom · ${customMm} mm dia`;
+    if (typeof last?.label === "string" && last.label) coinLabel = last.label;
+    updateCoinHintMark();
+    return;
+  }
   let last = null;
   try { last = JSON.parse(localStorage.getItem(LAST_COIN_KEY) || "null"); } catch { /* ignore */ }
   const mm = Number(last?.mm);
@@ -454,6 +508,19 @@ function restoreCoinSize() {
     setCoinSize(0);
     coinLabel = "";
   }
+}
+/** Select a known diameter without clearing the custom field (for restore). */
+function setCoinSizeKeepCustom(mm, label) {
+  const sel = $("coinKind");
+  if (!sel) return;
+  if (!(mm > 0)) { sel.value = "0"; updateCoinHintMark(); return; }
+  let opt = [...sel.options].find((o) => Number(o.value) === mm);
+  if (!opt) {
+    opt = new Option(label ? `${label} · ${mm} mm` : `${mm} mm reference`, String(mm));
+    sel.add(opt);
+  }
+  sel.value = String(mm);
+  updateCoinHintMark();
 }
 /** Select a known diameter, adding a one-off option when the coin is outside the preset list. */
 function setCoinSize(mm, label) {
@@ -1179,7 +1246,10 @@ $("markCanvas").addEventListener("pointerdown", async (ev) => {
 $("coinKind").addEventListener("change", () => {
   const opt = $("coinKind").selectedOptions[0];
   const custom = $("coinCustomMm");
-  if (custom && Number(opt?.value) > 0) custom.value = "";
+  if (custom && Number(opt?.value) > 0) {
+    custom.value = "";
+    try { localStorage.removeItem(LAST_CUSTOM_COIN_KEY); } catch { /* ignore */ }
+  }
   // The user's confirmation wins over the gate's size guess (it can name a
   // coin outside this list, e.g. a nickel, while the scale uses this value).
   coinLabel = opt && Number(opt.value) > 0 ? opt.textContent.replace(/ · (\d+(?:\.\d+)?) mm$/, " · $1 mm dia") : "";
@@ -1187,11 +1257,15 @@ $("coinKind").addEventListener("change", () => {
   updateCoinHintMark();
 });
 $("coinCustomMm")?.addEventListener("input", () => {
-  const mm = Number($("coinCustomMm").value);
-  if (mm > 0) {
+  const raw = $("coinCustomMm").value;
+  const mm = parseCustomCoinMm(raw);
+  if (mm !== null) {
     $("coinKind").value = "0";
     coinLabel = `Custom · ${mm} mm dia`;
     rememberCoin(mm, coinLabel);
+    saveLastCustomCoinMm(raw);
+  } else if (raw.trim() === "") {
+    coinLabel = "";
   } else {
     coinLabel = "";
   }

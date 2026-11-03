@@ -6,7 +6,7 @@ import { findCoins } from "../../../src/vision/coin-detect.js";
 import { closeMask } from "../lib/mask";
 import { segmentCoinViaApi, segmentViaApi, type SamClient } from "../lib/sam";
 import { buildObserveBody, completeMeasureJob, failMeasureJob, invalidateMeasure, startMeasureJob } from "../lib/measure-job";
-import { COIN_GROUPS, COIN_OPTIONS, freshAngleSlot, pickWinnerAngle, resetDmg, saveLastCoin, type AngleSlot, type SamMask, type Session } from "../lib/session";
+import { COIN_GROUPS, COIN_OPTIONS, customCoinError, freshAngleSlot, loadLastCustomCoin, parseCustomCoinMm, pickWinnerAngle, resetDmg, saveLastCoin, saveLastCustomCoin, type AngleSlot, type SamMask, type Session } from "../lib/session";
 import { BackButton, Stepper } from "../lib/ui";
 
 /** Custom coin-size dropdown: the native select cannot be styled square or
@@ -194,7 +194,17 @@ export default function Mark() {
   const [photoNotes, setPhotoNotes] = useState("");
   const [label, setLabel] = useState(s.dmgLabel);
   const [coinKind, setCoinKind] = useState(s.coinKindMm);
-  const [coinCustom, setCoinCustom] = useState("");
+  const [coinCustom, setCoinCustom] = useState(() => {
+    const last = loadLastCustomCoin();
+    if (last !== null && !(s.coinKindMm > 0)) {
+      s.coinKindMm = last;
+      s.coinLabel = `Custom · ${last} mm dia`;
+      return String(last);
+    }
+    if (last !== null && s.coinKindMm === last) return String(last);
+    return "";
+  });
+  const coinCustomErr = customCoinError(coinCustom);
   const [hasMask, setHasMask] = useState(!!s.dmg.mask);
   const [tapCount, setTapCount] = useState(s.dmg.points.length);
   const [markBusy, setMarkBusy] = useState(false);
@@ -961,6 +971,7 @@ export default function Mark() {
               onPick={(v, label) => {
                 setCoinKind(v);
                 setCoinCustom("");
+                saveLastCustomCoin("");
                 s.coinKindMm = v;
                 s.coinLabel = v > 0 ? label.replace(/ · (\d+(?:\.\d+)?) mm$/, " · $1 mm dia") : "";
                 touchInputs();
@@ -969,33 +980,44 @@ export default function Mark() {
             />
           </label>
           <label className="field">
-            Or type the diameter <small className="fieldex">any coin, ruler, card</small>
+            Or type the diameter (mm) <small className="fieldex">any coin, ruler, card · 15–40 mm</small>
             <input
               id="coinCustomMm"
               className="field-input"
               type="number"
               inputMode="decimal"
-              min={5}
-              max={100}
-              step="0.01"
-              placeholder="e.g. 24.26"
+              min={15}
+              max={40}
+              step="0.1"
+              placeholder="e.g. 24.3"
               value={coinCustom}
               onChange={(e) => {
                 const raw = e.target.value;
                 setCoinCustom(raw);
-                const mm = Number(raw);
-                if (mm > 0) {
+                const mm = parseCustomCoinMm(raw);
+                if (mm !== null) {
                   setCoinKind(0);
                   s.coinKindMm = mm;
                   s.coinLabel = `Custom · ${mm} mm dia`;
-                } else {
+                } else if (raw.trim() === "") {
                   s.coinKindMm = coinKind;
+                  s.coinLabel = "";
+                } else {
+                  s.coinKindMm = 0;
                   s.coinLabel = "";
                 }
                 touchInputs();
-                if (mm > 0) saveLastCoin(s.coinKindMm, s.coinLabel);
+                if (mm !== null) {
+                  saveLastCoin(s.coinKindMm, s.coinLabel);
+                  saveLastCustomCoin(raw);
+                }
               }}
             />
+            {coinCustomErr && (
+              <span id="coinCustomErr" className="coinhint" role="alert">
+                {coinCustomErr}
+              </span>
+            )}
           </label>
           <div className="coinrow">
             <button
