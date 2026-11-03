@@ -2,6 +2,18 @@
 
 Honest, dated build log. Mock mode by default; every live API call gets recorded here with its cost.
 
+## 2026-11-03 - Single-photo flow (second angle removed)
+
+**Shipped**
+
+- React flow is now one photo → mark → measure. Removed the second-photo / second-angle capture logic from the React app: `capturingAngle`, `stillA` / `still2DataUrl`, the per-angle marking bundles, `measurementA/B`, `payloadA/B`, `winnerAngle`, `activeAngle` / `resumeAngle`, `AngleSlot` / `freshAngleSlot` and `pickWinnerAngle` (`session.ts`); the two-step shutter/retake/upload flow in `Capture.tsx` (Use photo now goes straight to Mark); and the angle slot swapping in `Mark.tsx` (single working state, rebuilt from the one still).
+- Angle-vs-angle agreement is gone with it: the best-view-wins pick (`pickWinnerAngle`, larger percent stands for the report) no longer exists. Note the React flow never actually ran a two-angle comparison - `measurementA/B` were reset but never populated by `measure()`, and the angle tabs/switcher were dead code - so no live check was lost, only the dead selection logic.
+- Drafts shrank to the single-photo shape (`stillDataUrl`, `working`, `measurement`, `payload`); quota tiers now strip the location photo, then payload overlays, then masks. Loading old two-angle drafts does not crash: extra fields are ignored, and a draft whose working slot was angle 2 falls back to angle 1's still, taps and results. New test pins this.
+- `react/public/sw.js` CACHE v21. `pwa/` untouched (no second-angle logic there). `Say` / `Numbers` / `Check` / `Report` / `Shared` / `Tabs` needed no changes (nothing read the angle fields). README / react/README / docs had no two-angle mentions; nothing to remove there.
+- `tests/draft.test.ts` updated (single-photo round-trip, overlay-strip tier, legacy-draft test); `tests/react-shell.test.ts` needed no changes (no two-angle assertions). Root `tsc`, React build and the draft/shell/sw/CSP test files green. Full `npm test` still has pre-existing environment failures (`@meta-sam/parser` not installed, breaks every suite importing `src/vision/sam.ts`).
+
+**Spend:** $0.00.
+
 ## 2026-10-27 - Day 1: the deterministic core
 
 **Shipped**
