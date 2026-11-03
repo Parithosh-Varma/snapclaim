@@ -336,5 +336,17 @@ Credits claim ✅ - billing verified, $150 active on 2026-10-27.
 - PWA mirrors the change for the single-shot path (`pwa/app.js` background job, Say awaits, failure back to Mark); multi-shot stays sequential since frame B needs frame A on camera. New-case/retake/sample paths invalidate the job.
 - Parity: `tests/measure-overlap.test.ts` proves a stale job landing late is discarded and the observe/report bodies are byte-identical between the sequential and overlapping flows for the same inputs; `tests/react-shell.test.ts` pins the new state machine.
 - Housekeeping: React SW `snapclaim-react-v20` → `v21`, PWA `snapclaim-shell-v26` → `v27` (app.js changed); 323 tests green, both typechecks clean, React build clean.
+## 2026-11-03 - One-call headless API (no UI)
+
+**Shipped**
+
+- `POST /v1/claim`: one request runs segment → observe → report → render and returns `{measurement, findings, gate, overlay, svg?, replay, segmentation?}`. Two input shapes: COCO RLE `masks[]` (keyless, mock-capable, pixel-verified) or `imageUrl` + `damage[]` taps (+ optional `coin`) for live SAM 3.1 segmentation.
+- Segmentation attribution by pixel containment, not record order; wall-sized records (>50% frame) dropped like the app drops them; a tap with no surviving mask is `422`, never an empty finding. Coin picking mirrors the app's compactness heuristic; a non-coin outline still degrades to percent-only via `/v1/observe`.
+- Render happens in-process: `/v1/render` would re-run `/v1/report` and bill a second findings call for the same numbers.
+- The claim re-binds the input RLE to the observed masks, so claims are `provenance: "pixel-verified"` and pass `REQUIRE_PIXEL_PROVENANCE=1`.
+- Extracted `samSegment()` from `/v1/segment` so both routes share the SSRF guard, pixel cap, spend hold and archival; `/v1/segment` behavior unchanged (503-before-400 ordering pinned by tests).
+- `/v1/claim` joins the expensive rate tier (20/min) and the `REQUIRE_BILLING_AUTH` lockdown.
+- `cli/snapclaim.ts` (`npm run cli`): `health` and `claim` from the shell, PNG/JPEG/WebP dimension detection, data-URL building, `--tap`, `--coin`, `--say`, `--out`, `--svg`, `--dry-run`, BYOK headers.
+- `docs/API.md`: full contract, CLI flags, low-level route table, replay, Node client, limits/auth. 15 new tests; 364 total green. BYOK proven on `/v1/claim`: caller key drives SAM + findings, operator ledger stays at $0.
 
 **Spend:** $0.00.

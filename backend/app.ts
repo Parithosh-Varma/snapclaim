@@ -13,6 +13,7 @@ import { ellipseOutlinePath, maskOutlinePath } from "../src/vision/contour.ts";
 import { guardFor, spendStatus } from "./spend.ts";
 import { applyAdminMode, effectiveMockMode, isAdminEnabled, mockSource, parseAdminModeBody, requireAdmin } from "./admin.ts";
 import { BudgetExceededError, estimateCostUsd } from "../src/config/spend-guard.ts";
+import { type AppConfig } from "../src/config/config.ts";
 import { configFromEnv, findingsProvider, requireLiveKeys, skepticProvider, visionProvider, HttpError, SAM_IMAGE_USD, SPARK_PRICE, type Env, type FetchFn } from "./providers.ts";
 import {
   DEFAULT_KEYWORDS,
@@ -27,6 +28,7 @@ import { MemoryStore, type SavedSession, type Store } from "./store.ts";
 import { segmentWithSam, type SamBoxPrompt, type SamPoint } from "../src/vision/sam.ts";
 import { archiveSegmentImage } from "./storage.ts";
 import { DEFAULT_CONFIG } from "../src/config/config.ts";
+import { claimBody } from "./claim.ts";
 
 export const VERSION = "0.3.0";
 export const MAX_MASKS = 50;
@@ -494,6 +496,71 @@ export async function reportBody(body: unknown, env: Env, requestId = newRequest
   return envelope(requestId, started, { measurement, findings: drafts, gate });
 }
 
+export interface SamSegmentRequest {
+  imageUrl: string;
+  size: { width: number; height: number };
+  points: SamPoint[];
+  box?: SamBoxPrompt;
+}
+
+/**
+ * One billed SAM 3.1 image call: live-key check, SSRF guard, pixel cap, spend
+ * hold, best-effort archival. `/v1/segment` and `/v1/claim` share it so both
+ * routes bill, cap and validate identically instead of drifting apart.
+ */
+export async function samSegment(
+  env: Env,
+  config: AppConfig,
+  request: SamSegmentRequest,
+  requestId: string,
+  fetchFn?: FetchFn,
+  archive = true,
+): Promise<{ records: Awaited<ReturnType<typeof segmentWithSam>>["records"]; archivedImageUrl: string | null }> {
+  const { metaKey } = requireLiveKeys(env, config);
+  assertSafeImageUrl(request.imageUrl);
+  const { width, height } = request.size;
+  if (width * height > MAX_MASK_PIXELS) {
+    throw new HttpError(400, `width×height ${width}x${height} exceeds the ${MAX_MASK_PIXELS}-pixel cap`);
+  }
+  const spend = operatorSpend(env, "meta");
+  // Reserve the fixed SAM price BEFORE the upstream call: concurrent callers
+  // then serialize on the budget instead of each passing a stale
+  // $0-remaining check and billing after the fact.
+  // BYOK (spend undefined): caller pays, no operator hold.
+  let samHold: ReturnType<NonNullable<typeof spend>["reserve"]> | undefined;
+  try {
+    samHold = spend?.reserve("sam segment ceiling", SAM_IMAGE_USD);
+  } catch (error) {
+    if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
+    throw error;
+  }
+  // Best-effort archival: inline inputs are stored in the Supabase bucket so
+  // the exact measured pixels stay re-runnable. Never blocks measurement.
+  const archivedImageUrl = archive
+    ? await archiveSegmentImage(env, request.imageUrl, requestId, fetchFn)
+    : null;
+  let sam: Awaited<ReturnType<typeof segmentWithSam>>;
+  try {
+    sam = await segmentWithSam({
+      fetchFn,
+      base: config.endpoints.meta,
+      apiKey: metaKey,
+      model: config.models.sam,
+      request: { imageUrl: request.imageUrl, size: { width: Math.round(width), height: Math.round(height) }, points: request.points, ...(request.box ? { box: request.box } : {}) },
+    });
+  } catch (error) {
+    samHold?.release();
+    throw error;
+  }
+  try {
+    samHold?.settle(`sam segment ${sam.records.length} objects`, SAM_IMAGE_USD);
+  } catch (error) {
+    if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
+    throw error;
+  }
+  return { records: sam.records, archivedImageUrl };
+}
+
 export async function segmentBody(body: unknown, env: Env, requestId = newRequestId(), fetchFn?: FetchFn): Promise<EnvelopedResult> {
   const started = Date.now();
   if (!isRecord(body)) throw new Error("body must be a JSON object");
@@ -506,11 +573,13 @@ export async function segmentBody(body: unknown, env: Env, requestId = newReques
     });
     return envelope(requestId, started, result);
   }
+  // Live: fail closed on the missing key before parsing input, so a
+  // misconfigured backend never returns a 400 that looks like the caller's
+  // fault. samSegment re-checks (defensive) right before the billed call.
+  requireLiveKeys(env, config);
   // Live: SAM 3.1 point prompts over the Responses API. The backend decodes
   // masks with the official parser - it never invents them.
-  const { metaKey } = requireLiveKeys(env, config);
   const imageUrl = typeof body.imageUrl === "string" ? body.imageUrl : "";
-  assertSafeImageUrl(imageUrl);
   const width = requirePositive(body.width, "width");
   const height = requirePositive(body.height, "height");
   if (width * height > MAX_MASK_PIXELS) {
@@ -542,42 +611,15 @@ export async function segmentBody(body: unknown, env: Env, requestId = newReques
     }
     box = { left, top, right, bottom };
   }
-  const spend = operatorSpend(env, "meta");
-  // Reserve the fixed SAM price BEFORE the upstream call: concurrent callers
-  // then serialize on the budget instead of each passing a stale
-  // $0-remaining check and billing after the fact.
-  // BYOK (spend undefined): caller pays, no operator hold.
-  let samHold: ReturnType<NonNullable<typeof spend>["reserve"]> | undefined;
-  try {
-    samHold = spend?.reserve("sam segment ceiling", SAM_IMAGE_USD);
-  } catch (error) {
-    if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
-    throw error;
-  }
-  // Best-effort archival: inline inputs are stored in the Supabase bucket so
-  // the exact measured pixels stay re-runnable. Never blocks measurement.
-  const archivedImageUrl = await archiveSegmentImage(env, imageUrl, requestId, fetchFn);
-  let sam: Awaited<ReturnType<typeof segmentWithSam>>;
-  try {
-    sam = await segmentWithSam({
-      fetchFn,
-      base: config.endpoints.meta,
-      apiKey: metaKey,
-      model: config.models.sam,
-      request: { imageUrl, size: { width: Math.round(width), height: Math.round(height) }, points, ...(box ? { box } : {}) },
-    });
-  } catch (error) {
-    samHold?.release();
-    throw error;
-  }
-  try {
-    samHold?.settle(`sam segment ${sam.records.length} objects`, SAM_IMAGE_USD);
-  } catch (error) {
-    if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
-    throw error;
-  }
+  const sam = await samSegment(
+    env,
+    config,
+    { imageUrl, size: { width, height }, points, ...(box ? { box } : {}) },
+    requestId,
+    fetchFn,
+  );
   return envelope(requestId, started, {
-    archivedImageUrl,
+    archivedImageUrl: sam.archivedImageUrl,
     records: sam.records.map((record) => ({
       objectId: record.objectId,
       box: record.box,
@@ -1164,6 +1206,7 @@ export const RATE_LIMITS: Record<string, number> = {
   cheap: 120,
 };
 const EXPENSIVE_PATHS = new Set([
+  "/v1/claim",
   "/v1/report",
   "/v1/segment",
   "/v1/transcribe",
@@ -1310,7 +1353,7 @@ export async function handleRequest(input: {
     // Any Bearer value is NOT enough: compare against ADMIN_TOKEN in
     // constant time like requireAdmin does.
     if (env.REQUIRE_BILLING_AUTH === "1" && input.method === "POST" &&
-      ["/v1/report", "/v1/segment", "/v1/transcribe", "/v1/describe", "/v1/findings", "/v1/skeptic", "/v1/render"].includes(input.path)) {
+      ["/v1/claim", "/v1/report", "/v1/segment", "/v1/transcribe", "/v1/describe", "/v1/findings", "/v1/skeptic", "/v1/render"].includes(input.path)) {
       try {
         requireAdmin(headers, env);
       } catch (e) {
@@ -1336,6 +1379,7 @@ export async function handleRequest(input: {
     if (input.method === "POST" && input.path === "/v1/observe") return { status: 200, body: observeBody(input.body, requestId) };
     if (input.method === "POST" && input.path === "/v1/crosscheck") return { status: 200, body: crosscheckBody(input.body, requestId) };
     if (input.method === "POST" && input.path === "/v1/report") return { status: 200, body: await reportBody(input.body, env, requestId, input.fetchFn) };
+    if (input.method === "POST" && input.path === "/v1/claim") return { status: 200, body: await claimBody(input.body, env, requestId, input.fetchFn) };
     if (input.method === "POST" && input.path === "/v1/segment") return { status: 200, body: await segmentBody(input.body, env, requestId, input.fetchFn) };
     if (input.method === "POST" && input.path === "/v1/transcribe") return { status: 200, body: await transcribeBody(input.body, env, requestId, input.fetchFn) };
     if (input.method === "POST" && input.path === "/v1/describe") return { status: 200, body: await describeBody(input.body, env, requestId, input.fetchFn) };

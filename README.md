@@ -23,6 +23,7 @@ SnapClaim turns a damage photo plus a one-line description into a replayable evi
 
 - [Quickstart](#quickstart)
 - [How it works](#how-it-works)
+- [Headless API (no UI)](#headless-api-no-ui)
 - [Modes: demo vs live](#modes-demo-vs-live)
 - [API reference](#api-reference)
 - [Configuration](#configuration)
@@ -87,6 +88,34 @@ Three principles run through all of it:
 2. **Fail closed.** No key → 503. No evidence → 422. Empty model output → error. The backend never invents a mask, a transcript, or a number.
 3. **Everything replays.** `npm run replay` recomputes a report from request + receipts and prints MATCH or DRIFT.
 
+## Headless API (no UI)
+
+The app is a client of the API, not the API. `POST /v1/claim` runs the whole
+pipeline once - segmentation → pixel statistics → calibrated measurement →
+gated findings → SVG annexure - and returns the evidence package plus the inputs
+to replay it:
+
+```bash
+npm run backend:start
+npm run cli -- claim --image damage.jpg --tap 420,310,crack \
+  --coin 900,700,24.26 --say "crack above the window" \
+  --out report.json --svg annexure.svg
+```
+
+Masks already computed? Post COCO RLE instead and skip every model call (and
+every key) - deterministic, $0, works even in mock mode:
+
+```bash
+curl -s -X POST http://127.0.0.1:8787/v1/claim \
+  -H 'content-type: application/json' \
+  -d '{"masks":[{"id":"damage-1","label":"crack","confidence":0.9,
+       "rle":{"size":[10,10],"counts":[0,5,95]}}],"transcript":"crack on the wall panel"}'
+```
+
+Full contract, all routes, the CLI flags and a Node client:
+**[`docs/API.md`](./docs/API.md)**. Low-level routes stay available when you
+want an intermediate result - nothing in the app bypasses them.
+
 ## Modes: demo vs live
 
 | | Demo (default) | Live (`MOCK_MODE=0` + keys) |
@@ -119,6 +148,7 @@ All replies are enveloped: `{ok: true, requestId, durationMs, result}`. Errors: 
 |---|---|---|
 | `GET /v1/health` | - | `{version, time, mode}` |
 | `GET /v1/spend` | - | `{spentUsd, remainingUsd, limitUsd, entries}` |
+| `POST /v1/claim` | masks (COCO RLE) **or** `imageUrl` + `damage[]` taps (+ optional `coin`), `transcript?`, `render?` | one-call pipeline: `{measurement, findings, gate, overlay, svg?, replay}` |
 | `POST /v1/measure` | `{component, masks, scaleReference?, thresholds?}` · keyless | `{findings, receipts, mode: "absolute" \| "percent-only"}` |
 | `POST /v1/observe` | `{masks: [{id, label, rle, confidence}], component?, reference?}` (COCO RLE) · keyless | `{component, masks, scaleReference}` - feeds `/v1/report` |
 | `POST /v1/crosscheck` | `{a, b}` COCO RLE masks of one frame, `threshold?` (default 0.5) · keyless | `{intersection, union, iou, dice, verdict: AGREED/DISPUTED, threshold}` - SlimSAM-vs-SAM check |
@@ -244,11 +274,13 @@ src/render/     code-drawn SVG annexure
 src/adapters/   deterministic mock vision + findings
 src/config/     env config, spend guard
 backend/        one router (Node server + Cloudflare Worker), providers, transcribe proxy
+cli/            `npm run cli` - headless claim from the shell
+docs/API.md     headless API + CLI contract
 pwa/            capture app: photo, tap-to-mask, hold-to-speak, report, skeptic, annexure
 eval/           bench + replay CLI
 bench/          held-out split + dispute scorer
 fixtures/       masks, expected outputs, scale references (photos gitignored)
-tests/          297 tests, mock by default, live paths with stubbed fetch
+tests/          364 tests, mock by default, live paths with stubbed fetch
 ```
 
 ## Development
@@ -261,6 +293,7 @@ tests/          297 tests, mock by default, live paths with stubbed fetch
 | `npm run replay -- request.json measurement.json` | Recompute a report: MATCH or DRIFT (exit 1) |
 | `npm run backend:start` / `backend:live` | Node server, mock / live (`.env`) |
 | `npm run backend:smoke` | End-to-end smoke against a running backend |
+| `npm run cli -- claim --image …` | Headless claim from the shell (see `docs/API.md`) |
 
 ## Scope and boundaries
 
