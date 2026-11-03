@@ -6,7 +6,7 @@ import { findCoins } from "../../../src/vision/coin-detect.js";
 import { circleRle, encodeRle } from "../lib/rle";
 import { closeMask } from "../lib/mask";
 import { segmentCoinViaApi, segmentViaApi, type SamClient } from "../lib/sam";
-import { COIN_GROUPS, COIN_OPTIONS, freshAngleSlot, pickWinnerAngle, resetDmg, type AngleSlot, type SamMask, type Session } from "../lib/session";
+import { COIN_GROUPS, COIN_OPTIONS, resetDmg, type SamMask, type Session } from "../lib/session";
 import { BackButton, Stepper } from "../lib/ui";
 
 /** Custom coin-size dropdown: the native select cannot be styled square or
@@ -203,7 +203,6 @@ export default function Mark() {
   const [coinCorrect, setCoinCorrect] = useState(false);
   const [coinFixHint, setCoinFixHint] = useState("");
   const [taped, setTaped] = useState(s.coinTaped);
-  const [angle, setAngle] = useState<1 | 2>(() => s.resumeAngle ?? 1);
   const [coinOpen, setCoinOpen] = useState(false);
   const [coinActive, setCoinActive] = useState<number | null>(null);
   const dropRef = useRef<HTMLDivElement>(null);
@@ -369,32 +368,29 @@ export default function Mark() {
   /* Undo order: the last tap undone first, crack or coin. Entries land when
      a tap takes effect; a fresh photo clears the slate with the taps. */
   const histRef = useRef<("crack" | "coin")[]>([]);
-  /* Two angles, one screen: angle tabs swap the working fields with the
-     per-angle bundle, so every tap/undo/measure below keeps working on the
-     visible photo. The other angle's canvas, mask and coin wait in its slot. */
+  /* One photo, one working state: every tap/undo/measure below works on the
+     visible photo. */
 
-  const stillFor = (k: 1 | 2): string => (k === 1 ? s.stillA || s.stillDataUrl : s.still2DataUrl);
-
-  const saveBundle = (k: 1 | 2): void => {
-    const b: AngleSlot = {
-      photo: s.photo,
-      photoFor: s.photoFor,
-      dmg: s.dmg,
+  /* Rebuild the marking photo from its still. A draft restore (or back-nav)
+     re-applies the working taps after the canvas lands: masks are kept only
+     when their dimensions still match the rebuilt photo. */
+  const buildPhoto = useCallback((still: string) => {
+    // Stash the working taps (draft restore, back-nav) before clearing: the
+    // canvas rebuild re-applies them once its dimensions are known.
+    const pending = {
+      points: s.dmg.points.slice(),
+      mask: s.dmg.mask,
+      iou: s.dmg.iou,
+      source: s.dmg.source,
       coinManualPt: s.coinManualPt,
       coinMask: s.coinMask,
       coinIou: s.coinIou,
       gateCoin: s.gateCoin,
-      taped,
+      taped: s.coinTaped,
       hist: histRef.current.slice(),
     };
-    if (k === 1) s.bundleA = b;
-    else s.bundleB = b;
-  };
-
-  /* Rebuild the marking photo from its still. `restore` re-applies a draft
-     (or stashed bundle) after the canvas lands: masks are kept only when
-     their dimensions still match the rebuilt photo. */
-  const buildPhoto = useCallback((still: string, restore?: AngleSlot) => {
+    const hasPending =
+      pending.points.length > 0 || !!pending.mask || !!pending.coinManualPt;
     resetDmg(s);
     histRef.current = [];
     s.coinManualPt = null;
@@ -411,7 +407,7 @@ export default function Mark() {
     const img = new Image();
     if (!still) {
       setReady(false);
-      setStatus("Take the second photo first - back up to capture.");
+      setStatus("No photo yet - back up to capture.");
       return;
     }
     // A stalled decode (huge image, throttled phone) fires neither onload
@@ -456,24 +452,24 @@ export default function Mark() {
       embeddings.current = false;
       // A draft restore re-applies here, once the canvas dimensions are
       // known: anything that no longer fits the rebuilt photo is dropped.
-      if (restore) {
+      if (hasPending) {
         const fits = (m: Uint8Array | null) => !!m && m.length === photo.width * photo.height;
         s.dmg = {
-          points: restore.dmg.points.filter(
+          points: pending.points.filter(
             (p): p is [number, number] =>
               Array.isArray(p) && p.length === 2 && p.every((n) => typeof n === "number"),
           ),
           pointMasks: [],
-          mask: fits(restore.dmg.mask) ? (restore.dmg.mask as Uint8Array) : null,
-          iou: fits(restore.dmg.mask) ? restore.dmg.iou : 0,
-          source: fits(restore.dmg.mask) ? restore.dmg.source : (restore.dmg.points.length ? "api" : null),
+          mask: fits(pending.mask) ? (pending.mask as Uint8Array) : null,
+          iou: fits(pending.mask) ? pending.iou : 0,
+          source: fits(pending.mask) ? pending.source : (pending.points.length ? "api" : null),
         };
-        s.coinManualPt = restore.coinManualPt;
-        s.coinMask = fits(restore.coinMask) ? restore.coinMask : null;
-        s.coinIou = fits(restore.coinMask) ? restore.coinIou : 0;
-        s.gateCoin = restore.gateCoin;
-        setTaped(restore.taped);
-        histRef.current = restore.hist.filter((x) => x === "crack" || x === "coin");
+        s.coinManualPt = pending.coinManualPt;
+        s.coinMask = fits(pending.coinMask) ? pending.coinMask : null;
+        s.coinIou = fits(pending.coinMask) ? pending.coinIou : 0;
+        s.gateCoin = pending.gateCoin;
+        setTaped(pending.taped);
+        histRef.current = pending.hist.filter((x) => x === "crack" || x === "coin");
         setTapCount(s.dmg.points.length);
         setHasMask(!!s.dmg.mask);
         setCoinFixHint(
@@ -504,78 +500,38 @@ export default function Mark() {
     img.src = still;
   }, [drawMark, s]);
 
-  const loadAngle = useCallback((k: 1 | 2) => {
-    let still = k === 1 ? s.stillA || s.stillDataUrl : s.still2DataUrl;
-    if (k === 1 && !s.stillA && still) s.stillA = still;
-    s.stillDataUrl = still;
-    s.activeAngle = k;
-    const slot = (k === 1 ? s.bundleA : s.bundleB) ?? freshAngleSlot();
-    s.photo = slot.photo;
-    s.photoFor = slot.photoFor;
-    s.dmg = slot.dmg;
-    s.coinManualPt = slot.coinManualPt;
-    s.coinMask = slot.coinMask;
-    s.coinIou = slot.coinIou;
-    s.gateCoin = slot.gateCoin;
-    setTaped(slot.taped);
-    histRef.current = slot.hist.filter((x) => x === "crack" || x === "coin");
-    setTapCount(slot.dmg.points.length);
-    setHasMask(!!slot.dmg.mask);
+  const loadPhoto = useCallback(() => {
+    const still = s.stillDataUrl;
     setCoinCorrect(false);
-    setCoinFixHint(slot.coinManualPt && !slot.coinMask ? "Coin tap saved - confirm its size below." : "");
     setTfState("");
     huntRef.current = null;
     setMeasureBusy(false);
-    if (slot.photo && slot.photoFor === still && still) {
+    if (s.photo && s.photoFor === still && still) {
       setReady(true);
-      setStatus(slot.dmg.mask ? `Outlined (${Math.round(slot.dmg.iou)}% sure).` : "Select crack to continue.");
+      setStatus(s.dmg.mask ? `Outlined (${Math.round(s.dmg.iou)}% sure).` : "Select crack to continue.");
+      setTapCount(s.dmg.points.length);
+      setHasMask(!!s.dmg.mask);
+      setTaped(s.coinTaped);
+      histRef.current = s.workingHist.filter((x) => x === "crack" || x === "coin");
+      setCoinFixHint(s.coinManualPt && !s.coinMask ? "Coin tap saved - confirm its size below." : "");
       drawMark();
       // Rebuild the free coin hunt a revisit lost: no download, just Hough.
       if (!s.gateCoin && !s.coinManualPt) {
         try {
-          const px = slot.photo.getContext("2d", { willReadFrequently: true })?.getImageData(0, 0, slot.photo.width, slot.photo.height);
+          const px = s.photo.getContext("2d", { willReadFrequently: true })?.getImageData(0, 0, s.photo.width, s.photo.height);
           const found = px ? findCoins({ data: px.data, width: px.width, height: px.height }) : [];
-          huntRef.current = found.length ? { points: found.slice(0, 3), photo: slot.photo } : null;
+          huntRef.current = found.length ? { points: found.slice(0, 3), photo: s.photo } : null;
         } catch { huntRef.current = null; }
       }
       return;
     }
     setReady(false);
-    setStatus(still ? (slot.dmg.mask || slot.dmg.points.length ? "Restoring draft…" : "Select crack to continue.") : "Take the second photo first - back up to capture.");
+    setStatus(still ? (s.dmg.mask || s.dmg.points.length ? "Restoring draft…" : "Select crack to continue.") : "No photo yet - back up to capture.");
     // No canvas (fresh reload after a draft restore) but stashed taps: the
-    // still rebuilds the photo and the slot re-applies on top of it.
-    if (still) buildPhoto(still, slot.photoFor === still &&
-      (slot.dmg.points.length > 0 || !!slot.dmg.mask || !!slot.coinManualPt) ? slot : undefined);
+    // still rebuilds the photo and the working state re-applies on top of it.
+    if (still) buildPhoto(still);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [buildPhoto, drawMark, s]);
-
-  /* Angle tabs: persist the working photo into its slot, then load the other. */
-  const switchAngle = (next: 1 | 2) => {
-    if (next === angle || markBusy || measureBusy) return;
-    saveBundle(angle);
-    setAngle(next);
-    loadAngle(next);
-  };
-
-  /* Make an angle's bundle the working state (used for the winning angle
-     before leaving for Say, and when re-opening an already-marked angle). */
-  const applyWinner = (k: 1 | 2) => {
-    const slot = (k === 1 ? s.bundleA : s.bundleB) ?? freshAngleSlot();
-    const still = k === 1 ? s.stillA || s.stillDataUrl : s.still2DataUrl;
-    s.stillDataUrl = still;
-    s.photo = slot.photo;
-    s.photoFor = slot.photoFor;
-    s.dmg = slot.dmg;
-    s.coinManualPt = slot.coinManualPt;
-    s.coinMask = slot.coinMask;
-    s.coinIou = slot.coinIou;
-    s.gateCoin = slot.gateCoin;
-    setTaped(slot.taped);
-    histRef.current = slot.hist.filter((x) => x === "crack" || x === "coin");
-    setTapCount(slot.dmg.points.length);
-    setHasMask(!!slot.dmg.mask);
-    drawMark();
-  };
 
   /* build the marking photo; cloud-only, so no model ever loads on entry */
   useEffect(() => {    sam.onProgress = ({ percent }) => setTfState(`Downloading the outlining model… ${percent}%`);
@@ -590,8 +546,7 @@ export default function Mark() {
         ? "On-device outlining model not available offline yet - reconnect once to download it, then it works offline."
         : `Outlining unavailable (${message}). Check the connection and retry.`);
     };
-    loadAngle(s.resumeAngle ?? 1);
-    s.resumeAngle = null;
+    loadPhoto();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
