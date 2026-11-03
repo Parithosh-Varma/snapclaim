@@ -1,0 +1,28 @@
+{
+  "_comment": "Open-weights fine-tuning presets. Targets are Meta model ids (muse-glimmer, muse-spark-open); base weights resolve via HF_MODEL_REPO env so no registry URL is hardcoded. Hyperparameters per target reflect size: glimmer distills short verdicts, spark-open distills full receipt-cited findings.",
+  "defaults": {
+    "hub_repo_env": "HF_MODEL_REPO",
+    "output_dir": "finetune/checkpoints",
+    "seed": 7,
+    "lora": { "r": 8, "alpha": 16, "dropout": 0.05, "target_modules": ["q_proj", "v_proj"] },
+    "optim": { "lr": 2e-4, "epochs": 3, "batch_size": 4, "grad_accum": 4, "max_seq_len": 2048 }
+  },
+  "targets": {
+    "muse-glimmer": {
+      "description": "Small on-device chat model: distill short damage verdicts (no-damage vs measured) from receipts. Smoke-tested in CI without weights.",
+      "max_tokens": 512,
+      "chat_template": "glimmer",
+      "lora": { "r": 8, "alpha": 16, "dropout": 0.05, "target_modules": ["q_proj", "v_proj"] },
+      "optim": { "lr": 2e-4, "epochs": 3, "batch_size": 4, "grad_accum": 4, "max_seq_len": 1024 },
+      "eval_split": 0.1
+    },
+    "muse-spark-open": {
+      "description": "Open-weights findings model (Baseten mirror of Spark): distill full receipt-cited findings drafts with gate-shaped outputs.",
+      "max_tokens": 8192,
+      "chat_template": "spark-open",
+      "lora": { "r": 16, "alpha": 32, "dropout": 0.05, "target_modules": ["q_proj", "k_proj", "v_proj", "o_proj"] },
+      "optim": { "lr": 1e-4, "epochs": 2, "batch_size": 2, "grad_accum": 8, "max_seq_len": 4096 },
+      "eval_split": 0.1
+    }
+  }
+}

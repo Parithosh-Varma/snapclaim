@@ -1,0 +1,8 @@
+# SnapClaim open-weights fine-tuning
+# PyTorch + Hugging Face Transformers + PEFT (LoRA). Python >= 3.10 recommended
+# for training (torch wheels); dataset prep runs on stdlib only.
+torch
+transformers>=4.40
+datasets>=2.18
+peft>=0.10
+huggingface_hub>=0.22

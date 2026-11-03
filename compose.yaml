@@ -1,0 +1,25 @@
+# SnapClaim local stack: API backend on :8787.
+# Mock mode by default ($0 spend, no keys). For live calls, put real keys in
+# .env (see .env.example) — or set them in a `snapclaim.env` file and point
+# `env_file` at it instead.
+services:
+  snapclaim:
+    build: .
+    image: snapclaim:latest
+    ports:
+      - "${PORT:-8787}:8787"
+    env_file:
+      - path: ./.env
+        required: false
+    environment:
+      PORT: "8787"
+      MOCK_MODE: "${MOCK_MODE:-1}"
+      SPEND_GUARD_USD: "${SPEND_GUARD_USD:-5}"
+      ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-}"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/v1/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    restart: unless-stopped

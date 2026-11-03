@@ -40,3 +40,7 @@ DEFENSIVE-DOMAINS.md
 
 # Nested private marketing repo (has its own remote).
 /snapclaim-marketing/
+
+# Fine-tuning build artifacts (generated datasets, LoRA checkpoints)
+finetune/data/
+finetune/checkpoints/

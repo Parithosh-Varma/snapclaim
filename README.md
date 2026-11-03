@@ -100,6 +100,14 @@ For local development, Settings → Developer → **Open admin panel** flips the
 
 No image generation anywhere: every visual is drawn in code from the masks and the math. (Muse Image is unavailable in our region under Meta's Geographic Use Policy - the receipts pattern turns that constraint into a design principle, not a product boundary.)
 
+All Meta traffic goes through one canonical client, `backend/metaApi.ts`: the official endpoint (`https://api.meta.ai/v1`), `Authorization: Bearer $META_API_KEY` from the environment, OpenAI-compatible `POST {base}/chat/completions` calls, and a read-only `GET {base}/models` connectivity check. Providers (`backend/providers.ts`, `backend/transcribe.ts`, `backend/app.ts` describe) build on it; nothing calls the API anywhere else. Verify the integration end to end (read-only, $0) with:
+
+```bash
+node scripts/verify-meta.mjs   # GET {META_API_BASE}/models with the Bearer key
+```
+
+`meta.config.json` at the repo root records the endpoint, the model ids (`muse-spark`, `sam-3.1`, `muse-voice`, `muse-glimmer`, `muse-spark-open`), the four pipeline stages, and the verification flags (`meta_api_verified`, `open_weights_tuning`). `tests/metaIntegration.test.ts` asserts the manifest matches the code constants, so docs can't drift from the wiring.
+
 ## API reference
 
 All replies are enveloped: `{ok: true, requestId, durationMs, result}`. Errors: `{ok: false, error, code, requestId, details?}` with HTTP 400 (bad input), 422 (gate or receipt mismatch), 429 (spend exhausted), 503 (key missing in live mode), 501 (unwired live path).
@@ -179,6 +187,34 @@ The backend Worker is a separate hostname and is **not** behind Access; it relie
 
 The app keeps one strict backend policy in places that must stay in sync: the `<meta>` CSP `connect-src` in `pwa/index.html` (and `react/index.html`), the matching `Content-Security-Policy` response header in `pwa/_headers` (and `react/public/_headers`), and the `isAllowedBackendUrl()` allowlist in `pwa/app.js` (and `react/src/lib/api.ts`). Only `https://snapclaim-backend.parithosh.workers.dev` and loopback `http` (`localhost`, `127.0.0.1`, `[::1]`) are allowed; anything else shows "This backend isn't allowed by the app's security policy". To point at your own Worker: add its `https://host` to `connect-src` in both HTML files and both `_headers` files **and** to `DEFAULT_BACKEND_HOST`/`isAllowedBackendUrl` in both JS/TS files. `tests/pwa-csp-allowlist.test.ts` and `tests/csp-headers.test.ts` fail if they drift apart.
 
+### Docker
+
+`Dockerfile` + `compose.yaml` run the backend anywhere Docker runs. Mock mode by default ($0 spend, no keys needed):
+
+```bash
+docker compose up --build   # API on http://localhost:8787, /v1/health for checks
+```
+
+For live calls, put real keys in `.env` (same file as `backend:live`); compose reads it automatically. The image is Node 22 Alpine, installs production deps only, exposes `8787`, and ships a `HEALTHCHECK` on `/v1/health`.
+
+## Open-weights fine-tuning
+
+`finetune/` distills the receipt-cited findings behavior into open-weights chat models so the skeptic path (and future on-device drafts) can run without a vendor API:
+
+| Target | Role |
+|---|---|
+| `muse-glimmer` | Small on-device chat model: short damage verdicts |
+| `muse-spark-open` | Open findings model (Baseten mirror of Spark): full receipt-cited drafts |
+
+```bash
+pip install -r finetune/requirements.txt   # torch + transformers + datasets + peft (training only)
+python3 finetune/dataset.py --target muse-glimmer          # JSONL rows from fixtures/expected + fixtures/masks
+python3 finetune/train.py --target muse-glimmer --data finetune/data/train.jsonl --smoke-test   # validates config + schema, $0, no weights
+python3 finetune/train.py --target muse-spark-open --data finetune/data/train.jsonl --out finetune/checkpoints/spark-open-lora   # real LoRA SFT (needs HF_MODEL_REPO + weights access; --push uploads with HF_TOKEN)
+```
+
+Base weights resolve from the `HF_MODEL_REPO` env var (no registry URL hardcoded); checkpoints land in `finetune/checkpoints/` (gitignored build artifacts). Point the skeptic provider at a checkpoint and re-run `npm run eval` - gate pass rate must not regress vs the API model.
+
 ## Cost and limits
 
 Per-claim live cost at current pricing: SAM 3.1 ≈ $0.0025/image, voice ≈ $0.0005 per 10 s line, skeptic per Baseten token rates, Spark findings metered at $0 until Meta publishes pricing. The default $5 cap covers well over a thousand full live claims.
@@ -209,14 +245,18 @@ src/vision/     RLE masks, skeletonize, observe, coin calibration, SAM 3.1 adapt
 src/findings/   evidence gate (EvidenceError)
 src/receipts/   receipt ledger (deterministic ids, JSONL replay)
 src/render/     code-drawn SVG annexure
-src/adapters/   deterministic mock vision + findings
+src/adapters/   deterministic mock vision + findings, live pipeline registry
 src/config/     env config, spend guard
-backend/        one router (Node server + Cloudflare Worker), providers, transcribe proxy
+backend/        one router (Node server + Cloudflare Worker), providers, Meta API client (metaApi.ts), transcribe proxy
+finetune/       open-weights LoRA workflow (dataset prep, training entry, checkpoints)
+scripts/        verify-meta.mjs (read-only live API check)
 pwa/            capture app: photo, tap-to-mask, hold-to-speak, report, skeptic, annexure
 eval/           bench + replay CLI
 bench/          held-out split + dispute scorer
 fixtures/       masks, expected outputs, scale references (photos gitignored)
-tests/          258 tests, mock by default, live paths with stubbed fetch
+meta.config.json  endpoint, model ids, pipeline stages, verification flags
+Dockerfile, compose.yaml  containerized backend (mock by default)
+tests/          full suite, mock by default, live paths with stubbed fetch
 ```
 
 ## Development

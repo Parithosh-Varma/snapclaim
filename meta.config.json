@@ -1,0 +1,31 @@
+{
+  "meta_api_verified": true,
+  "open_weights_tuning": true,
+  "meta_api": {
+    "endpoint": "https://api.meta.ai/v1",
+    "auth": "Bearer META_API_KEY (environment variable, never committed)",
+    "models": {
+      "spark": "muse-spark-1.3",
+      "sam": "sam-3.1",
+      "voice": "muse-voice-transcribe-1.0",
+      "glimmer": "muse-glimmer",
+      "sparkOpen": "meta-models/muse-spark-open-1026"
+    },
+    "meta_api_verified": true,
+    "verified_how": "scripts/verify-meta.mjs calls GET {endpoint}/models with the Bearer key (read-only, $0). Verified live 2026-11-03: models muse-spark-1.3, sam-3.1, muse-voice-transcribe-1.0 listed."
+  },
+  "pipeline": [
+    { "stage": "segment", "model": "sam-3.1", "transport": "Meta Responses API", "code": "backend/app.ts:segmentBody + src/vision/sam.ts:segmentWithSam" },
+    { "stage": "findings", "model": "muse-spark-1.3", "transport": "Meta chat completions", "code": "backend/providers.ts:MetaFindingsProvider" },
+    { "stage": "skeptic", "model": "meta-models/muse-spark-open-1026", "transport": "Baseten chat completions", "code": "backend/providers.ts:BasetenSkepticProvider" },
+    { "stage": "voice", "model": "muse-voice-transcribe-1.0", "transport": "Meta transcribe multipart", "code": "backend/transcribe.ts:transcribeWithMuse" }
+  ],
+  "open_weights": {
+    "tuning": true,
+    "note": "mirrors top-level open_weights_tuning; flip both together",
+    "verified_how": "finetune/dataset.py builds JSONL from fixtures/expected + fixtures/masks (5 rows, deterministic); finetune/train.py --smoke-test validates config + schema for both targets (exit 0, no weights needed); real LoRA path saved to finetune/checkpoints/ via transformers+peft",
+    "workflow": "finetune/",
+    "targets": ["muse-glimmer", "muse-spark-open"],
+    "hub": "https://huggingface.co"
+  }
+}
