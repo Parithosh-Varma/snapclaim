@@ -100,6 +100,26 @@ export interface Payload {
   [key: string]: unknown;
 }
 
+/** Background measurement started from Mark, overlapping the Describe step.
+ *  The promise itself is transient (never drafted); only completed
+ *  payload/measurement persist. `seq` guards staleness: a new measure(),
+ *  new taps/coin/photo, or a new case bumps `measureSeq` so a late landing
+ *  is discarded. */
+export interface MeasureJob {
+  seq: number;
+  state: "running" | "done" | "error";
+  error?: string;
+  promise: Promise<void>;
+  /** Input snapshot: a late landing whose inputs no longer match is stale. */
+  photoFor: string;
+  points: [number, number][];
+  coinKindMm: number;
+  noScaleMode: boolean;
+  coinPt: [number, number] | null;
+  hasGateCoin: boolean;
+  dmgLabel: string;
+}
+
 export interface Session {
   stillDataUrl: string;
   photo: HTMLCanvasElement | null;
@@ -153,6 +173,9 @@ export interface Session {
   workingHist: ("crack" | "coin")[];
   /** One-shot resume target for Mark's mount after a draft restore. */
   resumeAngle: 1 | 2 | null;
+  /** Overlap plumbing: monotonic seq + the in-flight background job. */
+  measureSeq: number;
+  measureJob: MeasureJob | null;
 }
 
 export function createSession(): Session {
@@ -194,6 +217,8 @@ export function createSession(): Session {
     activeAngle: 1,
     workingHist: [],
     resumeAngle: null,
+    measureSeq: 0,
+    measureJob: null,
   };
 }
 
