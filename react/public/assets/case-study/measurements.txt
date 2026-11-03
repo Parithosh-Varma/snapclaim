@@ -1,35 +1,31 @@
 SnapClaim measured report — Ref SC-25D35C5E
 Terrace-slab crack, Nov 2026. Transcript: "crack above the slab"
-Scale: 2 INR coin (25 mm), taped beside the crack, same plane.
+Scale: 2 INR coin, 25 mm user-supplied (+/-0.5 mm scales all mm values +/-2%).
 
-MEASUREMENTS (all Confirmed, all cite evidence receipts)
-  Crack length      218.5 mm   [R005]
-  Crack width       3 mm       [R006]
-  Surface affected  0.73 %     [R002]
-  Area              6.51 cm2   [R004]
-  Severity          significant [R007]
+MEASUREMENTS (receipt-backed; width unverified)
+  Crack length      237.5 mm     [R005]  Confirmed
+  Crack width       3.2 mm       [R006]  Unverified — no width ground truth
+  Surface affected  0.73 %       [R002]  Confirmed
+  Area              7.69 cm2     [R004]  Confirmed
+  Severity          significant [R007]  Confirmed
   Regions           1          [R003]
 
-RECEIPTS (7) — computed, not generated; every number cites one or the gate fails
-  R001  scale_calibration       0.712074 mm_per_px   knownMm / referenceLengthPx
+RECEIPTS (7)
+  R001  scale_calibration       0.773994 mm_per_px   knownMm / referenceLengthPx (knownMm 25, lengthPx 32.3)
   R002  area_ratio              0.73 percent         damageAreaPx / componentAreaPx * 100
   R003  region_count            1 count              count of disconnected mask components
-  R004  calibrated_area         6.51 cm2             damageAreaPx * mmPerPx^2 / 100
-  R005  calibrated_length       218.5 mm             skeletonPx * mmPerPx
-  R006  calibrated_width        3 mm                 damageAreaPx / skeletonPx * mmPerPx
+  R004  calibrated_area         7.69 cm2             damageAreaPx * mmPerPx^2 / 100
+  R005  calibrated_length       237.5 mm             skeletonPx * mmPerPx (skeletonPx 306.8)
+  R006  calibrated_width        3.2 mm               damageAreaPx / skeletonPx * mmPerPx
   R007  severity_classification significant band    area ratio + calibrated length + region count vs printed thresholds
-
-METHOD
-  Outlines measured from photo pixels, scaled by the coin diameter
-  (tilt-corrected from its ellipse).
 
 VERIFICATION
   Evidence gate: passed - Independent skeptic: not run - Mask cross-check: not run
 
-GROUND TRUTH
-  Builder's physical tape 22.5–23 cm along the crack, midpoint 227 mm.
-  Tape 227 mm vs measured 218.5 mm -> err 8.5 mm (3.7%), inside +-10%.
-  Spark photo-alone guess 315 mm -> err 88 mm (38.8%), outside.
-  Bench case terrace-slab-tape-01. Replay from request + receipts.
+GROUND TRUTH (span only — no thread value is confirmed for this crack)
+  Tape span 227 mm, range 225–230 mm, straight span, midpoint 227 mm.
+  Measured 237.5 mm vs span 227 mm -> err +10.5 mm (+4.6%), span context, never scored.
+  Photo-alone guess 315 mm, unscored without scale.
+  Bench case terrace-slab-tape-01, n = 1.
 
-Source: signed report SC-25D35C5E (2 Nov 2026). Generated for file storage.
+Source: engine re-run at user-supplied 25 mm from signed-report scalars (self-reported, no RLE in repo). Generated for file storage.

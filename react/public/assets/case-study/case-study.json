@@ -1,57 +1,25 @@
 {
   "published": true,
-
   "title": "Terrace-slab crack — measured vs guessed",
-  "sub": "Terrace slab · Nov 2026 · Ref SC-25D35C5E · 2 INR coin (25 mm) for scale",
-
+  "sub": "Terrace slab · Nov 2026 · Ref SC-25D35C5E · 2 INR coin (25 mm, user-supplied) for scale",
   "photos": [
-    {
-      "src": "assets/case-study/photos/DSC_0711.jpg",
-      "alt": "Vertical crack in a terrace slab with a taped coin beside it and a yellow measuring tape held along the crack",
-      "caption": "Figure 1 — photo with tape: the measuring tape held along the crack is the ground truth (227 mm)."
-    },
-    {
-      "src": "assets/case-study/photos/DSC_0710.jpg",
-      "alt": "The same terrace-slab crack with the taped coin, photographed for the app measurement",
-      "caption": "Figure 2 — photo used for the guess: the same crack as the app measured it, photo + coin."
-    },
-    {
-      "src": "assets/case-study/measured-vs-guessed.svg",
-      "alt": "Bar chart: tape 227 mm, measured 218.5 mm inside ±10%, guess 315 mm outside",
-      "caption": "Figure 3 — the gap at a glance: the photo measurement lands inside the tape's ±10% band; the photo-alone guess does not.",
-      "wide": true
-    }
+    {"src": "assets/case-study/photos/DSC_0711.jpg", "alt": "Vertical crack in a terrace slab with a taped coin beside it and a yellow measuring tape held along the crack", "caption": "Figure 1 — photo with tape: the measuring tape held along the crack, span 227 mm (range 225–230)."},
+    {"src": "assets/case-study/photos/DSC_0710.jpg", "alt": "The same terrace-slab crack with the taped coin, photographed for the app measurement", "caption": "Figure 2 — photo used for the app measurement: the same crack, photo + coin."},
+    {"src": "assets/case-study/measured-vs-guessed.svg", "alt": "Bar chart: span 227 mm, measured 237.5 mm (+4.6%), guess 315 mm outside", "caption": "Figure 3 — the gap at a glance: the photo measurement against the 227 mm span; the photo-alone guess has no scale.", "wide": true}
   ],
-
-  "quote": {
-    "text": "crack above the slab",
-    "cite": "In the tenant's words"
-  },
-
+  "quote": {"text": "crack above the slab", "cite": "In the tenant's words"},
   "measurements": [
-    { "item": "Crack length", "value": "218.5 mm", "evidence": "R005", "status": "Confirmed" },
-    { "item": "Crack width", "value": "3 mm", "evidence": "R006", "status": "Confirmed" },
-    { "item": "Surface affected", "value": "0.73 %", "evidence": "R002", "status": "Confirmed" },
-    { "item": "Area", "value": "6.51 cm²", "evidence": "R004", "status": "Confirmed" },
-    { "item": "Severity", "value": "Significant", "evidence": "R007", "status": "Confirmed" }
+    {"item": "Crack length", "value": "237.5 mm", "evidence": "R005", "status": "Confirmed"},
+    {"item": "Crack width", "value": "3.2 mm", "evidence": "R006", "status": "Unverified"}
   ],
-
-  "method": "Outlines measured from photo pixels, scaled by the coin diameter (tilt-corrected from its ellipse). Ground truth is the builder's physical tape, 22.5–23 cm along the crack (midpoint 227 mm). Every number cites its evidence receipt.",
+  "method": "Outlines measured from photo pixels, scaled by the 25 mm coin diameter (tilt-corrected from its ellipse). Ground truth is the tape span, 227 mm (range 225–230); the span is context and is never scored. Every number cites its evidence receipt.",
   "verification": "Evidence gate: passed · Independent skeptic: not run · Mask cross-check: not run",
-
-  "compare": {
-    "heading": "Measured vs guessed",
-    "rows": [
-      { "label": "Tape truth", "value": "227 mm", "note": "ground truth, tape along the crack (22.5–23 cm, midpoint)" },
-      { "label": "SnapClaim measured", "value": "218.5 mm", "note": "err 8.5 mm (3.7%) — inside ±10% of the tape" },
-      { "label": "Photo-alone guess", "value": "315 mm", "note": "err 88 mm (38.8%) — outside ±10%, no measurement" }
-    ]
-  },
-
-  "outcome": "The photo measurement landed inside ±10% of the tape; the photo-alone guess did not. Bench case terrace-slab-tape-01.",
+  "compare": {"heading": "Measured vs span", "rows": [
+    {"label": "Tape span", "value": "227 mm", "note": "ground truth span, range 225–230 mm"},
+    {"label": "SnapClaim measured", "value": "237.5 mm", "note": "err +10.5 mm (+4.6%) — span context, never scored"},
+    {"label": "Photo-alone guess", "value": "315 mm", "note": "outside — no scale, unscored"}
+  ]},
+  "outcome": "Engine re-run at user-supplied 25 mm: R001 0.773994, R004 7.69 cm², R005 237.5 mm, R006 3.2 mm unverified. Bench case terrace-slab-tape-01, n = 1.",
   "reportPdf": "assets/case-study/terrace-slab.pdf",
-  "pages": [
-    "assets/case-study/terrace-slab-p1.png",
-    "assets/case-study/terrace-slab-p2.png"
-  ]
+  "pages": ["assets/case-study/terrace-slab-p1.png", "assets/case-study/terrace-slab-p2.png"]
 }
