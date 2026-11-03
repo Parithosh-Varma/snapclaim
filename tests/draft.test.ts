@@ -36,10 +36,8 @@ function photo(w: number, h: number): HTMLCanvasElement {
 function liveSession(): Session {
   const s = createSession();
   s.stillDataUrl = "data:image/jpeg;base64,AAA";
-  s.stillA = "data:image/jpeg;base64,AAA";
   s.photo = photo(8, 8);
   s.photoFor = "data:image/jpeg;base64,AAA";
-  s.activeAngle = 1;
   s.dmg.points = [[1, 2], [3, 4]];
   s.dmg.mask = new Uint8Array([1, 0, 0, 1, 0, 0, 0, 0].flatMap((v) => Array(8).fill(v)));
   s.dmg.iou = 0.8;
@@ -103,21 +101,21 @@ test("draft round-trips stills, taps, masks, coin and results", () => {
   assert.deepEqual([...fresh.coinMask!], [...s.coinMask!]);
   assert.equal(fresh.transcript, "crack near the window");
   assert.equal(fresh.measurement?.findings[0]?.percent, 5.17);
-  assert.equal(fresh.resumeAngle, 1);
-  assert.equal(fresh.activeAngle, 1);
   assert.deepEqual(fresh.workingHist, ["crack", "crack", "coin"]);
-  // Working state rides in its angle's bundle for Mark's mount path.
-  assert.ok(fresh.bundleA);
-  assert.equal(fresh.bundleA.photo, null);
-  assert.deepEqual(fresh.bundleA.hist, ["crack", "crack", "coin"]);
   assert.equal(fresh.photo, null);
   assert.equal(fresh.annexUrl, null);
 });
 
-test("quota tiers strip location photo, then the second angle, and still save", () => {
+test("quota tiers strip location photo, then payload overlays, and still save", () => {
   const s = liveSession();
-  s.locationPhoto = "data:image/jpeg;base64," + "L".repeat(5000);
-  s.still2DataUrl = "data:image/jpeg;base64," + "B".repeat(5000);
+  s.locationPhoto = "data:image/jpeg;base64," + "L".repeat(500);
+  s.payload = {
+    overlay: {
+      width: 8,
+      height: 8,
+      masks: [{ label: "crack", path: "M" + "0 0 L1 1 ".repeat(1000) }],
+    },
+  };
   const draft = collectDraft(s, "sMark");
   assert.ok(draft);
   const full = JSON.stringify(draft).length;
@@ -129,9 +127,72 @@ test("quota tiers strip location photo, then the second angle, and still save", 
   const loaded = loadDraft(store);
   assert.ok(loaded);
   assert.equal(loaded.locationPhoto, null);
+  assert.equal(loaded.payload?.overlay, undefined);
   // Core progress survives the stripping.
   assert.equal(loaded.working.points.length, 2);
   assert.equal(loaded.transcript, "crack near the window");
+});
+
+test("legacy two-angle drafts load without crashing, favouring angle 1", () => {
+  const angle1Still = "data:image/jpeg;base64,ANGLE1";
+  const angle2Still = "data:image/jpeg;base64,ANGLE2";
+  const legacy = {
+    v: 1,
+    savedAt: "2026-10-01T00:00:00.000Z",
+    screen: "sMark",
+    activeAngle: 2,
+    stillDataUrl: angle2Still,
+    stillA: angle1Still,
+    still2DataUrl: angle2Still,
+    locationPhoto: null,
+    capturingAngle: 2,
+    coinLabel: "",
+    coinKindMm: 0,
+    coinTaped: false,
+    noScaleMode: false,
+    dmgLabel: "crack",
+    transcript: "legacy draft",
+    extendedTranscript: null,
+    reportStatement: null,
+    reportFail: null,
+    raw: "{}",
+    currentCaseId: null,
+    working: {
+      photoFor: angle2Still, w: 0, h: 0,
+      points: [[9, 9]], maskRle: null, iou: 0, source: null,
+      coinManualPt: null, coinMaskRle: null, coinIou: 0,
+      gateCoin: null, taped: false, hist: [],
+    },
+    bundleA: {
+      photoFor: angle1Still, w: 0, h: 0,
+      points: [[1, 2]], maskRle: null, iou: 0, source: null,
+      coinManualPt: null, coinMaskRle: null, coinIou: 0,
+      gateCoin: null, taped: false, hist: [],
+    },
+    bundleB: null,
+    measurement: null,
+    payload: null,
+    measurementA: {
+      findings: [{ label: "crack", percent: 4.1, crackLengthMm: null, areaCm2: null, severity: "minor" }],
+      receipts: [],
+      mode: "percent-only",
+    },
+    measurementB: null,
+    payloadA: { overlay: { width: 8, height: 8, masks: [] } },
+    payloadB: null,
+    winnerAngle: 2,
+  };
+  const store = memStore();
+  store.data.set("snapclaim.draft.v1", JSON.stringify(legacy));
+  const loaded = loadDraft(store);
+  assert.ok(loaded);
+  const fresh = createSession();
+  applyDraft(fresh, loaded);
+  // Angle 2's working slot is ignored: angle 1's still, taps and results win.
+  assert.equal(fresh.stillDataUrl, angle1Still);
+  assert.deepEqual(fresh.dmg.points, [[1, 2]]);
+  assert.equal(fresh.measurement?.findings[0]?.percent, 4.1);
+  assert.equal(fresh.transcript, "legacy draft");
 });
 
 test("hopelessly small quota keeps the old draft and reports failure", () => {
