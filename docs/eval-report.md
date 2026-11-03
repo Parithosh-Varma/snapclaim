@@ -41,7 +41,7 @@ that numbers change decisions; scored qualitatively, not hidden.
 Median absolute error (mm) and % within ±10% on calibrated cases, dev vs
 held-out separately. The demo table goes in the README when the photos land.
 
-Held-out side is scored by `npm run bench:gap` (`bench/gap.ts`): for every scaled held-out case with a `groundTruth` it compares the archived pipeline run and a model-only guess from `bench/model-only/` against the thread path (`pathMm`), and prints the straight-span comparison labelled (`span=…(span) spanErr=…`) but never scores it. Refusals and missing files are counted per arm, not dropped. The dev side still comes from `npm run eval` and is not wired into the same table yet. On `release-candidate` 2026-11-03 the case is defined but `bench/runs/` + `bench/model-only/` are absent, so the command prints INCOMPLETE (exit 1) — numbers below are the deterministic engine recompute, not an archived run.
+Held-out side is scored by `npm run bench:gap` (`bench/gap.ts`): for every scaled held-out case with a `groundTruth` it compares the archived pipeline run and a model-only guess from `bench/model-only/` against the thread path (`pathMm`), and prints the straight-span comparison labelled (`span=…(span) spanErr=…`) but never scores it. Refusals and missing files are counted per arm, not dropped. The dev side still comes from `npm run eval` and is not wired into the same table yet. `terrace-slab-tape-01` is archived in `bench/runs/` + `bench/model-only/` — `npm run bench:gap` exit 0.
 
 ### Skeptic DISPUTED calls
 
@@ -55,8 +55,8 @@ Scored by `scoreDisputes` in `bench/score.ts`, with DISPUTED as the positive cla
 |---|---|---|---|
 | 2026-10-28 | 2 pass, 0 skip, 0 fail | scorer unit-tested, no live runs yet | wall-crack: 5.17% / 85.9 mm / 2.6 mm wide (unverified — no width ground truth) / 2.19 cm² (significant); stain: 1.29% percent-only (moderate) |
 | 2026-10-30 | 7 pass, 0 skip, 0 fail | dev fixtures grown (door-peel, facade-crack, tilted-wall, noscale); held-out still 0 archived runs (UNRUN ×4, strict exit 1) | tilted-wall: 0.27% / 66.8 mm cosmetic; facade-crack: 0.74% percent-only significant |
-| 2026-11-02 | 7 pass, 0 skip, 0 fail; gap INCOMPLETE (no runs on this branch) | — | `terrace-slab-tape-01`: builder slab DSC_0711.JPG, Ref SC-25D35C5E with wrong 23 mm coin read R005 218.5 mm (superseded — see 2026-11-03) |
-| 2026-11-03 | 7 pass, 0 skip, 0 fail; gap INCOMPLETE (truth 238.8 path, measured/modelOnly missing) | — | `terrace-slab-tape-01`, n = 1: engine recompute at 25 mm nominal → R001 0.773994, R004 7.69 cm², R005 237.5 mm vs thread 238.8 mm ±4 (err 1.3, 0.5%, in) vs Spark photo-alone 315 mm (err 76.2, 31.9%, out); span 227 mm [225–230] printed, span err 10.5 mm / 4.6%, never scored; width 3.2 mm unverified (no width ground truth); sensitivity at ruler 24 mm: R005 228.0 mm / R006 3.1 mm / R004 7.09 cm². Old 23 mm run 218.5 mm retained for history. No live calls on this branch. |
+| 2026-11-02 | 7 pass, 0 skip, 0 fail; gap INCOMPLETE (no runs yet) | — | `terrace-slab-tape-01`: builder slab DSC_0711.JPG, Ref SC-25D35C5E with wrong 23 mm coin read R005 218.5 mm (superseded — see 2026-11-03) |
+| 2026-11-03 | 7 pass, 0 skip, 0 fail; gap exit 0, both arms scored | — | `terrace-slab-tape-01`, n = 1: archived run R005 237.5 mm (25 mm nominal, engine recompute R001 0.773994, R004 7.69 cm²) vs thread 238.8 mm ±4 (err 1.3, 0.5%, in) vs Spark photo-alone 315 mm (err 76.2, 31.9%, out); span 227 mm [225–230] printed, span err 10.5 mm / 4.6%, never scored; width 3.2 mm unverified; sensitivity at ruler 24 mm: R005 228.0 mm / R006 3.1 mm / R004 7.09 cm². Run + guess in `bench/runs/` + `bench/model-only/`. No new live calls (run is deterministic recompute; guess reuses 2026-11-02 Spark 315 mm). |
 
 ## Failures and misses
 

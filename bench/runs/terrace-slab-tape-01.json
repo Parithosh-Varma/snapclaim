@@ -1,0 +1,38 @@
+{
+  "caseId": "terrace-slab-tape-01",
+  "provenance": {
+    "gitSha": "ac9144f",
+    "model": "deterministic (measureSession, 25mm nominal, engine recompute)",
+    "promptVersion": "default-thresholds",
+    "timestamp": "2026-11-03T10:47:29.732Z"
+  },
+  "findings": [
+    {
+      "maskId": "damage-1",
+      "crackLengthMm": 237.5
+    }
+  ],
+  "receipts": [
+    {
+      "unit": "mm_per_px"
+    },
+    {
+      "unit": "percent"
+    },
+    {
+      "unit": "count"
+    },
+    {
+      "unit": "cm2"
+    },
+    {
+      "unit": "mm"
+    },
+    {
+      "unit": "mm"
+    },
+    {
+      "unit": "band"
+    }
+  ]
+}
