@@ -14,6 +14,12 @@
       "src": "assets/case-study/photos/DSC_0710.jpg",
       "alt": "The same terrace-slab crack with the taped coin, photographed for the app measurement",
       "caption": "Figure 2 — photo used for the guess: the same crack as the app measured it, photo + coin."
+    },
+    {
+      "src": "assets/case-study/measured-vs-guessed.svg",
+      "alt": "Bar chart: tape 227 mm, measured 218.5 mm inside ±10%, guess 315 mm outside",
+      "caption": "Figure 3 — the gap at a glance: the photo measurement lands inside the tape's ±10% band; the photo-alone guess does not.",
+      "wide": true
     }
   ],
 
@@ -30,15 +36,15 @@
     { "item": "Severity", "value": "Significant", "evidence": "R007", "status": "Confirmed" }
   ],
 
-  "method": "Outlines measured from photo pixels, scaled by the coin diameter (tilt-corrected from its ellipse). Every number cites its evidence receipt.",
+  "method": "Outlines measured from photo pixels, scaled by the coin diameter (tilt-corrected from its ellipse). Ground truth is the builder's physical tape, 22.5–23 cm along the crack (midpoint 227 mm). Every number cites its evidence receipt.",
   "verification": "Evidence gate: passed · Independent skeptic: not run · Mask cross-check: not run",
 
   "compare": {
     "heading": "Measured vs guessed",
     "rows": [
-      { "label": "Tape truth", "value": "227 mm", "note": "ground truth, tape along the crack" },
-      { "label": "SnapClaim measured", "value": "218.5 mm", "note": "inside ±10% of the tape" },
-      { "label": "Photo-alone guess", "value": "315 mm", "note": "outside ±10% — no measurement" }
+      { "label": "Tape truth", "value": "227 mm", "note": "ground truth, tape along the crack (22.5–23 cm, midpoint)" },
+      { "label": "SnapClaim measured", "value": "218.5 mm", "note": "err 8.5 mm (3.7%) — inside ±10% of the tape" },
+      { "label": "Photo-alone guess", "value": "315 mm", "note": "err 88 mm (38.8%) — outside ±10%, no measurement" }
     ]
   },
 
