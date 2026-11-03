@@ -264,7 +264,7 @@ export const COIN_OPTIONS: CoinOption[] = [
   { value: 20.3, label: "UK 1p · 20.3 mm", group: "UK" },
   { value: 18, label: "UK 5p · 18 mm", group: "UK" },
   { value: 27, label: "India ₹10 · 27 mm", group: "India" },
-  { value: 25, label: "India ₹5 · 25 mm", group: "India" },
+  { value: 27, label: "India ₹5 · 27 mm", group: "India" },
   { value: 25, label: "India ₹2 · 25 mm (nominal — verify yours)", group: "India" },
   { value: 22, label: "India ₹1 · 22 mm", group: "India" },
   { value: 26.5, label: "Japanese ¥500 · 26.5 mm", group: "Japan" },
