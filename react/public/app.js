@@ -147,7 +147,7 @@ if (toggle) {
         }
         const st = document.createElement("td");
         const pill = document.createElement("span");
-        pill.className = "pill pill-ok";
+        pill.className = String(r.status || "").toLowerCase() === "confirmed" ? "pill pill-ok" : "pill";
         pill.textContent = String(r.status || "Confirmed");
         st.appendChild(pill);
         tr.appendChild(st);

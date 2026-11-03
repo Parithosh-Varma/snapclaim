@@ -20,51 +20,6 @@
       "alt": "Bar chart: tape 227 mm, measured 218.5 mm inside ±10%, guess 315 mm outside",
       "caption": "Figure 3 — the gap at a glance: the photo measurement lands inside the tape's ±10% band; the photo-alone guess does not.",
       "wide": true
-    },
-    {
-      "src": "assets/case-study/photos/DSC_0722.jpg",
-      "alt": "Yellow string pinned along the crack on the parapet top, marking its full path",
-      "caption": "Figure 4 — string pinned along the same crack: the string follows every bend, then gets measured off the wall."
-    },
-    {
-      "src": "assets/case-study/photos/DSC_0723.jpg",
-      "alt": "The pinned string beside a tape ruler, showing the string's measured length",
-      "caption": "Figure 5 — string against the tape: the string's length off the wall is the ground truth the app is checked against."
-    },
-    {
-      "src": "assets/case-study/photos/DSC_0760.jpg",
-      "alt": "Close-up of the crack with a centimetre ruler alongside and pins marking it",
-      "caption": "Figure 6 — ruler close-up: the same crack against a centimetre scale, pins marking its course."
-    },
-    {
-      "src": "assets/case-study/photos/DSC_0761.jpg",
-      "alt": "Close-up of the crack with a set square and pins at two points",
-      "caption": "Figure 7 — set square on the crack: pins at two points of the same crack."
-    },
-    {
-      "src": "assets/case-study/photos/DSC_0762.jpg",
-      "alt": "Close-up of the crack with a set square, pins a few centimetres apart",
-      "caption": "Figure 8 — pinned interval: two pins a few centimetres apart on the same crack."
-    },
-    {
-      "src": "assets/case-study/photos/DSC_0763.jpg",
-      "alt": "Close-up of the crack with a set square and two pins",
-      "caption": "Figure 9 — another pinned stretch of the same crack, ruler in frame."
-    },
-    {
-      "src": "assets/case-study/photos/DSC_0764.jpg",
-      "alt": "Close-up of the crack with a set square laid diagonal and two pins",
-      "caption": "Figure 10 — diagonal set square on the same crack, two pins marking it."
-    },
-    {
-      "src": "assets/case-study/photos/DSC_0765.jpg",
-      "alt": "Close-up of the crack with a set square and pins above and below",
-      "caption": "Figure 11 — pins above and below on the same crack, scale in frame."
-    },
-    {
-      "src": "assets/case-study/photos/DSC_0766.jpg",
-      "alt": "Wide view of the full crack running down the parapet, pins along its length, phone for scale",
-      "caption": "Figure 12 — the whole crack: full run down the parapet with pins along it, phone for scale."
     }
   ],
 

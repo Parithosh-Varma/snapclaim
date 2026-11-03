@@ -27,9 +27,9 @@ VERIFICATION
   Evidence gate: passed - Independent skeptic: not run - Mask cross-check: not run
 
 GROUND TRUTH
-  Builder's physical tape 22.5-23 cm along the crack, midpoint 227 mm.
+  Builder's physical tape 22.5–23 cm along the crack, midpoint 227 mm.
   Tape 227 mm vs measured 218.5 mm -> err 8.5 mm (3.7%), inside +-10%.
   Spark photo-alone guess 315 mm -> err 88 mm (38.8%), outside.
   Bench case terrace-slab-tape-01. Replay from request + receipts.
 
-Source: your signed report SC-25D35C5E (2 Nov 2026). Generated for file storage.
+Source: signed report SC-25D35C5E (2 Nov 2026). Generated for file storage.
