@@ -10,7 +10,19 @@ export interface HeldOutCase {
   /** Hand labels for the skeptic's calls on this case, when the case has any. */
   disputeLabels?: { maskId: string; expected: SkepticVerdict; reason?: string }[];
   /** Tape-measured length of the main crack, scaled cases only. Scored by bench/gap.ts. */
-  groundTruth?: { maskId: string; crackLengthMm: number };
+  groundTruth?: {
+    maskId: string;
+    /** Thread-along-the-crack length in mm. The pipeline length (skeleton path) is this quantity. */
+    pathMm?: number;
+    /** Uncertainty on the thread read in mm, e.g. 4. */
+    pathUncertaintyMm?: number;
+    /** Straight tape span in mm. Secondary: the pipeline does not measure spans. */
+    spanMm?: number;
+    /** Tape span read range in mm, e.g. [225, 230]. */
+    spanRangeMm?: [number, number];
+    /** Legacy single-number shape: treated as the primary truth. */
+    crackLengthMm?: number;
+  };
 }
 
 /** Where an archived run came from, so a number can be traced back to code and prompt. */

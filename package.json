@@ -14,6 +14,7 @@
     "backend:start": "node --experimental-strip-types --no-warnings backend/server.ts",
     "backend:live": "node --experimental-strip-types --no-warnings --env-file=.env backend/server.ts",
     "backend:smoke": "node backend/smoke.mjs",
+    "cli": "node --experimental-strip-types --no-warnings cli/snapclaim.ts",
     "eval": "node --experimental-strip-types --no-warnings eval/bench.ts",
     "replay": "node --experimental-strip-types --no-warnings eval/replay.ts",
     "bench": "node --experimental-strip-types --no-warnings bench/run.ts",

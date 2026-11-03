@@ -228,6 +228,12 @@ export default function App() {
     s.payloadA = null;
     s.payloadB = null;
     s.winnerAngle = null;
+    // A new case supersedes any in-flight background job: its late landing
+    // must be discarded, never applied to the fresh claim.
+    s.measureSeq = (s.measureSeq ?? 0) + 1;
+    s.measureJob = null;
+    s.payload = null;
+    s.measurement = null;
     resetDmg(s);
     go("capture");
   }, [go]);

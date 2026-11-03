@@ -13,5 +13,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src", "tests", "backend", "bench", "eval"]
+  "include": ["src", "tests", "backend", "bench", "eval", "cli"]
 }

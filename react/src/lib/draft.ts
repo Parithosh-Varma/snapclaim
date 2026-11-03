@@ -256,6 +256,9 @@ export function applyDraft(session: Session, draft: DraftV1): void {
   session.resumeAngle = draft.activeAngle;
   session.annexUrl = null;
   session.autoListen = false;
+  // Background jobs never survive a reload: only completed payloads persist.
+  session.measureSeq = 0;
+  session.measureJob = null;
 }
 
 /** Quota-tiered write: full draft first, then progressively smaller rather

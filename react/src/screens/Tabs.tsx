@@ -425,11 +425,7 @@ export function Settings() {
     toast(v === "auto" ? "Theme follows your system" : `Theme: ${v}`);
   };
 
-<<<<<<< HEAD
-  const runBackendCheck = async () => {
-=======
   const runBackendCheck = async (silent = false) => {
->>>>>>> fix/rate-limits-vulns-part2
     const err = validBackendUrl(urlDraft);
     setUrlError(err);
     if (err) return;

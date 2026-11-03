@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { pathToFileURL } from "node:url";
-import { checkRouteRateLimit, corsHeadersFor, handleRequest, securityHeaders } from "./app.ts";
+import { EXPENSIVE_ROUTE_PATHS, checkRouteRateLimit, corsHeadersFor, handleRequest, isOriginAllowed, securityHeaders } from "./app.ts";
 
 function parsePort(value: string | undefined): number {
   const n = Number(value ?? 8787);
@@ -54,12 +54,29 @@ function readJson(req: import("node:http").IncomingMessage): Promise<unknown> {
 
 export const server = createServer(async (req, res) => {
   const origin = typeof req.headers.origin === "string" ? req.headers.origin : null;
+  const path = new URL(req.url ?? "/", "http://localhost").pathname;
+  // Exact-match origin allowlist first: before rate limiting, spend holds,
+  // body parsing or any provider call. No Origin (curl) is not blocked.
+  if (origin !== null && origin !== "") {
+    if (!isOriginAllowed(origin, process.env)) {
+      sendJson(res, 403, { ok: false, error: "origin not allowed", code: "origin_not_allowed", requestId: "unknown" }, null);
+      try { req.destroy(); } catch { /* noop */ }
+      return;
+    }
+  } else if (process.env.REQUIRE_ORIGIN_FOR_EXPENSIVE === "1" && (EXPENSIVE_ROUTE_PATHS as readonly string[]).includes(path)) {
+    sendJson(res, 403, { ok: false, error: "origin required", code: "origin_not_allowed", requestId: "unknown" }, null);
+    try { req.destroy(); } catch { /* noop */ }
+    return;
+  }
   if (req.method === "OPTIONS") {
+    if (origin !== null && origin !== "" && !isOriginAllowed(origin, process.env)) {
+      sendJson(res, 403, { ok: false, error: "origin not allowed", code: "origin_not_allowed", requestId: "unknown" }, null);
+      return;
+    }
     res.writeHead(204, { ...securityHeaders(), ...corsHeadersFor(origin, process.env) });
     res.end();
     return;
   }
-  const path = new URL(req.url ?? "/", "http://localhost").pathname;
   // Tiered per-IP per-route limit before touching the body: anonymous
   // billable routes drain spend/CPU at 1 MB POSTs, so they get 20/min while
   // cheap deterministic routes stay at 120/min.
@@ -99,6 +116,7 @@ export const server = createServer(async (req, res) => {
     body,
     env: process.env,
     fetchFn,
+    origin,
     headers: {
       authorization: header("authorization"),
       "x-meta-key": header("x-meta-key"),
