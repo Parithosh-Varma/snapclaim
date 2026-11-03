@@ -276,6 +276,8 @@ function startShot(k) {
   frames = frames || { a: newFrameSlot(), b: newFrameSlot(), context: newFrameSlot() };
   // A retake only clears the slot being taken; the other slots are kept.
   frames[k] = newFrameSlot();
+  // A new photo supersedes any in-flight background job.
+  measureSeq++; measureJob = null; payloadObj = null; lastMeasurement = null;
   shotStage = k;
   backToCam();
   updateShotChrome();
@@ -701,6 +703,8 @@ fab.addEventListener("click", () => {
 });
 $("retake").onclick = () => {
   releaseSam(); releaseVoice();
+  // A retake is a new photo: any in-flight background job is stale.
+  measureSeq++; measureJob = null; payloadObj = null; lastMeasurement = null;
   // In a multi-shot set a retake only re-takes the current slot; A is kept.
   if (multiShotActive()) { startShot(shotStage); return; }
   backToCam();
@@ -1191,20 +1195,47 @@ function checkPhotoNotes() {
   let checkState = { skeptic: "idle", xcheck: "idle" }; // idle|loading|ok|error per check
 
 let measureBusy = false;
+/* Overlap: single-shot measurement runs in the background while the user is
+ * on Say. Only completed payloads are used; a late landing whose inputs no
+ * longer match (new taps, coin, photo, or case) is discarded. Multi-shot
+ * stays sequential: frame B is captured only after frame A lands. */
+let measureSeq = 0;
+let measureJob = null; // { seq, state: "running"|"done"|"error", error?, promise, snap }
+function snapshotPwaInputs() {
+  return {
+    still: stillDataUrl,
+    points: (dmg.points || []).map(([x, y]) => [x, y]),
+    size: getCoinSizeMm(),
+    noScale: !!noScaleMode,
+    coinPt: coinManualPt ? [coinManualPt[0], coinManualPt[1]] : null,
+    gate: !!gateCoin,
+  };
+}
+function pwaInputsMatch(snap) {
+  if (!snap) return false;
+  if (stillDataUrl !== snap.still) return false;
+  if (!!noScaleMode !== !!snap.noScale) return false;
+  if (getCoinSizeMm() !== snap.size) return false;
+  if (!!gateCoin !== !!snap.gate) return false;
+  const a = coinManualPt, b = snap.coinPt;
+  if (!!a !== !!b) return false;
+  if (a && b && (a[0] !== b[0] || a[1] !== b[1])) return false;
+  const p = dmg.points || [];
+  if (p.length !== snap.points.length) return false;
+  for (let i = 0; i < p.length; i++) {
+    if (p[i][0] !== snap.points[i][0] || p[i][1] !== snap.points[i][1]) return false;
+  }
+  return true;
+}
+function pwaJobStale(job) {
+  return !job || measureJob !== job || job.seq !== measureSeq || !pwaInputsMatch(job.snap);
+}
 $("measureBtn").onclick = async () => {
   if (!dmg.mask || measureBusy) return;
   measureBusy = true; $("measureBtn").disabled = true;
   checkPhotoNotes();
   const w = photo.width, h = photo.height;
-  show("sNum");
-  fillPhotoCard();
-  setNumLoading(true);
-  $("numError").hidden = true;
-  $("measured").innerHTML = "";
-  $("findings").innerHTML = "";
-  drawScheme([]);
-  const body = { masks: [{ id: "damage-1", label: dmgLabel, rle: encodeRle(dmg.mask, w, h), confidence: dmg.iou || 0.8 }] };
-  let circleRef = null;
+  // Synchronous validation BEFORE any navigation: same messages as the old flow.
   // Manual coin tap wins over the gate - taped coin or missed detection.
   const coinCxCyR = (() => {
     if (coinManualPt) {
@@ -1216,37 +1247,50 @@ $("measureBtn").onclick = async () => {
     return { cx: (gateCoin.cx / gateCoin.fw) * gateCoin.sw * kx, cy: (gateCoin.cy / gateCoin.fh) * gateCoin.sh * ky, r: Math.max(3, (gateCoin.rr / gateCoin.fw) * gateCoin.sw * kx) };
   })();
   if (coinCxCyR) {
-    const { cx, cy, r } = coinCxCyR;
     const knownMm = getCoinSizeMm();
-    if (!(knownMm > 0)) { setNumLoading(false); show("sMark"); $("status").textContent = "Choose the reference size first."; updateCoinHintMark(); return; }
-    circleRef = { id: "coin", rle: circleRle(cx, cy, r, w, h), knownMm, confidence: coinManualPt ? 0.9 : 0.85 };
-    // The coin's real outline, not the gate's circle: a tilted wall shows the coin as an
-    // ellipse, and the backend uses that ellipse to correct the crack lengths.
-    const traced = await traceCoin(cx, cy, r, w, h);
-    body.reference = traced ? { ...circleRef, rle: encodeRle(traced.mask, w, h), confidence: traced.iou } : circleRef;
-  } else if (noScaleMode) body.note = "percent-only requested";
-  $("status").textContent = "";
-  try {
-    const observe = (b) => fetch(base() + "/v1/observe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) });
-    let res = await observe(body);
-    let j = await res.json();
-    // a traced outline the backend refuses (not coin-shaped) falls back to the gate's circle
-    if (res.status === 422 && circleRef && body.reference !== circleRef) {
-      console.info(`[coin] traced outline refused (${j.error}); using the detected circle`);
-      body.reference = circleRef;
-      res = await observe(body);
-      j = await res.json();
+    if (!(knownMm > 0)) {
+      measureBusy = false; $("measureBtn").disabled = !dmg.mask;
+      show("sMark"); $("status").textContent = "Choose the reference size first."; updateCoinHintMark(); return;
     }
-    if (!res.ok || !j.ok) throw new Error(j.error ?? res.status);
-    const mres = await fetch(base() + "/v1/measure", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(j.result) });
-    const measured = await mres.json();
-    if (!mres.ok || !measured.ok) throw new Error(measured.error ?? mres.status);
-    payloadObj = j.result;
-    lastMeasurement = measured.result;
-    // Multi-shot: frame A is stashed and the set continues on the camera;
-    // frame B is compared against A, A is restored as the working headline,
-    // and the location frame comes next. Single-shot flows straight to Say.
-    if (multiShotActive() && MEASURE_SLOTS.includes(shotStage)) {
+  }
+  // Multi-shot stays sequential: the set advances only once each frame lands.
+  if (multiShotActive() && MEASURE_SLOTS.includes(shotStage)) {
+    show("sNum");
+    fillPhotoCard();
+    setNumLoading(true);
+    $("numError").hidden = true;
+    $("measured").innerHTML = "";
+    $("findings").innerHTML = "";
+    drawScheme([]);
+    const body = { masks: [{ id: "damage-1", label: dmgLabel, rle: encodeRle(dmg.mask, w, h), confidence: dmg.iou || 0.8 }] };
+    let circleRef = null;
+    if (coinCxCyR) {
+      const { cx, cy, r } = coinCxCyR;
+      const knownMm = getCoinSizeMm();
+      circleRef = { id: "coin", rle: circleRle(cx, cy, r, w, h), knownMm, confidence: coinManualPt ? 0.9 : 0.85 };
+      // The coin's real outline, not the gate's circle: a tilted wall shows the coin as an
+      // ellipse, and the backend uses that ellipse to correct the crack lengths.
+      const traced = await traceCoin(cx, cy, r, w, h);
+      body.reference = traced ? { ...circleRef, rle: encodeRle(traced.mask, w, h), confidence: traced.iou } : circleRef;
+    } else if (noScaleMode) body.note = "percent-only requested";
+    $("status").textContent = "";
+    try {
+      const observe = (b) => fetch(base() + "/v1/observe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) });
+      let res = await observe(body);
+      let j = await res.json();
+      // a traced outline the backend refuses (not coin-shaped) falls back to the gate's circle
+      if (res.status === 422 && circleRef && body.reference !== circleRef) {
+        console.info(`[coin] traced outline refused (${j.error}); using the detected circle`);
+        body.reference = circleRef;
+        res = await observe(body);
+        j = await res.json();
+      }
+      if (!res.ok || !j.ok) throw new Error(j.error ?? res.status);
+      const mres = await fetch(base() + "/v1/measure", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(j.result) });
+      const measured = await mres.json();
+      if (!mres.ok || !measured.ok) throw new Error(measured.error ?? mres.status);
+      payloadObj = j.result;
+      lastMeasurement = measured.result;
       stashWorkingFrame();
       frames[shotStage].payload = payloadObj;
       frames[shotStage].measurement = lastMeasurement;
@@ -1268,17 +1312,81 @@ $("measureBtn").onclick = async () => {
       renderAgreeBox();
       showMultiNext("Capture location shot →", () => { hideMultiNext(); startShot("context"); });
       return;
+    } catch (e) {
+      setNumLoading(false);
+      $("status").textContent = `Measuring failed (${e.message ?? e}).`;
+      showNumError("Measurement failed", String(e.message ?? e), () => $("measureBtn").click());
+    } finally {
+      measureBusy = false; $("measureBtn").disabled = !dmg.mask;
     }
-    hideMultiNext();
-    showMeasured(lastMeasurement);
-    show("sSay");
-    startListening();
+    return;
+  }
+  // Single-shot overlap: start the observe+measure chain in the background
+  // and move to Say immediately. No artificial delay, no fake progress, and
+  // Say never reports without a completed payloadObj (runReport awaits first).
+  $("numError").hidden = true;
+  $("measured").innerHTML = "";
+  $("findings").innerHTML = "";
+  drawScheme([]);
+  const seq = ++measureSeq;
+  const snap = snapshotPwaInputs();
+  payloadObj = null;
+  lastMeasurement = null;
+  let resolveJob = () => {};
+  const promise = new Promise((resolve) => { resolveJob = resolve; });
+  const job = measureJob = { seq, state: "running", promise, snap };
+  measureBusy = false; $("measureBtn").disabled = !dmg.mask;
+  $("status").textContent = "";
+  show("sSay");
+  startListening();
+  try {
+    const body = { masks: [{ id: "damage-1", label: dmgLabel, rle: encodeRle(dmg.mask, w, h), confidence: dmg.iou || 0.8 }] };
+    let circleRef = null;
+    if (coinCxCyR) {
+      const { cx, cy, r } = coinCxCyR;
+      const knownMm = getCoinSizeMm();
+      circleRef = { id: "coin", rle: circleRle(cx, cy, r, w, h), knownMm, confidence: coinManualPt ? 0.9 : 0.85 };
+      const traced = await traceCoin(cx, cy, r, w, h);
+      body.reference = traced ? { ...circleRef, rle: encodeRle(traced.mask, w, h), confidence: traced.iou } : circleRef;
+    } else if (noScaleMode) body.note = "percent-only requested";
+    const observe = (b) => fetch(base() + "/v1/observe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) });
+    let res = await observe(body);
+    let j = await res.json();
+    if (pwaJobStale(job)) return;
+    if (res.status === 422 && circleRef && body.reference !== circleRef) {
+      console.info(`[coin] traced outline refused (${j.error}); using the detected circle`);
+      body.reference = circleRef;
+      res = await observe(body);
+      j = await res.json();
+    }
+    if (pwaJobStale(job)) return;
+    if (!res.ok || !j.ok) throw new Error(j.error ?? res.status);
+    const mres = await fetch(base() + "/v1/measure", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(j.result) });
+    const measured = await mres.json();
+    if (pwaJobStale(job)) return;
+    if (!mres.ok || !measured.ok) throw new Error(measured.error ?? mres.status);
+    payloadObj = j.result;
+    lastMeasurement = measured.result;
+    // Populate the Numbers screen now so the later report keeps its numbers.
+    try { showMeasured(lastMeasurement); } catch { /* Numbers fills in when visited */ }
+    job.state = "done";
   } catch (e) {
-    setNumLoading(false);
-    $("status").textContent = `Measuring failed (${e.message ?? e}).`;
-    showNumError("Measurement failed", String(e.message ?? e), () => $("measureBtn").click());
+    if (pwaJobStale(job)) return;
+    job.state = "error";
+    job.error = String(e.message ?? e);
   } finally {
-    measureBusy = false; $("measureBtn").disabled = !dmg.mask;
+    if (measureJob === job) {
+      const failed = job.state === "error";
+      resolveJob();
+      if (failed) {
+        // Back to Mark - not Numbers - with the real message. Taps stay,
+        // and the transcript box is untouched so dictation survives.
+        show("sMark");
+        $("status").textContent = `Measuring failed (${job.error}).`;
+      }
+    } else {
+      resolveJob();
+    }
   }
 };
 let coinManualPt = null, coinCorrectMode = false;
@@ -1789,6 +1897,19 @@ $("backSay").onclick = () => {
 /* ---------- report / skeptic / render ---------- */
 let reportBusy = false;
 async function runReport() {
+  if (reportBusy) return;
+  // Overlap: the single-shot measurement runs while the user types. Never
+  // run /v1/report without a completed payloadObj: await the job first with
+  // an honest status. A failed job has already returned to Mark.
+  const job = measureJob;
+  if (job && job.state === "running") {
+    reportBusy = true; sendBtn.disabled = true;
+    setPill("busy", "Finishing the measurement…");
+    try { await job.promise; } catch { /* job records its own error */ }
+    reportBusy = false; syncSend();
+    setPill("idle", "Tap Dictate, or just type.");
+    if (job.state !== "done" || !payloadObj) return;
+  }
   if (!payloadObj || reportBusy) return;
   reportBusy = true; sendBtn.disabled = true;
   $("findings").innerHTML = "";
@@ -2075,6 +2196,7 @@ $("newClaimBtn").onclick = () => {
   currentCaseId = null;
   autoChecksFor = null;
   payloadObj = null; lastMeasurement = null;
+  measureSeq++; measureJob = null;
   releaseSam(); releaseVoice();
   resetShots();
   dmg = { points: [], pointMasks: [], mask: null, iou: 0, source: null };
@@ -2158,6 +2280,7 @@ $("renderBtn").onclick = async () => {
 async function loadSample() {
   // The sample is always single-shot: it bypasses the three-shot set.
   resetShots();
+  measureSeq++; measureJob = null; payloadObj = null; lastMeasurement = null;
   const sample = {
     component: { id: "wall-panel-north", areaPx: 480000, confidence: 0.93 },
     masks: [
