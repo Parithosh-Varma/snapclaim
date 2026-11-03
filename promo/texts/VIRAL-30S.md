@@ -1,5 +1,14 @@
 # 30 s viral cut: resume point (2026-11-02)
 
+## Newest state: format search replaced this plan (do not rebuild the text thread)
+
+Tariq stopped the text-thread build and asked for a format that could truly go viral; nothing new is built.
+Proposed: real tenant with a real deduction sheet if Parithosh (in India) can find one by midday Nov 3 IST,
+otherwise a one-take "Rs 2 coin vs an expensive wall" with a tape-measure check. Upload natively to X, first-person
+stakes in the first line, ask "How much did your landlord keep?". Bigger accounts repost or quote, never re-upload.
+Waiting on Tariq's final approval and Parithosh's reply. Evidence: IG/TikTok reach does not transfer to X
+(TexpatBBQ 762.2K TikTok views vs 43 on X); only small-account X breakout found is @varunsuhag, a contested dispute.
+
 ## Latest state (read this first; it replaces "Nothing is built" and the Script below if Tariq says yes)
 
 Built: `promo/viral30/make.py` (the script below), silent preview in `promo/viral30/out/`. Voices were
