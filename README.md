@@ -5,9 +5,16 @@
 
 # SnapClaim
 
-> Point your phone at damage, speak one line about it - get a claim-ready report where every number is measured, cited, and checked before it ships. **Computed, not generated.**
+> Point your phone at damage, speak one line about it - get a claim-ready report where every shipped number cites a machine-checkable receipt. **Computed, not generated.**
 
 [![tests](https://github.com/Parithosh-Varma/snapclaim/actions/workflows/ci.yml/badge.svg)](https://github.com/Parithosh-Varma/snapclaim/actions/workflows/ci.yml)
+> Live: <https://snapclaim.pages.dev> — open to anyone. Admin panel (`/admin`) is behind team login.
+
+> Accuracy status: **n = 1 thread-and-tape-measured case** (terrace slab: pipeline 237.5 mm [R005, 25 mm coin] vs thread 238.8 mm ±4, err 1.3 mm / 0.5% inside ±10%; straight span 227 mm [225–230], span err 10.5 mm printed, never scored; photo-alone guess 315 mm, err 76.2 mm / 32% outside). The 23 mm-coin run read 218.5 mm. Width 3.2 mm is unverified (no width ground truth). Engine recompute 2026-11-03. The 54-scene bench tests the maths given a mask, not phone capture. Treat “measured” as receipt-backed, not tape-proven, until the 10–20 tape set lands. 2D in-plane only (no depth/volume). Documentation, not advice.
+
+> What is real vs mocked: **Measurement (`/v1/measure`, `/v1/observe`, receipts, gate) is keyless and deterministic — runs offline, $0. Live findings / skeptic / SAM / voice use our keys with a spend cap (`SPEND_GUARD_USD`, default $5). Photos stay on the phone except two explicit taps: Cross-check sends the photo once to SAM 3.1 via the backend, and Render attaches it to the annexure.** Demo defaults to mock ($0, no keys).
+
+[![tests](https://img.shields.io/badge/tests-366%20passing-brightgreen)](./tests)
 [![node](https://img.shields.io/badge/node-%3E%3D22.18-339933)](./package.json)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](./LICENSE)
 
@@ -197,11 +204,7 @@ npm --prefix react run build
 npx wrangler pages deploy react/dist --project-name snapclaim
 ```
 
-Production is <https://snapclaim.pages.dev> - open to anyone. Only the dev panel at <https://snapclaim.pages.dev/admin> sits behind Cloudflare Access: anonymous requests there get a 302 to the team login, and only these three emails can get in (one-time PIN, no Cloudflare account or WARP client, 24-hour session):
-
-- `parithvrmo@gmail.com`
-- `therealtariqkhalif@gmail.com`
-- `rizgarozan7@gmail.com`
+Production is <https://snapclaim.pages.dev> - open to anyone. Only the dev panel at <https://snapclaim.pages.dev/admin> sits behind Cloudflare Access: anonymous requests there get a 302 to the team login, and only allow-listed team emails can get in (one-time PIN, no Cloudflare account or WARP client, 24-hour session). Admin emails are managed in the Zero Trust dashboard (Access → Applications → `SnapClaim admin`), not in this repo.
 
 `react/public/_redirects` rewrites `/admin/*` to the app shell; `react/src/App.tsx` boots straight into the admin screen when the path starts with `/admin`, and Settings → Developer → *Open admin panel* navigates there as a real page load so Access can challenge it.
 
@@ -247,18 +250,19 @@ All three commands are free and deterministic; run them yourself.
 |---|---|---|
 | Measurement code vs known answers (54 scenes drawn in code, coin scale, some on tilted walls) | `npm run bench:truth` | length median error 1.4%, 100% within ±10%; width median error 4.0%, 96.3% within ±10%; 3/3 no-scale refusals held |
 | Regression on dev mask fixtures | `npm run eval` | 7 pass, 0 skip, 0 fail |
-| Live pipeline on held-out real photos | `npm run bench` | 11 cases, 0 archived runs yet (all UNRUN, so the command exits 1 on purpose) |
+| Live pipeline on held-out real photos | `npm run bench` | 12 cases, 0 archived runs yet (all UNRUN, so the command exits 1 on purpose) |
 
-What this does not show yet: how well SAM finds the crack on a real photo. `bench:truth` checks the maths given a mask, not the mask itself. No real crack has been tape-measured yet, so `npm run bench:gap` (pipeline vs model-only guess against a tape) still prints UNSCORED. We would rather show that gap than fill it with a number we cannot back.
+What this does not show yet: how well SAM finds the crack on a real photo. `bench:truth` checks the maths given a mask, not the mask itself. One real crack has a thread-and-tape ground truth (`terrace-slab-tape-01`, n = 1, below); `npm run bench:gap` scores the path against the thread and prints the span for context. We would rather show that gap than fill it with a number we cannot back.
 
-- `npm run eval` — deterministic bench over `fixtures/masks/*.json` vs `fixtures/expected/` (missing expected file = SKIP, never a pass). Current: wall-crack 5.17% / 85.9 mm / 2.6 mm wide / 2.19 cm² (significant), stain 1.29% percent-only (moderate).
+- `npm run eval` — deterministic bench over `fixtures/masks/*.json` vs `fixtures/expected/` (missing expected file = SKIP, never a pass). Current: wall-crack 5.17% / 85.9 mm / 2.6 mm wide (unverified — no width ground truth) / 2.19 cm² (significant), stain 1.29% percent-only (moderate).
 <img src="docs/images/terrace-slab.jpg" width="560" alt="Terrace-slab crack with a taped ₹2 coin; a yellow measuring tape runs alongside as ground truth">
 *Our own field photo: the crack, a taped coin for scale, and the tape as ground truth — [full case-study report](https://landing.snapclaim.pages.dev/assets/case-study/terrace-slab.pdf).*
 
-- Field case (terrace slab, Nov 2026): measured 218.5 mm against a 227 mm tape (inside ±10%); photo-alone guess 315 mm (outside ±10%). Full report: [terrace-slab.pdf](https://landing.snapclaim.pages.dev/assets/case-study/terrace-slab.pdf).
+- Field case (terrace slab, Nov 2026, n = 1, coin 25 mm nominal): pipeline 237.5 mm [R005] vs thread 238.8 mm ±4 (err 1.3 mm / 0.5%, in) vs span 227 mm [225–230] (span err 10.5 mm, printed, never scored); photo-alone guess 315 mm (err 76.2 mm / 32%, out). Width 3.2 mm unverified. Old 23 mm-coin run read 218.5 mm (superseded). Sensitivity at ruler 24 mm: 228.0 mm. Full report: [terrace-slab.pdf](https://landing.snapclaim.pages.dev/assets/case-study/terrace-slab.pdf).
 
-![Bar chart: tape 227 mm as ground truth, SnapClaim measured 218.5 mm inside ±10%, photo-alone guess 315 mm outside ±10%](docs/images/measured-vs-guessed.svg)
-- `bench/split.json` — dev/held-out split, frozen before tuning. Held-out has 11 cases: 4 public no-scale photos that must stay percent-only, and 7 team photos with a 2 INR coin (no tape measurement yet, so they test detection and refusals).
+![Bar chart: thread 238.8 mm path vs span 227 mm, SnapClaim 237.5 mm inside ±10%, photo-alone guess 315 mm outside ±10%](docs/images/measured-vs-guessed.svg)
+- `npm run bench:gap` — thread-and-tape check (`terrace-slab-tape-01`: engine 237.5 mm [R005, 25 mm coin] vs thread 238.8 mm ±4, err 1.3 mm / 0.5% in; span 227 mm [225–230] printed, span err 10.5 mm / 4.6%, never scored; Spark 315 mm out). Scale 25 mm nominal (ruler 24 mm ±0.5; sensitivity 228.0 mm / 3.1 mm / 7.09 cm²). Width unverified. Photos stay gitignored. Phone capture: **not yet tested on a real phone**.
+- `bench/split.json` — dev/held-out split, frozen before tuning. Held-out has 12 cases: 4 public no-scale photos that must stay percent-only, 7 team photos with a 2 INR coin (no tape yet, detection/refusals), and 1 scaled thread-and-tape case.
 - `npm run bench:truth` (`bench/truth.ts`) — 54 scenes with exactly known crack length/width, run through the same measurement code a photo goes through. Tests the maths, not SAM.
 - `bench/score.ts` — skeptic DISPUTED scoring with missing-label accounting.
 - Full write-up, baselines protocol and open gaps: [`docs/eval-report.md`](./docs/eval-report.md).
@@ -270,17 +274,18 @@ src/engine/     measurement math, severity bands, session + receipts
 src/vision/     RLE masks, skeletonize, observe, coin calibration, SAM 3.1 adapter
 src/findings/   evidence gate (EvidenceError)
 src/receipts/   receipt ledger (deterministic ids, JSONL replay)
-src/render/     code-drawn SVG annexure
+src/render/     code-drawn SVG annexure (server); React client also offers on-device PDF export (react/src/lib/pdf.ts)
 src/adapters/   deterministic mock vision + findings
 src/config/     env config, spend guard
 backend/        one router (Node server + Cloudflare Worker), providers, transcribe proxy
 cli/            `npm run cli` - headless claim from the shell
 docs/API.md     headless API + CLI contract
+react/          canonical app (capture → mark → say → report)
 pwa/            capture app: photo, tap-to-mask, hold-to-speak, report, skeptic, annexure
 eval/           bench + replay CLI
 bench/          held-out split + dispute scorer
 fixtures/       masks, expected outputs, scale references (photos gitignored)
-tests/          364 tests, mock by default, live paths with stubbed fetch
+tests/          366 tests, mock by default, live paths with stubbed fetch, $0
 ```
 
 ## Development
@@ -300,7 +305,7 @@ tests/          364 tests, mock by default, live paths with stubbed fetch
 - **Documentation, not advice.** No coverage decisions, no legal claims, no approval predictions. A human decides; SnapClaim produces the evidence package.
 - **Measurement ≠ causation.** The chain proves what was measured, not who broke it.
 - **Staged photos are a known limit.** Receipts make measurement replayable and partly tamper-evident; they do not prove provenance.
-- No medical, health, or insurance-advice functionality. No image generation - every visual is drawn in code. SVG only (no PDF).
+- No medical, health, or insurance-advice functionality. No image generation - every visual is drawn in code. Server annexure is SVG; the React client additionally offers an on-device PDF export (`react/src/lib/pdf.ts`).
 - No geo-circumvention, no VPN. Credits claimed only with each builder's own registration email; no pooling. Build-time tooling disclosed in `DEV-LOG.md`.
 
 ## Provenance and license

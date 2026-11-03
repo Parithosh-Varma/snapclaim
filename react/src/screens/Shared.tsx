@@ -98,7 +98,7 @@ export default function Shared({ rep }: { rep: SharedReport }) {
         headerLogo: logo,
         rows: [
           ...(rep.lengthMm != null ? [row("Crack length", `${rep.lengthMm} mm`)] : []),
-          ...(rep.widthMm != null ? [row("Crack width", `${rep.widthMm} mm`)] : []),
+          ...(rep.widthMm != null ? [row("Crack width", `${rep.widthMm} mm`, "Unverified — no width ground truth")] : []),
           row("Surface affected", `${rep.percent} %`),
           ...(rep.areaCm2 != null ? [row("Area", `${rep.areaCm2} cm2`)] : []),
           row("Severity", rep.severity),

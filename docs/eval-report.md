@@ -1,6 +1,6 @@
 # Eval report
 
-Updated 2026-10-30. Weak rows stay in; nothing is buried.
+Updated 2026-11-03. Weak rows stay in; nothing is buried.
 
 ## Setup
 
@@ -12,7 +12,7 @@ Cases and their split live in `bench/split.json`. The held-out split is frozen b
 
 Dev: one synthetic wall-crack fixture with a coin scale reference.
 
-Held-out: 11 cases. Four public photos with no scale reference in the crack's plane test whether the pipeline refuses to invent millimetres. Seven team photos with a coin joined on 2026-10-30 (see below); none has a tape measurement yet, so accuracy on real photos is still UNSCORED.
+Held-out: 12 cases. Four public photos with no scale reference in the crack's plane test whether the pipeline refuses to invent millimetres. Seven team photos with a coin joined on 2026-10-30 (see below); none has a tape measurement yet, so they test detection/refusals. One scaled accuracy case exists (`terrace-slab-tape-01`: Rs 2 coin in frame, thread path 238.8 mm ±4 + tape span 227 mm [225–230], n = 1, coin 25 mm nominal); the 10–20-case set is still missing.
 
 | Case | Surface | Source license |
 | --- | --- | --- |
@@ -41,7 +41,7 @@ that numbers change decisions; scored qualitatively, not hidden.
 Median absolute error (mm) and % within ±10% on calibrated cases, dev vs
 held-out separately. The demo table goes in the README when the photos land.
 
-Held-out side is scored by `npm run bench:gap` (`bench/gap.ts`): for every scaled held-out case with a `groundTruth` it compares the archived pipeline run and a model-only guess from `bench/model-only/` against the same tape measurement, and prints both arms side by side. Refusals and missing files are counted per arm, not dropped. As of 2026-10-30 no held-out case has a scale reference and a ground truth, so the command prints UNSCORED; the coin photos need a tape measurement before a row can go here. The dev side still comes from `npm run eval` and is not wired into the same table yet.
+Held-out side is scored by `npm run bench:gap` (`bench/gap.ts`): for every scaled held-out case with a `groundTruth` it compares the archived pipeline run and a model-only guess from `bench/model-only/` against the thread path (`pathMm`), and prints the straight-span comparison labelled (`span=…(span) spanErr=…`) but never scores it. Refusals and missing files are counted per arm, not dropped. The dev side still comes from `npm run eval` and is not wired into the same table yet. On `release-candidate` 2026-11-03 the case is defined but `bench/runs/` + `bench/model-only/` are absent, so the command prints INCOMPLETE (exit 1) — numbers below are the deterministic engine recompute, not an archived run.
 
 ### Skeptic DISPUTED calls
 
@@ -53,9 +53,10 @@ Scored by `scoreDisputes` in `bench/score.ts`, with DISPUTED as the positive cla
 
 | Date | Bench | Disputes | Notes |
 |---|---|---|---|
-| 2026-10-28 | 2 pass, 0 skip, 0 fail | scorer unit-tested, no live runs yet | wall-crack: 5.17% / 85.9 mm / 2.6 mm wide / 2.19 cm² (significant); stain: 1.29% percent-only (moderate) |
+| 2026-10-28 | 2 pass, 0 skip, 0 fail | scorer unit-tested, no live runs yet | wall-crack: 5.17% / 85.9 mm / 2.6 mm wide (unverified — no width ground truth) / 2.19 cm² (significant); stain: 1.29% percent-only (moderate) |
 | 2026-10-30 | 7 pass, 0 skip, 0 fail | dev fixtures grown (door-peel, facade-crack, tilted-wall, noscale); held-out still 0 archived runs (UNRUN ×4, strict exit 1) | tilted-wall: 0.27% / 66.8 mm cosmetic; facade-crack: 0.74% percent-only significant |
-| 2026-11-02 | 7 pass, 0 skip, 0 fail; gap first row scored, both arms | `terrace-slab-tape-01`: tape 227 mm vs measured 218.5 mm (err 8.5, 3.7%, in) vs Spark photo-alone 315 mm (err 88, 38.8%, out) | builder-measured slab DSC_0711.JPG, Ref SC-25D35C5E |
+| 2026-11-02 | 7 pass, 0 skip, 0 fail; gap INCOMPLETE (no runs on this branch) | — | `terrace-slab-tape-01`: builder slab DSC_0711.JPG, Ref SC-25D35C5E with wrong 23 mm coin read R005 218.5 mm (superseded — see 2026-11-03) |
+| 2026-11-03 | 7 pass, 0 skip, 0 fail; gap INCOMPLETE (truth 238.8 path, measured/modelOnly missing) | — | `terrace-slab-tape-01`, n = 1: engine recompute at 25 mm nominal → R001 0.773994, R004 7.69 cm², R005 237.5 mm vs thread 238.8 mm ±4 (err 1.3, 0.5%, in) vs Spark photo-alone 315 mm (err 76.2, 31.9%, out); span 227 mm [225–230] printed, span err 10.5 mm / 4.6%, never scored; width 3.2 mm unverified (no width ground truth); sensitivity at ruler 24 mm: R005 228.0 mm / R006 3.1 mm / R004 7.09 cm². Old 23 mm run 218.5 mm retained for history. No live calls on this branch. |
 
 ## Failures and misses
 
@@ -66,7 +67,7 @@ Scored by `scoreDisputes` in `bench/score.ts`, with DISPUTED as the positive cla
 
 ## Datasets and licenses
 
-The four held-out photos above are the only external data so far. Photo files stay local; source URLs are in `bench/split.json`.
+The four held-out photos above are the public external set. Photo files stay local; source URLs are in `bench/split.json`. The scaled case `terrace-slab-tape-01` (team-internal slab DSC_0711.JPG, coin in frame, thread 238.8 mm ±4 + span 227 mm [225–230], n = 1) is the first tape ground truth; its photo stays local (gitignored).
 
 Seven team photos (Parithosh, DSLR, 2026-10-29, a 2 INR coin in the crack's plane) joined the held-out set on 2026-10-30 as `team-coin-*`: two with no crack, three full-frame cracks, two cracks that leave the frame. They are team-internal and not redistributed. None has a measured crack length yet, so they test detection and refusal behaviour; accuracy on them stays UNSCORED until the wall is measured.
 
