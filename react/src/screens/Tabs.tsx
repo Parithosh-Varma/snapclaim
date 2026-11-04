@@ -147,20 +147,6 @@ export function Home() {
         </div>
         {sampleErr && <p role="alert" className="sample-err">{sampleErr}</p>}
         <SamplePicker open={pickerOpen} picking={picking} onClose={() => setPickerOpen(false)} onPick={(f) => void pickSample(f)} />
-        <div className="card" aria-label="Demo video">
-          <p className="found">Watch the demo (2 min)</p>
-          <div style={{ position: "relative", width: "100%", aspectRatio: "16 / 9" }}>
-            <iframe
-              src="https://www.youtube-nocookie.com/embed/CdqSvKHyrCg?rel=0&controls=0&modestbranding=1&iv_load_policy=3&disablekb=1&fs=0&playsinline=1"
-              title="SnapClaim demo: damage measured, not guessed"
-              loading="lazy"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }}
-            />
-          </div>
-          <p className="sub"><a className="link-btn" href="https://youtu.be/CdqSvKHyrCg">Open on YouTube</a></p>
-        </div>
 
         {draft && (
           <div className="card" role="status" aria-label="Unfinished claim">
