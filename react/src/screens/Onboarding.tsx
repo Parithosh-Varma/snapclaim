@@ -588,7 +588,7 @@ export default function Onboarding({
                   action={
                     <>
                       {camState === "granted" ? (
-                        <p role="status" style={{ color: "#0B6E3B", fontWeight: 800, margin: 0 }}>
+                        <p role="status" className="ob-ok">
                           <IconTick /> {STRINGS.permCameraGranted}
                         </p>
                       ) : camState === "blocked" || camState === "denied" ? (
@@ -656,7 +656,7 @@ export default function Onboarding({
                   action={
                     <>
                       {micState === "granted" ? (
-                        <p role="status" style={{ color: "#0B6E3B", fontWeight: 800, margin: 0 }}>{STRINGS.permMicOn}</p>
+                        <p role="status" className="ob-ok">{STRINGS.permMicOn}</p>
                       ) : micState === "denied" || micState === "blocked" || micState === "unavailable" ? (
                         <>
                           <div className="ob-recover" role="alert">
@@ -756,8 +756,8 @@ export default function Onboarding({
             aria-labelledby="obSheetTitle"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 id="obSheetTitle" style={{ fontSize: 19, margin: "0 0 8px" }}>{STRINGS.privacySheetTitle}</h2>
-            <p style={{ fontSize: 15, lineHeight: 1.6, color: "#3D4A68", margin: "0 0 16px" }}>{STRINGS.privacySheetBody}</p>
+            <h2 id="obSheetTitle">{STRINGS.privacySheetTitle}</h2>
+            <p>{STRINGS.privacySheetBody}</p>
             <PrimaryButton onClick={() => setSheetOpen(false)}>{STRINGS.privacySheetClose}</PrimaryButton>
           </div>
         </div>

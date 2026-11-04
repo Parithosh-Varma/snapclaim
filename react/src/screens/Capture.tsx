@@ -4,6 +4,7 @@ import { loadSamplePhoto } from "../lib/sample";
 import { SamplePicker } from "./SamplePicker";
 import { applyLastCoin, freshAngleSlot, resetDmg } from "../lib/session";
 import { CaptureCoach, CoinStatusChip, dismissCaptureCoach, shouldShowCaptureCoach } from "./Onboarding";
+import { setTorch, torchSupported } from "../lib/torch";
 
 const CAM_ERRORS: Record<string, string> = {
   NotAllowedError: "Camera permission is off - tap Enable camera",
@@ -16,7 +17,7 @@ const CAM_ERRORS: Record<string, string> = {
 };
 
 export default function Capture() {
-  const { session, go, screen } = useApp();
+  const { session, go, screen, toast } = useApp();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -30,6 +31,8 @@ export default function Capture() {
   const [live, setLive] = useState(false);
   const [acquiring, setAcquiring] = useState(false);
   const [noScale, setNoScale] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
+  const [torchOk, setTorchOk] = useState(false);
   /* Just-in-time coach-mark: first capture only, dismissible, persisted. */
   const [coachOn, setCoachOn] = useState(() => {
     try { return shouldShowCaptureCoach(); } catch { return true; }
@@ -79,6 +82,27 @@ export default function Capture() {
     setTimeout(() => { shotBusy.current = false; }, 1000);
   };
 
+  /* Flashlight: capability-gated (hidden where unsupported), off on every
+     acquire/stop so it can never leak into the next shot or a dead track. */
+  const trackNow = useCallback(() => {
+    const stream = videoRef.current?.srcObject as MediaStream | null;
+    return stream?.getVideoTracks?.()[0] ?? null;
+  }, []);
+
+  const toggleTorch = useCallback(async () => {
+    const track = trackNow();
+    if (!track) return;
+    const next = !torchOn;
+    try {
+      await setTorch(track, next);
+      setTorchOn(next);
+      if (next) toast("Flashlight on - watch for glare on shiny surfaces.");
+    } catch {
+      setTorchOn(false);
+      toast("Flashlight is not available on this camera.");
+    }
+  }, [torchOn, trackNow, toast]);
+
   /* bottom-sheet drag to dismiss */
   const dragStart = (clientY: number) => {
     dragY.current = clientY;
@@ -102,6 +126,7 @@ export default function Capture() {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
+    setTorchOn(false);
   }, []);
 
   const onCameraError = useCallback((name: string) => {
@@ -120,6 +145,8 @@ export default function Capture() {
       return;
     }
     stopStream();
+    setTorchOn(false);
+    setTorchOk(false);
     const backCam: MediaStreamConstraints = { video: { facingMode: { exact: "environment" } }, audio: false };
     const anyCam: MediaStreamConstraints = { video: { facingMode: "environment" }, audio: false };
     try {
@@ -363,6 +390,12 @@ export default function Capture() {
             setAcquiring(false);
             setEnableCam(false);
             setBlocked(false);
+            try {
+              const stream = videoRef.current?.srcObject as MediaStream | null;
+              setTorchOk(torchSupported(stream?.getVideoTracks?.()[0] ?? null));
+            } catch {
+              setTorchOk(false);
+            }
           }}
         />
       </div>
@@ -453,14 +486,28 @@ export default function Capture() {
                 </div>
               )}
               <div className="shutter-block">
-                <button
-                  id="shutter"
-                  type="button"
-                  aria-label="Capture"
-                  disabled={!live}
-                  onClick={onShutterTap}
-                >
-                </button>
+                <div className="shutter-row">
+                  {torchOk && <span className="shutter-spacer" aria-hidden="true" />}
+                  <button
+                    id="shutter"
+                    type="button"
+                    aria-label="Capture"
+                    disabled={!live}
+                    onClick={onShutterTap}
+                  >
+                  </button>
+                  {torchOk && (
+                    <button
+                      type="button"
+                      className={`torchbtn${torchOn ? " on" : ""}`}
+                      aria-pressed={torchOn}
+                      aria-label={torchOn ? "Turn flashlight off" : "Turn flashlight on"}
+                      onClick={() => void toggleTorch()}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 2h6v4H9z" /><path d="M10 6h4l3 5v10H7V11z" /><path d="M12 15.5v.5" /></svg>
+                    </button>
+                  )}
+                </div>
                 <span className="shutter-label">{!live ? "Starting camera…" : "Tap to capture"}</span>
                 <div className="alt-row">
                   <button id="uploadBtn" className="alt-btn" type="button" onClick={() => fileRef.current?.click()}>

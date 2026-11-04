@@ -49,6 +49,7 @@ The rest is manual, one pass per release, on a real phone if possible.
 - [ ] Screen reader: heading order correct, progress announced as `Step N of 5`, icon buttons labelled, status chips read as text.
 - [ ] Dynamic Type / large text: no clipped containers, no fixed text heights.
 - [ ] `prefers-reduced-motion`: coin art static, no slide/fade transitions.
+- [ ] Dark mode (Settings → Appearance → Dark, and Auto with OS dark): onboarding follows the theme, all text pairs hold 4.5:1.
 - [ ] Text contrast at least 4.5:1 on body copy; large/bold actions at least 3:1.
 - [ ] Safe-area padding respected top and bottom (notched phones).
 - [ ] Transitions feel 150-250ms: slide between screens, fade for tooltips.
