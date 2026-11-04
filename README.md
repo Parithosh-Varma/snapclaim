@@ -50,7 +50,7 @@ Built on the [Meta AI developer platform](https://dev.meta.ai), with four Meta m
 |---|---|---|
 | **SAM 3.1** | Segments the damage and the coin from a tap (point prompts) | Meta AI API (`api.meta.ai`) |
 | **Muse Spark 1.3** | Drafts the findings; the evidence gate ships a sentence only if every number cites a receipt | Meta AI API |
-| **Spark Open** (open weights) | Independent skeptic that re-checks the findings | **Baseten**, official inference partner (`inference.baseten.co`) |
+| **Muse Spark Open** (open weights) | Independent skeptic that re-checks the findings | **Baseten**, official inference partner (`inference.baseten.co`) |
 | **Muse Voice Transcribe** | Turns the one spoken line into text, any language | Meta AI API (file + realtime) |
 
 On the phone, a SlimSAM model gives an offline mask preview before anything is sent. We fine-tuned its open-weights mask decoder on public crack masks (CC BY 4.0) and published it as [`tariqkhalif/slimsam-77-crack`](https://huggingface.co/tariqkhalif/slimsam-77-crack) on the Hugging Face Hub: held-out crack mIoU 0.174 stock vs 0.697 tuned in the browser build (training code and eval in [`training/slimsam-crack/`](./training/slimsam-crack/)). Endpoints and model IDs: [Meta models used](#meta-models-used).
@@ -123,7 +123,7 @@ RECEIPTS - every value carries its formula, inputs, confidence and id
 FINDINGS - Muse Spark drafts sentences; the evidence gate ships them only if
    every number cites its receipt (else HTTP 422 with named failures)
    ↓
-SKEPTIC - Spark Open re-checks the findings; unreproducible ones are
+SKEPTIC - Muse Spark Open re-checks the findings; unreproducible ones are
    printed DISPUTED, never hidden
    ↓
 ANNEXURE - code-drawn SVG: mask outlines, findings, receipts table
@@ -168,7 +168,7 @@ want an intermediate result - nothing in the app bypasses them.
 | | Demo (default) | Live (`MOCK_MODE=0` + keys) |
 |---|---|---|
 | Masks | Supplied fixture (`backend invents no masks`) | SAM 3.1 point prompts via `/v1/segment`; the PWA falls back to on-device SlimSAM on any failure |
-| Findings / skeptic | Deterministic mocks ($0) | Muse Spark 1.3 / Spark Open on Baseten |
+| Findings / skeptic | Deterministic mocks ($0) | Muse Spark 1.3 / Muse Spark Open on Baseten |
 | Voice | Supplied `fixtureTranscript` | Muse Voice Transcribe proxy (`/v1/transcribe`) |
 | Measure, observe, gate, render, replay | Real in both modes | Real in both modes |
 
@@ -182,7 +182,7 @@ For local development, Settings → Developer → **Open admin panel** flips the
 |---|---|---|
 | Perception - damage masks | **SAM 3.1** | `https://api.meta.ai/v1` |
 | Reasoning - evidence-gated findings | **Muse Spark 1.3** | `https://api.meta.ai/v1/chat/completions` |
-| Independent skeptic (open weights) | **Spark Open** | `https://inference.baseten.co/v1` · `meta-models/muse-spark-open-1026` |
+| Independent skeptic (open weights) | **Muse Spark Open** | `https://inference.baseten.co/v1` · `meta-models/muse-spark-open-1026` |
 | On-device damage masks (offline / fallback) | **SlimSAM-77** (compressed SAM) + our crack-tuned decoder [`tariqkhalif/slimsam-77-crack`](https://huggingface.co/tariqkhalif/slimsam-77-crack) | in the browser, transformers.js · [`training/slimsam-crack/`](./training/slimsam-crack/) |
 | Voice intake (any language; auto-detected, optional `languageBias`) | **Muse Voice Transcribe** | `POST https://api.meta.ai/v1/asr/transcribe` (file) · `wss://api.meta.ai/v1/asr/realtime` (live) |
 
@@ -220,7 +220,7 @@ Copy `.env.example` to `.env` (never commit it). Every variable is optional; uns
 | `MOCK_MODE` | unset (= demo) | Set `0` for live calls; live routes fail closed without keys |
 | `META_API_KEY` | - | Muse Spark findings, SAM 3.1 segment, voice transcribe |
 | `META_API_BASE` | `https://api.meta.ai/v1` | Override for proxies / debugging |
-| `BASETEN_API_KEY` | - | Spark Open skeptic |
+| `BASETEN_API_KEY` | - | Muse Spark Open skeptic |
 | `BASETEN_API_BASE` | `https://inference.baseten.co/v1` | Override for proxies / debugging |
 | `SPEND_GUARD_USD` | `5` | Hard cap on live spend; 429 at $0 remaining |
 | `MIN_REFERENCE_CONFIDENCE` | `0.6` | Below this, reports stay percent-only |
