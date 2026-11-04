@@ -14,7 +14,7 @@
 
 > What is real vs mocked: **Measurement (`/v1/measure`, `/v1/observe`, receipts, gate) is keyless and deterministic — runs offline, $0. Live findings / skeptic / SAM / voice use our keys with a spend cap (`SPEND_GUARD_USD`, default $5). Photos stay on the phone except two explicit taps: Cross-check sends the photo once to SAM 3.1 via the backend, and Render attaches it to the annexure.** Demo defaults to mock ($0, no keys).
 
-[![tests](https://img.shields.io/badge/tests-385%20passing-brightgreen)](./tests)
+[![tests](https://img.shields.io/badge/tests-386%20passing-brightgreen)](./tests)
 [![node](https://img.shields.io/badge/node-%3E%3D22.18-339933)](./package.json)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](./LICENSE)
 
@@ -31,7 +31,7 @@ All three commands are free and deterministic; run them yourself.
 | Check | Command | Result on `main` |
 |---|---|---|
 | Measurement code vs known answers (54 scenes drawn in code, coin scale, some on tilted walls) | `npm run bench:truth` | length median error 1.4%, 100% within ±10%; width median error 4.0%, 96.3% within ±10%; 3/3 no-scale refusals held |
-| Regression on dev mask fixtures | `npm run eval` | 7 pass, 0 skip, 0 fail |
+| Regression on dev mask fixtures, plus known-answer error on the 5 synthetic ones | `npm run eval` | 10 pass, 0 skip, 0 fail; 5 scored, median abs error 1.0 mm, 5/5 within ±10% (drawn cracks, not real photos) |
 | Live pipeline on held-out real photos | `npm run bench` | 4 public photos run live 2026-11-02: 4/4 refused millimetres, but only 2/4 masks were on the crack and the skeptic flagged neither miss ([details](docs/eval-report.md#failures-and-misses)); 7 team cases UNRUN, so the command still exits 1 on purpose |
 
 What this does not show yet: how well SAM finds the crack on a real photo. `bench:truth` checks the maths given a mask, not the mask itself. No real crack has been tape-measured yet, so `npm run bench:gap` (pipeline vs model-only guess against a tape) still prints UNSCORED. We would rather show that gap than fill it with a number we cannot back.
@@ -342,7 +342,7 @@ pwa/            capture app: photo, tap-to-mask, hold-to-speak, report, skeptic,
 eval/           bench + replay CLI
 bench/          held-out split + dispute scorer
 fixtures/       masks, expected outputs, scale references (photos gitignored)
-tests/          385 tests, mock by default, live paths with stubbed fetch, $0
+tests/          386 tests, mock by default, live paths with stubbed fetch, $0
 ```
 
 ## Development
