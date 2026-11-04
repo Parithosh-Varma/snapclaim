@@ -51,7 +51,7 @@ Built on the [Meta AI developer platform](https://dev.meta.ai), with four Meta m
 | **Spark Open** (open weights) | Independent skeptic that re-checks the findings | **Baseten**, official inference partner (`inference.baseten.co`) |
 | **Muse Voice Transcribe** | Turns the one spoken line into text, any language | Meta AI API (file + realtime) |
 
-On the phone, a SlimSAM model gives an offline mask preview before anything is sent. Endpoints and model IDs: [Meta models used](#meta-models-used).
+On the phone, a SlimSAM model gives an offline mask preview before anything is sent. We fine-tuned its open-weights mask decoder on public crack masks (CC BY 4.0) and published it as [`tariqkhalif/slimsam-77-crack`](https://huggingface.co/tariqkhalif/slimsam-77-crack) on the Hugging Face Hub: held-out crack mIoU 0.174 stock vs 0.697 tuned in the browser build (training code and eval in [`training/slimsam-crack/`](./training/slimsam-crack/)). Endpoints and model IDs: [Meta models used](#meta-models-used).
 
 ## Contents
 
