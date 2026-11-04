@@ -123,9 +123,6 @@ export default function App() {
     store.setSettings({ baseUrl: url.trim().replace(/\/$/, "") });
   }, [store, toast]);
 
-  const [stepLoading, setStepLoading] = useState(false);
-  const stepTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   /* Draft: autosave the in-progress claim on every step change and when the
      page hides, so a reload or crash never wastes progress. Finished or
      abandoned claims clear it (see startCapture / Report save). */
@@ -148,20 +145,31 @@ export default function App() {
     } catch { /* autosave is best-effort; the claim continues */ }
   }, []);
 
-  /* Forced scripted transition: every screen change shows the step loader
-     for a full second, even when the next screen is instant. Timer resets
-     on rapid taps; cleared on unmount. */
-  const go = useCallback((s: Screen) => {
-    persistDraft(s);
-    setScreen(s);
-    setStepLoading(true);
-    if (stepTimer.current) clearTimeout(stepTimer.current);
-    stepTimer.current = setTimeout(() => setStepLoading(false), 1000);
+  /* Deferred step-change save: collectDraft serializes full photo data URLs
+     (stills + location + payload overlays). That must never run between the
+     tap and first paint: even requestAnimationFrame + setTimeout(0) usually
+     fires pre-paint in the same frame, which is exactly the loader-then-page
+     flash. requestIdleCallback runs when the browser is idle (post-paint);
+     the double-rAF fallback paints first, then saves. Crash coverage stays
+     synchronous via the pagehide/visibilitychange handlers below. */
+  const persistDraftSoon = useCallback((forScreen: string) => {
+    const save = () => persistDraft(forScreen);
+    const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
+    if (typeof ric === "function") {
+      ric.call(window, save, { timeout: 2000 });
+    } else {
+      requestAnimationFrame(() => requestAnimationFrame(save));
+    }
   }, [persistDraft]);
 
-  useEffect(() => () => {
-    if (stepTimer.current) clearTimeout(stepTimer.current);
-  }, []);
+  /* Navigation is instant with a fade: no scripted loader. The step-change
+     draft save stays deferred past paint (see persistDraftSoon), and every
+     slow screen owns its own honest loading state (Mark skeleton, Say
+     status, Numbers skeletons). */
+  const go = useCallback((s: Screen) => {
+    setScreen(s);
+    persistDraftSoon(s);
+  }, [persistDraftSoon]);
 
   const resumeDraft = useCallback(() => {
     try {
@@ -173,10 +181,14 @@ export default function App() {
       Object.assign(sessionRef.current, createSession());
       applyDraft(sessionRef.current, d);
       setDraft(draftSummary(d));
-      setScreen(d.screen);
-      setStepLoading(true);
-      if (stepTimer.current) clearTimeout(stepTimer.current);
-      stepTimer.current = setTimeout(() => setStepLoading(false), 1000);
+      // A draft saved mid-flight (or before a failed measure) can point at
+      // Check/Report with no measurement - landing there is a dead screen.
+      // Mark rebuilds the photo from the still and re-measures from the
+      // restored taps, so route there instead of stranding the user.
+      const hasMeasure = !!(d.measurement && d.payload);
+      const target = (d.screen === "sCheck" || d.screen === "sReport") && !hasMeasure ? "sMark" : d.screen;
+      if (target !== d.screen) toast("That draft had no measurement - taps kept, measure again from Mark");
+      setScreen(target);
     } catch {
       toast("That draft could not be restored - starting fresh");
       try {
@@ -437,12 +449,6 @@ export default function App() {
         </div>
       )}
       {toastMsg && <div id="toast" role="status">{toastMsg}</div>}
-      {stepLoading && (
-        <div id="stepLoading" role="status" aria-label="Loading next step">
-          <span className="spin" aria-hidden="true" />
-          <b>Loading…</b>
-        </div>
-      )}
     </Ctx.Provider>
   );
 }

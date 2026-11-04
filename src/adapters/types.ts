@@ -29,6 +29,13 @@ export interface FindingsRequest {
    * case is a draft citing scale/count numbers no citation can verify.
    */
   repairNote?: string;
+  /**
+   * Optional damage photo (https: or data:image/) for multimodal Muse Spark
+   * findings. When set, the photo travels with the receipts so the writer
+   * grounds prose in both pixels and measured numbers; the evidence gate
+   * still decides what ships. Absent = text-only (receipts alone).
+   */
+  imageUrl?: string;
 }
 
 export interface FindingsProvider {

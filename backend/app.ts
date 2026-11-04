@@ -485,9 +485,18 @@ export async function reportBody(body: unknown, env: Env, requestId = newRequest
     drafts = body.drafts as FindingDraft[];
   } else {
     const provider = findingsProvider(env, config, fetchFn, operatorSpend(env, "meta"));
+    let imageUrl: string | undefined;
+    if ((body as Record<string, unknown>).imageUrl !== undefined) {
+      const raw = (body as Record<string, unknown>).imageUrl;
+      if (typeof raw !== "string") throw new HttpError(400, "imageUrl must be a string");
+      if (raw !== "") {
+        assertSafeImageUrl(raw);
+        imageUrl = raw;
+      }
+    }
     ({ drafts } = await draftAndGate(
       provider,
-      { transcript, findings: measurement.findings, receipts: measurement.receipts },
+      { transcript, findings: measurement.findings, receipts: measurement.receipts, ...(imageUrl ? { imageUrl } : {}) },
       measurement.receipts,
     ));
   }
@@ -506,6 +515,8 @@ export interface SamSegmentRequest {
   size: { width: number; height: number };
   points: SamPoint[];
   box?: SamBoxPrompt;
+  /** Multi-object prompts (damage + coin, one billed image). Overrides points/box when set. */
+  objects?: import("../src/vision/sam.ts").SamObjectPrompt[];
 }
 
 /**
@@ -551,7 +562,13 @@ export async function samSegment(
       base: config.endpoints.meta,
       apiKey: metaKey,
       model: config.models.sam,
-      request: { imageUrl: request.imageUrl, size: { width: Math.round(width), height: Math.round(height) }, points: request.points, ...(request.box ? { box: request.box } : {}) },
+      request: {
+        imageUrl: request.imageUrl,
+        size: { width: Math.round(width), height: Math.round(height) },
+        points: request.points,
+        ...(request.box ? { box: request.box } : {}),
+        ...(request.objects ? { objects: request.objects } : {}),
+      },
     });
   } catch (error) {
     samHold?.release();
@@ -591,38 +608,69 @@ export async function segmentBody(body: unknown, env: Env, requestId = newReques
     throw new HttpError(400, `width×height ${width}x${height} exceeds the ${MAX_MASK_PIXELS}-pixel cap`);
   }
   const rawPoints = Array.isArray(body.points) ? body.points : [];
-  if (rawPoints.length === 0 || rawPoints.length > 16) throw new HttpError(400, "live /v1/segment needs 1-16 body.points [{x, y}]");
-  const points: SamPoint[] = rawPoints.map((point, i) => {
-    if (!isRecord(point)) throw new HttpError(400, `points[${i}] must be an object`);
-    return { x: requireNumber(point.x, `points[${i}].x`), y: requireNumber(point.y, `points[${i}].y`) };
-  });
-  // Optional box prompt: constrains SAM to the damage region so a thin-crack
-  // tap can't come back as the whole wall. The cross-check derives it from
-  // the measured mask (dilated bounding box, same photo pixels as points).
-  let box: SamBoxPrompt | undefined;
-  if ((body as Record<string, unknown>).box !== undefined) {
-    const rawBox = (body as Record<string, unknown>).box;
-    if (!isRecord(rawBox)) throw new HttpError(400, "live /v1/segment box must be an object");
-    const w = Math.round(width);
-    const h = Math.round(height);
-    const sides = (["left", "top", "right", "bottom"] as const).map((k) => {
-      const v = requireNumber((rawBox as Record<string, unknown>)[k], `box.${k}`);
-      if (!Number.isInteger(v)) throw new HttpError(400, `box.${k} must be an integer, got ${v}`);
-      return v;
+  const rawObjects = Array.isArray((body as Record<string, unknown>).objects)
+    ? (body as Record<string, unknown>).objects as unknown[]
+    : null;
+  let samRequest: { imageUrl: string; size: { width: number; height: number }; points: SamPoint[]; box?: SamBoxPrompt; objects?: import("../src/vision/sam.ts").SamObjectPrompt[] };
+  const baseReq = { imageUrl, size: { width: Math.round(width), height: Math.round(height) } };
+  if (rawObjects !== null) {
+    // Multi-object SAM: damage + coin (or several damages) in one billed
+    // image. Each entry is {id?, points[{x,y,label?}], box?}; ids default
+    // to the entry index. Still capped at 16 objects / 16 points each.
+    if (rawObjects.length === 0 || rawObjects.length > 16) throw new HttpError(400, "live /v1/segment objects needs 1-16 entries");
+    const objects = rawObjects.map((raw, oi) => {
+      if (!isRecord(raw)) throw new HttpError(400, `objects[${oi}] must be an object`);
+      const id = raw.id === undefined ? oi + 1 : requireNumber(raw.id, `objects[${oi}].id`);
+      if (!Number.isInteger(id) || id < 0) throw new HttpError(400, `objects[${oi}].id must be a non-negative integer`);
+      const pts = Array.isArray(raw.points) ? raw.points : [];
+      if (pts.length === 0 || pts.length > 16) throw new HttpError(400, `objects[${oi}].points needs 1-16 [{x, y}]`);
+      const points = pts.map((point, pi) => {
+        if (!isRecord(point)) throw new HttpError(400, `objects[${oi}].points[${pi}] must be an object`);
+        const label = (point as Record<string, unknown>).label;
+        return {
+          x: requireNumber(point.x, `objects[${oi}].points[${pi}].x`),
+          y: requireNumber(point.y, `objects[${oi}].points[${pi}].y`),
+          ...(label === "negative" ? { label: "negative" as const } : {}),
+        };
+      });
+      return { id, points };
     });
-    const [left, top, right, bottom] = sides as [number, number, number, number];
+    samRequest = { ...baseReq, points: [], objects };
+  } else {
+    if (rawPoints.length === 0 || rawPoints.length > 16) throw new HttpError(400, "live /v1/segment needs 1-16 body.points [{x, y}]");
+    const points: SamPoint[] = rawPoints.map((point, i) => {
+      if (!isRecord(point)) throw new HttpError(400, `points[${i}] must be an object`);
+      const label = (point as Record<string, unknown>).label;
+      return {
+        x: requireNumber(point.x, `points[${i}].x`),
+        y: requireNumber(point.y, `points[${i}].y`),
+        ...(label === "negative" ? { label: "negative" as const } : {}),
+      };
+    });
+    // Optional box prompt: constrains SAM to the damage region so a thin-crack
+    // tap can't come back as the whole wall. The cross-check derives it from
+    // the measured mask (dilated bounding box, same photo pixels as points).
+    // Ignored when objects[] is used (each object carries its own prompts).
+    let box: SamBoxPrompt | undefined;
+    if ((body as Record<string, unknown>).box !== undefined) {
+      const rawBox = (body as Record<string, unknown>).box;
+      if (!isRecord(rawBox)) throw new HttpError(400, "live /v1/segment box must be an object");
+      const w = Math.round(width);
+      const h = Math.round(height);
+      const sides = (["left", "top", "right", "bottom"] as const).map((k) => {
+        const v = requireNumber((rawBox as Record<string, unknown>)[k], `box.${k}`);
+        if (!Number.isInteger(v)) throw new HttpError(400, `box.${k} must be an integer, got ${v}`);
+        return v;
+      });
+      const [left, top, right, bottom] = sides as [number, number, number, number];
     if (left < 0 || top < 0 || right > w || bottom > h || left >= right || top >= bottom) {
       throw new HttpError(400, `box [${left},${top},${right},${bottom}] is outside the ${w}x${h} frame`);
     }
-    box = { left, top, right, bottom };
+      box = { left, top, right, bottom };
+    }
+    samRequest = { ...baseReq, points, ...(box ? { box } : {}) };
   }
-  const sam = await samSegment(
-    env,
-    config,
-    { imageUrl, size: { width, height }, points, ...(box ? { box } : {}) },
-    requestId,
-    fetchFn,
-  );
+  const sam = await samSegment(env, config, samRequest, requestId, fetchFn);
   return envelope(requestId, started, {
     archivedImageUrl: sam.archivedImageUrl,
     records: sam.records.map((record) => ({
@@ -909,6 +957,16 @@ export async function findingsBody(body: unknown, env: Env, requestId = newReque
       return noDamageResult(recomputed, requestId, started);
     }
   }
+  // Optional multimodal grounding: a damage photo travels with the receipts
+  // to Muse Spark (vision input). Gate still decides what ships.
+  let imageUrl: string | undefined;
+  if (body.imageUrl !== undefined) {
+    if (typeof body.imageUrl !== "string") throw new HttpError(400, "imageUrl must be a string");
+    if (body.imageUrl !== "") {
+      assertSafeImageUrl(body.imageUrl);
+      imageUrl = body.imageUrl;
+    }
+  }
   const provider = findingsProvider(env, configFromEnv(env), fetchFn, operatorSpend(env, "meta"));
   const { drafts, gate } = await draftAndGate(
     provider,
@@ -916,6 +974,7 @@ export async function findingsBody(body: unknown, env: Env, requestId = newReque
       transcript: typeof body.transcript === "string" ? body.transcript.slice(0, 2000) : "",
       findings,
       receipts,
+      ...(imageUrl ? { imageUrl } : {}),
     },
     receipts,
   );

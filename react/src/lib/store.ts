@@ -39,6 +39,7 @@ export interface SnapCase {
   percent?: number;
   severity?: string;
   crackLengthMm?: number | null;
+  crackWidthMm?: number | null;
   areaCm2?: number | null;
   mode?: string;
   photo?: string | null;
@@ -83,9 +84,24 @@ export function createCaseStore(
   const now = opts.now ?? (() => new Date().toISOString());
   const makeId = opts.makeId ?? secureId;
 
+  // Memoized parse: cases carry full photo data URLs, and Home/Cases call
+  // list() on every render. Re-parsing megabytes per navigation blocked
+  // first paint past the loader delay (loader first, page second). The raw
+  // string is the cache key, so writes, TTL trims and external edits
+  // re-parse exactly once. Callers never mutate returned cases in place
+  // (save() spreads into a fresh record), so sharing the parse is safe.
+  let lastRaw: string | null | undefined;
+  let lastParsed: SnapCase[] | null = null;
+
   function readCases(): SnapCase[] {
-    const list = parse<unknown>(storage.getItem(CASES_KEY), []);
-    if (!Array.isArray(list)) return [];
+    const raw = storage.getItem(CASES_KEY);
+    if (raw === lastRaw && lastParsed) return lastParsed;
+    const list = parse<unknown>(raw, []);
+    if (!Array.isArray(list)) {
+      lastRaw = raw;
+      lastParsed = [];
+      return [];
+    }
     // 90-day TTL: drop stale device-only cases automatically.
     const cutoff = Date.now() - 90 * 24 * 3600 * 1000;
     const fresh = (list as SnapCase[]).filter((c) => {
@@ -94,7 +110,11 @@ export function createCaseStore(
     });
     if (fresh.length !== (list as SnapCase[]).length) {
       try { writeCases(fresh); } catch { /* ignore */ }
+      // writeCases changed the raw bytes: re-read so the memo matches storage.
+      return readCases();
     }
+    lastRaw = raw;
+    lastParsed = fresh;
     return fresh;
   }
   function writeCases(list: SnapCase[]) {

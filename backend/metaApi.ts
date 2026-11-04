@@ -88,6 +88,8 @@ export interface MetaChatOptions {
   model: string;
   messages: MetaChatMessage[];
   maxTokens?: number;
+  /** OpenAI-compatible structured output hint; Spark returns JSON drafts. */
+  responseFormat?: { type: "json_object" };
   fetchFn?: FetchFn;
   timeoutMs?: number;
 }
@@ -109,13 +111,13 @@ export interface MetaChatWireReply {
  * settlement and message strings (see MetaFindingsProvider).
  */
 export async function metaChatCompletions(options: MetaChatOptions): Promise<MetaChatWireReply> {
-  const { apiKey, base = META_API_BASE, model, messages, maxTokens, fetchFn, timeoutMs } = options;
+  const { apiKey, base = META_API_BASE, model, messages, maxTokens, responseFormat, fetchFn, timeoutMs } = options;
   const res = await metaRequest({
     apiKey,
     base,
     path: "/chat/completions",
     method: "POST",
-    body: { model, ...(maxTokens === undefined ? {} : { max_tokens: maxTokens }), messages },
+    body: { model, ...(maxTokens === undefined ? {} : { max_tokens: maxTokens }), ...(responseFormat ? { response_format: responseFormat } : {}), messages },
     fetchFn,
     timeoutMs,
   });

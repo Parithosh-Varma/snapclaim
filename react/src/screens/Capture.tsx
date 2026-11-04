@@ -64,14 +64,12 @@ export default function Capture() {
 
   const noCam = typeof navigator !== "undefined" && !navigator.mediaDevices?.getUserMedia;
 
-  /* one status line, driven by state */
-  const statusLine = enableCam
-    ? "Enable camera"
-    : !live
-      ? "Starting camera…"
-      : noScale
-        ? "Percentages only - no millimetres"
-        : "Fit damage + coin in frame - you'll tap both next";
+  /* one status line, driven by state (hidden while the permit card owns the state) */
+  const statusLine = !live
+    ? "Starting camera…"
+    : noScale
+      ? "Percentages only - no millimetres"
+      : "Fit damage + coin in frame - you'll tap both next";
 
   /* Double-tap guard: one shutter press, one still. No lock, no gate. */
   const shotBusy = useRef(false);
@@ -415,7 +413,7 @@ export default function Capture() {
               Coin tips
             </button>
           </div>
-          <div id="coinHint" role="status">{statusLine}</div>
+          {!enableCam && <div id="coinHint" role="status">{statusLine}</div>}
           {live && !noScale && (
             <div style={{ alignSelf: "center", marginTop: 8 }}>
               {/* Live detector plugs in here: detected flips the chip with
@@ -443,13 +441,14 @@ export default function Capture() {
                 <img className="mark-light" src="./snapclaim-mark.png" alt="" width={40} height={38} />
                 <img className="mark-dark" src="./snapclaim-mark-dark.png" alt="" width={40} height={38} />
               </span>
-              <p id="permitTitle">{noCam ? "No camera on this device" : "Camera is off"}</p>
-              <p id="permitDesc">{noCam ? "Upload a photo or pick a sample instead - measuring works the same." : "We use your camera to measure your object. Photos stay on this device."}</p>
+              <p id="permitTitle" className="cap-title">{noCam ? "No camera on this device" : "Camera is off"}</p>
+              <p id="permitDesc" className="cap-desc">{noCam ? "Upload a photo or pick a sample instead - measuring works the same." : "Your photo goes to the SnapClaim backend to outline the damage. Measuring needs a connection."}</p>
+              <div className="cap-actions">
               {!noCam && (
                 <button
                   id="enableCam"
                   type="button"
-                  className={`btn-primary${acquiring ? " busy" : ""}`}
+                  className={`cap-primary${acquiring ? " busy" : ""}`}
                   disabled={acquiring}
                   aria-busy={acquiring}
                   onClick={() => {
@@ -463,17 +462,18 @@ export default function Capture() {
                 </button>
               )}
               {blocked && !noCam && (
-                <p className="permit-hint">Blocked in your browser? Click the lock icon in the address bar → Allow camera, then tap Enable camera.</p>
+                <div className="cap-alert" role="note"><b>Blocked in your browser?</b><span>Click the lock icon in the address bar → Allow camera, then tap Enable camera.</span></div>
               )}
-              <div className="alt-row permit-alt">
-                <button id="uploadBtn" className="alt-btn" type="button" onClick={() => fileRef.current?.click()}>
+              <div className="cap-row">
+                <button id="uploadBtn" className="cap-secondary" type="button" onClick={() => fileRef.current?.click()}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5" /><path d="M4 20h16" /></svg>
                   Upload photo
                 </button>
-                <button id="altEntry" className="alt-btn" type="button" onClick={onSample}>
+                <button id="altEntry" className="cap-secondary" type="button" onClick={onSample}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="0" /><circle cx="12" cy="13.5" r="3.4" /></svg>
                   Use a sample
                 </button>
+              </div>
               </div>
             </div>
           ) : (

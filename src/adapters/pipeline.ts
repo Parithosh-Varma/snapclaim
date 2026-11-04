@@ -8,9 +8,10 @@ import { META_MODELS } from "../../backend/metaApi.ts";
 /**
  * SnapClaim inference pipeline, wired to Meta model ids.
  *
- * Three live integrations, one per stage:
- * - segment  -> sam-3.1            (SAM 3.1 point/box prompts, Meta Responses API)
- * - findings -> muse-spark        (Spark chat completions, Meta Model API)
+ * Four live integrations, one per stage:
+ * - segment  -> sam-3.1            (SAM 3.1 point/box + multi-object + negative prompts, Meta Responses API)
+ * - findings -> muse-spark        (Spark chat completions, text + multimodal image_url, plain-text JSON array: response_format json_object makes both models echo the request)
+ * - describe -> muse-spark        (Spark vision: photo + note to prose, Meta chat completions)
  * - skeptic  -> muse-spark-open   (Spark Open on Baseten, independent check)
  * - voice    -> muse-voice        (Muse Voice Transcribe, Meta Model API)
  *
@@ -20,7 +21,8 @@ import { META_MODELS } from "../../backend/metaApi.ts";
 
 export const PIPELINE_STAGES = [
   { stage: "segment", model: META_MODELS.sam, transport: "Meta Responses API", code: "backend/app.ts:segmentBody + src/vision/sam.ts:segmentWithSam" },
-  { stage: "findings", model: META_MODELS.spark, transport: "Meta chat completions", code: "backend/providers.ts:MetaFindingsProvider" },
+  { stage: "findings", model: META_MODELS.spark, transport: "Meta chat completions multimodal", code: "backend/providers.ts:MetaFindingsProvider" },
+  { stage: "describe", model: META_MODELS.spark, transport: "Meta chat completions vision", code: "backend/app.ts:describeBody" },
   { stage: "skeptic", model: META_MODELS.sparkOpen, transport: "Baseten chat completions", code: "backend/providers.ts:BasetenSkepticProvider" },
   { stage: "voice", model: META_MODELS.voice, transport: "Meta transcribe multipart", code: "backend/transcribe.ts:transcribeWithMuse" },
 ] as const;

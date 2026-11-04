@@ -29,8 +29,9 @@ test("React app exists with the full screen set", () => {
   for (const screen of ["tHome", "tCases", "tSettings", "capture", "sReview", "sMark", "sSay", "sNum", "sCheck", "sReport"]) {
     assert.ok(app.includes(`"${screen}"`), `screen ${screen} in the React state machine`);
   }
-  assert.ok(app.includes('id="stepLoading"'), "every screen change shows the forced step loader");
-  assert.ok(app.includes("1000"), "step loader is scripted to a full second");
+  assert.ok(!app.includes('id="stepLoading"'), "no fake loader overlay over loaded pages");
+  assert.ok(!app.includes("stepTimer"), "no loader timers on navigation");
+  assert.ok(app.includes("persistDraftSoon"), "step-change draft save stays deferred past paint");
   assert.ok(app.includes("20 * 60 * 1000"), "long-lived app polls for worker updates");
   const mark = read("react/src/screens/Mark.tsx");
   assert.ok(mark.includes("taking too long to load"), "a stalled photo decode fails visible, never silent");
@@ -54,6 +55,10 @@ test("Capture has one primary action and camera-free paths", () => {
   }
   assert.ok(!cap.includes("Place a coin to unlock"), "no coin gate blocks the shutter");
   assert.ok(!cap.includes("CoinGate"), "live detection gate is gone");
+  assert.ok(cap.includes("cap-title") && cap.includes("cap-desc") && cap.includes("cap-actions"), "permit card uses the designed cap styles, not dead classes");
+  assert.ok(!cap.includes("permit-hint") && !cap.includes("permit-alt"), "no unstyled permit leftovers");
+  assert.ok(cap.includes("goes to the SnapClaim backend"), "permit copy is honest about photo upload");
+  assert.ok(!cap.includes("Photos stay on this device"), "no false on-device promise on the permit card");
 });
 
 test("Mark gates on crack selection; cloud-only, no model download", () => {
@@ -65,6 +70,7 @@ test("Mark gates on crack selection; cloud-only, no model download", () => {
   assert.ok(mark.includes("segmentCoinViaApi"), "coin tap is outlined via SAM like the crack");
   assert.ok(!mark.includes("estR"), "no guessed coin radius feeds the measurement");
   assert.ok(mark.includes("there is nothing outlined to measure"), "measure refuses an empty mask even if forced");
+  assert.ok(!mark.includes("useEffect(() => () => { measureSeq.current++; }, [])"), "no unmount bump: measure navigates mid-run by design, and invalidating it drops every measurement after /v1/observe");
   assert.ok(mark.includes('histRef'), "undo tracks tap order across crack and coin");
   assert.ok(mark.includes('last === "coin"'), "undo pops the last tap first, including the coin");
 });
@@ -120,6 +126,8 @@ test("Report is an official document with PDF and send options", () => {
   assert.ok(rep.includes("locationImg"), "the share link carries the location photo");
   assert.ok(rep.includes('id="linkBtn"'), "report offers a landlord share link");
   assert.ok(rep.includes('id="linkFallback"'), "blocked clipboards get a manual-copy field, never silence");
+  assert.ok(rep.includes("{gateOk &&"), "share/export options appear only after Generate report succeeds");
+  assert.ok(rep.includes("useState(!!s.annexUrl)"), "report state survives leaving and coming back (no second Generate, no duplicate case)");
   assert.ok(rep.includes("/lib/share"), "share link is built locally, nothing uploaded");
   const app = read("react/src/App.tsx");
   assert.ok(app.includes('"sShared"'), "a shared link opens the read-only report view");
@@ -153,8 +161,12 @@ test("React port keeps backend, worker and privacy contracts", () => {
   assert.ok(check.includes("console.error"), "React logs backend errors with status");
   assert.ok(check.includes("Skeptic unavailable") && check.includes("Cross-check unavailable"), "React names 4xx states");
   assert.ok(check.includes('id="xPhotoCard"') && check.includes('id="xChip"'), "React shows both cross-check outlines over the photo");
+  assert.ok(check.includes("Same model, fresh prompt"), "cross-check copy is honest about re-prompting SAM");
+  assert.ok(!check.includes("on this device (SlimSAM-vs-SAM IoU)"), "no stale on-device comparison story");
+  assert.ok(!check.includes("segmentOnDevice"), "dead on-device fallback is gone from Check");
   const num = read("react/src/screens/Numbers.tsx");
   assert.ok(num.includes('id="skipChecks"'), "Numbers offers skipping the double-check");
+  assert.ok(num.includes("Back to Describe and retry"), "report failure offers a way back, not a JSON dump");
   const say = read("react/src/screens/Say.tsx");
   assert.ok(!say.includes('id="aiDescribeBtn"'), "Say stays manual - no auto-fill button");
   assert.ok(say.includes("/v1/describe"), "the manual line is AI-extended on the way to the report");
@@ -164,10 +176,15 @@ test("React port keeps backend, worker and privacy contracts", () => {
   assert.ok(say.includes('role="progressbar"') && say.includes("Step 3 of 6"), "Say step progress is an accessible progressbar");
   assert.ok(say.includes('aria-label="Back to Mark damage"') && say.includes('aria-label="Dictate description"'),
     "Say back and mic buttons are labelled for assistive tech");
-  assert.ok(say.includes("noticed this morning"), "Say textarea carries a concrete placeholder");
+  assert.ok(say.includes("e.g. Crack on the pavement slab"), "Say textarea carries a concrete placeholder");
   assert.ok(say.includes("disabled={sending || !hasText}"), "Continue stays disabled until the field has content");
-  assert.ok(say.includes("Saving…") && say.includes(": \"Continue\""), "Continue keeps its label and names the saving state");
+  assert.ok(say.includes("Generating…") && say.includes(": \"Continue\""), "Continue keeps its label and names the generating state");
   assert.ok(say.includes("Measurements captured"), "measurement status is a chip, not an orphan line");
+  assert.ok(say.includes("body.imageUrl = photoDataUrl"), "the report photo grounds Spark multimodally");
+  const tabsScreen = read("react/src/screens/Tabs.tsx");
+  assert.ok(tabsScreen.includes("openCaseId"), "Home recent items open the case dialog, not the bare list");
+  const markScreen = read("react/src/screens/Mark.tsx");
+  assert.ok(markScreen.includes("the list is ignored"), "Mark states which coin size wins");
   assert.ok(read("react/src/lib/ui.tsx").includes('role="progressbar"'), "TopBar exposes the step progress");
   for (const [screen, step] of [["Mark", 2], ["Numbers", 4], ["Check", 5], ["Report", 6], ["Shared", 6]] as const) {
     const src = read(`react/src/screens/${screen}.tsx`);
@@ -181,6 +198,9 @@ test("React port keeps backend, worker and privacy contracts", () => {
   assert.ok(tabs.includes('id="metaKeyInput"') && tabs.includes('id="byokSave"') && tabs.includes('id="byokClear"'), "settings offers device-only BYOK fields");
   assert.ok(tabs.includes("never stored server-side"), "BYOK copy states the key handling honestly");
   const css = read("react/src/styles.css");
+  assert.ok(css.includes(".tab-pill") && css.includes("border-radius:999px"), "active tab is a rounded pill, not a hard rectangle");
+  assert.ok(css.includes("@media (min-width:900px)") && css.includes("border-radius:22px"), "desktop gets a floating dock, not a stranded phone bar");
+  assert.ok(css.includes("@keyframes screenIn"), "screen changes fade instead of a loader overlay");
   assert.ok(css.includes(".samplecell .imgph") && css.includes("aspect-ratio:4/3"), "sample thumbs reserve their box so the first tap cannot miss on reflow");
   for (const sel of [".field-input{", ".text-input{", 'dialog#caseDlg input[type="text"]']) {
     const i = css.indexOf(sel);
@@ -239,6 +259,14 @@ test("React store is the vanilla store contract", () => {
   assert.ok(store.includes('CASES_KEY = "snapclaim.cases.v1"'), "same localStorage key: existing cases survive the switch");
   assert.ok(store.includes('SETTINGS_KEY = "snapclaim.settings.v1"'), "same settings key");
   assert.ok(store.includes("photoDropped"), "quota photo-drop kept");
+  assert.ok(store.includes("crackWidthMm"), "saved cases keep the width so the PDF survives a reload");
+});
+
+test("Saved cases offer a PDF, not just JSON", () => {
+  const tabs = read("react/src/screens/Tabs.tsx");
+  assert.ok(tabs.includes('id="dlgPdf"'), "case dialog has a Download PDF button");
+  assert.ok(tabs.includes("buildReportPdf"), "saved-case PDF is built offline from the stored numbers and photos");
+  assert.ok(tabs.includes("Export JSON"), "raw-data button is labeled JSON so nobody expects a report from it");
 });
 
 test("Percent-only is a toggle, never a trap", () => {

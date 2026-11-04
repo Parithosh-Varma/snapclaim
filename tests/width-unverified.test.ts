@@ -32,7 +32,9 @@ test("report tables and PDF exports label crack width unverified, not confirmed"
   const widthRow = report.match(/Crack width[\s\S]{0,500}?<\/tr>/)?.[0] ?? "";
   assert.match(widthRow, /Unverified/, "report table width row is unverified");
   assert.ok(!/Confirmed/.test(widthRow), "report table width row is not confirmed");
-  assert.match(report, /row\("Crack width", `\$\{String\(f\.crackWidthMm\)\} mm`, refs\.width, "Unverified/, "PDF width row is unverified");
+  assert.match(report, /widthStatus: w === null \? "confirmed" : "unverified",/, "PDF width card is unverified whenever a width exists");
+  assert.match(report, /unverified: method === "calibrated_width",/, "PDF width receipt is unverified");
   const shared = read("react/src/screens/Shared.tsx");
-  assert.match(shared, /row\("Crack width", `\$\{rep\.widthMm\} mm`, "Unverified/, "shared PDF width row is unverified");
+  assert.match(shared, /widthStatus: \(rep\.widthMm \?\? null\) === null \? \("confirmed" as const\) : \("unverified" as const\)/, "shared PDF width is unverified");
+  assert.match(shared, /Crack width<\/th><td>\{rep\.widthMm\} mm · Unverified/, "shared table width row is unverified");
 });

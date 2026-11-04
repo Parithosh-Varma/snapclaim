@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.13" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <meta name="author" content="OpenCode Audit" />
+  <meta name="dcterms.date" content="2026-11-04" />
+  <title>SnapClaim — Full Project Audit</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      color: light-dark(#1a1a1a, #fdfdfd);
+      background-color: #fdfdfd;
+      background-color: light-dark(#fdfdfd, #1a1a1a);
+      color-scheme: light dark;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        color-scheme: light only;
+      }
+      html, body, pre, code {
+        background-color: transparent;
+      }
+      body, a, a:visited, blockquote {
+        color: black;
+      }
+      pre, code {
+        padding: 0;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a, a:visited {
+      color: inherit;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid;
+      border-color: #e6e6e6;
+      border-color: light-dark(#e6e6e6, #4c4c4c);
+      color: #606060;
+      color: light-dark(#606060, #b6b6b6);
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid currentColor;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid currentColor;
+      border-bottom: 1px solid currentColor;
+    }
+    th {
+      border-top: 1px solid currentColor;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">SnapClaim — Full Project Audit</h1>
+<p class="subtitle">Architecture, Code Quality, Security, Testing &amp;
+Recommendations</p>
+<p class="author">OpenCode Audit</p>
+<p class="date">2026-11-04</p>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#executive-summary" id="toc-executive-summary">Executive
+Summary</a></li>
+<li><a href="#inventory" id="toc-inventory">Inventory</a>
+<ul>
+<li><a href="#repository-layout" id="toc-repository-layout">Repository
+layout</a></li>
+<li><a href="#entry-points" id="toc-entry-points">Entry points</a></li>
+<li><a href="#technology-stack" id="toc-technology-stack">Technology
+stack</a></li>
+</ul></li>
+<li><a href="#architecture" id="toc-architecture">Architecture</a>
+<ul>
+<li><a href="#pipeline" id="toc-pipeline">Pipeline</a></li>
+<li><a href="#data-flow-happy-path" id="toc-data-flow-happy-path">Data
+flow (happy path)</a></li>
+<li><a href="#api-surface" id="toc-api-surface">API surface</a></li>
+</ul></li>
+<li><a href="#code-quality" id="toc-code-quality">Code Quality</a>
+<ul>
+<li><a href="#strengths" id="toc-strengths">Strengths</a></li>
+<li><a href="#issues-found" id="toc-issues-found">Issues found</a></li>
+</ul></li>
+<li><a href="#security-audit" id="toc-security-audit">Security Audit</a>
+<ul>
+<li><a href="#what-is-done-well" id="toc-what-is-done-well">What is done
+well</a></li>
+<li><a href="#findings" id="toc-findings">Findings</a></li>
+</ul></li>
+<li><a href="#testing-and-evaluation"
+id="toc-testing-and-evaluation">Testing and Evaluation</a>
+<ul>
+<li><a href="#unit-integration-tests"
+id="toc-unit-integration-tests">Unit / integration tests</a></li>
+<li><a href="#deterministic-eval-eval"
+id="toc-deterministic-eval-eval">Deterministic eval
+(<code>eval/</code>)</a></li>
+<li><a href="#held-out-bench-bench"
+id="toc-held-out-bench-bench">Held-out bench
+(<code>bench/</code>)</a></li>
+<li><a href="#case-study" id="toc-case-study">Case study</a></li>
+</ul></li>
+<li><a href="#documentation"
+id="toc-documentation">Documentation</a></li>
+<li><a href="#deployment-and-operations"
+id="toc-deployment-and-operations">Deployment and Operations</a></li>
+<li><a href="#cost-model" id="toc-cost-model">Cost Model</a></li>
+<li><a href="#recommendations"
+id="toc-recommendations">Recommendations</a>
+<ul>
+<li><a href="#p0-before-any-real-user-data"
+id="toc-p0-before-any-real-user-data">P0 — before any real user
+data</a></li>
+<li><a href="#p1-before-pilot" id="toc-p1-before-pilot">P1 — before
+pilot</a></li>
+<li><a href="#p2-polish" id="toc-p2-polish">P2 — polish</a></li>
+</ul></li>
+<li><a href="#risk-register" id="toc-risk-register">Risk
+Register</a></li>
+<li><a href="#appendix-a-file-map-selected"
+id="toc-appendix-a-file-map-selected">Appendix A — File Map
+(selected)</a></li>
+<li><a href="#appendix-b-audit-method"
+id="toc-appendix-b-audit-method">Appendix B — Audit Method</a></li>
+<li><a href="#document-control" id="toc-document-control">Document
+Control</a></li>
+</ul>
+</nav>
+<h1 id="executive-summary">Executive Summary</h1>
+<p>SnapClaim (“Computed, not generated”) is a damage-documentation
+pipeline: phone photo of damage plus a coin for scale plus one spoken
+line produces a claim-ready report where every number is measured,
+cited, and checked before shipping.</p>
+<p>The project is a 3-person student build for the Meta Global AI
+Hackathon (Oct 27 – Nov 4, 2026). It is technically ambitious and
+unusually rigorous for a hackathon: deterministic measurement core,
+receipt ledger, evidence gate, skeptic re-check, replay determinism,
+frozen eval split, and tape-measured ground truth.</p>
+<p>Overall verdict: <strong>strong architecture, honest evaluation,
+production-plausible demo; needs security hardening, test-suite
+maintenance, and scope cleanup before real user data.</strong></p>
+<p>Key scores (1–5):</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Area</th>
+<th>Score</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Architecture</td>
+<td>5</td>
+<td>Clean separation: deterministic core vs. AI periphery</td>
+</tr>
+<tr>
+<td>Correctness / determinism</td>
+<td>4</td>
+<td>Receipts + gate + replay; provenance gap acknowledged</td>
+</tr>
+<tr>
+<td>Testing</td>
+<td>4</td>
+<td>347 claimed passing; stale counts in secondary READMEs</td>
+</tr>
+<tr>
+<td>Security</td>
+<td>3</td>
+<td>Good guards; gaps detailed below</td>
+</tr>
+<tr>
+<td>Documentation</td>
+<td>4</td>
+<td>Excellent README + DEV-LOG; some drift</td>
+</tr>
+<tr>
+<td>Deploy / Ops</td>
+<td>4</td>
+<td>Worker + Pages + Docker coherent</td>
+</tr>
+<tr>
+<td>Marketing / demo assets</td>
+<td>3</td>
+<td>Large surface; nested repo + big binaries</td>
+</tr>
+</tbody>
+</table>
+<h1 id="inventory">Inventory</h1>
+<h2 id="repository-layout">Repository layout</h2>
+<p>Top-level directories and their roles:</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Path</th>
+<th>Purpose</th>
+<th>Verdict</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>backend/</code></td>
+<td>Node + Cloudflare Worker API, single <code>handleRequest</code>
+router</td>
+<td>Keep; core server</td>
+</tr>
+<tr>
+<td><code>src/</code></td>
+<td>Deterministic core: engine, vision, receipts, gate, render</td>
+<td>Keep; the moat</td>
+</tr>
+<tr>
+<td><code>react/</code></td>
+<td>React 19 + Vite 6 app (primary UI)</td>
+<td>Keep; primary frontend</td>
+</tr>
+<tr>
+<td><code>pwa/</code></td>
+<td>Vanilla-JS PWA, on-device workers, zero npm deps</td>
+<td>Keep or merge; overlaps React</td>
+</tr>
+<tr>
+<td><code>migrations/</code></td>
+<td>Single D1 migration <code>0001_sessions.sql</code></td>
+<td>Keep</td>
+</tr>
+<tr>
+<td><code>tests/</code></td>
+<td>54 test files, <code>node --test</code></td>
+<td>Keep; prune stale</td>
+</tr>
+<tr>
+<td><code>eval/</code>, <code>bench/</code>, <code>fixtures/</code></td>
+<td>Deterministic eval, held-out bench, masks + photos</td>
+<td>Keep; strongest asset</td>
+</tr>
+<tr>
+<td><code>finetune/</code></td>
+<td>LoRA distill workflow for muse-glimmer / spark-open</td>
+<td>Keep; training-only</td>
+</tr>
+<tr>
+<td><code>snapclaim-marketing/</code></td>
+<td>Nested git repo: landing site + HyperFrames promo/demo video
+factory</td>
+<td>Isolate or submodule</td>
+</tr>
+<tr>
+<td><code>mg/</code></td>
+<td>Deterministic motion-graphics scene renderer (Playwright +
+ffmpeg)</td>
+<td>Keep; demo tooling</td>
+</tr>
+<tr>
+<td><code>demo/</code></td>
+<td><code>landlord-status.html</code>, explicitly DEMO ONLY</td>
+<td>Keep; clearly labeled</td>
+</tr>
+<tr>
+<td><code>CASE STUDY/</code></td>
+<td>Terrace-slab tape ground truth (227 mm) + photos</td>
+<td>Keep; evidence</td>
+</tr>
+<tr>
+<td><code>defensive-redirect/</code>,
+<code>redirector-worker/</code></td>
+<td>Typosquat trap + edge 301 canonicalizer</td>
+<td>Keep one; redundant</td>
+</tr>
+<tr>
+<td><code>pwa/</code>, <code>react/</code></td>
+<td>Two frontends doing the same flow</td>
+<td>Consolidate long-term</td>
+</tr>
+<tr>
+<td><code>frames/</code>, <code>snapclaim_demo/</code></td>
+<td>Empty scaffolds</td>
+<td>Delete or gitignore</td>
+</tr>
+</tbody>
+</table>
+<h2 id="entry-points">Entry points</h2>
+<table>
+<thead>
+<tr>
+<th>Entry</th>
+<th>File</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Node dev server</td>
+<td><code>backend/server.ts</code> (<code>:8787</code>)</td>
+</tr>
+<tr>
+<td>Cloudflare Worker</td>
+<td><code>backend/worker.ts</code></td>
+</tr>
+<tr>
+<td>Request router</td>
+<td><code>backend/app.ts</code> (<code>handleRequest</code>,
+<code>VERSION=0.3.0</code>)</td>
+</tr>
+<tr>
+<td>Core barrel</td>
+<td><code>src/index.ts</code></td>
+</tr>
+<tr>
+<td>React app</td>
+<td><code>react/src/main.tsx</code> →
+<code>react/src/App.tsx</code></td>
+</tr>
+<tr>
+<td>PWA app</td>
+<td><code>pwa/index.html</code> + <code>pwa/app.js</code></td>
+</tr>
+<tr>
+<td>Meta connectivity probe</td>
+<td><code>scripts/verify-meta.mjs</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="technology-stack">Technology stack</h2>
+<ul>
+<li>Runtime: Node <code>&gt;=22.18</code>, ESM, TypeScript executed
+directly via <code>node --experimental-strip-types</code>.</li>
+<li>Strict TS:
+<code>strict + noUncheckedIndexedAccess + allowImportingTsExtensions</code>.</li>
+<li>Dual-target backend: same <code>handleRequest()</code> served by
+Node <code>http.createServer</code> (local) and Cloudflare Worker (prod,
+optional D1 binding, <code>MemoryStore</code> fallback).</li>
+<li>Persistence: D1 <code>sessions(id, at, findings, mode)</code> or
+in-memory (cap 1000, list 50 newest-first). Optional Supabase Storage
+for <code>data:</code> segment inputs (best-effort, EXIF-stripped,
+magic-byte checked).</li>
+<li>AI models (via <code>backend/metaApi.ts</code>,
+<code>src/config/config.ts</code>): <code>muse-spark-1.3</code>
+(findings writer + describe), <code>sam-3.1</code> (segmentation),
+<code>muse-voice-transcribe-1.0</code> (ASR), <code>muse-glimmer</code>,
+<code>meta-models/muse-spark-open-1026</code> on Baseten (skeptic).</li>
+<li>Frontends: React 19.1 + Vite 6.3 PWA (<code>react/</code>); vanilla
+JS + Web Workers + IndexedDB PWA (<code>pwa/</code>, zero npm deps, CDN
+onnxruntime/transformers.js).</li>
+<li>Single extra runtime dep: <code>@meta-sam/parser</code> (Meta SAM
+License; only non-Apache dep).</li>
+</ul>
+<h1 id="architecture">Architecture</h1>
+<h2 id="pipeline">Pipeline</h2>
+<pre class="text"><code>MASKS (SlimSAM on-device preview, or live SAM 3.1 via /v1/segment, COCO RLE)
+  -&gt; MATH (src/engine: % damaged, crack length mm, mean width mm, area cm2;
+     no scale -&gt; percent-only, never upgraded)
+  -&gt; RECEIPTS (R001... formula + inputs + confidence, JSONL, src/receipts/)
+  -&gt; FINDINGS (Muse Spark 1.3 drafts; evidence-gate ships only if every
+     number cites a receipt, else 422 EvidenceError)
+  -&gt; SKEPTIC (Spark Open on Baseten re-derives; server re-measures via
+     crossCheckMeasurement; /v1/crosscheck IoU SlimSAM-vs-SAM)
+  -&gt; ANNEXURE (code-drawn SVG in src/render/, no image generation, no PDF)</code></pre>
+<p>Principles enforced in code: no LLM touches numbers; fail closed (503
+no key, 422 no evidence, never invent mask/transcript/number);
+everything replays via <code>npm run replay</code> producing MATCH or
+DRIFT.</p>
+<h2 id="data-flow-happy-path">Data flow (happy path)</h2>
+<p>Capture (photo + coin) -&gt; Mark (taps -&gt; RLE via SAM /
+on-device) -&gt; <code>/v1/observe</code> (pixels -&gt; component,
+masks, scale, overlay, tilt correction) -&gt; <code>/v1/measure</code>
+or <code>/v1/report</code> (numbers + receipts) -&gt; Say (transcript
+via <code>/v1/transcribe</code> or on-device) -&gt; Numbers (findings)
+-&gt; Check (<code>/v1/skeptic</code> + <code>/v1/crosscheck</code> IoU)
+-&gt; Report (<code>/v1/render</code> SVG annexure + share link
+<code>#/s/...</code> + <code>/v1/sessions</code> + Supabase
+archive).</p>
+<p>Trust rules: numbers only from receipts; <code>evidence-gate</code>
+rejects uncited or qualitative numbers;
+<code>REQUIRE_PIXEL_PROVENANCE=1</code> forces
+<code>provenance=pixel-verified</code>; live custom drafts rejected.</p>
+<h2 id="api-surface">API surface</h2>
+<p>All responses enveloped as
+<code>{ok, requestId, durationMs, result}</code>. POST body cap 1 MB.
+Tiered per-IP rate limit (billable 20/min for
+report/segment/transcribe/describe/findings/skeptic/render; 120/min
+others).</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Route</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET /v1/health</code></td>
+<td>public</td>
+<td><code>{version, time, mode: mock\|live\|config-error}</code></td>
+</tr>
+<tr>
+<td><code>GET /v1/spend</code></td>
+<td>ledger</td>
+<td>spend-guard state</td>
+</tr>
+<tr>
+<td><code>GET /v1/admin/status</code></td>
+<td>public</td>
+<td>mode readout</td>
+</tr>
+<tr>
+<td><code>POST /v1/admin/mode</code></td>
+<td>Bearer <code>ADMIN_TOKEN</code></td>
+<td>mock toggle, in-memory override</td>
+</tr>
+<tr>
+<td><code>POST /v1/measure</code></td>
+<td>deterministic, keyless</td>
+<td>component + masks -&gt; <code>measureSession</code></td>
+</tr>
+<tr>
+<td><code>POST /v1/observe</code></td>
+<td>deterministic</td>
+<td>COCO-RLE masks -&gt; overlay + tilt correction (cap 1.7x, refuse
+beyond 60 deg)</td>
+</tr>
+<tr>
+<td><code>POST /v1/crosscheck</code></td>
+<td>deterministic</td>
+<td>IoU of two RLEs -&gt;
+<code>{agreement, verdict, threshold}</code></td>
+</tr>
+<tr>
+<td><code>POST /v1/report</code></td>
+<td>billable</td>
+<td>measure + findings draft + repair-retry + validate</td>
+</tr>
+<tr>
+<td><code>POST /v1/segment</code></td>
+<td>billable</td>
+<td>mock fixture; live SAM 3.1 (<code>imageUrl</code>, points 1–16,
+optional box)</td>
+</tr>
+<tr>
+<td><code>POST /v1/transcribe</code></td>
+<td>billable</td>
+<td>mock fixture; live Muse ASR (<code>audioBase64</code>, max 4
+MB)</td>
+</tr>
+<tr>
+<td><code>POST /v1/describe</code></td>
+<td>billable</td>
+<td>mock fixture; live Spark caption (max 400 chars)</td>
+</tr>
+<tr>
+<td><code>POST /v1/findings</code>, <code>POST /v1/skeptic</code></td>
+<td>billable</td>
+<td>require component + masks for server recompute; anti-smuggle</td>
+</tr>
+<tr>
+<td><code>POST /v1/render</code></td>
+<td>billable</td>
+<td><code>reportBody</code> -&gt;
+<code>{svg, gate, findings}</code></td>
+</tr>
+<tr>
+<td><code>POST /v1/sessions</code>, <code>GET /v1/sessions</code></td>
+<td>store</td>
+<td>server-minted id/at; counts only, never photo bytes</td>
+</tr>
+<tr>
+<td><code>GET /</code></td>
+<td>static</td>
+<td>health / frontend shell</td>
+</tr>
+</tbody>
+</table>
+<h1 id="code-quality">Code Quality</h1>
+<h2 id="strengths">Strengths</h2>
+<ul>
+<li>Deterministic core (<code>src/</code>) is pure, network-free, and
+well factored: <code>engine/measure|math|severity|types</code>,
+<code>vision/observe|mask|sam|contour|agreement|exif|coin-detect</code>,
+<code>findings/evidence-gate</code>,
+<code>receipts/types|ledger|hash</code>, <code>render/svg</code>,
+<code>adapters/types|mock|pipeline</code>,
+<code>config/config|spend-guard</code>.</li>
+<li>Single canonical Meta client (<code>backend/metaApi.ts</code> -&gt;
+<code>https://api.meta.ai/v1</code> + Baseten), avoiding SDK
+sprawl.</li>
+<li>SSRF guard (<code>assertSafeImageUrl</code>), magic-byte image
+checks, EXIF stripping, 1 MB / 4 MB caps, per-IP rate limits, CORS
+allowlist, spend guard with pre-billing hold (429 at zero balance).</li>
+<li>Evidence gate constants are explicit (<code>MAX_DRAFTS 64</code>,
+per-unit backing rules, severity-word checks).</li>
+<li>Tilt handling is honest: correction capped, low-aspect or covered
+references rejected, sub-confidence scales downgraded to percent-only
+with <code>scale_rejected</code>, coplanar warnings, frame-exit treated
+as lower bound.</li>
+</ul>
+<h2 id="issues-found">Issues found</h2>
+<ol type="1">
+<li><p><strong>Two frontends, one flow.</strong> <code>react/</code> and
+<code>pwa/</code> implement the same Capture -&gt; Mark -&gt; Say -&gt;
+Numbers -&gt; Check -&gt; Report flow with duplicated allowlists
+(<code>isAllowedBackendUrl</code>), CSP meta, <code>_headers</code>,
+photo-check, tilt, RLE, and store logic. Drift is already policed by
+tests (<code>pwa-csp-allowlist</code>, <code>csp-headers</code>) but
+duplication doubles every future fix.</p></li>
+<li><p><strong>Backend <code>app.ts</code> is a god-router.</strong> All
+<code>*Body()</code> handlers plus routing (lines ~1245–1320) live in
+one file. Works, but review and test targeting would improve by
+splitting per-route modules.</p></li>
+<li><p><strong><code>admin.ts</code> in-memory
+<code>mockOverride</code>.</strong> Fine for demo; must not be mistaken
+for durable config. Prod already returns 403 when
+<code>ADMIN_TOKEN</code> is unset, which is correct.</p></li>
+<li><p><strong>Stale test counts in docs.</strong> Root README claims
+347 passing; <code>backend/README.md</code> still says 105. Cosmetic but
+undermines the rigor narrative the project sells.</p></li>
+<li><p><strong><code>.env.example</code> missing.</strong> Subagent glob
+found no <code>.env*</code> template; setup docs reference
+<code>cp .env.example .env</code> but the file is absent from the tree
+audited. Add it (keys optional, <code>MOCK_MODE</code>,
+<code>SPEND_GUARD_USD</code>, <code>ADMIN_TOKEN</code>,
+<code>ALLOWED_ORIGINS</code>,
+<code>MIN_REFERENCE_CONFIDENCE</code>).</p></li>
+<li><p><strong>Empty scaffold dirs.</strong> <code>frames/</code>,
+<code>snapclaim_demo/frames/</code>, <code>snapclaim_demo/raw/</code>
+are empty. Either gitignore them or remove them.</p></li>
+<li><p><strong>Redirect redundancy.</strong>
+<code>defensive-redirect/</code> (static <code>_redirects</code>) and
+<code>redirector-worker/</code> (edge Worker 301) solve the same
+canonicalization. Keep the Worker; keep the static one only as fallback
+with a comment.</p></li>
+<li><p><strong>Nested git repo.</strong>
+<code>snapclaim-marketing/</code> has its own <code>.git/</code>. It
+will confuse contributors and CI checkout. Convert to a git submodule
+with an explicit pointer, or split to a separate repo.</p></li>
+<li><p><strong>Large binaries in tree.</strong>
+<code>fixtures/photos/</code> (28+ real JPGs), <code>CASE STUDY</code>
+JPGs, <code>*.mp4</code> promo files, <code>mg/out/*.mp4</code>,
+<code>node_modules/</code> inside <code>mg/</code>. Ensure Git LFS or
+release-asset hosting; verify no photo bytes leak PII (plates, faces,
+addresses) before public release.</p></li>
+</ol>
+<h1 id="security-audit">Security Audit</h1>
+<p>Scope: static review of guards described in code and tests. No live
+penetration test performed.</p>
+<h2 id="what-is-done-well">What is done well</h2>
+<ul>
+<li>SSRF guard on image URLs; no raw user-URL fetch without
+validation.</li>
+<li>Magic-byte image validation; EXIF stripped before archive.</li>
+<li>Multipart WAV path with 4 MB cap; JSON body cap 1 MB (multibyte
+bypass covered by test).</li>
+<li>Tiered per-IP rate limiting using <code>cf-connecting-ip</code> in
+Worker, fallback in Node.</li>
+<li>Spend guard with reserve/settle semantics; per-process, fail-closed
+at zero.</li>
+<li>BYOK via <code>x-meta-key</code> / <code>x-baseten-key</code>
+headers so user keys never persist server-side.</li>
+<li><code>ADMIN_TOKEN</code> minimum 16 chars; admin writes 403 when
+unset in prod.</li>
+<li>CSP <code>connect-src</code> allowlist mirrored in
+<code>pwa/index.html</code>, <code>react/index.html</code>,
+<code>_headers</code> files, and <code>isAllowedBackendUrl</code> in
+both frontends; drift tests exist.</li>
+<li>D1 sessions store counts only, never photo bytes.</li>
+<li><code>sig=UNVERIFIED</code> HMAC stance is honest: replay MATCH is
+not provenance.</li>
+</ul>
+<h2 id="findings">Findings</h2>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th>ID</th>
+<th>Severity</th>
+<th>Finding</th>
+<th>Recommendation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S-01</td>
+<td>Medium</td>
+<td><code>MemoryStore</code> fallback keeps sessions in-process (cap
+1000). Single-instance data loss on restart; multi-instance
+divergence.</td>
+<td>Document as demo-only; require D1 (or KV) in prod; add startup log
+line stating store mode.</td>
+</tr>
+<tr>
+<td>S-02</td>
+<td>Medium</td>
+<td>Per-process spend guard does not aggregate across Worker isolates or
+Node replicas. Concurrent spend can exceed cap.</td>
+<td>Move ledger to D1/KV or Durable Object; or set conservative
+per-isolate caps and document the multiplier.</td>
+</tr>
+<tr>
+<td>S-03</td>
+<td>Medium</td>
+<td>BYOK keys travel in headers per request. Safe if TLS-only, but
+logs/proxies can capture them.</td>
+<td>Enforce HTTPS-only (HSTS), never log headers, add
+<code>Cache-Control: no-store</code> on keyed routes, document key
+rotation.</td>
+</tr>
+<tr>
+<td>S-04</td>
+<td>Low</td>
+<td><code>ADMIN_TOKEN</code> in <code>sessionStorage</code> (frontend
+Admin panel). XSS would expose it.</td>
+<td>Scope token lifetime, add logout/clear, set short expiry, consider
+httpOnly cookie flow later.</td>
+</tr>
+<tr>
+<td>S-05</td>
+<td>Low</td>
+<td>Supabase archive is best-effort with service credentials
+server-side. Bucket misconfiguration could make images public.</td>
+<td>Verify bucket is private; use signed URLs; log archive failures
+without leaking URLs.</td>
+</tr>
+<tr>
+<td>S-06</td>
+<td>Low</td>
+<td>Share links (<code>#/s/...</code>) embed findings client-side.
+Tampered links are readable but not verifiable.</td>
+<td>Sign share payloads (HMAC) and verify on load; mark unsigned shares
+as unverified in UI.</td>
+</tr>
+<tr>
+<td>S-07</td>
+<td>Info</td>
+<td>Staged-photo limitation is documented (replay MATCH != provenance).
+Capture hash + signature is future work
+(<code>src/receipts/hash.ts</code>).</td>
+<td>Keep the disclaimer in UI; prioritize capture-time hashing on the
+roadmap.</td>
+</tr>
+<tr>
+<td>S-08</td>
+<td>Info</td>
+<td>No PII scrub in demo photos/fixtures audit trail.</td>
+<td>Add a <code>fixtures/README</code> PII checklist gate before adding
+real photos; blur faces/plates.</td>
+</tr>
+</tbody>
+</table>
+<p>No hardcoded secrets were found by the auditing subagents. Canonical
+auth is <code>Authorization: Bearer $META_API_KEY</code> server-side,
+never committed.</p>
+<h1 id="testing-and-evaluation">Testing and Evaluation</h1>
+<h2 id="unit-integration-tests">Unit / integration tests</h2>
+<ul>
+<li>Runner: <code>node --test tests/*.test.ts</code>; typecheck
+<code>tsc --noEmit</code>; CI (<code>.github/workflows/ci</code>) runs
+install, test, typecheck, eval, mock smoke on Node 22.</li>
+<li>Claimed: 347 passing (root README). DEV-LOG shows growth 24 -&gt;
+244 across the build.</li>
+<li>Files: 54 test files covering admin, agreement, backend, bench
+archive/gap/run/score, bounty fixes, BYOK, coin detect/pick, config,
+contour, crosscheck, CSP headers, describe, draft, engine,
+evidence-gate, exif, mask-ops, metaApi, meta-integration constants,
+overlay, pdf, photo-check, pipeline, provenance, PWA
+backend-input/compute/CSP-allowlist/multishot/offline-copy/RLE/shell/store,
+react-cases/shell, receipt-chain/receipts, render, replay, sam,
+security, share-link, spend, storage, store, sw-version, theme-dark,
+tilt-meter/tilt, transcribe, vision-real/vision, plus
+<code>helpers.ts</code>.</li>
+<li>Invariants tested: per-unit gate backing, multibyte cap bypass,
+CSP/allowlist parity, offline copy, skeptic payload shape, coin radius,
+SAM decoder markers, frozen-split hash, replay MATCH/DRIFT + SHA256
+chain.</li>
+</ul>
+<p>Gaps: backend README count stale; no load/chaos test for rate limiter
+under concurrency; no contract test pinning Worker vs. Node parity
+beyond smoke; PWA/React parity is convention + a few tests rather than
+shared code.</p>
+<h2 id="deterministic-eval-eval">Deterministic eval
+(<code>eval/</code>)</h2>
+<p><code>eval/bench.ts</code>: <code>fixtures/masks/*.json</code> -&gt;
+<code>measureSession</code> -&gt; <code>fixtures/expected/*.json</code>
+with tolerance. Missing expected file = SKIP. Current state 7 pass, 0
+skip, 0 fail (wall-crack 5.17% / 85.9 mm / 2.6 mm / 2.19 cm2
+significant; stain 1.29% percent-only moderate; tilted-wall;
+facade-crack; door-peel; noscale).</p>
+<h2 id="held-out-bench-bench">Held-out bench (<code>bench/</code>)</h2>
+<ul>
+<li>Split frozen <code>2026-10-28T18:05+03:00</code>: 2 dev + 12
+held-out (4 public no-scale refusal cases CC BY-SA/CC0, 7 team-coin
+DSLR, 1 <code>terrace-slab-tape-01</code> tape 227 mm).</li>
+<li><code>run.ts</code> strict: exit 0 clean, 1
+incomplete/invented/missed, 2 unfrozen/unreadable. <code>score.ts</code>
+skeptic DISPUTED scoring. <code>gap.ts</code> pipeline vs. model-only
+vs. tape (medianAbsErrorMm + within-10%).</li>
+<li>Only <code>terrace-slab-tape-01</code> has runs so far; rest UNRUN
+(strict runner fails honestly rather than passing vacuously).</li>
+<li>First scored row (live 2026-11-02): pipeline 218.5 mm, error 8.5 mm
+(3.7%, IN) vs. Spark photo-alone 315 mm, error 88 mm (38.8%, OUT). n=1,
+clearly labeled as such.</li>
+</ul>
+<h2 id="case-study">Case study</h2>
+<p><code>CASE STUDY/</code>: terrace-slab ground truth 227 mm tape
+vs. 218.5 mm pipeline (R005), 3.7% error inside ±10%; Spark guess 315 mm
+(38.8%) outside. Report <code>SC-25D35C5E-report.md</code> lists 7
+receipts R001–R007, method, annexure v0.3.0 ABSOLUTE. This is the
+project’s strongest single evidence artifact.</p>
+<p>Assessment: the eval design is more honest than typical hackathon
+claims (frozen split, refusal cases, UNRUN instead of fake passes, n=1
+disclosed). Next step is filling the held-out runs, not adding new
+metrics.</p>
+<h1 id="documentation">Documentation</h1>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Doc</th>
+<th>Role</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>README.md</code></td>
+<td>Canonical purpose, quickstart, API, config, deploy, cost, privacy,
+eval, structure</td>
+<td>Excellent; fix test count + <code>.env.example</code> ref</td>
+</tr>
+<tr>
+<td><code>DEV-LOG.md</code></td>
+<td>Dated build log 2026-10-27 -&gt; 11-02, every live call + spend</td>
+<td>Excellent; rare transparency</td>
+</tr>
+<tr>
+<td><code>backend/README.md</code></td>
+<td>Router, routes/modes/limits, D1, deploy</td>
+<td>Good; stale test count</td>
+</tr>
+<tr>
+<td><code>eval/README.md</code></td>
+<td>eval/bench/replay/gap/archive usage, exit codes, frozen split</td>
+<td>Good</td>
+</tr>
+<tr>
+<td><code>docs/eval-report.md</code></td>
+<td>Setup, split/licenses, baselines, gap row, tilt, skeptic,
+misses</td>
+<td>Good; update as n grows</td>
+</tr>
+<tr>
+<td><code>docs/TEAM-SEARCH.md</code></td>
+<td>Team call, 4-model thesis, rigor moat</td>
+<td>Good context</td>
+</tr>
+<tr>
+<td><code>fixtures/README.md</code></td>
+<td>Engine fixtures vs. photo intake checklist, no staging</td>
+<td>Good; add PII gate</td>
+</tr>
+<tr>
+<td><code>finetune/README.md</code></td>
+<td>muse-glimmer / spark-open LoRA workflow</td>
+<td>Good</td>
+</tr>
+<tr>
+<td><code>react/README.md</code></td>
+<td>React port map</td>
+<td>Good</td>
+</tr>
+<tr>
+<td><code>CASE STUDY/README.md</code> + report</td>
+<td>Ground truth + receipts</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td><code>leaderboard.md</code>,
+<code>leaderboard-20261101.md</code></td>
+<td>Channel rigor analysis</td>
+<td>Context; non-shipping</td>
+</tr>
+<tr>
+<td><code>THIRD-PARTY-NOTICES.md</code></td>
+<td><code>@meta-sam/parser</code> Meta SAM License</td>
+<td>Keep current</td>
+</tr>
+<tr>
+<td><code>mg/backlog.md</code></td>
+<td>Motion-graphics backlog</td>
+<td>Fine</td>
+</tr>
+</tbody>
+</table>
+<h1 id="deployment-and-operations">Deployment and Operations</h1>
+<ul>
+<li>Local:
+<code>npm install; npm test; npm run typecheck; npm run backend:start</code>
+(<code>:8787</code>); <code>npm run backend:live</code> with
+<code>--env-file=.env</code>, <code>MOCK_MODE=0</code>.</li>
+<li>Docker: Node 22-alpine, <code>npm ci --omit=dev</code>, copies
+backend/src/eval/migrations/meta.config.json, <code>EXPOSE 8787</code>,
+<code>HEALTHCHECK /v1/health</code>;
+<code>docker compose up --build</code> (API <code>:8787</code>,
+<code>MOCK_MODE=1</code> default).</li>
+<li>Worker: <code>cd backend &amp;&amp; npx wrangler deploy</code>;
+secrets <code>META_API_KEY</code>, <code>BASETEN_API_KEY</code>; vars
+<code>SPEND_GUARD_USD=5</code>,
+<code>MIN_REFERENCE_CONFIDENCE=0.6</code>, <code>ALLOWED_ORIGINS</code>,
+<code>ADMIN_TOKEN</code>.</li>
+<li>Pages: React <code>dist/</code> via
+<code>npx wrangler pages deploy react/dist --project-name snapclaim</code>;
+PWA served static; SW caches shell, never <code>/v1</code>.</li>
+<li>Production URLs: app <code>https://snapclaim.pages.dev</code> (only
+<code>/admin</code> behind Cloudflare Access), backend
+<code>https://snapclaim-backend.parithosh.workers.dev</code>.</li>
+<li>Self-hosted backend allowlist must stay in sync across 6 locations
+(2 HTML CSP metas, 2 <code>_headers</code>, 2
+<code>isAllowedBackendUrl</code>); drift tests help but shared config
+would be better.</li>
+<li>Observability: <code>observability.enabled=false</code> in Worker
+config; health endpoint exists; no centralized logging/metrics. Fine for
+hackathon; add minimal request-ID logging + spend alerts before
+pilot.</li>
+</ul>
+<h1 id="cost-model">Cost Model</h1>
+<ul>
+<li>Mock mode: $0 (default, no keys).</li>
+<li>Live guarded by <code>MOCK_MODE=0</code>, keys,
+<code>SPEND_GUARD_USD</code> (default $5), BYOK headers.</li>
+<li>Observed spend (DEV-LOG): ~$0.0025 SAM image, ~$0.02 skeptic probes,
+~$0.0001 voice, ~$0.000143 Hinglish clip.
+<code>FINDINGS_COST_CEILING $0.05</code>.</li>
+<li>Model pricing noted: SAM 3.1 $0.0025/image, Muse voice $0.18/hr,
+Baseten skeptic $1.25/4.25 per MTok.</li>
+<li>Verdict: cost story is credible and demo-safe. Add per-request cost
+attribution to the spend ledger before any paid pilot.</li>
+</ul>
+<h1 id="recommendations">Recommendations</h1>
+<h2 id="p0-before-any-real-user-data">P0 — before any real user
+data</h2>
+<ol type="1">
+<li><p>Add <code>.env.example</code> and verify setup from clean
+checkout.</p></li>
+<li><p>Centralize backend allowlist into one shared config imported (or
+code-generated) by both frontends; keep drift tests.</p></li>
+<li><p>Decide Worker vs. static redirect; document the survivor; remove
+or clearly subordinate the other.</p></li>
+<li><p>Verify Supabase bucket privacy + signed URLs; add PII checklist
+to <code>fixtures/README.md</code>.</p></li>
+<li><p>Sign share payloads; mark unsigned shares unverified in
+UI.</p></li>
+</ol>
+<h2 id="p1-before-pilot">P1 — before pilot</h2>
+<ol start="6" type="1">
+<li><p>Move spend ledger + sessions to D1 (or KV/Durable Object); log
+store mode on boot.</p></li>
+<li><p>Split <code>backend/app.ts</code> router into per-route modules;
+add Worker-vs-Node contract test.</p></li>
+<li><p>Consolidate PWA + React shared logic (api, RLE, tilt,
+photo-check, store) into one shared package; keep both shells
+thin.</p></li>
+<li><p>Fill held-out bench runs (12 cases); publish updated
+<code>docs/eval-report.md</code> with n, errors, refusal
+precision.</p></li>
+<li><p>Convert <code>snapclaim-marketing/</code> to a submodule (or
+separate repo); move big MP4s to release assets or LFS.</p></li>
+</ol>
+<h2 id="p2-polish">P2 — polish</h2>
+<ol start="11" type="1">
+<li><p>Fix stale test counts; add CI check that README count matches
+actual <code>node --test</code> output.</p></li>
+<li><p>Add rate-limit concurrency test; HSTS + <code>no-store</code> on
+keyed routes; Admin token logout.</p></li>
+<li><p>Capture-time hashing + signature to close the provenance gap
+(replay MATCH != tamper evidence).</p></li>
+<li><p>Minimal ops: request-ID logs, spend alerts, Pages/Worker deploy
+runbook in <code>backend/README.md</code>.</p></li>
+</ol>
+<h1 id="risk-register">Risk Register</h1>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Likelihood</th>
+<th>Impact</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Staged photos accepted as genuine</td>
+<td>High</td>
+<td>High</td>
+<td>Capture hash/signature; UI disclaimer (already present); intake
+checklist</td>
+</tr>
+<tr>
+<td>Spend overrun across isolates</td>
+<td>Medium</td>
+<td>Medium</td>
+<td>Central ledger; conservative caps</td>
+</tr>
+<tr>
+<td>In-memory session loss</td>
+<td>Medium</td>
+<td>Low</td>
+<td>D1 in prod; boot-mode log</td>
+</tr>
+<tr>
+<td>Frontend drift (PWA vs React)</td>
+<td>Medium</td>
+<td>Medium</td>
+<td>Shared package; drift tests (exist)</td>
+</tr>
+<tr>
+<td>PII in public fixtures</td>
+<td>Low</td>
+<td>High</td>
+<td>PII gate; blur pass</td>
+</tr>
+<tr>
+<td>Nested-repo confusion</td>
+<td>Low</td>
+<td>Low</td>
+<td>Submodule split</td>
+</tr>
+<tr>
+<td>Eval n=1 overclaim</td>
+<td>Low</td>
+<td>Medium</td>
+<td>Already disclosed; fill bench</td>
+</tr>
+</tbody>
+</table>
+<h1 id="appendix-a-file-map-selected">Appendix A — File Map
+(selected)</h1>
+<ul>
+<li><code>backend/app.ts</code> — routing + validation,
+<code>VERSION=0.3.0</code>.</li>
+<li><code>backend/providers.ts</code> —
+<code>MetaFindingsProvider</code>, <code>BasetenSkepticProvider</code>,
+<code>FINDINGS_COST_CEILING</code>.</li>
+<li><code>backend/metaApi.ts</code> — <code>metaChatCompletions</code>,
+<code>verifyMetaConnectivity</code>.</li>
+<li><code>backend/transcribe.ts</code> —
+<code>transcribeWithMuse</code>, 4 MB cap.</li>
+<li><code>backend/storage.ts</code> —
+<code>archiveSegmentImage</code>.</li>
+<li><code>backend/store.ts</code> — <code>MemoryStore</code> /
+<code>D1Store</code>.</li>
+<li><code>backend/spend.ts</code>, <code>backend/admin.ts</code>,
+<code>backend/smoke.mjs</code>, <code>backend/wrangler.toml</code>.</li>
+<li><code>src/engine/measure|math|severity|types</code> — labels
+<code>crack|stain|peel|dent</code>.</li>
+<li><code>src/vision/observe|mask|sam|contour|agreement|exif|coin-detect</code>
+— RLE, skeleton, calibration, tilt.</li>
+<li><code>src/findings/evidence-gate.ts</code> —
+<code>MAX_DRAFTS 64</code>.</li>
+<li><code>src/receipts/types|ledger|hash</code> — receipt kinds, chain,
+HMAC stub.</li>
+<li><code>src/render/svg.ts</code> —
+<code>renderAnnexureSvg</code>.</li>
+<li><code>src/adapters/types|mock|pipeline</code>,
+<code>src/config/config|spend-guard</code>.</li>
+<li><code>react/src/lib/api|sam|session|store|draft|mask|rle|share|voice|pdf|photo-check|tilt</code>.</li>
+<li><code>react/src/screens/Capture|Mark|Say|Numbers|Check|Report|Shared|Admin|Tabs|SamplePicker</code>.</li>
+<li><code>pwa/app.js</code>, <code>pwa/store.js</code>,
+<code>pwa/sam-worker.js</code>, <code>pwa/voice-worker.js</code>,
+<code>pwa/sw.js</code>,
+<code>pwa/agree|compute|mask-ops|rle|photo-check|coin-model|tilt-meter</code>.</li>
+<li><code>migrations/0001_sessions.sql</code>.</li>
+<li><code>meta.config.json</code> — endpoint, models, pipeline
+pointers.</li>
+</ul>
+<h1 id="appendix-b-audit-method">Appendix B — Audit Method</h1>
+<ul>
+<li>Three parallel subagent sweeps (backend+core, docs+config+tests,
+marketing+assets+edge) against the working tree at
+<code>/Users/varma/Downloads/CODING/snapclaim</code>.</li>
+<li>No live pentest; no network calls beyond local reads; production
+URLs listed but not probed.</li>
+<li>PDF generated from this markdown via Pandoc (HTML standalone +
+Chromium print-to-PDF, A4) per the PDF Generation skill; xelatex
+unavailable in this sandbox (no sudo for BasicTeX), so the LaTeX path
+was replaced with an equivalent styled-HTML path.</li>
+</ul>
+<h1 id="document-control">Document Control</h1>
+<ul>
+<li>Source: <code>docs/AUDIT-REPORT.md</code> (this file).</li>
+<li>Generated: 2026-11-04.</li>
+<li>Classification: internal review; safe to share after PII pass on
+fixtures.</li>
+<li>Next review: after P0 items close or bench n reaches 13.</li>
+</ul>
+</body>
+</html>

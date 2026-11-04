@@ -1,11 +1,18 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
 
 // Static PWA. Root-absolute base: the app is served at "/" and also at
 // "/admin" (see public/_redirects), and a trailing-slash URL like /admin/
 // must still resolve /assets/*. Subpath hosting is not supported by design.
+const rootDir = dirname(fileURLToPath(import.meta.url));
+const pages = ["index.html", "how.html", "faq.html", "progress.html"];
+// Extra pages (how/faq/progress) exist after the landing merge; on older
+// main-only checkouts only index.html builds. Filtering by existence keeps
+// both green.
 export default defineConfig({
   base: "/",
   plugins: [
@@ -22,5 +29,15 @@ export default defineConfig({
       },
     },
   ],
-  build: { outDir: "dist", assetsDir: "assets" },
+  build: {
+    outDir: "dist",
+    assetsDir: "assets",
+    rollupOptions: {
+      input: Object.fromEntries(
+        pages
+          .filter((p) => existsSync(resolve(rootDir, p)))
+          .map((p) => [p.replace(/\.html$/, ""), resolve(rootDir, p)]),
+      ),
+    },
+  },
 });

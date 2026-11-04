@@ -1,0 +1,6 @@
+# Cloudflare Pages response headers for the gallery (static, no external requests).
+/*
+  Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; object-src https://snapclaim.pages.dev; base-uri 'self'; frame-ancestors 'self'
+  X-Frame-Options: SAMEORIGIN
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer

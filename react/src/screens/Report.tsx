@@ -29,8 +29,11 @@ export default function Report() {
   const [renderError, setRenderError] = useState<string | null>(null);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [state, setState] = useState("");
-  const [gateOk, setGateOk] = useState(false);
-  const [annexSrc, setAnnexSrc] = useState<string | null>(null);
+  // Report state survives leaving and coming back: the blob URL lives on the
+  // session, so a remount (Back to Checks and forward again) must not hide
+  // the share options or force a second Generate (which would re-save the case).
+  const [gateOk, setGateOk] = useState(!!s.annexUrl);
+  const [annexSrc, setAnnexSrc] = useState<string | null>(s.annexUrl ?? null);
   const [healthOut, setHealthOut] = useState("");
   const [installEvt, setInstallEvt] = useState<Event | null>(null);
 
@@ -60,6 +63,7 @@ export default function Report() {
       percent: f.percent,
       severity: String(f.severity),
       crackLengthMm: f.crackLengthMm ?? null,
+      crackWidthMm: f.crackWidthMm ?? null,
       areaCm2: f.areaCm2 ?? null,
       mode: s.measurement?.mode ?? "",
       photo: s.stillDataUrl || null,
@@ -78,7 +82,7 @@ export default function Report() {
     }
     setRendering(true);
     setRenderError(null);
-    setState("Generating report…");
+    setState("Sending measurement — the findings model drafts next (tens of seconds)…");
     const body = JSON.parse(JSON.stringify(s.payload)) as Record<string, unknown>;
     body.transcript = s.transcript;
     const overlay = body.overlay as { photoHref?: string } | undefined;
@@ -108,6 +112,7 @@ export default function Report() {
       }
       const { res, j } = out;
       if (!res.ok || !j.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
+      setState("Findings received — drawing the annexure…");
       const rawSvg = String((j.result as { svg?: unknown } | undefined)?.svg ?? "");
       // A photo-less annexure renders as outlines on grey with a footer and
       // no photo - never accept that silently.
@@ -287,10 +292,9 @@ export default function Report() {
         v === "ok" ? "passed" : v === "error" ? "failed" : v === "loading" ? "checking" : "not-run";
       const skeptic = mapCheck(ctx.checks.skeptic);
       const xcheck = mapCheck(ctx.checks.xcheck);
-      // Width is the number most likely to be challenged: it stays
-      // Unverified until an independent check (skeptic or cross-check) backs
-      // it, with the reason kept next to the card in plain language.
-      const widthBacked = skeptic === "passed" || xcheck === "passed";
+      // Width is the number most likely to be challenged. Neither the skeptic
+      // nor the mask cross-check measures it against a reference, so it stays
+      // Unverified (as on screen), with the reason next to the card.
       const allFindings = (s.measurement?.findings ?? [f]) as typeof f[];
       const findings: PdfFinding[] = allFindings.map((ff) => {
         const rids = ((ff as unknown as { receiptIds?: Record<string, string | null> }).receiptIds ?? {}) as Record<string, string | null>;
@@ -303,7 +307,7 @@ export default function Report() {
           areaCm2: ff.areaCm2 ?? null,
           severity: String(ff.severity ?? "moderate"),
           receiptIds: { ratio: rids.ratio ?? null, length: rids.length ?? null, area: rids.area ?? null, width: rids.width ?? null, severity: rids.severity ?? null },
-          widthStatus: w === null ? "confirmed" : widthBacked ? "confirmed" : "unverified",
+          widthStatus: w === null ? "confirmed" : "unverified",
           widthNote: "No reference to verify width against",
           statement: typeof ff.statement === "string" && ff.statement.trim() ? ff.statement : undefined,
         };
@@ -345,7 +349,7 @@ export default function Report() {
             measure: MEASURE_LABEL[method] ?? String(method).replace(/_/g, " "),
             value,
             formula: String(rr.formula ?? ""),
-            unverified: method === "calibrated_width" && !widthBacked,
+            unverified: method === "calibrated_width",
           };
         });
       const now = new Date();
@@ -616,23 +620,26 @@ export default function Report() {
             </button>
           </div>
           {state ? <div id="reportState" className="stateline" aria-live="polite">{state}</div> : null}
+          {/* Share and export options appear only after Generate report succeeds. */}
+          {gateOk && (
+          <>
           <div className="rowbtns">
-            <button id="pdfBtn" className={`btn-dark${pdfBusy ? " busy" : ""}`} type="button" disabled={!gateOk || pdfBusy} aria-busy={pdfBusy} onClick={() => void downloadPdf()}>{pdfBusy ? "Preparing PDF…" : "Download PDF"}</button>
+            <button id="pdfBtn" className={`btn-dark${pdfBusy ? " busy" : ""}`} type="button" disabled={pdfBusy} aria-busy={pdfBusy} onClick={() => void downloadPdf()}>{pdfBusy ? "Preparing PDF…" : "Download PDF"}</button>
           </div>
           <div className="rowbtns">
-            <button id="shareBtn" className="btn-ghostline" type="button" disabled={!gateOk} onClick={share}>Share</button>
-            <a id="emailBtn" className="btn-ghostline" href={gateOk ? mailUrl : undefined} aria-disabled={!gateOk} onClick={(e) => { if (!gateOk) e.preventDefault(); }}>Email</a>
+            <button id="shareBtn" className="btn-ghostline" type="button" onClick={share}>Share</button>
+            <a id="emailBtn" className="btn-ghostline" href={mailUrl}>Email</a>
           </div>
           <div className="rowbtns">
-            <button id="copyBtn" className="btn-ghostline" type="button" disabled={!gateOk} onClick={copy}>Copy summary</button>
-            <a id="waBtn" className="btn-ghostline" href={gateOk ? waUrl : undefined} target="_blank" rel="noreferrer noopener" aria-disabled={!gateOk} onClick={(e) => { if (!gateOk) e.preventDefault(); }}>WhatsApp</a>
+            <button id="copyBtn" className="btn-ghostline" type="button" onClick={copy}>Copy summary</button>
+            <a id="waBtn" className="btn-ghostline" href={waUrl} target="_blank" rel="noreferrer noopener">WhatsApp</a>
           </div>
           <button
             id="linkBtn"
             className={`btn-dark${linkBusy ? " busy" : ""}`}
             type="button"
             style={{ width: "100%", marginTop: 10 }}
-            disabled={!gateOk || linkBusy}
+            disabled={linkBusy}
             aria-busy={linkBusy}
             onClick={() => void copyShareLink()}
           >
@@ -654,6 +661,8 @@ export default function Report() {
                 style={{ marginTop: 0 }}
               />
             </details>
+          )}
+          </>
           )}
           <div className="rowbtns">
             {annexSrc && (

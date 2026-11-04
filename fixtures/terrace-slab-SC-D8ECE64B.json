@@ -43,7 +43,7 @@
   },
   "widthStatus": "Unverified",
   "coinMm": 25,
-  "coinNote": "25 mm measured (case study)",
+  "coinNote": "25 mm measured (case study, confirmed by measurer)",
   "rerunLengthMm": 237.5,
-  "rerunNote": "engine re-run of the same photo, ~2% run variance at the same coin"
+  "rerunNote": "second photo of the same crack, ~2% apart, 25 mm coin both shots"
 }

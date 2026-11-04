@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>09 replay — original vs recomputed</title>
+<script src="../lib/mg.js"></script>
+<style>
+  :root {
+    --ink: #0B0F14; --panel: #131A22; --line: #263241; --text: #EAF0F6; --muted: #8EA0B3;
+    --accent: #5CC8FF; --match: #3DDC97; --drift: #FFB547; --refuse: #FF5C6C;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 100%; height: 100%; background: var(--ink); }
+  #stage { position: relative; width: 100vw; height: 100vh; overflow: hidden;
+    background: var(--ink); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .tag { position: absolute; top: 5vmin; left: 8vmin; font-size: 2.6vmin; letter-spacing: .14em;
+    color: var(--muted); border: 1px solid var(--line); border-radius: 1.2vmin; padding: 1vmin 2vmin; }
+  #cols { position: absolute; left: 16vmin; right: 16vmin; top: 22vmin; display: flex; gap: 4vmin; }
+  .col { flex: 1; background: var(--panel); border: 1px solid var(--line); border-radius: 2vmin; padding: 3vmin; }
+  .col h3 { font-size: 3vmin; color: var(--muted); font-weight: 700; letter-spacing: .08em; margin-bottom: 2vmin; }
+  .col .n { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums; font-size: 4.2vmin; padding: 1vmin 0; color: var(--text); }
+  .col .n b { color: var(--accent); }
+  #stamp { position: absolute; left: 50%; top: 66vmin; width: 40vmin; margin-left: -20vmin;
+    text-align: center; padding: 2vmin 0; border: .8vmin solid var(--match); color: var(--match);
+    background: rgba(61, 220, 151, .08); border-radius: 2vmin; font-size: 6vmin; font-weight: 800; opacity: 0; }
+  #gloss { position: absolute; bottom: 6vmin; left: 0; right: 0; text-align: center;
+    font-size: 3.2vmin; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="tag">DEMO MODE · SAMPLE DATA</div>
+  <div id="cols">
+    <div class="col" id="c0"><h3>ORIGINAL</h3>
+      <div class="n"><b>R002</b> 1.58 %</div>
+      <div class="n"><b>R005</b> 239.2 mm</div>
+      <div class="n"><b>R006</b> 4.2 mm</div>
+    </div>
+    <div class="col" id="c1"><h3>RECOMPUTED</h3>
+      <div class="n"><b>R002</b> 1.58 %</div>
+      <div class="n"><b>R005</b> 239.2 mm</div>
+      <div class="n"><b>R006</b> 4.2 mm</div>
+    </div>
+  </div>
+  <div id="stamp">MATCH</div>
+  <div id="gloss">Replay recomputes the report from request + receipts.</div>
+</div>
+<script>
+(function () {
+  var c0 = document.getElementById('c0');
+  var c1 = document.getElementById('c1');
+  var stamp = document.getElementById('stamp');
+  var gloss = document.getElementById('gloss');
+  var rows0 = c0.querySelectorAll('.n');
+  var rows1 = c1.querySelectorAll('.n');
+  window.SCENE = {
+    duration: 8, fps: 30, loop: false,
+    seek: function (t) {
+      rows0.forEach(function (el, k) {
+        var q = mg.seg(t, 0.5 + k * 0.35, 1.0 + k * 0.35);
+        el.style.opacity = q;
+        el.style.transform = 'translateX(' + ((1 - mg.ease.outCubic(q)) * -4) + 'vmin)';
+      });
+      rows1.forEach(function (el, k) {
+        var q = mg.seg(t, 2.2 + k * 0.35, 2.7 + k * 0.35);
+        el.style.opacity = q;
+        el.style.transform = 'translateX(' + ((1 - mg.ease.outCubic(q)) * 4) + 'vmin)';
+      });
+      var sq = mg.seg(t, 4.6, 5.1);
+      stamp.style.opacity = sq;
+      stamp.style.transform = 'scale(' + mg.lerp(1.25, 1, mg.ease.outBack(sq)) + ') rotate(-3deg)';
+      gloss.style.opacity = mg.seg(t, 5.4, 6.0);
+    }
+  };
+  SCENE.seek(0);
+})();
+</script>
+</body>
+</html>

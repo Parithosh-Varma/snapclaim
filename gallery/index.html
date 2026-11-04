@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SnapClaim Gallery — measured damage, receipt by receipt</title>
+<meta name="description" content="Gallery of SnapClaim captures, pipeline diagrams, and the terrace-slab field proof. Every number cites a machine-checkable receipt.">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; object-src https://snapclaim.pages.dev; base-uri 'self'">
+<link rel="icon" href="assets/snapclaim-mark.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="site-header">
+  <a class="brand" href="https://snapclaim.pages.dev">
+    <img src="assets/snapclaim-mark.png" width="34" height="34" alt="SnapClaim mark">
+    <span>Snap<strong>Claim</strong> <em>/ gallery</em></span>
+  </a>
+  <nav aria-label="Exhibits">
+    <a href="#capture">A · Capture</a>
+    <a href="#pipeline">B · Pipeline</a>
+    <a href="#proof">C · Field proof</a>
+    <a href="#case-study">D · Case study</a>
+    <a href="#cost">E · Cost</a>
+  </nav>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <p class="kicker">Computed, not generated — field record SC-D8ECE64B</p>
+    <h1><span class="measure" aria-label="232 millimetres">232<span class="unit">mm</span></span></h1>
+    <p class="hero-sub">One terrace crack. Tape said <strong>227&nbsp;mm</strong>, a photo-alone guess said <strong>315&nbsp;mm</strong>, SnapClaim measured <strong>232&nbsp;mm [R005]</strong> — confirmed by gate, skeptic, and mask cross-check.</p>
+    <p class="cta-row">
+      <a class="btn" href="https://snapclaim.pages.dev">Try the live app</a>
+      <a class="btn ghost" href="https://landing.snapclaim.pages.dev">How it works</a>
+    </p>
+    <figure class="hero-photo">
+      <img src="assets/hero-crack.jpg" alt="Close-up of the measured terrace crack with a coin for scale">
+      <figcaption>The crack, photographed with a coin for scale.</figcaption>
+    </figure>
+  </section>
+
+  <section id="capture" class="exhibit">
+    <p class="exhibit-tag">Exhibit A</p>
+    <h2>Capture — a phone and a coin</h2>
+    <p>Sample captures from the team's test set. Tap any photo to enlarge it. In the app, you tap the damage and the coin; on-device SlimSAM previews the masks before anything is sent.</p>
+    <div class="grid" id="photo-grid">
+      <button class="tile" data-full="assets/samples/dsc_0682.jpg"><img loading="lazy" src="assets/samples/dsc_0682.jpg" alt="Sample damage capture 0682"></button>
+      <button class="tile" data-full="assets/samples/dsc_0683.jpg"><img loading="lazy" src="assets/samples/dsc_0683.jpg" alt="Sample damage capture 0683"></button>
+      <button class="tile" data-full="assets/samples/dsc_0684.jpg"><img loading="lazy" src="assets/samples/dsc_0684.jpg" alt="Sample damage capture 0684"></button>
+      <button class="tile" data-full="assets/samples/dsc_0685.jpg"><img loading="lazy" src="assets/samples/dsc_0685.jpg" alt="Sample damage capture 0685"></button>
+      <button class="tile" data-full="assets/samples/dsc_0686.jpg"><img loading="lazy" src="assets/samples/dsc_0686.jpg" alt="Sample damage capture 0686"></button>
+      <button class="tile" data-full="assets/samples/dsc_0687.jpg"><img loading="lazy" src="assets/samples/dsc_0687.jpg" alt="Sample damage capture 0687"></button>
+      <button class="tile" data-full="assets/samples/dsc_0688.jpg"><img loading="lazy" src="assets/samples/dsc_0688.jpg" alt="Sample damage capture 0688"></button>
+      <button class="tile" data-full="assets/samples/dsc_0690.jpg"><img loading="lazy" src="assets/samples/dsc_0690.jpg" alt="Sample damage capture 0690"></button>
+      <button class="tile" data-full="assets/samples/dsc_0691.jpg"><img loading="lazy" src="assets/samples/dsc_0691.jpg" alt="Sample damage capture 0691"></button>
+      <button class="tile" data-full="assets/samples/dsc_0692.jpg"><img loading="lazy" src="assets/samples/dsc_0692.jpg" alt="Sample damage capture 0692"></button>
+      <button class="tile" data-full="assets/samples/dsc_0693.jpg"><img loading="lazy" src="assets/samples/dsc_0693.jpg" alt="Sample damage capture 0693"></button>
+      <button class="tile" data-full="assets/samples/dsc_0694.jpg"><img loading="lazy" src="assets/samples/dsc_0694.jpg" alt="Sample damage capture 0694"></button>
+      <button class="tile" data-full="assets/samples/dsc_0695.jpg"><img loading="lazy" src="assets/samples/dsc_0695.jpg" alt="Sample damage capture 0695"></button>
+      <button class="tile" data-full="assets/samples/dsc_0697.jpg"><img loading="lazy" src="assets/samples/dsc_0697.jpg" alt="Sample damage capture 0697"></button>
+      <button class="tile" data-full="assets/samples/dsc_0698.jpg"><img loading="lazy" src="assets/samples/dsc_0698.jpg" alt="Sample damage capture 0698"></button>
+      <button class="tile" data-full="assets/samples/dsc_0699.jpg"><img loading="lazy" src="assets/samples/dsc_0699.jpg" alt="Sample damage capture 0699"></button>
+    </div>
+  </section>
+
+  <section id="pipeline" class="exhibit">
+    <p class="exhibit-tag">Exhibit B</p>
+    <h2>Pipeline — masks to receipts to sentences</h2>
+    <p>No LLM touches the numbers. Models write sentences; deterministic code does the arithmetic. The evidence gate ships a finding only if every number cites its receipt — otherwise HTTP 422 with named failures.</p>
+    <figure class="wide">
+      <img src="assets/how-it-works.svg" alt="Diagram: photo plus coin, tap to mask, deterministic measure, receipted values, gated findings; field proof 227 mm span vs measured vs 315 mm guess">
+    </figure>
+  </section>
+
+  <section id="proof" class="exhibit">
+    <p class="exhibit-tag">Exhibit C</p>
+    <h2>Field proof — terrace slab, ref SC-D8ECE64B</h2>
+    <div class="proof">
+      <figure>
+        <img src="assets/terrace-slab.jpg" alt="Terrace slab crack with tape measure and coin in frame">
+        <figcaption>Tape span 227 mm (225–230) for context; pin-to-pin path 274 mm.</figcaption>
+      </figure>
+      <div>
+        <ul class="receipts">
+          <li><span class="r">R005</span><span class="v">232 mm</span><span class="k">length</span><span class="stamp ok">Confirmed</span></li>
+          <li><span class="r">R006</span><span class="v">3.2 mm</span><span class="k">width</span><span class="stamp warn">Unverified — no width ground truth</span></li>
+          <li><span class="r">R002</span><span class="v">0.73%</span><span class="k">surface</span><span class="stamp ok">Confirmed</span></li>
+          <li><span class="r">R004</span><span class="v">7.48 cm²</span><span class="k">area</span><span class="stamp ok">Confirmed</span></li>
+          <li><span class="r">R007</span><span class="v">significant</span><span class="k">severity</span><span class="stamp ok">Confirmed</span></li>
+        </ul>
+        <p>Verification: evidence gate passed · skeptic verified · mask cross-check verified. Chart below shows the earlier run (span 227 mm, measured 237.5 mm with a user-supplied 25 mm coin, photo-alone guess 315 mm).</p>
+        <p class="cta-row">
+          <a class="btn" href="https://snapclaim.pages.dev/reports/snapclaim-SC-D8ECE64B.pdf">Report PDF</a>
+          <a class="btn ghost" href="https://snapclaim.pages.dev/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf">Case-study PDF</a>
+        </p>
+      </div>
+    </div>
+    <figure class="wide">
+      <img src="assets/measured-vs-guessed.svg" alt="Bar chart: span 227 mm, measured 237.5 mm, photo-alone guess 315 mm">
+    </figure>
+  </section>
+
+  <section id="case-study" class="exhibit">
+    <p class="exhibit-tag">Exhibit D</p>
+    <h2>Case study — comparative measurement of a terrace-slab crack</h2>
+    <p>The full 5-page write-up: tape span vs pin-to-pin path vs pipeline vs photo-alone guess, with receipts R001–R007. Read it below or open the PDF.</p>
+    <p class="cta-row">
+      <a class="btn" href="https://snapclaim.pages.dev/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf">Open PDF</a>
+    </p>
+    <figure class="wide pdf-frame">
+      <object data="https://snapclaim.pages.dev/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf" type="application/pdf" aria-label="Terrace-slab crack case study PDF">
+        <p>Your browser can't preview PDFs here — <a href="https://snapclaim.pages.dev/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf">open the case-study PDF directly</a>.</p>
+      </object>
+    </figure>
+  </section>
+
+  <section id="cost" class="exhibit">
+    <p class="exhibit-tag">Exhibit E</p>
+    <h2>Cost — what the $5 cap buys</h2>
+    <p>Live calls are metered on a hard per-isolate spend cap. The demo and CI run in mock mode at $0.</p>
+    <figure class="wide">
+      <img src="assets/cost-per-claim.svg" alt="Chart of cost per live claim versus the 5 dollar hard cap">
+    </figure>
+  </section>
+</main>
+
+<div class="lightbox" id="lightbox" hidden>
+  <button class="close" aria-label="Close">×</button>
+  <img src="assets/snapclaim-mark.png" alt="Enlarged gallery photo" id="lightbox-img">
+</div>
+
+<footer>
+  <p>SnapClaim gallery · <a href="https://github.com/Parithosh-Varma/snapclaim">Source on GitHub</a> · Apache-2.0 · Documentation, not legal or insurance advice.</p>
+</footer>
+<script src="app.js"></script>
+</body>
+</html>

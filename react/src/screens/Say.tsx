@@ -224,11 +224,16 @@ export default function Say() {
     // photo on the way to the report. Best-effort: any failure keeps the
     // user's own line and the report still runs.
     let contextLine = transcript;
+    // Reused for the multimodal findings call below: the photo travels with
+    // the receipts so Muse Spark grounds prose in pixels + numbers. The
+    // evidence gate still decides what ships - pixels alone prove nothing.
+    let photoDataUrl: string | null = null;
     if (s.photo) {
       setMicState("Extending your line with the photo…");
       try {
+        photoDataUrl = s.photo.toDataURL("image/jpeg", 0.8);
         const { res: dres, j: dj } = await apiPost(base, "/v1/describe", {
-          imageUrl: s.photo.toDataURL("image/jpeg", 0.8),
+          imageUrl: photoDataUrl,
           note: transcript,
         });
         const ext = String((dj.result as { description?: unknown } | undefined)?.description ?? "").trim().slice(0, 500);
@@ -243,6 +248,7 @@ export default function Say() {
     setMicState("Seeing measurements…");
     const body = JSON.parse(JSON.stringify(s.payload)) as Record<string, unknown>;
     body.transcript = contextLine;
+    if (photoDataUrl) body.imageUrl = photoDataUrl;
     const { res, j } = await apiPost(base, "/v1/report", body).catch(
       (): Awaited<ReturnType<typeof apiPost>> => ({
         res: { ok: false, status: 0 } as Response,
@@ -420,7 +426,7 @@ export default function Say() {
             aria-busy={sending}
             onClick={runReport}
           >
-            {sending ? (<><span className="sayspin" aria-hidden="true" /> Saving…</>) : "Continue"}
+            {sending ? (<><span className="sayspin" aria-hidden="true" /> Generating…</>) : "Continue"}
           </button>
           <button type="button" className="saybacklink" onClick={() => go("sMark")}>
             Back

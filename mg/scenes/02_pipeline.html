@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>02 pipeline — five nodes</title>
+<script src="../lib/mg.js"></script>
+<style>
+  :root {
+    --ink: #0B0F14; --panel: #131A22; --line: #263241; --text: #EAF0F6; --muted: #8EA0B3;
+    --accent: #5CC8FF; --match: #3DDC97; --drift: #FFB547; --refuse: #FF5C6C;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 100%; height: 100%; background: var(--ink); }
+  #stage { position: relative; width: 100vw; height: 100vh; overflow: hidden;
+    background: var(--ink); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .tag { position: absolute; top: 5vmin; left: 8vmin; font-size: 2.6vmin; letter-spacing: .14em;
+    color: var(--muted); border: 1px solid var(--line); border-radius: 1.2vmin; padding: 1vmin 2vmin; }
+  #flow { position: absolute; left: 8vmin; right: 8vmin; top: 34vmin; height: 30vmin; }
+  .wire { position: absolute; top: 9vmin; left: 4%; right: 4%; height: .6vmin; background: var(--line);
+    border-radius: .3vmin; }
+  .wire b { display: block; height: 100%; width: 100%; background: var(--accent);
+    border-radius: .3vmin; transform-origin: left; }
+  .node { position: absolute; top: 0; width: 17vmin; text-align: center; }
+  .dot { width: 18vmin; height: 18vmin; margin: 0 auto; border-radius: 50%;
+    border: .5vmin solid var(--line); background: var(--panel);
+    display: grid; place-items: center; font-size: 5vmin; font-weight: 800; color: var(--muted); }
+  .node.on .dot { border-color: var(--accent); color: var(--accent); }
+  .node p { margin-top: 2vmin; font-size: 2.9vmin; color: var(--muted); font-weight: 600; }
+  .node.on p { color: var(--text); }
+  #stamp { position: absolute; left: 50%; top: 68vmin; width: 44vmin; margin-left: -22vmin;
+    text-align: center; padding: 2.4vmin 0; border: .8vmin solid var(--match); color: var(--match);
+    border-radius: 2.4vmin; font-size: 6vmin; font-weight: 800; letter-spacing: .02em; opacity: 0;
+    background: rgba(61, 220, 151, .08); }
+  #gloss { position: absolute; bottom: 6vmin; left: 0; right: 0; text-align: center;
+    font-size: 3.2vmin; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="tag">DEMO MODE · SAMPLE DATA</div>
+  <div id="flow">
+    <div class="wire"><b id="wirefill"></b></div>
+    <div class="node" id="nd0" style="left:0;"><div class="dot">1</div><p>photo + coin<br>+ one line</p></div>
+    <div class="node" id="nd1" style="left:20.75%;"><div class="dot">2</div><p>tap masks<br>to pixels</p></div>
+    <div class="node" id="nd2" style="left:41.5%;"><div class="dot">3</div><p>deterministic<br>math</p></div>
+    <div class="node" id="nd3" style="left:62.25%;"><div class="dot">4</div><p>findings +<br>skeptic</p></div>
+    <div class="node" id="nd4" style="right:0;"><div class="dot">5</div><p>replayable<br>report</p></div>
+  </div>
+  <div id="stamp">COMPUTED</div>
+  <div id="gloss">Every number is measured, cited, and checked before it ships.</div>
+</div>
+<script>
+(function () {
+  var nodes = [0, 1, 2, 3, 4].map(function (k) { return document.getElementById('nd' + k); });
+  var wire = document.getElementById('wirefill');
+  var stamp = document.getElementById('stamp');
+  var gloss = document.getElementById('gloss');
+  window.SCENE = {
+    duration: 8, fps: 30, loop: false,
+    seek: function (t) {
+      for (var k = 0; k < 5; k++) {
+        var on = t >= 0.6 + k * 1.1 ? 1 : 0;
+        nodes[k].classList.toggle('on', !!on);
+        nodes[k].style.opacity = on ? 1 : 0.45;
+      }
+      wire.style.transform = 'scaleX(' + mg.tween(t, 0.6, 6.0, 0, 1, mg.ease.inOutCubic) + ')';
+      var sq = mg.seg(t, 6.2, 6.7);
+      stamp.style.opacity = sq;
+      stamp.style.transform = 'scale(' + mg.lerp(1.25, 1, mg.ease.outBack(sq)) + ') rotate(-3deg)';
+      gloss.style.opacity = mg.seg(t, 6.6, 7.1);
+    }
+  };
+  SCENE.seek(0);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>01 hook — guess vs ruler</title>
+<script src="../lib/mg.js"></script>
+<style>
+  :root {
+    --ink: #0B0F14; --panel: #131A22; --line: #263241; --text: #EAF0F6; --muted: #8EA0B3;
+    --accent: #5CC8FF; --match: #3DDC97; --drift: #FFB547; --refuse: #FF5C6C;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 100%; height: 100%; background: var(--ink); }
+  #stage { position: relative; width: 100vw; height: 100vh; overflow: hidden;
+    background: var(--ink); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .tag { position: absolute; top: 5vmin; left: 8vmin; font-size: 2.6vmin; letter-spacing: .14em;
+    color: var(--muted); border: 1px solid var(--line); border-radius: 1.2vmin; padding: 1vmin 2vmin; }
+  #guess { position: absolute; top: 30vmin; left: 0; right: 0; text-align: center;
+    font-size: 9vmin; font-weight: 600; font-style: italic; color: var(--muted); }
+  #strike { position: absolute; top: 36vmin; left: 18vmin; right: 18vmin; height: 1vmin;
+    background: var(--refuse); border-radius: .5vmin; transform-origin: left; }
+  #ruler { position: absolute; top: 58vmin; left: 14vmin; right: 14vmin; height: 12vmin; }
+  #ruler .bar { position: absolute; left: 0; right: 0; top: 0; height: 1vmin; background: var(--accent);
+    border-radius: .5vmin; transform-origin: left; }
+  #ruler .tick { position: absolute; top: 1vmin; width: .4vmin; height: 3.4vmin; background: var(--accent); opacity: .7; }
+  #true { position: absolute; top: 74vmin; left: 0; right: 0; text-align: center;
+    font-size: 8vmin; font-weight: 800; letter-spacing: -.02em; }
+  #true .num { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums; color: var(--accent); }
+  #gloss { position: absolute; bottom: 6vmin; left: 0; right: 0; text-align: center;
+    font-size: 3.2vmin; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="tag">DEMO MODE · SAMPLE DATA</div>
+  <div id="guess">“about a foot, probably”</div>
+  <div id="strike"></div>
+  <div id="ruler"><div class="bar" id="bar"></div></div>
+  <div id="true"><span class="num" id="num">0.0 mm</span> · measured</div>
+  <div id="gloss">SnapClaim measures damage instead of guessing it.</div>
+</div>
+<script>
+(function () {
+  var bar = document.getElementById('bar');
+  var ruler = document.getElementById('ruler');
+  for (var k = 0; k <= 20; k++) {
+    var tick = document.createElement('div');
+    tick.className = 'tick';
+    tick.style.left = (k * 5) + '%';
+    tick.style.height = (k % 5 === 0 ? 5 : 3.2) + 'vmin';
+    ruler.appendChild(tick);
+  }
+  var strike = document.getElementById('strike');
+  var guess = document.getElementById('guess');
+  var num = document.getElementById('num');
+  var tru = document.getElementById('true');
+  var gloss = document.getElementById('gloss');
+  var VAL = 239.2; // (b) real terrace-slab run, annexure v0.3.0
+  window.SCENE = {
+    duration: 5, fps: 30, loop: false,
+    seek: function (t) {
+      guess.style.opacity = 1 - mg.seg(t, 1.6, 2.2);
+      strike.style.transform = 'scaleX(' + mg.tween(t, 1.6, 2.4, 0, 1, mg.ease.inOutCubic) + ')';
+      bar.style.transform = 'scaleX(' + mg.tween(t, 2.2, 3.4, 0, 1, mg.ease.inOutCubic) + ')';
+      var nq = mg.tween(t, 2.4, 3.2, 0, VAL, mg.ease.outCubic);
+      num.textContent = mg.fmt(nq, 1) + ' mm';
+      tru.style.opacity = mg.seg(t, 2.6, 3.0);
+      gloss.style.opacity = mg.seg(t, 3.4, 3.9);
+    }
+  };
+  SCENE.seek(0);
+})();
+</script>
+</body>
+</html>
