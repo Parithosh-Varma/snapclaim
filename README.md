@@ -7,6 +7,8 @@
 
 > Point your phone at damage, speak one line about it - get a claim-ready report where every shipped number cites a machine-checkable receipt. **Computed, not generated.**
 
+**Built on Meta AI, a 4-model pipeline:** SAM 3.1 (damage masks) + Muse Spark 1.3 (evidence-gated findings) + **Muse Spark Open**, open weights served by Baseten (`meta-models/muse-spark-open-1026`, independent skeptic) + Muse Voice Transcribe (spoken intake). **Open-weights fine-tuning:** our crack-tuned SlimSAM-77 mask decoder is published on the Hugging Face Hub as [`tariqkhalif/slimsam-77-crack`](https://huggingface.co/tariqkhalif/slimsam-77-crack) (held-out crack mIoU 0.174 stock vs 0.697 tuned, [`training/slimsam-crack/`](./training/slimsam-crack/)). [`finetune/`](./finetune/) holds a LoRA (PEFT) distillation recipe for Muse Glimmer and Muse Spark Open; it is smoke-tested only, with no trained weights yet.
+
 [![tests](https://github.com/Parithosh-Varma/snapclaim/actions/workflows/ci.yml/badge.svg)](https://github.com/Parithosh-Varma/snapclaim/actions/workflows/ci.yml)
 > Live: <https://snapclaim.pages.dev> — open to anyone. Admin panel (`/admin`) is behind team login.
 
