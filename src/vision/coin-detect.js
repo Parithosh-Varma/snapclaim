@@ -5,6 +5,10 @@
 // light one on a dark wall). Each peak is then checked by fitting an ellipse
 // to the outline around it, which also finds a tilted coin's true centre.
 // Only the centre is used: it becomes the coin tap and SAM outlines the coin.
+// Note: the same ellipse fit gives coin tilt-correction for scale — aspect
+// (minor/major) is cos tilt and r is the area-equivalent sqrt(major*minor);
+// the SC-D8ECE64B 232mm measurement uses that ellipse tilt-correction for the
+// coin scale. This file keeps returning centre + r; no tilt logic here.
 // Pure (no DOM): the PWA passes RGBA pixels and tests pass synthetic ones.
 
 /** Longest side the search runs at; the photo is box-averaged down to it. */

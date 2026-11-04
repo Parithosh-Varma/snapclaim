@@ -22,7 +22,7 @@ export function SamplePicker({ open, picking, onClose, onPick }: {
       onClick={(e) => { if (e.target === ref.current) ref.current?.close(); }}
     >
       <h2 id="h-sample">Pick a sample photo</h2>
-      <p className="sub">Real field photos - tap one to mark and measure its damage.</p>
+      <p className="sub">Real field photos - tap one to mark and measure its damage. E.g. terrace-slab sample measured 232mm (R005).</p>
       <div className="samplegrid">
         {SAMPLE_PHOTOS.map((p) => (
           <button key={p.file} type="button" className={`samplecell${picking === p.file ? " cellbusy" : ""}`} disabled={picking !== null} onClick={() => onPick(p.file)}>

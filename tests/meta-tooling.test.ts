@@ -85,6 +85,13 @@ test("report accepts an optional photo and grounds Spark multimodally", async ()
   assert.ok(Array.isArray(user.content), "report photo reaches Spark as vision input");
 });
 
+test("react Say screen sends the photo with /v1/report for multimodal findings", async () => {
+  const { readFileSync } = await import("node:fs");
+  const say = readFileSync(new URL("../react/src/screens/Say.tsx", import.meta.url), "utf8");
+  assert.ok(say.includes("body.imageUrl = photoDataUrl"), "report body carries the photo for vision-grounded findings");
+  assert.ok(say.includes("/v1/report"), "report route still used");
+});
+
 test("segment accepts negative points and multi-object prompts in one image", async () => {
   // Negative-label points must pass validation (fail later at fetch, not 400).
   const neg = await handleRequest({

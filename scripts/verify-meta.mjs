@@ -4,6 +4,10 @@
 // no writes, no model calls. Exits 0 + JSON on success, non-zero + message
 // on failure (missing key, unreachable host, bad key).
 //
+// Production proof PDFs (quick verify — both expect HTTP 200):
+//   curl -s -o /dev/null -w '%{http_code}\n' https://snapclaim.pages.dev/reports/snapclaim-SC-D8ECE64B.pdf
+//   curl -s -o /dev/null -w '%{http_code}\n' "https://snapclaim.pages.dev/reports/Case Study Comparative Measurement of a Terrace-Slab Crack.pdf"
+//
 //   META_API_KEY=... node scripts/verify-meta.mjs [--live]
 // Reads .env if present (same convention as `npm run backend:live`).
 import { readFileSync, existsSync } from "node:fs";

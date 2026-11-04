@@ -18,6 +18,7 @@ import Admin from "./screens/Admin";
 import Shared from "./screens/Shared";
 import { decodeShareHash, type SharedReport } from "./lib/share";
 import { Home, Cases, Settings } from "./screens/Tabs";
+import Onboarding, { useOnboardingGate } from "./screens/Onboarding";
 
 export type Screen =
   | "tHome" | "tCases" | "tSettings" | "tAdmin"
@@ -54,6 +55,8 @@ export interface AppCtx {
   resumeDraft(): void;
   discardDraft(): void;
   clearDraft(): void;
+  /** Re-open first-run onboarding from Settings / How it works. */
+  replayOnboarding(): void;
 }
 
 const Ctx = createContext<AppCtx | null>(null);
@@ -228,6 +231,12 @@ export default function App() {
     s.payloadA = null;
     s.payloadB = null;
     s.winnerAngle = null;
+    // A new case supersedes any in-flight background job: its late landing
+    // must be discarded, never applied to the fresh claim.
+    s.measureSeq = (s.measureSeq ?? 0) + 1;
+    s.measureJob = null;
+    s.payload = null;
+    s.measurement = null;
     resetDmg(s);
     go("capture");
   }, [go]);
@@ -240,6 +249,11 @@ export default function App() {
     document.body.classList.toggle("reviewing", screen === "sReview");
     document.body.classList.toggle("step2", screen === "sSay");
   }, [screen]);
+
+  /* First-run onboarding gate: overlay until completed or dismissed. */
+  const obGate = useOnboardingGate();
+  const [obActive, setObActive] = useState(obGate.active);
+  const replayOnboarding = useCallback(() => setObActive(true), []);
 
   useEffect(() => {
     const sync = () => setOnline(navigator.onLine);
@@ -333,6 +347,7 @@ export default function App() {
     screen,
     go,
     startCapture,
+    replayOnboarding,
     toast,
     casesVersion,
     bumpCases,
@@ -355,6 +370,7 @@ export default function App() {
     clearDraft: clearDraftState,
   };
 
+  // Screen routing: field proof SC-D8ECE64B (232mm / 0.73% / 7.48cm2) - see /reports URLs.
   return (
     <Ctx.Provider value={ctx}>
       {(screen === "capture" || screen === "sReview") && <Capture />}
@@ -406,6 +422,14 @@ export default function App() {
           <span>A new version is ready - applies when this claim ends.</span>
           <button id="updateGo" type="button" onClick={applyUpdate}>Reload</button>
         </div>
+      )}
+      {obActive && (
+        <Onboarding
+          initialStep={obGate.initialStep}
+          resumed={obGate.resumed}
+          onDone={() => setObActive(false)}
+          onExit={() => setObActive(false)}
+        />
       )}
       {!online && (
         <div id="offlineBar" role="status">

@@ -170,7 +170,7 @@ export default function Admin() {
   const mockActive = status?.mockMode !== false;
 
   return (
-    <section className="screen on" aria-labelledby="h-admin">
+    <section className="screen on polish" aria-labelledby="h-admin">
       <div className="wrap">
         <BackButton label="Home" onClick={() => window.location.assign("/")} />
         <h1 id="h-admin">Admin panel.</h1>
@@ -352,6 +352,13 @@ export default function Admin() {
             </div>
           </div>
         )}
+
+        <div className="group">
+          <h3>Field proof PDFs</h3>
+          <p className="fineprint" style={{ marginTop: 4 }}>
+            Sample outputs live under <a href="/reports">/reports</a> - reference case SC-D8ECE64B shows a finished field report PDF.
+          </p>
+        </div>
 
         <div className="group">
           <h3>What changes with the mode</h3>

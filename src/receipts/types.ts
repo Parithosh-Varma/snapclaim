@@ -6,7 +6,8 @@ export type ReceiptMethod =
   | "calibrated_length"
   | "calibrated_area"
   | "calibrated_width"
-  | "severity_classification";
+  | "severity_classification"
+  | "damage_refuted";
 
 export type ReceiptUnit = "percent" | "ratio" | "count" | "mm" | "mm_per_px" | "cm2" | "band";
 

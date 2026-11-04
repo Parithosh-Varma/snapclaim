@@ -4,3 +4,4 @@
 # Rewrite to `/`, not `/index.html` - Pages canonicalises /index.html to /.
 /admin    /   200
 /admin/*  /   200
+/case-study /#case-study 301

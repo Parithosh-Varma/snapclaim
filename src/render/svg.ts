@@ -25,6 +25,7 @@ export interface AnnexureOverlay {
 const OVERLAY_MAX_WIDTH = 752;
 const OVERLAY_MAX_HEIGHT = 420;
 const OVERLAY_TOP = 88;
+/** Overlay palette follows annexure Figure 2 style (SC-D8ECE64B p2): red damage, green coin. */
 const OVERLAY_COLORS = new Map<string, string>([
   ["crack", "#c0392b"],
   ["stain", "#f39c12"],
@@ -143,7 +144,7 @@ export function renderAnnexureSvg(input: AnnexureInput): string {
       const y = 150 + i * 38;
       const mm = f.crackLengthMm === null ? "percent-only" : `${f.crackLengthMm} mm`;
       const area = f.areaCm2 === null ? "" : ` · ${f.areaCm2} cm2`;
-      const width = f.crackWidthMm === null ? "" : ` · w ${f.crackWidthMm} mm`;
+      const width = f.crackWidthMm === null ? "" : ` · w ${f.crackWidthMm} mm (unverified — no width ground truth)`;
       const statement = input.statements?.[i]?.statement ?? "";
       return (
         `<rect x="24" y="${y}" width="14" height="14" fill="${severityColor(f.severity)}"/>` +

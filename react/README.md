@@ -1,9 +1,9 @@
-# SnapClaim - React PWA
+# SnapClaim - React app
 
-React + TypeScript port of the vanilla `pwa/` app (full parity: Home/Cases/
-Settings tabs, capture with the coin gate, review, tap-to-mark with SlimSAM /
-SAM 3.1, voice, measured numbers, skeptic + mask cross-check, SVG report,
-local case store, offline shell and update bar).
+The SnapClaim app (React + TypeScript): Home/Cases/Settings tabs, capture
+with the coin gate, review, tap-to-mark with SlimSAM / SAM 3.1, voice,
+measured numbers, skeptic + mask cross-check, SVG report, local case store,
+offline shell and update bar.
 
 ```bash
 npm install
@@ -13,22 +13,28 @@ npm run preview  # serve dist/ locally
 ```
 
 Deploy: serve `dist/` as a static site (Cloudflare Pages: build command
-`npm run build`, output `dist`). The vanilla `pwa/` remains the live app
-until this build is pointed at production.
+`npm run build`, output `dist/`). Production: https://snapclaim.pages.dev.
 
-How it maps to the vanilla app:
+Layout:
 
-| Vanilla | React |
+| Area | File |
 |---|---|
-| `pwa/app.js` screens + flow state | `src/App.tsx` state machine + `src/screens/` |
-| module-level flow variables | `src/lib/session.ts` (mutable session ref; React state only mirrors what renders) |
-| `pwa/store.js` | `src/lib/store.ts` - same localStorage keys, so existing cases/settings carry over |
-| `pwa/photo-check.js`, `pwa/rle.js`, `pwa/tilt-meter.js` | `src/lib/photo-check.ts`, `src/lib/rle.ts`, `src/lib/tilt.ts` (logic identical) |
-| coin gate inside `app.js` | `src/lib/camera.ts` (`CoinGate`, callbacks into React) |
-| `coin-model.js`, `sam-worker.js`, `voice-worker.js`, `theme.js` | copied verbatim into `public/` |
-| `pwa/sw.js` | `public/sw.js` - same strategy, cache `snapclaim-react-v1` |
+| state machine + screens | `src/App.tsx`, `src/screens/` |
+| flow state (mutable session ref; React state mirrors what renders) | `src/lib/session.ts` |
+| local cases/settings store (localStorage keys shared with earlier builds) | `src/lib/store.ts` |
+| photo check, RLE codec, tilt meter | `src/lib/photo-check.ts`, `src/lib/rle.ts`, `src/lib/tilt.ts` |
+| coin gate | `src/lib/camera.ts` (`CoinGate`, callbacks into React) |
+| workers, coin model, theme | `public/` (`sam-worker.js`, `voice-worker.js`, `coin-model.js`, `theme.js`) |
+| offline shell | `public/sw.js` |
 
-Backend calls are unchanged (`/v1/measure`, `/v1/observe`, `/v1/report`,
+Backend calls (`/v1/measure`, `/v1/observe`, `/v1/report`,
 `/v1/skeptic`, `/v1/crosscheck`, `/v1/render`, `/v1/transcribe`,
 `/v1/segment`, `/v1/health`); the base URL is a setting, defaulting to the
 production Worker.
+
+## Live proof (Ref SC-D8ECE64B, 4 Nov 2026)
+
+Terrace-slab: 232mm [R005] Confirmed, 3.2mm [R006] Unverified, 0.73% [R002], 7.48cm2 [R004], significant [R007].
+
+- Report: https://snapclaim.pages.dev/reports/snapclaim-SC-D8ECE64B.pdf
+- Case study: https://snapclaim.pages.dev/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf

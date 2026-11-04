@@ -24,6 +24,14 @@ SYSTEM = (
     "exactly matches a cited receipt output. Cite only receipts from one mask "
     "per finding. Reply with JSON only."
 )
+# Few-shot shape reference (docs only, not used in training):
+# Terrace-slab field proof Ref SC-D8ECE64B — crack R005 Confirmed, 232 mm
+# calibrated vs 227 mm manual straight-tape (+5 mm); 0.73% / 7.48 cm2 /
+# significant; crack width 3.2 mm Unverified (receipts R001-R007).
+# Assistant row shape:
+# [{"statement": "crack covers 0.73%; measures 232 mm; classified significant.",
+#   "citations": ["R005"]}]
+# Width stays Unverified and is never cited as measured.
 
 
 def load_expected(path):

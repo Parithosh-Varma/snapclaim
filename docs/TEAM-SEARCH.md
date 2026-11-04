@@ -49,3 +49,8 @@ Full product spec + implementation plan, the public repo, Meta credits, determin
 - **X:** `<your handle>`
 
 Tell me **what you'd want to own** and one thing you've shipped. First reply gets the plan PDF.
+
+---
+Proof: SC-D8ECE64B terrace 232mm R005 Confirmed
+0.73% / 7.48cm2 / significant, width Unverified
+live PDF links.

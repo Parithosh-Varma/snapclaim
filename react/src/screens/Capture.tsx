@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "../App";
 import { loadSamplePhoto } from "../lib/sample";
 import { SamplePicker } from "./SamplePicker";
-import { freshAngleSlot, resetDmg } from "../lib/session";
+import { applyLastCoin, freshAngleSlot, resetDmg } from "../lib/session";
+import { CaptureCoach, CoinStatusChip, dismissCaptureCoach, shouldShowCaptureCoach } from "./Onboarding";
+import { setTorch, torchSupported } from "../lib/torch";
 
 const CAM_ERRORS: Record<string, string> = {
   NotAllowedError: "Camera permission is off - tap Enable camera",
@@ -15,7 +17,7 @@ const CAM_ERRORS: Record<string, string> = {
 };
 
 export default function Capture() {
-  const { session, go, screen } = useApp();
+  const { session, go, screen, toast } = useApp();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -29,6 +31,16 @@ export default function Capture() {
   const [live, setLive] = useState(false);
   const [acquiring, setAcquiring] = useState(false);
   const [noScale, setNoScale] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
+  const [torchOk, setTorchOk] = useState(false);
+  /* Just-in-time coach-mark: first capture only, dismissible, persisted. */
+  const [coachOn, setCoachOn] = useState(() => {
+    try { return shouldShowCaptureCoach(); } catch { return true; }
+  });
+  const hideCoach = useCallback(() => {
+    setCoachOn(false);
+    try { dismissCaptureCoach(); } catch { /* ignore */ }
+  }, []);
   const sheetRef = useRef<HTMLDivElement>(null);
   const dragY = useRef<number | null>(null);
   /* tips: closed by default; auto-open only on first visit */
@@ -70,6 +82,27 @@ export default function Capture() {
     setTimeout(() => { shotBusy.current = false; }, 1000);
   };
 
+  /* Flashlight: capability-gated (hidden where unsupported), off on every
+     acquire/stop so it can never leak into the next shot or a dead track. */
+  const trackNow = useCallback(() => {
+    const stream = videoRef.current?.srcObject as MediaStream | null;
+    return stream?.getVideoTracks?.()[0] ?? null;
+  }, []);
+
+  const toggleTorch = useCallback(async () => {
+    const track = trackNow();
+    if (!track) return;
+    const next = !torchOn;
+    try {
+      await setTorch(track, next);
+      setTorchOn(next);
+      if (next) toast("Flashlight on - watch for glare on shiny surfaces.");
+    } catch {
+      setTorchOn(false);
+      toast("Flashlight is not available on this camera.");
+    }
+  }, [torchOn, trackNow, toast]);
+
   /* bottom-sheet drag to dismiss */
   const dragStart = (clientY: number) => {
     dragY.current = clientY;
@@ -93,6 +126,7 @@ export default function Capture() {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
+    setTorchOn(false);
   }, []);
 
   const onCameraError = useCallback((name: string) => {
@@ -111,6 +145,8 @@ export default function Capture() {
       return;
     }
     stopStream();
+    setTorchOn(false);
+    setTorchOk(false);
     const backCam: MediaStreamConstraints = { video: { facingMode: { exact: "environment" } }, audio: false };
     const anyCam: MediaStreamConstraints = { video: { facingMode: "environment" }, audio: false };
     try {
@@ -210,6 +246,8 @@ export default function Capture() {
         session.bundleB = { ...freshAngleSlot() };
       }
       session.gateCoin = null;
+      // The gate's coin ID is a colour guess; it must not set the scale.
+      applyLastCoin(session);
     } catch { /* stills are best-effort */ }
     stopStream();
     setFlash(true);
@@ -307,8 +345,7 @@ export default function Capture() {
       }
       session.gateCoin = null;
       session.noScaleMode = true;
-      session.coinLabel = "";
-      session.coinKindMm = 0;
+      applyLastCoin(session);
       stopStream();
       go("sReview");
     };
@@ -336,14 +373,6 @@ export default function Capture() {
     }
   };
 
-  /* Idle retry: same acquire path as the automatic attempt on mount. */
-  const retryAcquire = () => {
-    setEnableCam(false);
-    setBlocked(false);
-    setAcquiring(true);
-    void acquire().finally(() => setAcquiring(false));
-  };
-
   return (
     <>
       <div
@@ -361,6 +390,12 @@ export default function Capture() {
             setAcquiring(false);
             setEnableCam(false);
             setBlocked(false);
+            try {
+              const stream = videoRef.current?.srcObject as MediaStream | null;
+              setTorchOk(torchSupported(stream?.getVideoTracks?.()[0] ?? null));
+            } catch {
+              setTorchOk(false);
+            }
           }}
         />
       </div>
@@ -369,29 +404,29 @@ export default function Capture() {
           <div className="cam-top">
             <button
               type="button"
-              className="cam-close cap-close"
-              aria-label="Close"
+              className="cam-close"
+              aria-label="Close camera, back to home"
               onClick={() => go("tHome")}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
             </button>
-            <div className="cap-step">
-              <span className="cap-step-label" id="capStepLabel">Step 1 of 6 · Capture</span>
-              <div className="cap-progress" role="progressbar" aria-labelledby="capStepLabel" aria-valuemin={0} aria-valuemax={6} aria-valuenow={1}>
-                <i className="on" aria-hidden="true" />
-                <i aria-hidden="true" />
-                <i aria-hidden="true" />
-                <i aria-hidden="true" />
-                <i aria-hidden="true" />
-                <i aria-hidden="true" />
-              </div>
-            </div>
-            <button id="tipsBtn" className="cap-tips" type="button" onClick={() => setTipsOpen(true)}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5" /><circle cx="12" cy="7.8" r="1.1" fill="currentColor" stroke="none" /></svg>
+            <div id="camStep" className="step-tag">01 / 06 · Capture</div>
+            <button id="tipsBtn" type="button" onClick={() => setTipsOpen(true)}>
               Coin tips
             </button>
           </div>
-          {!enableCam && <div id="coinHint" role="status">{statusLine}</div>}
+          <div id="coinHint" role="status">{statusLine}</div>
+          {live && !noScale && (
+            <div style={{ alignSelf: "center", marginTop: 8 }}>
+              {/* Live detector plugs in here: detected flips the chip with
+                  icon + text, never colour alone. Until then it honestly
+                  reports that no coin is confirmed yet. */}
+              <CoinStatusChip detected={false} />
+            </div>
+          )}
+          {live && !enableCam && coachOn && !noScale && (
+            <CaptureCoach onGotIt={hideCoach} />
+          )}
           <input
             ref={fileRef}
             type="file"
@@ -405,72 +440,40 @@ export default function Capture() {
           {enableCam ? (
             <div className="permitcard" role="alertdialog" aria-labelledby="permitTitle" aria-describedby="permitDesc">
               <span className="permit-icon" aria-hidden="true">
-                <img className="mark-light" src="./snapclaim-mark.png" alt="" width={44} height={42} />
-                <img className="mark-dark" src="./snapclaim-mark-dark.png" alt="" width={44} height={42} />
+                <img className="mark-light" src="./snapclaim-mark.png" alt="" width={40} height={38} />
+                <img className="mark-dark" src="./snapclaim-mark-dark.png" alt="" width={40} height={38} />
               </span>
-              <p id="permitTitle" className="cap-title">{noCam ? "No camera on this device" : "Photograph the damage"}</p>
-              <p id="permitDesc" className="cap-desc">{noCam ? "Upload a photo or pick a sample instead - measuring works the same." : "Place a coin next to the crack so we can measure it in millimetres. Your photo stays on this device."}</p>
-              {!noCam && !blocked && (
-                <p className="cap-nocoin">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" strokeDasharray="3 2.4" /></svg>
-                  <span>No coin? You&apos;ll get percentages only.</span>
-                  <button type="button" className="cap-link" onClick={() => setTipsOpen(true)}>Coin tips</button>
-                </p>
+              <p id="permitTitle">{noCam ? "No camera on this device" : "Camera is off"}</p>
+              <p id="permitDesc">{noCam ? "Upload a photo or pick a sample instead - measuring works the same." : "We use your camera to measure your object. Photos stay on this device."}</p>
+              {!noCam && (
+                <button
+                  id="enableCam"
+                  type="button"
+                  className={`btn-primary${acquiring ? " busy" : ""}`}
+                  disabled={acquiring}
+                  aria-busy={acquiring}
+                  onClick={() => {
+                    setEnableCam(false);
+                    setBlocked(false);
+                    setAcquiring(true);
+                    void acquire().finally(() => setAcquiring(false));
+                  }}
+                >
+                  {acquiring ? "Starting…" : "Enable camera"}
+                </button>
               )}
-              <div className="cap-actions">
-                {blocked && !noCam ? (
-                  <>
-                    <div className="cap-alert" role="alert">
-                      <b>Camera access is blocked.</b>
-                      <span>Open your browser&apos;s site settings, allow Camera for this site, then tap Try again.</span>
-                    </div>
-                    <button
-                      id="enableCam"
-                      type="button"
-                      className={`cap-primary${acquiring ? " busy" : ""}`}
-                      disabled={acquiring}
-                      aria-busy={acquiring}
-                      onClick={retryAcquire}
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10a8 8 0 1 1 2 6" /><path d="M4 4v6h6" /></svg>
-                      {acquiring ? "Starting…" : "Try again"}
-                    </button>
-                    <button id="uploadBtn" className="cap-primary" type="button" onClick={() => fileRef.current?.click()}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5" /><path d="M4 20h16" /></svg>
-                      Upload photo
-                    </button>
-                    <button id="altEntry" className="cap-tertiary" type="button" onClick={onSample}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" /><path d="M18.5 15l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" /></svg>
-                      Try a sample
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    {!noCam && (
-                      <button
-                        id="enableCam"
-                        type="button"
-                        className={`cap-primary${acquiring ? " busy" : ""}`}
-                        disabled={acquiring}
-                        aria-busy={acquiring}
-                        onClick={retryAcquire}
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 8h3l2-2.5h6L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" /><circle cx="12" cy="13.5" r="3.4" /></svg>
-                        {acquiring ? "Starting…" : "Enable camera"}
-                      </button>
-                    )}
-                    <div className="cap-row">
-                      <button id="uploadBtn" className="cap-secondary" type="button" onClick={() => fileRef.current?.click()}>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5" /><path d="M4 20h16" /></svg>
-                        Upload photo
-                      </button>
-                      <button id="altEntry" className="cap-tertiary" type="button" onClick={onSample}>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" /><path d="M18.5 15l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" /></svg>
-                        Try a sample
-                      </button>
-                    </div>
-                  </>
-                )}
+              {blocked && !noCam && (
+                <p className="permit-hint">Blocked in your browser? Click the lock icon in the address bar → Allow camera, then tap Enable camera.</p>
+              )}
+              <div className="alt-row permit-alt">
+                <button id="uploadBtn" className="alt-btn" type="button" onClick={() => fileRef.current?.click()}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5" /><path d="M4 20h16" /></svg>
+                  Upload photo
+                </button>
+                <button id="altEntry" className="alt-btn" type="button" onClick={onSample}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="0" /><circle cx="12" cy="13.5" r="3.4" /></svg>
+                  Use a sample
+                </button>
               </div>
             </div>
           ) : (
@@ -483,14 +486,28 @@ export default function Capture() {
                 </div>
               )}
               <div className="shutter-block">
-                <button
-                  id="shutter"
-                  type="button"
-                  aria-label="Capture"
-                  disabled={!live}
-                  onClick={onShutterTap}
-                >
-                </button>
+                <div className="shutter-row">
+                  {torchOk && <span className="shutter-spacer" aria-hidden="true" />}
+                  <button
+                    id="shutter"
+                    type="button"
+                    aria-label="Capture"
+                    disabled={!live}
+                    onClick={onShutterTap}
+                  >
+                  </button>
+                  {torchOk && (
+                    <button
+                      type="button"
+                      className={`torchbtn${torchOn ? " on" : ""}`}
+                      aria-pressed={torchOn}
+                      aria-label={torchOn ? "Turn flashlight off" : "Turn flashlight on"}
+                      onClick={() => void toggleTorch()}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 2h6v4H9z" /><path d="M10 6h4l3 5v10H7V11z" /><path d="M12 15.5v.5" /></svg>
+                    </button>
+                  )}
+                </div>
                 <span className="shutter-label">{!live ? "Starting camera…" : "Tap to capture"}</span>
                 <div className="alt-row">
                   <button id="uploadBtn" className="alt-btn" type="button" onClick={() => fileRef.current?.click()}>
@@ -498,8 +515,8 @@ export default function Capture() {
                     Upload photo
                   </button>
                   <button id="altEntry" className="alt-btn" type="button" onClick={onSample}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" /><path d="M18.5 15l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" /></svg>
-                    Try a sample
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="0" /><circle cx="12" cy="13.5" r="3.4" /></svg>
+                    Use a sample
                   </button>
                 </div>
                 <button
@@ -518,7 +535,7 @@ export default function Capture() {
               </div>
             </>
           )}
-          {tipsOpen && (
+          {tipsOpen && !enableCam && (
             <>
               <button type="button" id="tipsScrim" aria-label="Close coin tips" onClick={closeTips} />
               <div
@@ -553,6 +570,7 @@ export default function Capture() {
                   <li>Coin flat, touching the damage</li>
                   <li>Both sharp, filling the frame</li>
                   <li>Even light, no flash glare</li>
+                  <li>Terrace proof: coin in frame → 232mm measured</li>
                 </ul>
                 <button type="button" id="tipsGotIt" onClick={closeTips}>Got it</button>
               </div>

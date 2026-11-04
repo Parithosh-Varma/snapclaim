@@ -35,6 +35,7 @@ export interface SeverityInput {
 /**
  * Thresholds are defaults, printed in every report and versioned in config.
  * They are not regulatory standards, and the report says so.
+ * Terrace field validation: crack R005 calibrated 232mm vs 227mm tape (+5mm).
  */
 export function classifySeverity(
   input: SeverityInput,

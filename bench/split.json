@@ -7,13 +7,66 @@
       "id": "fixture-wall-crack-01",
       "source": "fixtures/masks/wall-crack.json",
       "surface": "wall",
-      "hasScaleReference": true
+      "hasScaleReference": true,
+      "groundTruth": {
+        "maskId": "crack-1",
+        "crackLengthMm": 85.0
+      }
+    },
+    {
+      "id": "fixture-tilted-wall-01",
+      "source": "fixtures/masks/tilted-wall.json",
+      "surface": "wall",
+      "hasScaleReference": true,
+      "groundTruth": {
+        "maskId": "crack-1",
+        "crackLengthMm": 66.7
+      }
     },
     {
       "id": "photo-facade-crack-01",
       "source": "fixtures/masks/facade-crack.json",
       "surface": "brick facade",
       "hasScaleReference": false
+    },
+    {
+      "id": "calibrated-plaster-hairline-01",
+      "source": "fixtures/masks/calibrated-plaster-hairline-01.json",
+      "rleSource": "fixtures/rle/calibrated-plaster-hairline-01.json",
+      "backdropSource": "https://commons.wikimedia.org/wiki/File:Cracked_Cream_Walls_(Unsplash).jpg",
+      "surface": "wall",
+      "hasScaleReference": true,
+      "groundTruth": {
+        "maskId": "crack-1",
+        "crackLengthMm": 90.4
+      },
+      "note": "800x600 canvas composite over CC0 plaster backdrop with 90.4 mm vector crack and India 10 INR coin (27.0 mm) at 4.00 px/mm; segmented live via SAM 3.1 (POST /v1/segment)."
+    },
+    {
+      "id": "calibrated-masonry-step-02",
+      "source": "fixtures/masks/calibrated-masonry-step-02.json",
+      "rleSource": "fixtures/rle/calibrated-masonry-step-02.json",
+      "backdropSource": "https://commons.wikimedia.org/wiki/File:Crack_in_the_wall_(44892).jpg",
+      "surface": "wall",
+      "hasScaleReference": true,
+      "groundTruth": {
+        "maskId": "crack-1",
+        "crackLengthMm": 92.2
+      },
+      "note": "800x600 canvas composite over CC BY-SA 4.0 stone backdrop with 92.2 mm stepped vector crack and US Quarter (24.26 mm) at 4.00 px/mm; segmented live via SAM 3.1 (POST /v1/segment)."
+    },
+    {
+      "id": "calibrated-stone-oblique-03",
+      "source": "fixtures/masks/calibrated-stone-oblique-03.json",
+      "rleSource": "fixtures/rle/calibrated-stone-oblique-03.json",
+      "backdropSource": "https://commons.wikimedia.org/wiki/File:Crack_in_the_wall,_Larkbeare_Road,_Exeter_-_geograph.org.uk_-_5058687.jpg",
+      "surface": "wall",
+      "hasScaleReference": true,
+      "groundTruth": {
+        "maskId": "crack-1",
+        "crackLengthMm": 88.5
+      },
+      "note": "800x600 canvas composite over CC BY-SA 2.0 garden-wall backdrop with 88.5 mm oblique vector crack and Euro 1 EUR coin (23.25 mm at 0.80 aspect / 36.8 deg tilt); segmented live via SAM 3.1 (POST /v1/segment)."
     }
   ],
   "heldOut": [
@@ -184,19 +237,17 @@
       "coin": {
         "id": "coin-2inr",
         "knownMm": 25.0,
-        "note": "2 INR coin taped beside the crack, same plane"
+        "knownMmNote": "25 mm user-supplied 2026-11-04 (+/-0.5); replaces a mistaken prior value, do not use it",
+        "note": "2 INR coin taped beside the crack, same plane; engine recompute at 25 mm (R001 0.773994, R004 7.69 cm², R005 237.5 mm, R006 3.2 mm unverified — no width ground truth; n = 1)"
       },
       "groundTruth": {
         "maskId": "damage-1",
-        "crackLengthMm": 227
+        "spanMm": 227,
+        "spanRangeMm": [225, 230],
+        "spanNote": "straight tape span ~127 cm to ~149.5-150 cm, midpoint; pipeline measures path, not span"
       },
-      "pinPathMm": 274,
-      "spanNote": "227 mm is the straight-tape chord (tape 127 cm to ~149.5-150 cm in DSC_0711.JPG, range 225-230 mm). A crack path must exceed its chord, so the chord is context only, not path-length accuracy.",
-      "pinNote": "274 mm pin-to-pin polyline (6 spans 5.2 + 4.8 + 4.5 + 4.2 + 2.9 + 5.8 cm) follows the crack path most closely and is the closest path-length truth. Against it the pipeline reads low: SC-25D35C5E 218.5 mm is 55.5 mm low (-20.3%), second run SC-D8ECE64B 232 mm is 42 mm low (-15.3%). Pins cover the full parapet top-to-bottom including edge zones outside the tape segment, so part of the gap may be extent, not just under-measure - stated as read-low, not as a calibrated error.",
-      "threadNote": "Thread-and-pin 238.8 mm was read on a different horizontal crack with no coin in frame (see comparative PDF section 4) and is NOT comparable to this crack - excluded from scoring.",
-      "runs": "SC-25D35C5E 2026-11-02 218.5 mm [R005] is the archived bench run (bench/runs/terrace-slab-tape-01.json). SC-D8ECE64B 2026-11-04 232 mm [R005] is a second live run on a different photo/date - labeled separately, never conflated. Marketing case-study.json 237.5 mm for SC-25D35C5E was a coin-diameter error (25 mm nominal vs 23 mm used by the bench run; ruler reads 24 mm = 228 mm) and is fixed to 218.5 mm.",
       "expected": "one crack, coin in the crack's plane, millimetre length with coin receipts",
-      "note": "First tape ground truth. Builder's physical tape reading 2026-11-02: crack spans ~127 cm to ~149.5-150 cm = 22.5-23 cm; recorded 227 mm chord (midpoint). Pipeline Ref SC-25D35C5E measured 218.5 mm (R005): 8.5 mm low vs the chord (-3.7%, inside +-10% on the chord) but ~20% low vs the 274 mm pin path. Model-only guess DSC_0710.JPG (same crack, tape not legible) 315 mm: 88 mm high vs chord (+38.8%, outside), 41 mm high vs pin path (+15.0%, outside). maskId damage-1 is the tap-mask id the PWA sends (pwa/app.js)."
+      "note": "First tape ground truth, n = 1. Builder tape 2026-11-02: crack spans ~127 cm to ~149.5-150 cm = 22.5-23 cm; recorded 227 mm span (midpoint, range 225-230, +/-2.5). Pipeline at 25 mm coin: R005 237.5 mm vs span err +10.5 mm (+4.6%, span is context, never scored); coin uncertainty +/-0.5 mm scales all mm values +/-2%. Width 3.2 mm unverified (no width ground truth). maskId damage-1 is the tap-mask id the PWA sends (pwa/app.js). Model-only guess shown DSC_0710.JPG (same crack)."
     }
   ]
 }

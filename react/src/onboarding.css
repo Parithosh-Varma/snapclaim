@@ -1,0 +1,530 @@
+/* SnapClaim onboarding: isolated brand layer.
+   Brand: navy #0A1E48 (headings, text), green #0E8A4B (actions, progress),
+   amber #B7791F (caution), warm off-white #F4F1EA page, white cards with
+   hairline #E4E1D8 borders, 12px radii, Inter or system sans.
+   Scoped under .ob- so the legacy square-corner app theme is untouched. */
+
+.ob-root {
+  --ob-navy: #0A1E48;
+  --ob-green: #0E8A4B;
+  --ob-green-deep: #0B6E3B;
+  --ob-green-tint: #E6F3EB;
+  --ob-amber: #B7791F;
+  --ob-amber-tint: #FBF1DE;
+  --ob-bg: #F4F1EA;
+  --ob-card: #FFFFFF;
+  --ob-line: #E4E1D8;
+  --ob-slate: #3D4A68;
+  --ob-red: #C81E2B;
+  /* Derived tokens: the only values that change in dark mode. */
+  --ob-accent: #0B6E3B;
+  --ob-track: #CFC8B8;
+  --ob-num-bg: #0A1E48;
+  --ob-num-fg: #FFFFFF;
+  --ob-okline: #BFE3CD;
+  --ob-warnline: #EAC98F;
+  --ob-r: 12px;
+  --ob-font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--ob-bg);
+  color: var(--ob-navy);
+  font-family: var(--ob-font);
+  overflow-y: auto;
+  -webkit-font-smoothing: antialiased;
+}
+
+.ob-col {
+  margin: 0 auto;
+  width: 100%;
+  max-width: 480px;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: calc(8px + env(safe-area-inset-top)) 20px calc(16px + env(safe-area-inset-bottom));
+}
+
+/* Top bar: 44px back, centered dots, Skip. */
+.ob-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 48px;
+}
+
+.ob-back {
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  border-radius: var(--ob-r);
+  background: transparent;
+  color: var(--ob-navy);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 12px;
+}
+
+.ob-back > span {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
+.ob-skip {
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  border-radius: var(--ob-r);
+  background: transparent;
+  color: var(--ob-slate);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 0 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ob-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ob-dots li {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ob-track);
+  transition: background-color 200ms ease, transform 200ms ease;
+}
+
+.ob-dots li.on {
+  background: var(--ob-green);
+  transform: scale(1.15);
+}
+
+.ob-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding-top: 8px;
+  animation: ob-slide 200ms ease;
+}
+
+@keyframes ob-slide {
+  from { opacity: 0; transform: translateX(18px); }
+  to { opacity: 1; transform: none; }
+}
+
+.ob-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ob-accent);
+  background: var(--ob-green-tint);
+  border-radius: 999px;
+  padding: 6px 12px;
+  margin-bottom: 10px;
+}
+
+.ob-title {
+  font-size: 28px;
+  line-height: 1.18;
+  letter-spacing: -0.01em;
+  margin: 0 0 8px;
+  color: var(--ob-navy);
+  text-wrap: balance;
+}
+
+.ob-sub {
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--ob-slate);
+  margin: 0 0 16px;
+  overflow-wrap: break-word;
+}
+
+.ob-card {
+  background: var(--ob-card);
+  border: 1px solid var(--ob-line);
+  border-radius: var(--ob-r);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.ob-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.ob-step {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.ob-num {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--ob-num-bg);
+  color: var(--ob-num-fg);
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.ob-step b { display: block; font-size: 16px; }
+.ob-step p { margin: 2px 0 0; font-size: 14.5px; line-height: 1.5; color: var(--ob-slate); }
+.ob-step svg { width: 20px; height: 20px; flex: none; }
+
+.ob-art {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--ob-line);
+  border-radius: var(--ob-r);
+  background: #fff;
+  margin-bottom: 12px;
+}
+
+/* Do / don't pair. */
+.ob-pair { display: grid; gap: 12px; }
+@media (min-width: 400px) { .ob-pair { grid-template-columns: 1fr 1fr; } }
+
+.ob-mini {
+  border: 1px solid var(--ob-line);
+  border-radius: var(--ob-r);
+  background: var(--ob-card);
+  padding: 12px;
+}
+
+.ob-mini figure { margin: 0 0 8px; }
+.ob-mini svg { display: block; width: 100%; height: auto; border-radius: 8px; }
+
+.ob-verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.ob-verdict svg { width: 18px; height: 18px; }
+.ob-verdict.do { color: var(--ob-accent); }
+.ob-verdict.dont { color: var(--ob-red); }
+
+.ob-mini ul { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.55; color: var(--ob-slate); }
+.ob-mini li { margin-bottom: 2px; }
+
+.ob-note {
+  border: 1px solid var(--ob-line);
+  border-left: 4px solid var(--ob-amber);
+  background: var(--ob-card);
+  border-radius: var(--ob-r);
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ob-navy);
+  margin: 0 0 12px;
+  overflow-wrap: break-word;
+}
+
+.ob-note small { display: block; color: var(--ob-slate); margin-top: 4px; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* Sticky bottom action. */
+.ob-cta {
+  position: sticky;
+  bottom: calc(8px + env(safe-area-inset-bottom));
+  padding-top: 10px;
+  background: linear-gradient(transparent, var(--ob-bg) 30%);
+  display: grid;
+  gap: 4px;
+}
+
+.ob-primary {
+  width: 100%;
+  min-height: 56px;
+  border: 0;
+  border-radius: var(--ob-r);
+  background: var(--ob-green-deep);
+  color: #fff;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 800;
+  box-shadow: 0 4px 16px rgba(14, 138, 75, 0.25);
+  transition: transform 150ms ease, filter 150ms ease;
+}
+
+.ob-primary:active { transform: scale(0.98); filter: brightness(0.96); }
+.ob-primary:disabled { opacity: 0.5; box-shadow: none; }
+
+.ob-secondary {
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  border-radius: var(--ob-r);
+  background: transparent;
+  color: var(--ob-accent);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ob-linkbtn {
+  border: 0;
+  background: none;
+  color: var(--ob-accent);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 10px 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ob-resumed {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  background: var(--ob-card);
+  border: 1px solid var(--ob-line);
+  border-radius: var(--ob-r);
+  padding: 10px 12px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ob-slate);
+  margin-bottom: 12px;
+}
+
+/* Privacy sheet. */
+.ob-sheet-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(10, 30, 72, 0.5);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 12px;
+}
+
+.ob-sheet {
+  width: min(480px, 100%);
+  max-height: 80vh;
+  overflow-y: auto;
+  background: #fff;
+  color: var(--ob-navy);
+  border-radius: var(--ob-r);
+  padding: 20px;
+  animation: ob-up 220ms ease;
+}
+
+@keyframes ob-up {
+  from { transform: translateY(24px); opacity: 0.6; }
+  to { transform: none; opacity: 1; }
+}
+
+/* Coach-mark over the viewfinder (capture JIT). */
+.ob-coach {
+  position: absolute;
+  z-index: 12;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(150px + env(safe-area-inset-bottom));
+  width: min(400px, calc(100% - 32px));
+  background: var(--ob-card);
+  color: var(--ob-navy);
+  border-radius: var(--ob-r);
+  border: 1px solid var(--ob-line);
+  box-shadow: 0 12px 32px rgba(10, 30, 72, 0.3);
+  padding: 14px 14px 10px;
+  font-family: var(--ob-font);
+  animation: ob-up 200ms ease;
+}
+
+.ob-coach p { margin: 0 0 8px; font-size: 15px; font-weight: 700; line-height: 1.45; }
+.ob-coach::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  width: 16px;
+  height: 16px;
+  background: var(--ob-card);
+  border-right: 1px solid var(--ob-line);
+  border-bottom: 1px solid var(--ob-line);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.ob-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 800;
+  font-family: var(--ob-font);
+}
+
+.ob-chip svg { width: 16px; height: 16px; flex: none; }
+.ob-chip.ok { background: var(--ob-green-tint); color: var(--ob-accent); border: 1px solid var(--ob-okline); }
+.ob-chip.wait { background: var(--ob-card); color: var(--ob-navy); border: 1px solid var(--ob-line); }
+
+/* Mic tooltip (describe JIT). */
+.ob-mic-tip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--ob-navy);
+  color: #fff;
+  border-radius: var(--ob-r);
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.45;
+  margin-top: 8px;
+  animation: ob-fade 200ms ease;
+  font-family: var(--ob-font);
+}
+
+@keyframes ob-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.ob-mic-tip button {
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 8px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  padding: 0 12px;
+}
+
+/* Focus: visible 2px green ring on every interactive element. */
+.ob-root button:focus-visible,
+.ob-root a:focus-visible,
+.ob-root summary:focus-visible {
+  outline: 2px solid var(--ob-green);
+  outline-offset: 2px;
+}
+
+/* Coin wobble: gentle, stops under reduced motion. */
+.ob-wobble { transform-origin: center; animation: ob-wobble 2.4s ease-in-out infinite; }
+@keyframes ob-wobble {
+  0%, 100% { transform: rotate(-2deg); }
+  50% { transform: rotate(2deg); }
+}
+
+/* Landscape + very small screens: tighter art, everything still reachable. */
+@media (max-height: 500px) and (orientation: landscape) {
+  .ob-art { max-height: 30vh; object-fit: cover; width: 100%; }
+  .ob-title { font-size: 24px; }
+}
+
+@media (max-width: 340px) {
+  .ob-col { padding-left: 16px; padding-right: 16px; }
+  .ob-title { font-size: 25px; }
+  .ob-card { padding: 12px; }
+}
+
+/* Reduced motion: static illustrations, instant transitions. */
+@media (prefers-reduced-motion: reduce) {
+  .ob-root *, .ob-coach, .ob-mic-tip {
+    animation: none !important;
+    transition: none !important;
+  }
+  .ob-wobble { animation: none !important; }
+  .ob-body { animation: none; }
+}
+
+/* ---------- dark theme: follows the app chrome (data-theme from theme.js).
+   Buttons keep the deep green fill in both modes (white text stays 6.35:1);
+   only text accents and surfaces shift. Illustrations are treated like
+   photos: they do not invert. ---------- */
+.ob-root 
+.ob-sheet h2{font-size:19px;margin:0 0 8px;color:var(--ob-navy)}
+.ob-sheet p{font-size:15px;line-height:1.6;color:var(--ob-slate);margin:0 0 16px}
+html[data-theme="dark"] .ob-root{
+  --ob-navy:#EDE6D6;
+  --ob-bg:#141310;
+  --ob-card:#1D1B17;
+  --ob-line:#3A342A;
+  --ob-slate:#B3AA97;
+  --ob-green:#2E9E63;
+  --ob-green-tint:#173524;
+  --ob-amber-tint:#33270F;
+  --ob-accent:#7BD9A3;
+  --ob-red:#FF9C9C;
+  --ob-track:#4A4438;
+  --ob-num-bg:#2E9E63;
+  --ob-num-fg:#081226;
+  --ob-okline:#2E5B40;
+  --ob-warnline:#6B5320;
+}
+@media (prefers-color-scheme: dark){
+  html[data-theme="auto"] .ob-root{
+    --ob-navy:#EDE6D6;
+    --ob-bg:#141310;
+    --ob-card:#1D1B17;
+    --ob-line:#3A342A;
+    --ob-slate:#B3AA97;
+    --ob-green:#2E9E63;
+    --ob-green-tint:#173524;
+    --ob-amber-tint:#33270F;
+    --ob-accent:#7BD9A3;
+    --ob-red:#FF9C9C;
+    --ob-track:#4A4438;
+    --ob-num-bg:#2E9E63;
+    --ob-num-fg:#081226;
+    --ob-okline:#2E5B40;
+    --ob-warnline:#6B5320;
+  }
+}

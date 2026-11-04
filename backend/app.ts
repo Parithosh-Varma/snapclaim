@@ -1,3 +1,7 @@
+// Field proof SC-D8ECE64B: 232mm [R005] / 0.73% [R002] / 7.48cm2 [R004] / significant [R007].
+// Report: /reports/snapclaim-SC-D8ECE64B.pdf
+// Case study: /reports/Case Study Comparative Measurement of a Terrace-Slab Crack.pdf
+// (comment-only, no logic change).
 import { measureSession } from "../src/engine/measure.ts";
 import { assertDamageLabel } from "../src/engine/measure.ts";
 import { type ReferenceDiagnostics, circularReference, observeMask, tiltStretch } from "../src/vision/observe.ts";
@@ -13,6 +17,7 @@ import { ellipseOutlinePath, maskOutlinePath } from "../src/vision/contour.ts";
 import { guardFor, spendStatus } from "./spend.ts";
 import { applyAdminMode, effectiveMockMode, isAdminEnabled, mockSource, parseAdminModeBody, requireAdmin } from "./admin.ts";
 import { BudgetExceededError, estimateCostUsd } from "../src/config/spend-guard.ts";
+import { type AppConfig } from "../src/config/config.ts";
 import { configFromEnv, findingsProvider, requireLiveKeys, skepticProvider, visionProvider, HttpError, SAM_IMAGE_USD, SPARK_PRICE, type Env, type FetchFn } from "./providers.ts";
 import { metaChatCompletions } from "./metaApi.ts";
 import {
@@ -28,6 +33,7 @@ import { MemoryStore, type SavedSession, type Store } from "./store.ts";
 import { segmentWithSam, type SamBoxPrompt, type SamPoint } from "../src/vision/sam.ts";
 import { archiveSegmentImage } from "./storage.ts";
 import { DEFAULT_CONFIG } from "../src/config/config.ts";
+import { claimBody } from "./claim.ts";
 
 export const VERSION = "0.3.0";
 export const MAX_MASKS = 50;
@@ -143,8 +149,8 @@ export function toMeasureInput(body: unknown, serverMinConfidence?: number): Mea
       throw new Error("masks[].skeletonPx must be in [0, 10000000]");
     }
     const rc = (m as { regionCount?: unknown }).regionCount;
-    if (rc !== undefined && (!Number.isInteger(rc) || (rc as number) < 1 || (rc as number) > 100000)) {
-      throw new Error("masks[].regionCount must be an integer in [1, 100000]");
+    if (rc !== undefined && (!Number.isInteger(rc) || (rc as number) < 0 || (rc as number) > 100000)) {
+      throw new Error("masks[].regionCount must be an integer in [0, 100000]");
     }
     // Optional pixel binding: light shape check here, exact pixel agreement
     // enforced in measureSession (fail-closed on mismatch).
@@ -368,6 +374,9 @@ export function observeBody(body: unknown, requestId = newRequestId()): Envelope
       id: requireId(raw.id, `masks[${i}].id`),
       label: label as never,
       confidence: requireConfidence(raw.confidence, `masks[${i}].confidence`),
+      // Drop 1-3px noise regions: single-pixel SAM speckle otherwise counts
+      // as dozens of "regions" and flips severity to significant.
+      minRegionAreaPx: 4,
       ...(componentMask ? { component: componentMask } : {}),
       ...(stretch ? { stretch } : {}),
     });
@@ -448,6 +457,13 @@ export async function reportBody(body: unknown, env: Env, requestId = newRequest
   if (body.transcript !== undefined && typeof body.transcript !== "string") throw new HttpError(400, "transcript must be a string");
   const transcript = typeof body.transcript === "string" ? body.transcript.slice(0, 2000) : "";
 
+  // No-damage verdict: skip the LLM entirely and answer deterministically.
+  // A clean wall or a refuted tap is a verdict with cited receipts, not a
+  // model generation - $0, no invention possible.
+  if (measurement.verdict === "no-damage") {
+    return noDamageResult(measurement, requestId, started);
+  }
+
   let drafts: FindingDraft[];
   if (body.drafts !== undefined) {
     // Gate-wash fix: caller-supplied phrasing with correct numbers passes
@@ -494,6 +510,79 @@ export async function reportBody(body: unknown, env: Env, requestId = newRequest
   return envelope(requestId, started, { measurement, findings: drafts, gate });
 }
 
+export interface SamSegmentRequest {
+  imageUrl: string;
+  size: { width: number; height: number };
+  points: SamPoint[];
+  box?: SamBoxPrompt;
+  /** Multi-object prompts (damage + coin, one billed image). Overrides points/box when set. */
+  objects?: import("../src/vision/sam.ts").SamObjectPrompt[];
+}
+
+/**
+ * One billed SAM 3.1 image call: live-key check, SSRF guard, pixel cap, spend
+ * hold, best-effort archival. `/v1/segment` and `/v1/claim` share it so both
+ * routes bill, cap and validate identically instead of drifting apart.
+ */
+export async function samSegment(
+  env: Env,
+  config: AppConfig,
+  request: SamSegmentRequest,
+  requestId: string,
+  fetchFn?: FetchFn,
+  archive = true,
+): Promise<{ records: Awaited<ReturnType<typeof segmentWithSam>>["records"]; archivedImageUrl: string | null }> {
+  const { metaKey } = requireLiveKeys(env, config);
+  assertSafeImageUrl(request.imageUrl);
+  const { width, height } = request.size;
+  if (width * height > MAX_MASK_PIXELS) {
+    throw new HttpError(400, `width×height ${width}x${height} exceeds the ${MAX_MASK_PIXELS}-pixel cap`);
+  }
+  const spend = operatorSpend(env, "meta");
+  // Reserve the fixed SAM price BEFORE the upstream call: concurrent callers
+  // then serialize on the budget instead of each passing a stale
+  // $0-remaining check and billing after the fact.
+  // BYOK (spend undefined): caller pays, no operator hold.
+  let samHold: ReturnType<NonNullable<typeof spend>["reserve"]> | undefined;
+  try {
+    samHold = spend?.reserve("sam segment ceiling", SAM_IMAGE_USD);
+  } catch (error) {
+    if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
+    throw error;
+  }
+  // Best-effort archival: inline inputs are stored in the Supabase bucket so
+  // the exact measured pixels stay re-runnable. Never blocks measurement.
+  const archivedImageUrl = archive
+    ? await archiveSegmentImage(env, request.imageUrl, requestId, fetchFn)
+    : null;
+  let sam: Awaited<ReturnType<typeof segmentWithSam>>;
+  try {
+    sam = await segmentWithSam({
+      fetchFn,
+      base: config.endpoints.meta,
+      apiKey: metaKey,
+      model: config.models.sam,
+      request: {
+        imageUrl: request.imageUrl,
+        size: { width: Math.round(width), height: Math.round(height) },
+        points: request.points,
+        ...(request.box ? { box: request.box } : {}),
+        ...(request.objects ? { objects: request.objects } : {}),
+      },
+    });
+  } catch (error) {
+    samHold?.release();
+    throw error;
+  }
+  try {
+    samHold?.settle(`sam segment ${sam.records.length} objects`, SAM_IMAGE_USD);
+  } catch (error) {
+    if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
+    throw error;
+  }
+  return { records: sam.records, archivedImageUrl };
+}
+
 export async function segmentBody(body: unknown, env: Env, requestId = newRequestId(), fetchFn?: FetchFn): Promise<EnvelopedResult> {
   const started = Date.now();
   if (!isRecord(body)) throw new Error("body must be a JSON object");
@@ -506,11 +595,13 @@ export async function segmentBody(body: unknown, env: Env, requestId = newReques
     });
     return envelope(requestId, started, result);
   }
+  // Live: fail closed on the missing key before parsing input, so a
+  // misconfigured backend never returns a 400 that looks like the caller's
+  // fault. samSegment re-checks (defensive) right before the billed call.
+  requireLiveKeys(env, config);
   // Live: SAM 3.1 point prompts over the Responses API. The backend decodes
   // masks with the official parser - it never invents them.
-  const { metaKey } = requireLiveKeys(env, config);
   const imageUrl = typeof body.imageUrl === "string" ? body.imageUrl : "";
-  assertSafeImageUrl(imageUrl);
   const width = requirePositive(body.width, "width");
   const height = requirePositive(body.height, "height");
   if (width * height > MAX_MASK_PIXELS) {
@@ -562,59 +653,26 @@ export async function segmentBody(body: unknown, env: Env, requestId = newReques
     // Ignored when objects[] is used (each object carries its own prompts).
     let box: SamBoxPrompt | undefined;
     if ((body as Record<string, unknown>).box !== undefined) {
-    const rawBox = (body as Record<string, unknown>).box;
-    if (!isRecord(rawBox)) throw new HttpError(400, "live /v1/segment box must be an object");
-    const w = Math.round(width);
-    const h = Math.round(height);
-    const sides = (["left", "top", "right", "bottom"] as const).map((k) => {
-      const v = requireNumber((rawBox as Record<string, unknown>)[k], `box.${k}`);
-      if (!Number.isInteger(v)) throw new HttpError(400, `box.${k} must be an integer, got ${v}`);
-      return v;
-    });
-    const [left, top, right, bottom] = sides as [number, number, number, number];
+      const rawBox = (body as Record<string, unknown>).box;
+      if (!isRecord(rawBox)) throw new HttpError(400, "live /v1/segment box must be an object");
+      const w = Math.round(width);
+      const h = Math.round(height);
+      const sides = (["left", "top", "right", "bottom"] as const).map((k) => {
+        const v = requireNumber((rawBox as Record<string, unknown>)[k], `box.${k}`);
+        if (!Number.isInteger(v)) throw new HttpError(400, `box.${k} must be an integer, got ${v}`);
+        return v;
+      });
+      const [left, top, right, bottom] = sides as [number, number, number, number];
     if (left < 0 || top < 0 || right > w || bottom > h || left >= right || top >= bottom) {
       throw new HttpError(400, `box [${left},${top},${right},${bottom}] is outside the ${w}x${h} frame`);
     }
-    box = { left, top, right, bottom };
+      box = { left, top, right, bottom };
     }
     samRequest = { ...baseReq, points, ...(box ? { box } : {}) };
   }
-  const spend = operatorSpend(env, "meta");
-  // Reserve the fixed SAM price BEFORE the upstream call: concurrent callers
-  // then serialize on the budget instead of each passing a stale
-  // $0-remaining check and billing after the fact.
-  // BYOK (spend undefined): caller pays, no operator hold.
-  let samHold: ReturnType<NonNullable<typeof spend>["reserve"]> | undefined;
-  try {
-    samHold = spend?.reserve("sam segment ceiling", SAM_IMAGE_USD);
-  } catch (error) {
-    if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
-    throw error;
-  }
-  // Best-effort archival: inline inputs are stored in the Supabase bucket so
-  // the exact measured pixels stay re-runnable. Never blocks measurement.
-  const archivedImageUrl = await archiveSegmentImage(env, imageUrl, requestId, fetchFn);
-  let sam: Awaited<ReturnType<typeof segmentWithSam>>;
-  try {
-    sam = await segmentWithSam({
-      fetchFn,
-      base: config.endpoints.meta,
-      apiKey: metaKey,
-      model: config.models.sam,
-      request: samRequest,
-    });
-  } catch (error) {
-    samHold?.release();
-    throw error;
-  }
-  try {
-    samHold?.settle(`sam segment ${sam.records.length} objects`, SAM_IMAGE_USD);
-  } catch (error) {
-    if (error instanceof BudgetExceededError) throw new HttpError(429, error.message);
-    throw error;
-  }
+  const sam = await samSegment(env, config, samRequest, requestId, fetchFn);
   return envelope(requestId, started, {
-    archivedImageUrl,
+    archivedImageUrl: sam.archivedImageUrl,
     records: sam.records.map((record) => ({
       objectId: record.objectId,
       box: record.box,
@@ -893,7 +951,12 @@ export async function findingsBody(body: unknown, env: Env, requestId = newReque
   const findings = body.findings as MeasuredFinding[];
   const receipts = body.receipts as Receipt[];
   assertFindingsShape(findings, receipts);
-  crossCheckMeasurement(body, findings, receipts, env);
+  {
+    const recomputed = crossCheckMeasurement(body, findings, receipts, env);
+    if (recomputed.verdict === "no-damage") {
+      return noDamageResult(recomputed, requestId, started);
+    }
+  }
   // Optional multimodal grounding: a damage photo travels with the receipts
   // to Muse Spark (vision input). Gate still decides what ships.
   let imageUrl: string | undefined;
@@ -930,7 +993,12 @@ export async function skepticBody(body: unknown, env: Env, requestId = newReques
   const findings = body.findings as MeasuredFinding[];
   const receipts = body.receipts as Receipt[];
   assertFindingsShape(findings, receipts);
-  crossCheckMeasurement(body, findings, receipts, env);
+  {
+    const recomputed = crossCheckMeasurement(body, findings, receipts, env);
+    if (recomputed.verdict === "no-damage") {
+      return noDamageResult(recomputed, requestId, started);
+    }
+  }
   const provider = skepticProvider(env, configFromEnv(env), fetchFn, operatorSpend(env, "baseten"));
   const { drafts, gate } = await draftAndGate(
     provider,
@@ -1030,7 +1098,7 @@ export function errorBody(message: string, code: number, requestId: string, deta
  * re-measure and reject smuggled fake receipts - the gate alone only checks
  * internal consistency. No opt-out: use /v1/report for the full pipeline.
  */
-export function crossCheckMeasurement(body: Record<string, unknown>, findings: unknown, receipts: unknown, env: Env = {}): void {
+export function crossCheckMeasurement(body: Record<string, unknown>, findings: unknown, receipts: unknown, env: Env = {}): import("../src/engine/types.ts").MeasureSessionResult {
   if (body.component === undefined || body.masks === undefined) {
     throw new HttpError(422, "component and masks are required: send measurement inputs for server-side recomputation");
   }
@@ -1044,6 +1112,24 @@ export function crossCheckMeasurement(body: Record<string, unknown>, findings: u
     (err as HttpError & { details?: unknown }).details = ["re-measured server-side; resubmit via /v1/report or send matching receipts"];
     throw err;
   }
+  return recomputed;
+}
+
+/** Deterministic no-damage answer shared by /v1/report|findings|skeptic. */
+function noDamageResult(
+  measurement: import("../src/engine/types.ts").MeasureSessionResult,
+  requestId: string,
+  started: number,
+): EnvelopedResult {
+  const refutedIds = measurement.receipts.filter((r) => r.method === "damage_refuted").map((r) => r.id);
+  const drafts = [{ statement: "No crack found - the marked region is not damage.", citations: refutedIds }];
+  const gate = validateFindings(drafts, measurement.receipts);
+  if (!gate.ok) {
+    const err = new HttpError(422, "Evidence gate failed");
+    (err as HttpError & { details?: unknown }).details = gate.failures;
+    throw err;
+  }
+  return envelope(requestId, started, { measurement, findings: drafts, gate });
 }
 
 const SESSION_MODES = ["absolute", "percent-only"];
@@ -1072,6 +1158,67 @@ export function toSavedSession(body: unknown): SavedSession {
 const CORS_METHODS = "GET, POST, OPTIONS";
 const CORS_HEADERS = "content-type, authorization, x-meta-key, x-baseten-key";
 
+/** Default allowlist when ALLOWED_ORIGINS is unset or empty. No path, no
+ * wildcard, exact origins only. Requests without an Origin header (curl,
+ * server-to-server) are never blocked by this check — this is not
+ * authentication, only a browser-spend guard. */
+export const DEFAULT_ALLOWED_ORIGINS: readonly string[] = [
+  "https://snapclaim.pages.dev",
+  "http://localhost:8787",
+  "http://127.0.0.1:8787",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+];
+
+/** Normalise one allowlist entry: trim, lowercase scheme+host, strip a single
+ * trailing slash. Returns null for malformed entries (path, query, hash,
+ * wildcard, unparseable) so the caller can ignore them with a warning. */
+export function normalizeAllowedOrigin(entry: string): string | null {
+  const t = entry.trim();
+  if (t === "" || t.includes("*")) return null;
+  let url: URL;
+  try {
+    url = new URL(t);
+  } catch {
+    return null;
+  }
+  if (url.username !== "" || url.password !== "") return null;
+  if (url.search !== "" || url.hash !== "") return null;
+  if (url.pathname !== "" && url.pathname !== "/") return null;
+  const scheme = url.protocol.toLowerCase();
+  if (scheme !== "http:" && scheme !== "https:") return null;
+  const host = url.host.toLowerCase();
+  if (host === "") return null;
+  return `${scheme}//${host}`;
+}
+
+/** Effective allowlist: normalised ALLOWED_ORIGINS, or the default when unset,
+ * empty, or fully malformed. Malformed entries are ignored with a warning. */
+export function getAllowedOrigins(env: Env = {}): string[] {
+  const raw = env.ALLOWED_ORIGINS ?? "";
+  const out: string[] = [];
+  for (const part of raw.split(",")) {
+    const t = part.trim();
+    if (t === "") continue;
+    const n = normalizeAllowedOrigin(t);
+    if (n === null) {
+      console.warn(`[cors] ignoring malformed ALLOWED_ORIGINS entry: ${t}`);
+      continue;
+    }
+    if (!out.includes(n)) out.push(n);
+  }
+  if (out.length > 0) return out;
+  return [...DEFAULT_ALLOWED_ORIGINS];
+}
+
+/** Exact-match check after normalising the incoming Origin header. */
+export function isOriginAllowed(origin: string | null | undefined, env: Env = {}): boolean {
+  if (origin === null || origin === undefined || origin === "") return false;
+  const n = normalizeAllowedOrigin(origin);
+  if (n === null) return false;
+  return getAllowedOrigins(env).includes(n);
+}
+
 export function corsHeaders(): Record<string, string> {
   return {
     "access-control-allow-origin": "*",
@@ -1084,31 +1231,22 @@ export function corsHeaders(): Record<string, string> {
 }
 
 /**
- * Origin-restricted CORS for the public demo. Set ALLOWED_ORIGINS to a
- * comma-separated list (e.g. your Pages URL) and browsers outside it can no
- * longer spend your SPEND_GUARD_USD from a web page.
- * - No allowlist + mock mode: "*" (local dev, $0 spend).
- * - No allowlist + live mode: no ACAO header (deny by default; curl unaffected).
- * - Allowlist set: echo the caller only on exact match, otherwise omit ACAO
- *   (fail closed - never fall back to the first allowlisted origin).
+ * Exact-match CORS. ALLOWED_ORIGINS is a comma-separated list; entries are
+ * normalised (trim, lowercase scheme+host, no trailing slash). Entries with
+ * paths or wildcards are ignored. Unset or empty uses the default list
+ * (Pages + localhost/127.0.0.1 :8787/:5173). Live mode never falls back to
+ * "*". Echoes only the exact matching origin, no suffix or prefix matching.
  */
 export function corsHeadersFor(origin: string | null, env: Env = {}): Record<string, string> {
-  const raw = env.ALLOWED_ORIGINS ?? "";
-  const allowed = raw
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter((entry) => entry !== "");
-  if (allowed.length === 0) {
-    const mockMode = effectiveMockMode(env);
-    if (mockMode) return corsHeaders();
+  const allowed = getAllowedOrigins(env);
+  const n = origin === null ? null : normalizeAllowedOrigin(origin);
+  if (n !== null && allowed.includes(n)) {
     return {
+      "access-control-allow-origin": n,
       "access-control-allow-methods": CORS_METHODS,
       "access-control-allow-headers": CORS_HEADERS,
       vary: "Origin, x-meta-key, x-baseten-key",
     };
-  }
-  if (origin !== null && allowed.includes(origin)) {
-    return { ...corsHeaders(), "access-control-allow-origin": origin };
   }
   // Mismatch (or missing Origin): omit ACAO so the browser blocks the read.
   return {
@@ -1117,6 +1255,18 @@ export function corsHeadersFor(origin: string | null, env: Env = {}): Record<str
     vary: "Origin, x-meta-key, x-baseten-key",
   };
 }
+
+/** Expensive (billable) routes for REQUIRE_ORIGIN_FOR_EXPENSIVE. */
+export const EXPENSIVE_ROUTE_PATHS: readonly string[] = [
+  "/v1/claim",
+  "/v1/report",
+  "/v1/segment",
+  "/v1/transcribe",
+  "/v1/describe",
+  "/v1/findings",
+  "/v1/skeptic",
+  "/v1/render",
+];
 
 export interface HandledResponse {
   status: number;
@@ -1183,6 +1333,7 @@ export const RATE_LIMITS: Record<string, number> = {
   cheap: 120,
 };
 const EXPENSIVE_PATHS = new Set([
+  "/v1/claim",
   "/v1/report",
   "/v1/segment",
   "/v1/transcribe",
@@ -1308,11 +1459,31 @@ export async function handleRequest(input: {
   store?: Store;
   headers?: RequestHeaders;
   clientIp?: string;
+  /** Browser Origin header, if present. Enforced before any cost. */
+  origin?: string | null;
 }): Promise<HandledResponse> {
   const requestId = newRequestId();
   const store = input.store ?? defaultStore;
   const headers = input.headers ?? {};
   let env = input.env ?? {};
+  const origin: string | null =
+    input.origin !== undefined ? input.origin : (headers.origin ?? headers.Origin ?? null);
+  // Exact-match origin allowlist: enforced before rate limiting, spend holds,
+  // body parsing or any provider call. No Origin (curl, server-to-server) is
+  // not blocked here — this is a browser-spend guard, not authentication.
+  if (origin !== null && origin !== "") {
+    if (!isOriginAllowed(origin, env)) {
+      return {
+        status: 403,
+        body: { ok: false, error: "origin not allowed", code: "origin_not_allowed", requestId },
+      };
+    }
+  } else if (env.REQUIRE_ORIGIN_FOR_EXPENSIVE === "1" && (EXPENSIVE_ROUTE_PATHS as readonly string[]).includes(input.path)) {
+    return {
+      status: 403,
+      body: { ok: false, error: "origin required", code: "origin_not_allowed", requestId },
+    };
+  }
   // Defense in depth: when callers pass clientIp (server/worker do), enforce
   // the per-route tier here too so direct handleRequest callers get the same
   // protection as the edge.
@@ -1329,7 +1500,7 @@ export async function handleRequest(input: {
     // Any Bearer value is NOT enough: compare against ADMIN_TOKEN in
     // constant time like requireAdmin does.
     if (env.REQUIRE_BILLING_AUTH === "1" && input.method === "POST" &&
-      ["/v1/report", "/v1/segment", "/v1/transcribe", "/v1/describe", "/v1/findings", "/v1/skeptic", "/v1/render"].includes(input.path)) {
+      ["/v1/claim", "/v1/report", "/v1/segment", "/v1/transcribe", "/v1/describe", "/v1/findings", "/v1/skeptic", "/v1/render"].includes(input.path)) {
       try {
         requireAdmin(headers, env);
       } catch (e) {
@@ -1355,6 +1526,7 @@ export async function handleRequest(input: {
     if (input.method === "POST" && input.path === "/v1/observe") return { status: 200, body: observeBody(input.body, requestId) };
     if (input.method === "POST" && input.path === "/v1/crosscheck") return { status: 200, body: crosscheckBody(input.body, requestId) };
     if (input.method === "POST" && input.path === "/v1/report") return { status: 200, body: await reportBody(input.body, env, requestId, input.fetchFn) };
+    if (input.method === "POST" && input.path === "/v1/claim") return { status: 200, body: await claimBody(input.body, env, requestId, input.fetchFn) };
     if (input.method === "POST" && input.path === "/v1/segment") return { status: 200, body: await segmentBody(input.body, env, requestId, input.fetchFn) };
     if (input.method === "POST" && input.path === "/v1/transcribe") return { status: 200, body: await transcribeBody(input.body, env, requestId, input.fetchFn) };
     if (input.method === "POST" && input.path === "/v1/describe") return { status: 200, body: await describeBody(input.body, env, requestId, input.fetchFn) };

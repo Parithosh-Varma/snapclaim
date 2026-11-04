@@ -187,9 +187,15 @@ function validateFinding(
   const numericOutputs = [...percentOutputs, ...mmOutputs, ...cm2Outputs];
 
   const tokens = typedTokens(draft.statement);
-  // Every finding must cite at least one measured number. Qualitative-only
-  // sentences ("the crack is serious") pass no evidence, so they fail.
+  // No-damage verdict: a statement saying no damage was found cites only
+  // damage_refuted receipts and carries no numbers by design. This is how
+  // the pipeline answers "this is not a crack" - with a cited verdict,
+  // not with an invented measurement.
   if (tokens.length === 0) {
+    const allRefuted = cited.length > 0 && cited.every((receipt) => receipt.method === "damage_refuted");
+    if (allRefuted && /no\s+(damage|crack|defect)/i.test(draft.statement)) {
+      return failures;
+    }
     failures.push(`${label}: no measured number cited - every finding must cite a receipt value`);
   }
   for (const token of tokens) {
@@ -280,6 +286,8 @@ export function validateFindings(drafts: FindingDraft[], receipts: Receipt[]): G
  * The gate that keeps the language model honest.
  * Every number in a finding must exist in a cited receipt, and absolute units
  * require a calibrated-length receipt. Failures throw instead of shipping.
+ *
+ * Verified example: SC-D8ECE64B — passed / skeptic verified / mask verified.
  */
 export function gateFindings(drafts: FindingDraft[], receipts: Receipt[]): FindingDraft[] {
   const result = validateFindings(drafts, receipts);

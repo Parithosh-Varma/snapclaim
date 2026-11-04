@@ -95,7 +95,7 @@ export function Home() {
   };
   return (
     <section className="screen tab on home" aria-labelledby="h-home">
-      <div className="wrap home-wrap">
+      <div className="wrap wide home-wrap">
         <header className="home-top">
           <span className="brand">
             <span className="brand-mark" aria-hidden="true">
@@ -111,6 +111,8 @@ export function Home() {
         <h1 id="h-home">Damage, measured.</h1>
         <p className="sub home-sub">Coin for scale, photo for proof - a report in minutes.</p>
 
+        <div className="split">
+        <div className="split-main">
         <button id="ctaNew" className="hero-tap" type="button" onClick={startCapture} aria-describedby="heroSteps">
           <span className="hero-art" aria-hidden="true">
             <LoadImg className="hero-photo" src="./hero-crack.jpg" alt="" />
@@ -159,7 +161,9 @@ export function Home() {
             </div>
           </div>
         )}
+        </div>
 
+        <div className="split-side">
         <div className="home-duo">
           <div className="tipcard">
             <p className="tipcard-title">Coin tips</p>
@@ -171,8 +175,14 @@ export function Home() {
           </div>
           <div className="tipcard">
             <p className="tipcard-title">How accuracy works</p>
-            <p className="tipcard-copy">The coin sets the millimetres. Tilt is corrected from its ellipse - no coin, percent-only report.</p>
+            <p className="tipcard-copy">The coin sets the millimetres. Tilt is corrected from its ellipse - no coin, percent-only report. Terrace proof: 232 mm vs 227 mm manual straight-tape. Receipts R001–R007. Crack width 3.2 mm Unverified.</p>
           </div>
+        </div>
+
+        <div className="card" role="note" aria-label="Live terrace-slab proof">
+          <p className="found">Live proof — terrace slab</p>
+          <p className="sub">232 mm length [R005] Confirmed · 0.73% [R002] · 7.48 cm2 [R004] · significant [R007] · width 3.2mm [R006] Unverified.</p>
+          <p className="sub"><a className="link-btn" href="/reports/snapclaim-SC-D8ECE64B.pdf">See report: snapclaim-SC-D8ECE64B.pdf</a></p>
         </div>
 
         <div className="recent-head">
@@ -200,6 +210,8 @@ export function Home() {
             <button type="button" className="btn-primary empty-cta" onClick={startCapture}>Start your first claim</button>
           </div>
         )}
+        </div>
+        </div>
       </div>
     </section>
   );
@@ -476,7 +488,7 @@ type BackendState =
 
 export function Settings() {
   const ctx = useApp();
-  const { store, casesVersion, bumpCases, toast, base, setBase, checkForUpdates, swUpdateReady, applyUpdate, go } = ctx;
+  const { store, casesVersion, bumpCases, toast, base, setBase, checkForUpdates, swUpdateReady, applyUpdate, go, replayOnboarding } = ctx;
   const cases = store.list();
   void casesVersion;
   const [theme, setTheme] = useState(() => String(store.getSettings().theme ?? document.documentElement.dataset.theme ?? "auto"));
@@ -488,6 +500,8 @@ export function Settings() {
   const [metaDraft, setMetaDraft] = useState("");
   const [basetenDraft, setBasetenDraft] = useState("");
   const [keyMsg, setKeyMsg] = useState("");
+  const [computeMsg, setComputeMsg] = useState("");
+  const [onDevice, setOnDevice] = useState(() => Boolean(store.getSettings().onDevice));
   const savedMeta = String(store.getSettings().metaKey ?? "");
   const savedBaseten = String(store.getSettings().basetenKey ?? "");
   const maskKey = (k: string) => (k.length <= 4 ? "••••" : `••••${k.slice(-4)}`);
@@ -829,6 +843,23 @@ export function Settings() {
         </Section>
 
         <Section
+          label="Compute"
+          icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M9 9h6v6H9zM4 10h-2M4 14h-2M22 10h-2M22 14h-2M10 4V2M14 4V2M10 22v-2M14 22v-2" /></svg>}
+        >
+          <label className="checkline" htmlFor="onDeviceToggle">
+            <input
+              id="onDeviceToggle"
+              type="checkbox"
+              checked={onDevice}
+              onChange={(e) => { const v = e.target.checked; setOnDevice(v); store.setSettings({ onDevice: v }); setComputeMsg(v ? "On-device outlining on - the model downloads once, then taps work offline." : "On-device outlining off - taps outline via the cloud."); }}
+            />
+            <span>Outline on this device</span>
+          </label>
+          {computeMsg ? <p className="fineprint" role="status">{computeMsg}</p> : null}
+          <p className="fineprint">Cloud is the default: taps outline via the backend and low-memory phones never download the ~200 MB model. Turn this on only on a strong device, ideally on Wi-Fi - the first outline still downloads the model once.</p>
+        </Section>
+
+        <Section
           label="Developer"
           icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3M13 5l-2 14" /></svg>}
         >
@@ -875,6 +906,24 @@ export function Settings() {
         >
           <div className="about-rows">
             <span className="about-row"><span>Version</span><b>{APP_VERSION}</b></span>
+            <span className="about-row"><span>Field proof</span><b>232 mm · 0.73% · 7.48 cm²</b></span>
+            <p className="fineprint" style={{ marginTop: 0 }}>
+              Terrace slab SC-D8ECE64B: 232 mm length [R005] · 0.73% extent [R002] · 7.48 cm² area [R004] · significant [R007] · width 3.2 mm [R006] Unverified.
+            </p>
+            <a className="about-row about-link" href="/reports/snapclaim-SC-D8ECE64B.pdf">
+              <span>Sample report (SC-D8ECE64B)</span><b aria-hidden="true">→</b>
+            </a>
+            <a className="about-row about-link" href="/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf">
+              <span>Terrace-slab case study</span><b aria-hidden="true">→</b>
+            </a>
+            <button
+              type="button"
+              className="about-row about-link"
+              style={{ border: 0, background: "none", width: "100%", font: "inherit", cursor: "pointer", textAlign: "left" }}
+              onClick={replayOnboarding}
+            >
+              <span>How it works</span><b aria-hidden="true">→</b>
+            </button>
             <details className="learn about-detail">
               <summary>Privacy policy</summary>
               <p>Tapping damage sends the photo to the backend for outlining (falls back to on-device). Optional cross-checks send the tapped photo again to the backend you configure. Sharing for measurement improvement is off by default and per-photo.</p>
