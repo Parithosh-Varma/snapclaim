@@ -27,6 +27,18 @@ SnapClaim turns a damage photo plus a one-line description into a replayable evi
 
 **Try it:** <https://snapclaim.pages.dev> (no login needed).
 
+## Demo video
+
+Watch the full loop — photo + coin, tap to mask, gated findings, skeptic, SVG annexure:
+
+<https://youtu.be/CdqSvKHyrCg>
+
+> _More walkthroughs coming — this section will grow with new cuts._
+
+## Project gallery
+
+> _Coming soon — screenshots of the capture, check, and report screens will live here._
+
 ### What is measured today
 
 All three commands are free and deterministic; run them yourself.
