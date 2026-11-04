@@ -150,16 +150,19 @@ export default function App() {
   }, []);
 
   /* Deferred step-change save: collectDraft serializes full photo data URLs
-     (stills + location + payload overlays), which can block first paint past
-     the loader delay - loader first, page second. Save after the browser has
-     painted so taps feel instant. Crash coverage stays synchronous via the
-     pagehide/visibilitychange handlers below, which must run before death. */
+     (stills + location + payload overlays). That must never run between the
+     tap and first paint: even requestAnimationFrame + setTimeout(0) usually
+     fires pre-paint in the same frame, which is exactly the loader-then-page
+     flash. requestIdleCallback runs when the browser is idle (post-paint);
+     the double-rAF fallback paints first, then saves. Crash coverage stays
+     synchronous via the pagehide/visibilitychange handlers below. */
   const persistDraftSoon = useCallback((forScreen: string) => {
     const save = () => persistDraft(forScreen);
-    if (typeof requestAnimationFrame === "function") {
-      requestAnimationFrame(() => { setTimeout(save, 0); });
+    const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
+    if (typeof ric === "function") {
+      ric.call(window, save, { timeout: 2000 });
     } else {
-      setTimeout(save, 0);
+      requestAnimationFrame(() => requestAnimationFrame(save));
     }
   }, [persistDraft]);
 
