@@ -63,6 +63,8 @@ export async function loadSamplePhoto(session: Session, file: string): Promise<v
   resetDmg(session);
   session.payload = null;
   session.measurement = null;
+  session.measureSeq = (session.measureSeq ?? 0) + 1;
+  session.measureJob = null;
   session.transcript = "";
   session.currentCaseId = null;
   session.annexUrl = null;

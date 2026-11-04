@@ -123,11 +123,13 @@ export default function Numbers() {
 
   return (
     <section className="screen on" aria-labelledby="h-num">
-      <div className="wrap">
+      <div className="wrap wide">
         <BackButton label="Describe" onClick={() => go("sSay")} />
         <Stepper step={4} />
         <h1 id="h-num">Get the numbers.</h1>
         <p className="sub">Outlined and measured, not guessed.</p>
+        <div className="split">
+        <div className="split-main">
 
         {s.stillDataUrl && (
           <div className="photocard" id="numPhotoCard">
@@ -148,7 +150,8 @@ export default function Numbers() {
             </button>
           </div>
         )}
-
+        </div>
+        <div className="split-side">
         <div id="measured" aria-live="polite">
           {numError ? (
             <div className="statecard err" role="alert">
@@ -232,6 +235,8 @@ export default function Numbers() {
           >
             or skip straight to the report
           </button>
+        </div>
+        </div>
         </div>
       </div>
     </section>

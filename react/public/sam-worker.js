@@ -5,6 +5,11 @@
 // {type:"progress"|"ready"|"error"} and {type:"decoded", id, result}.
 const TF_URL = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2";
 const MODEL_ID = "Xenova/slimsam-77-uniform";
+// Damage taps use a second decoder fine-tuned on crack masks (training/slimsam-crack/).
+// Fed the stock embeddings it scores 0.697 held-out mIoU against stock's 0.174 (q8,
+// 276 taps, these rules). Coins stay on the stock decoder: the tuned one grows coin
+// masks into the tape around them. Only its decoder runs; its encoder is freed.
+const CRACK_MODEL_ID = "tariqkhalif/slimsam-77-crack";
 
 // Cracks are thin: SAM's highest-scoring candidate is often the wall the crack runs
 // through (71% of the photo on a real facade), so damage takes the smallest candidate
@@ -19,6 +24,7 @@ const WALL_FRACTION = 0.5;
 
 let tf = null, model = null, processor = null, device = null;
 let rawImage = null, embeddings = null, currentPhoto = -1;
+let crackModel = null, crackLoad = null; // tuned decoder; null means taps use the stock one
 let forcedCpu = false; // set after a GPU run fails, for the rest of the session
 let progressPhotoId = -1; // embed that triggered the download: tags progress so stale photos drop it
 
@@ -62,8 +68,22 @@ function fallBackToCpu() {
   if (device !== "webgpu" || forced === "webgpu") return false;
   model = null;
   device = null;
+  crackModel = null;
+  crackLoad = null;
   forcedCpu = true;
   return true;
+}
+
+/** Load the crack decoder in the background on the stock model's device. Never throws. */
+function loadCrackModel() {
+  const dev = device;
+  crackLoad ??= (async () => {
+    const m = await tf.SamModel.from_pretrained(CRACK_MODEL_ID, dev === "webgpu" ? { device: "webgpu", dtype: "fp32" } : {});
+    // Embeddings come from the stock model, so this repo's encoder session is dead weight.
+    try { await m.sessions.model?.release?.(); delete m.sessions.model; } catch { /* keep it */ }
+    if (device === dev) crackModel = m; // a GPU fallback meanwhile drops this load
+  })().catch(() => { /* offline or blocked: damage taps keep the stock decoder */ });
+  return crackLoad;
 }
 
 async function embed({ photoId, image }) {
@@ -88,6 +108,7 @@ async function embed({ photoId, image }) {
     rawImage = raw;
     embeddings = result;
     postMessage({ type: "ready", photoId, device, embedMs: Math.round(performance.now() - started) });
+    loadCrackModel(); // fetched after the first photo is ready, so it never delays it
   } catch (e) {
     if (photoId === currentPhoto) postMessage({ type: "error", photoId, message: String(e?.message ?? e) });
   }
@@ -96,7 +117,17 @@ async function embed({ photoId, image }) {
 async function decodePoint(point, preferSmallest) {
   // input_points shape: [image][prompt][point][x,y], in original image pixels
   const inputs = await processor(rawImage, { input_points: [[point]] });
-  const outputs = await model({ ...embeddings, input_points: inputs.input_points, input_labels: inputs.input_labels });
+  const prompt = { ...embeddings, input_points: inputs.input_points, input_labels: inputs.input_labels };
+  if (preferSmallest) await loadCrackModel();
+  let outputs;
+  if (preferSmallest && crackModel) {
+    try {
+      outputs = await crackModel(prompt);
+    } catch {
+      crackModel = null; // failed once: stock decoder for the rest of the session
+    }
+  }
+  outputs ??= await model(prompt);
   // masks[0] has dims [1, 3, H, W]: three candidate masks at original size
   const masks = await processor.post_process_masks(outputs.pred_masks, inputs.original_sizes, inputs.reshaped_input_sizes);
   const scores = outputs.iou_scores.data; // 3 scores, one per candidate

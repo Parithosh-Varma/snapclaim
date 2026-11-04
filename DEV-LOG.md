@@ -326,3 +326,51 @@ Credits claim ✅ - billing verified, $150 active on 2026-10-27.
 - `npm run bench:gap` exit 0: measured err 8.5 mm (3.7%, in) vs model-only err 88 mm (38.8%, out). `/proof.html` second column filled; rebuilt + redeployed.
 
 **Spend:** $0.00 recorded (Spark pricing unconfirmed; 3,110 tokens metered at $0).
+
+## 2026-11-03 - Measurement now overlaps the Describe step
+
+**Shipped**
+
+- React: tapping "Measure damage" validates everything up front (mask, coin outline, size, mock-backend refusal) exactly as before, then starts the observe+measure chain as a background job on the session (`s.measureJob = { promise, seq, state }`) and navigates to Describe immediately. Say awaits the job before `/v1/report` with an honest "Finishing the measurement…" status; a finished job behaves exactly as the old sequential flow. Failures return to Mark (not Numbers) with the real "Measuring failed (...)" message, keeping taps and transcript.
+- Staleness: the old component-level `measureSeq` moved onto the session with an input snapshot (photo, taps, coin, label); new measures, tap/coin/photo edits, angle switches, and new cases supersede the old job, and late landings are discarded. New `react/src/lib/measure-job.ts` carries the shared body builder (maths unchanged) plus the job lifecycle.
+- PWA mirrors the change for the single-shot path (`pwa/app.js` background job, Say awaits, failure back to Mark); multi-shot stays sequential since frame B needs frame A on camera. New-case/retake/sample paths invalidate the job.
+- Parity: `tests/measure-overlap.test.ts` proves a stale job landing late is discarded and the observe/report bodies are byte-identical between the sequential and overlapping flows for the same inputs; `tests/react-shell.test.ts` pins the new state machine.
+- Housekeeping: React SW `snapclaim-react-v20` → `v21`, PWA `snapclaim-shell-v26` → `v27` (app.js changed); 323 tests green, both typechecks clean, React build clean.
+## 2026-11-03 - One-call headless API (no UI)
+
+**Shipped**
+
+- `POST /v1/claim`: one request runs segment → observe → report → render and returns `{measurement, findings, gate, overlay, svg?, replay, segmentation?}`. Two input shapes: COCO RLE `masks[]` (keyless, mock-capable, pixel-verified) or `imageUrl` + `damage[]` taps (+ optional `coin`) for live SAM 3.1 segmentation.
+- Segmentation attribution by pixel containment, not record order; wall-sized records (>50% frame) dropped like the app drops them; a tap with no surviving mask is `422`, never an empty finding. Coin picking mirrors the app's compactness heuristic; a non-coin outline still degrades to percent-only via `/v1/observe`.
+- Render happens in-process: `/v1/render` would re-run `/v1/report` and bill a second findings call for the same numbers.
+- The claim re-binds the input RLE to the observed masks, so claims are `provenance: "pixel-verified"` and pass `REQUIRE_PIXEL_PROVENANCE=1`.
+- Extracted `samSegment()` from `/v1/segment` so both routes share the SSRF guard, pixel cap, spend hold and archival; `/v1/segment` behavior unchanged (503-before-400 ordering pinned by tests).
+- `/v1/claim` joins the expensive rate tier (20/min) and the `REQUIRE_BILLING_AUTH` lockdown.
+- `cli/snapclaim.ts` (`npm run cli`): `health` and `claim` from the shell, PNG/JPEG/WebP dimension detection, data-URL building, `--tap`, `--coin`, `--say`, `--out`, `--svg`, `--dry-run`, BYOK headers.
+- `docs/API.md`: full contract, CLI flags, low-level route table, replay, Node client, limits/auth. 15 new tests; 364 total green. BYOK proven on `/v1/claim`: caller key drives SAM + findings, operator ledger stays at $0.
+## 2026-11-03 - Release candidate truth pass (25 mm nominal, n = 1, no live calls)
+
+**Corrected (all figures from `src/engine/measure.ts` run 2026-11-03 or the values below, never invented)**
+
+- Coin: nominal 25 mm issue spec, user-confirmed 2026-11-03; same physical coin ruler-read 24 mm (+/-0.5). Presets fixed 23→25 mm (`pwa/coin-model.js`, `react/public/coin-model.js`, `pwa/index.html`, `react/src/lib/session.ts`); sizes vary by issue, type your measured diameter. Sensitivity at 24 mm from the same engine run: R005 228.0 mm / R006 3.1 mm / R004 7.09 cm².
+- Terrace slab (`bench/split.json:terrace-slab-tape-01`, `fixtures/photos/DSC_0711.JPG`, n = 1): engine at 25 mm → R001 0.773994 mm/px, R004 7.69 cm², R005 237.5 mm, R006 3.2 mm (unverified — no width ground truth), R007 significant. Old 23 mm-coin run SC-25D35C5E R005 218.5 mm retained for history, superseded.
+- Ground truth: thread path 238.8 mm (9.4 in × 25.4, +/-4 mm uncertainty, end readings blank, confirm) + tape span 227 mm (range 225–230, midpoint, +/-2.5). Pipeline measures path, not span.
+- Errors (n = 1): vs thread 238.8 ±4 → err 1.3 mm (0.5%, inside ±10%, within thread ±4); vs span 227 → err 10.5 mm (4.6%, printed, never scored); Spark photo-alone 315 mm vs thread err 76.2 mm (31.9%, outside). `bench/gap.ts` now scores `pathMm` primary, prints `spanMm` labelled.
+- Width: 3.2 mm (terrace) + 2.6 mm (wall-crack fixture) marked unverified everywhere (annexure `src/render/svg.ts`, `react/src/screens/Report.tsx`, `react/src/screens/Shared.tsx`, `tests/width-unverified.test.ts`, golden hash `cc12e41c…`).
+- Stale claims removed: "tape not legible" for DSC_0710 (same crack, no legibility claim); "SVG only (no PDF)" → server SVG + React on-device PDF (`react/src/lib/pdf.ts`).
+- Bench status on this branch: `npm run eval` 7 pass; `npm run bench:gap` INCOMPLETE (exit 1, truth 238.8 path, measured/modelOnly missing — `bench/runs/terrace-slab-tape-01.json` + `bench/model-only/terrace-slab-tape-01.json` absent, not fabricated; regenerate via `npm run bench:archive -- <caseId> <input.json>` with `{ provenance, measurement: { findings, receipts } }` from a live pipeline result, plus a Spark photo-alone guess file). `npm test` 319 pass, `tsc` clean. No live API calls, no deploy on this branch.
+
+**Spend:** $0.00.
+
+## 2026-11-04 - Terrace final: 25 mm user-supplied, span-only truth, no thread
+
+**Shipped**
+
+- Coin is 25 mm, final, user-supplied (+/-0.5). The 23 mm read was a mistake: the 2026-11-02 SC-25D35C5E run (R005 218.5 mm) is void, not superseded. No 23, no 24 anywhere in the case.
+- Thread 238.8 mm removed from `terrace-slab-tape-01`: the string crack is not confirmed to be the terrace crack, so it must not validate it. Ground truth is the tape span 227 mm [225–230] only, context, never scored.
+- Engine re-run (`src/engine/measure.ts`, signed-report scalars, self-reported — no RLE in repo, pixel provenance pending masks): R001 0.773994, R004 7.69 cm², R005 237.5 mm, R006 3.2 mm (unverified, no width ground truth), R007 significant. Archived run replaced with the full receipted result (coin 25).
+- Error vs span: +10.5 mm (+4.6%, span context, never scored); coin +/-0.5 mm scales mm values +/-2%; width 3.2 mm unverified.
+- `npm run bench:gap` now prints UNSCORED (exit 0): with no path truth the case has no validated accuracy claim. `npm test` green.
+- Landing case-study text (other branch) needs the same swap: 237.5 vs span 227, no thread — corrected text supplied, not pushed.
+
+**Spend:** $0.00.

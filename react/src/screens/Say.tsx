@@ -8,7 +8,7 @@ const MAXLEN = 280;
 
 export default function Say() {
   const ctx = useApp();
-  const { session: s, go, base } = ctx;
+  const { session: s, go, base, measuring } = ctx;
   const [micState, setMicState] = useState("Tap Dictate, or just type.");
   const [transcript, setTranscript] = useState(s.transcript);
   const [voiceErr, setVoiceErr] = useState("");
@@ -176,7 +176,25 @@ export default function Say() {
   }, []);
 
   const runReport = async () => {
-    if (!s.payload || sending) return;
+    if (sending) return;
+    // Overlap: the measurement started on Mark runs while the user speaks or
+    // types. Never run /v1/report without a completed payload: if the job is
+    // still running, await it first with an honest status. If it already
+    // failed, it has returned to Mark (keeping taps and transcript) - there
+    // is nothing to report from here.
+    const job = s.measureJob;
+    if (job && job.state === "running") {
+      setSending(true);
+      setMicState("Finishing the measurement…");
+      try {
+        await job.promise;
+      } catch {
+        /* the job records its own error state; fall through to the checks */
+      }
+      setSending(false);
+      if (s.measureJob?.state !== "done" || !s.payload) return;
+    }
+    if (!s.payload) return;
     setSending(true);
     s.reportFail = null;
     s.reportStatement = null;
@@ -229,11 +247,19 @@ export default function Say() {
 
   return (
     <section className="screen on" aria-labelledby="h-say">
-      <div className="wrap">
+      <div className="wrap wide">
         <BackButton label="Mark damage" onClick={() => go("sMark")} />
         <Stepper step={3} />
         <h1 id="h-say">Describe what happened.</h1>
         <p className="sub">Type a line, or dictate it with the mic.</p>
+        {(measuring || s.measureJob?.state === "running") && (
+          <p id="measureBg" role="status" className="fineprint">Measuring in the background… describe away, nothing to wait for.</p>
+        )}
+        {s.measureJob?.state === "done" && s.payload && (
+          <p id="measureReady" role="status" className="fineprint">Measured — ready when you are.</p>
+        )}
+        <div className="split">
+        <div className="split-main">
         <div className="card saycard">
           <label className="field" htmlFor="transcriptBox">What happened</label>
           <textarea
@@ -268,6 +294,8 @@ export default function Say() {
           <p className="fineprint" style={{ margin: "10px 2px 0" }}>Your line stays yours here - AI extends it with the photo when the report runs.</p>
           {voiceErr ? <p id="voiceErr" role="alert">{voiceErr}</p> : null}
         </div>
+        </div>
+        <div className="split-side">
         <div className="card">
           <b>Location photo <small className="fieldex">optional - wide shot showing where the damage is</small></b>
           <input
@@ -307,6 +335,8 @@ export default function Say() {
         <button id="sendBtn" className={`btn-primary${sending ? " busy" : ""}`} type="button" style={{ width: "100%" }} disabled={sending} aria-busy={sending} onClick={runReport}>
           {sending ? "Seeing measurements…" : "See measurements"}
         </button>
+        </div>
+        </div>
       </div>
     </section>
   );

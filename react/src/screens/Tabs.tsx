@@ -68,7 +68,7 @@ export function Home() {
   };
   return (
     <section className="screen tab on home" aria-labelledby="h-home">
-      <div className="wrap home-wrap">
+      <div className="wrap wide home-wrap">
         <header className="home-top">
           <span className="brand">
             <span className="brand-mark" aria-hidden="true">
@@ -84,6 +84,8 @@ export function Home() {
         <h1 id="h-home">Damage, measured.</h1>
         <p className="sub home-sub">Coin for scale, photo for proof - a report in minutes.</p>
 
+        <div className="split">
+        <div className="split-main">
         <button id="ctaNew" className="hero-tap" type="button" onClick={startCapture} aria-describedby="heroSteps">
           <span className="hero-art" aria-hidden="true">
             <LoadImg className="hero-photo" src="./hero-crack.jpg" alt="" />
@@ -132,7 +134,9 @@ export function Home() {
             </div>
           </div>
         )}
+        </div>
 
+        <div className="split-side">
         <div className="home-duo">
           <div className="tipcard">
             <p className="tipcard-title">Coin tips</p>
@@ -173,6 +177,8 @@ export function Home() {
             <button type="button" className="btn-primary empty-cta" onClick={startCapture}>Start your first claim</button>
           </div>
         )}
+        </div>
+        </div>
       </div>
     </section>
   );
@@ -425,11 +431,7 @@ export function Settings() {
     toast(v === "auto" ? "Theme follows your system" : `Theme: ${v}`);
   };
 
-<<<<<<< HEAD
-  const runBackendCheck = async () => {
-=======
   const runBackendCheck = async (silent = false) => {
->>>>>>> fix/rate-limits-vulns-part2
     const err = validBackendUrl(urlDraft);
     setUrlError(err);
     if (err) return;

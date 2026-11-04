@@ -1,0 +1,9 @@
+{
+ "heldout_tuned": {
+  "images": 92,
+  "taps": 460,
+  "miou_pwa_rule": 0.4591515443868184,
+  "miou_oracle": 0.47626093942863873
+ },
+ "val_best": 0.40046432389271663
+}

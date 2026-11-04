@@ -39,6 +39,40 @@ async function main() {
     console.log("report fails closed 503 (MOCK_MODE=0, no META_API_KEY)");
   }
 
+  // One-call claim from masks: keyless, deterministic, works in mock and live.
+  // A 100x100 frame with a one-pixel line across row 50 (COCO RLE: column-major,
+  // runs start with zeros).
+  const size = 100;
+  const row = 50;
+  const counts = [row];
+  for (let x = 0; x < size; x++) {
+    counts.push(1);
+    counts.push(x === size - 1 ? size - row - 1 : size - 1);
+  }
+  const claimPayload = {
+    masks: [{ id: "damage-1", label: "crack", confidence: 0.9, rle: { size: [size, size], counts } }],
+    transcript: "crack across the panel",
+    render: false,
+  };
+  const claimed = await fetch(`${base}/v1/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(claimPayload),
+  });
+  if (live || mock) {
+    const body = await claimed.json();
+    if (!body?.ok || body?.result?.gate?.ok !== true) throw new Error("claim failed: " + JSON.stringify(body));
+    if (body.result.measurement?.provenance !== "pixel-verified") {
+      throw new Error("claim must stay pixel-verified: " + JSON.stringify(body.result.measurement?.provenance));
+    }
+    console.log(`claim ok (${health.mode})`, JSON.stringify({ findings: body.result.findings.length, gate: body.result.gate.ok, provenance: body.result.measurement.provenance }));
+  } else {
+    // MOCK_MODE=0 with no keys: the findings provider is missing, so the claim
+    // must refuse rather than invent sentences.
+    if (claimed.status !== 503) throw new Error("claim without keys should 503, got " + claimed.status);
+    console.log("claim fails closed 503 (MOCK_MODE=0, no META_API_KEY)");
+  }
+
   const gated = await fetch(`${base}/v1/report`, {
     method: "POST",
     headers: { "content-type": "application/json" },

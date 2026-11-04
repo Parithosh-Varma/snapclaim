@@ -39,7 +39,7 @@
 <text x="97" y="470" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="34" font-weight="700" fill="#3d4a66" text-anchor="start" letter-spacing="0">227 mm</text>
 <text x="97" y="494" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" fill="#5d6880" text-anchor="start" letter-spacing="0">ground truth</text>
 <text x="451" y="430" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14" font-weight="700" fill="#8a6d1a" text-anchor="start" letter-spacing="0.08em">MEASURED</text>
-<text x="451" y="470" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="34" font-weight="700" fill="#0f7a36" text-anchor="start" letter-spacing="0">218.5 mm</text>
+<text x="451" y="470" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="34" font-weight="700" fill="#0f7a36" text-anchor="start" letter-spacing="0">237.5 mm</text>
 <text x="451" y="494" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" fill="#5d6880" text-anchor="start" letter-spacing="0">inside ±10%</text>
 <text x="805" y="430" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14" font-weight="700" fill="#8a6d1a" text-anchor="start" letter-spacing="0.08em">GUESS</text>
 <text x="805" y="470" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="34" font-weight="700" fill="#c41f29" text-anchor="start" letter-spacing="0">315 mm</text>

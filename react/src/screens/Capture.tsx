@@ -2,11 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "../App";
 import { loadSamplePhoto } from "../lib/sample";
 import { SamplePicker } from "./SamplePicker";
-<<<<<<< HEAD
-import { applyLastCoin, resetDmg } from "../lib/session";
-=======
-import { freshAngleSlot, resetDmg } from "../lib/session";
->>>>>>> fix/rate-limits-vulns-part2
+import { applyLastCoin, freshAngleSlot, resetDmg } from "../lib/session";
 
 const CAM_ERRORS: Record<string, string> = {
   NotAllowedError: "Camera permission is off - tap Enable camera",
@@ -185,10 +181,6 @@ export default function Capture() {
       } catch {
         return null;
       }
-<<<<<<< HEAD
-      // The gate's coin ID is a colour guess; it must not set the scale.
-      applyLastCoin(session);
-=======
     };
     let best: { cap: HTMLCanvasElement; mean: number } | null = snap();
     for (let i = 0; i < 2 && (!best || best.mean < 3 / 255); i++) {
@@ -218,7 +210,8 @@ export default function Capture() {
         session.bundleB = { ...freshAngleSlot() };
       }
       session.gateCoin = null;
->>>>>>> fix/rate-limits-vulns-part2
+      // The gate's coin ID is a colour guess; it must not set the scale.
+      applyLastCoin(session);
     } catch { /* stills are best-effort */ }
     stopStream();
     setFlash(true);
@@ -278,8 +271,6 @@ export default function Capture() {
   };
 
   const usePhoto = () => {
-<<<<<<< HEAD
-=======
     // Two angles: after the first photo goes back behind the camera for the
     // second; after the second, on to marking.
     if (session.capturingAngle !== 2) {
@@ -292,7 +283,6 @@ export default function Capture() {
       void acquire();
       return;
     }
->>>>>>> fix/rate-limits-vulns-part2
     go("sMark");
   };
 
@@ -319,14 +309,8 @@ export default function Capture() {
       }
       session.gateCoin = null;
       session.noScaleMode = true;
-<<<<<<< HEAD
       applyLastCoin(session);
-      gateRef.current?.stop();
-=======
-      session.coinLabel = "";
-      session.coinKindMm = 0;
       stopStream();
->>>>>>> fix/rate-limits-vulns-part2
       go("sReview");
     };
     img.onerror = () => {

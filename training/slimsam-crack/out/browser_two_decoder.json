@@ -1,0 +1,9 @@
+{
+  "runtime": "transformers.js 3.0.2, q8 (the browser wasm build)",
+  "rules": { "MIN_FINE_SCORE": 0.3, "MIN_FINE_AREA": 20, "WALL_FRACTION": 0.5 },
+  "heldout_images": 92,
+  "taps": 276,
+  "embeddings": "stock Xenova/slimsam-77-uniform encoder",
+  "stock_decoder": { "miou": 0.174, "null_masks": 1 },
+  "crack_decoder": { "miou": 0.697, "null_masks": 0 }
+}

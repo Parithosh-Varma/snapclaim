@@ -1,0 +1,25 @@
+# docker compose up --build
+#   app:     http://localhost:8080  (Settings -> Backend: http://localhost:8787)
+#   backend: http://localhost:8787/v1/health
+# Mock mode by default. For live calls put MOCK_MODE=0 and your keys in .env.
+services:
+  backend:
+    build:
+      context: .
+      target: backend
+    ports:
+      - "8787:8787"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      ALLOWED_ORIGINS: "http://localhost:8080,http://127.0.0.1:8080,http://localhost:8787,http://127.0.0.1:8787"
+    restart: unless-stopped
+  web:
+    build:
+      context: .
+      target: web
+    ports:
+      - "8080:8080"
+    depends_on:
+      - backend

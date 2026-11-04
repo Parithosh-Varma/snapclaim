@@ -1,0 +1,15 @@
+{
+ "max_abs_logit_diff_fp32_vs_torch": 0.000762939453125,
+ "prompt_encoder_mask_decoder.onnx": {
+  "taps": 460,
+  "miou_pwa_rule": 0.45920738701216524,
+  "miou_oracle": 0.4762531158127233,
+  "bytes": 16552371
+ },
+ "prompt_encoder_mask_decoder_quantized.onnx": {
+  "taps": 460,
+  "miou_pwa_rule": 0.4567156804315596,
+  "miou_oracle": 0.47428898840164574,
+  "bytes": 4896433
+ }
+}

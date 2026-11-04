@@ -69,6 +69,37 @@ test("Mark gates on crack selection; cloud-only, no model download", () => {
   assert.ok(mark.includes('last === "coin"'), "undo pops the last tap first, including the coin");
 });
 
+test("Measurement overlaps the Describe step; Say awaits the job, failures return to Mark", () => {
+  const mark = read("react/src/screens/Mark.tsx");
+  const say = read("react/src/screens/Say.tsx");
+  const session = read("react/src/lib/session.ts");
+  const job = read("react/src/lib/measure-job.ts");
+  // The job lives on the session; only completed payloads persist in drafts.
+  assert.ok(session.includes("measureJob"), "session carries the background job");
+  assert.ok(session.includes("measureSeq"), "session carries the staleness seq");
+  assert.ok(job.includes("startMeasureJob"), "job start bumps the seq");
+  assert.ok(job.includes("inputsMatch"), "late landings check the input snapshot");
+  assert.ok(job.includes("completeMeasureJob") && job.includes("failMeasureJob"), "success and failure both gate on staleness");
+  assert.ok(job.includes("buildObserveBody"), "observe body is built once and shared");
+  // Mark validates everything up front, then starts the job and leaves at once.
+  assert.ok(mark.includes("buildObserveBody"), "Mark builds the same observe body as the old flow");
+  assert.ok(mark.includes("startMeasureJob"), "Mark starts a background job");
+  assert.ok(mark.includes('go("sSay")'), "Mark moves to Describe immediately");
+  assert.ok(mark.includes("completeMeasureJob"), "success lands payload/measurement without navigating");
+  assert.ok(mark.includes("failMeasureJob"), "failure is staleness-gated");
+  assert.ok(mark.includes('go("sMark")'), "failure returns to Mark, not Numbers");
+  assert.ok(!mark.includes('ctx.setNumError({ title: "Measurement failed"'), "failure no longer files a Numbers error");
+  // Say never reports without a completed payload; a running job is awaited honestly.
+  assert.ok(say.includes("Finishing the measurement"), "Say names the wait while the job runs");
+  assert.ok(say.includes("await job.promise"), "Say awaits the in-flight job before /v1/report");
+  assert.ok(say.includes('id="measureBg"'), "Say shows the background run without fake progress");
+  assert.ok(say.includes('id="measureReady"'), "Say confirms when the numbers land");
+  // Drafts persist completed results only, never the promise.
+  const draft = read("react/src/lib/draft.ts");
+  assert.ok(!draft.includes("measureJob:"), "drafts never persist the in-flight promise");
+  assert.ok(draft.includes("measureJob = null"), "resume clears any running job");
+});
+
 test("Report is an official document with PDF and send options", () => {
   const rep = read("react/src/screens/Report.tsx");
   for (const id of ["pdfBtn", "shareBtn", "copyBtn", "emailBtn", "waBtn", "renderBtn", "annexImg", "docMeta"]) {
@@ -164,6 +195,11 @@ test("React port keeps backend, worker and privacy contracts", () => {
   }
   for (const w of ["react/public/sam-worker.js", "pwa/sam-worker.js"]) {
     assert.ok(read(w).includes("photoId: progressPhotoId"), `${w} tags progress with the photo so stale downloads never paint the bar`);
+    const src = read(w);
+    assert.ok(src.includes('"tariqkhalif/slimsam-77-crack"'), `${w} loads the crack-tuned decoder`);
+    assert.ok(src.includes("preferSmallest && crackModel") && src.includes("outputs ??= await model(prompt)"),
+      `${w} sends damage taps to the tuned decoder and coins (or a failed load) to stock`);
+    assert.ok(!/get_image_embeddings[^\n]*crackModel|crackModel\.get_image_embeddings/.test(src), `${w} embeds with the stock encoder only`);
   }
   assert.ok(mark.includes("That photo could not be read"), "unreadable photo fails closed instead of keeping a stale mask");
   assert.ok(mark.includes("there is nothing outlined to measure"), "measure refuses an empty mask even if the button is forced");
