@@ -1,13 +1,16 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { MeasuredFinding } from "../src/engine/types.ts";
-import type { FindingDraft } from "../src/findings/evidence-gate.ts";
+import { normalizeReceiptId, type FindingDraft } from "../src/findings/evidence-gate.ts";
 import type { Receipt } from "../src/receipts/types.ts";
 import { validateRun } from "./run.ts";
 import type { CaseRun, Provenance } from "./run.ts";
 import type { SkepticVerdict } from "./score.ts";
 
-const receiptIdsOf = (f: MeasuredFinding): string[] => Object.values(f.receiptIds).filter((id): id is string => id !== null);
+const receiptIdsOf = (f: MeasuredFinding): string[] =>
+  Object.values(f.receiptIds)
+    .filter((id): id is string => id !== null)
+    .map(normalizeReceiptId);
 
 /**
  * Reads the skeptic's free-text drafts as one verdict per measured finding.
@@ -19,9 +22,9 @@ export function verdictsFromSkeptic(findings: MeasuredFinding[], drafts: Finding
   const out = new Map<string, SkepticVerdict>();
   for (const f of findings) {
     const mine = new Set(receiptIdsOf(f));
-    const about = drafts.filter((d) => d.citations.some((c) => mine.has(c)));
+    const about = drafts.filter((d) => d.citations.some((c) => mine.has(normalizeReceiptId(c))));
     if (about.length === 0) continue;
-    out.set(f.maskId, about.some((d) => /\bDISPUTED\b/.test(d.statement)) ? "DISPUTED" : "CONFIRMED");
+    out.set(f.maskId, about.some((d) => /\bDISPUTED\b/i.test(d.statement)) ? "DISPUTED" : "CONFIRMED");
   }
   return out;
 }
