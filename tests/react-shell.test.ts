@@ -194,6 +194,8 @@ test("React port keeps backend, worker and privacy contracts", () => {
   assert.ok(tabs.includes('id="metaKeyInput"') && tabs.includes('id="byokSave"') && tabs.includes('id="byokClear"'), "settings offers device-only BYOK fields");
   assert.ok(tabs.includes("never stored server-side"), "BYOK copy states the key handling honestly");
   const css = read("react/src/styles.css");
+  assert.ok(css.includes(".tab-pill") && css.includes("border-radius:999px"), "active tab is a rounded pill, not a hard rectangle");
+  assert.ok(css.includes("@media (min-width:900px)") && css.includes("border-radius:22px"), "desktop gets a floating dock, not a stranded phone bar");
   assert.ok(css.includes(".samplecell .imgph") && css.includes("aspect-ratio:4/3"), "sample thumbs reserve their box so the first tap cannot miss on reflow");
   for (const sel of [".field-input{", ".text-input{", 'dialog#caseDlg input[type="text"]']) {
     const i = css.indexOf(sel);

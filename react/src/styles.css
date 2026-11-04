@@ -501,7 +501,7 @@
     white-space:nowrap;position:relative;border-radius:0;transition:transform 150ms ease,background-color 150ms ease,color 150ms ease}
   #tabs button:active{transform:scale(.96)}
   #tabs .tab-pill{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
-    padding:6px 16px;border-radius:0;transition:background-color 150ms ease,color 150ms ease,transform 150ms ease}
+    padding:6px 16px;border-radius:999px;transition:background-color 150ms ease,color 150ms ease,transform 150ms ease}
   #tabs .tabicon{height:30px;display:grid;place-items:center}
   #tabs .tabicon svg{width:24px;height:24px;flex:none}
   #tabs .tabicon .icon-filled{display:none}
@@ -512,13 +512,20 @@
   #tabs button[aria-current="page"] .tab-pill{background:var(--coin-tint)}
   #tabs button[aria-current="page"] .tablabel{font-weight:600}
   #tabs #tabNew{color:var(--slate)}
-  #tabs #tabNew .tabicon--fab{height:52px;overflow:visible;margin-top:-20px}
-  #tabs #tabNew .fabdot{height:52px;width:52px;border-radius:50%;background:var(--coin-strong);color:#fff;
-    display:grid;place-items:center;box-shadow:0 6px 18px rgba(14,138,77,.35),0 2px 6px rgba(11,30,70,.18);border:4px solid var(--card);
+  #tabs #tabNew .tabicon--fab{height:48px;overflow:visible;margin-top:-12px}
+  #tabs #tabNew .fabdot{height:48px;width:48px;border-radius:50%;background:var(--coin-strong);color:#fff;
+    display:grid;place-items:center;box-shadow:0 6px 18px rgba(14,138,77,.35),0 2px 6px rgba(11,30,70,.18);border:3px solid var(--card);
     transition:transform 150ms ease,filter 150ms ease}
   #tabs #tabNew:active .fabdot{transform:scale(.94)}
   #tabs #tabNew .fabdot svg{width:24px;height:24px}
   #tabs #tabNew .tablabel{margin-top:4px}
+  /* Desktop: a phone-width bottom bar looks stranded on a wide screen.
+     Float it as a compact centered dock instead. */
+  @media (min-width:900px){
+    #tabs{bottom:16px;width:max-content;min-width:min(560px,calc(100% - 32px));max-width:calc(100% - 32px);
+      border:1px solid var(--line);border-radius:22px;padding:10px 16px calc(10px + env(safe-area-inset-bottom));
+      box-shadow:0 12px 40px rgba(11,30,70,.18)}
+  }
   .iconbtn{flex:none;width:44px;height:44px;border-radius:0;border:1px solid var(--line);background:var(--card);
     color:var(--ink);display:grid;place-items:center;box-shadow:var(--shadow-1);
     transition:transform 150ms ease,background-color 150ms ease}
