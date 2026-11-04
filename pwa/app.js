@@ -74,6 +74,46 @@ function base() {
   if (!isAllowedBackendUrl(backendUrl)) throw new Error(POLICY_BACKEND_MESSAGE);
   return backendUrl;
 }
+/* Bring your own key: optional Meta / Baseten keys sent as x-meta-key /
+ * x-baseten-key on the billable routes only (segment, transcribe, report,
+ * skeptic, render). The worker uses them over its own secrets for that one
+ * request and never stores them. Kept in sessionStorage unless the user ticks
+ * "Remember on this device"; only ever sent to base(), which is allowlisted. */
+const BYOK_STORE_KEYS = { meta: "snapclaim.byok.meta", baseten: "snapclaim.byok.baseten" };
+const BYOK_REMEMBER_KEY = "snapclaim.byok.remember";
+const BYOK_MAX_CHARS = 512; // matches the worker's MAX_CALLER_KEY_CHARS
+function byokRemembered() {
+  try { return localStorage.getItem(BYOK_REMEMBER_KEY) === "1"; } catch { return false; }
+}
+function byokStorage() {
+  try { return byokRemembered() ? localStorage : sessionStorage; } catch { return null; }
+}
+/** A usable key is printable ASCII with no spaces (a header value can't hold more). */
+function cleanCallerKey(raw) {
+  const v = String(raw ?? "").trim();
+  if (!v) return "";
+  if (v.length > BYOK_MAX_CHARS || !/^[\x21-\x7e]+$/.test(v)) throw new Error("That key has spaces or odd characters - paste it again");
+  return v;
+}
+function getCallerKey(kind) {
+  try { return byokStorage()?.getItem(BYOK_STORE_KEYS[kind]) || ""; } catch { return ""; }
+}
+function setCallerKey(kind, raw) {
+  const v = cleanCallerKey(raw);
+  for (const s of [(() => { try { return sessionStorage; } catch { return null; } })(), (() => { try { return localStorage; } catch { return null; } })()]) {
+    try { s?.removeItem(BYOK_STORE_KEYS[kind]); } catch { /* ignore */ }
+  }
+  if (v) { try { byokStorage()?.setItem(BYOK_STORE_KEYS[kind], v); } catch { /* ignore */ } }
+  return v;
+}
+function apiHeaders() {
+  const h = { "content-type": "application/json" };
+  const meta = getCallerKey("meta");
+  const baseten = getCallerKey("baseten");
+  if (meta) h["x-meta-key"] = meta;
+  if (baseten) h["x-baseten-key"] = baseten;
+  return h;
+}
 /* Backend mode cache: one /v1/health per minute. In mock mode the PWA skips
  * the live-only API attempts (/v1/segment point prompts, server transcribe)
  * and goes straight to the on-device models - no pointless 400s, no log noise,
@@ -1028,7 +1068,7 @@ const decodePoint = (point) => samDecode(point, true);
 // Throws on any failure so the caller falls back to the on-device model.
 async function segmentViaApi(points, box) {
   const res = await fetch(base() + "/v1/segment", {
-    method: "POST", headers: { "content-type": "application/json" },
+    method: "POST", headers: apiHeaders(),
     body: JSON.stringify({
       imageUrl: photo.toDataURL("image/jpeg", 0.85),
       width: photo.width, height: photo.height,
@@ -1890,7 +1930,7 @@ async function finishListening(landed) {
           fr.readAsDataURL(wav);
         });
         const res = await fetch(base() + "/v1/transcribe", {
-          method: "POST", headers: { "content-type": "application/json" },
+          method: "POST", headers: apiHeaders(),
           body: JSON.stringify({ audioBase64: b64 }),
         });
         const j = await res.json().catch(() => ({}));
@@ -2013,7 +2053,7 @@ async function runReport() {
   body.transcript = $("transcriptBox").value;
   let res, j;
   try {
-    res = await fetch(base() + "/v1/report", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    res = await fetch(base() + "/v1/report", { method: "POST", headers: apiHeaders(), body: JSON.stringify(body) });
     j = await res.json();
   } catch { j = { ok: false, error: "backend unreachable" }; res = { status: 0 }; }
   $("raw").textContent = JSON.stringify(j, null, 2);
@@ -2104,7 +2144,7 @@ async function runSkeptic(auto, retried = false) {
       ...(payloadObj.minReferenceConfidence !== undefined ? { minReferenceConfidence: payloadObj.minReferenceConfidence } : {}),
     };
     const res = await fetch(base() + "/v1/skeptic", {
-      method: "POST", headers: { "content-type": "application/json" },
+      method: "POST", headers: apiHeaders(),
       body: JSON.stringify({ ...measureInputs, transcript: $("transcriptBox").value, findings: lastMeasurement.findings, receipts: lastMeasurement.receipts }),
     });
     const j = await res.json().catch(() => ({}));
@@ -2349,7 +2389,7 @@ $("renderBtn").onclick = async () => {
     const timer = setTimeout(() => ctl.abort(), 30000);
     let res, j;
     try {
-      res = await fetch(base() + "/v1/render", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: ctl.signal });
+      res = await fetch(base() + "/v1/render", { method: "POST", headers: apiHeaders(), body: JSON.stringify(body), signal: ctl.signal });
       j = await res.json();
     } finally { clearTimeout(timer); }
     if (!res.ok || !j.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
@@ -2714,6 +2754,46 @@ async function checkBackend() {
   syncNetPill();
 }
 $("setCheck").onclick = checkBackend;
+/* settings: bring your own key */
+function paintByok() {
+  const meta = getCallerKey("meta");
+  const baseten = getCallerKey("baseten");
+  $("byokMeta").value = meta;
+  $("byokBaseten").value = baseten;
+  $("byokRemember").checked = byokRemembered();
+  const using = [meta && "Meta", baseten && "Baseten"].filter(Boolean);
+  $("byokStatus").textContent = using.length
+    ? `Using your ${using.join(" + ")} key${using.length > 1 ? "s" : ""}${byokRemembered() ? " on this device" : " until you close the app"}.`
+    : "Using the SnapClaim keys.";
+}
+$("byokSave").onclick = () => {
+  try {
+    setCallerKey("meta", $("byokMeta").value);
+    setCallerKey("baseten", $("byokBaseten").value);
+    paintByok();
+    toast("Keys saved");
+  } catch (e) {
+    $("byokStatus").textContent = e instanceof Error ? e.message : String(e);
+  }
+};
+$("byokClear").onclick = () => {
+  setCallerKey("meta", "");
+  setCallerKey("baseten", "");
+  paintByok();
+  toast("Keys removed");
+};
+$("byokRemember").onchange = () => {
+  // Move whatever is saved to the newly chosen storage.
+  const meta = getCallerKey("meta");
+  const baseten = getCallerKey("baseten");
+  try {
+    if ($("byokRemember").checked) localStorage.setItem(BYOK_REMEMBER_KEY, "1");
+    else localStorage.removeItem(BYOK_REMEMBER_KEY);
+  } catch { /* ignore */ }
+  try { setCallerKey("meta", meta); setCallerKey("baseten", baseten); } catch { /* already clean */ }
+  paintByok();
+};
+paintByok();
 $("updateBtn").onclick = async () => {
   if (!swReg) { toast("Service worker not registered yet - reload once, then check again"); return; }
   await swReg.update().catch(() => {});
