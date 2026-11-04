@@ -291,10 +291,9 @@ export default function Report() {
         v === "ok" ? "passed" : v === "error" ? "failed" : v === "loading" ? "checking" : "not-run";
       const skeptic = mapCheck(ctx.checks.skeptic);
       const xcheck = mapCheck(ctx.checks.xcheck);
-      // Width is the number most likely to be challenged: it stays
-      // Unverified until an independent check (skeptic or cross-check) backs
-      // it, with the reason kept next to the card in plain language.
-      const widthBacked = skeptic === "passed" || xcheck === "passed";
+      // Width is the number most likely to be challenged. Neither the skeptic
+      // nor the mask cross-check measures it against a reference, so it stays
+      // Unverified (as on screen), with the reason next to the card.
       const allFindings = (s.measurement?.findings ?? [f]) as typeof f[];
       const findings: PdfFinding[] = allFindings.map((ff) => {
         const rids = ((ff as unknown as { receiptIds?: Record<string, string | null> }).receiptIds ?? {}) as Record<string, string | null>;
@@ -307,7 +306,7 @@ export default function Report() {
           areaCm2: ff.areaCm2 ?? null,
           severity: String(ff.severity ?? "moderate"),
           receiptIds: { ratio: rids.ratio ?? null, length: rids.length ?? null, area: rids.area ?? null, width: rids.width ?? null, severity: rids.severity ?? null },
-          widthStatus: w === null ? "confirmed" : widthBacked ? "confirmed" : "unverified",
+          widthStatus: w === null ? "confirmed" : "unverified",
           widthNote: "No reference to verify width against",
           statement: typeof ff.statement === "string" && ff.statement.trim() ? ff.statement : undefined,
         };
@@ -349,7 +348,7 @@ export default function Report() {
             measure: MEASURE_LABEL[method] ?? String(method).replace(/_/g, " "),
             value,
             formula: String(rr.formula ?? ""),
-            unverified: method === "calibrated_width" && !widthBacked,
+            unverified: method === "calibrated_width",
           };
         });
       const now = new Date();

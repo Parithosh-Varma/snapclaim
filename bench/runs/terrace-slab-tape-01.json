@@ -1,1 +1,135 @@
-{"caseId":"terrace-slab-tape-01","findings":[{"crackLengthMm":218.5,"maskId":"damage-1"}],"provenance":{"gitSha":"810ae306e9c2480b7b401bc0925c569594592b21","model":"deterministic (measureSession, no model in the loop)","promptVersion":"default-thresholds","timestamp":"2026-11-02T12:24:12.229Z"},"receipts":[{"unit":"mm_per_px"},{"unit":"percent"},{"unit":"count"},{"unit":"cm2"},{"unit":"mm"},{"unit":"mm"},{"unit":"band"}]}
+{
+ "caseId": "terrace-slab-tape-01",
+ "provenance": {
+  "gitSha": "d5ed81b",
+  "model": "deterministic (measureSession, 25 mm user-supplied coin, scalar inputs derived from signed 23 mm report \u2014 self-reported, no RLE in repo)",
+  "promptVersion": "default-thresholds",
+  "timestamp": "2026-11-03T17:49:13.000Z"
+ },
+ "findings": [
+  {
+   "maskId": "damage-1",
+   "label": "crack",
+   "crackLengthMm": 237.5
+  }
+ ],
+ "receipts": [
+  {
+   "id": "R001",
+   "method": "scale_calibration",
+   "inputs": {
+    "referenceId": "coin-2inr",
+    "knownMm": 25,
+    "lengthPx": 32.3,
+    "confidence": 0.88
+   },
+   "output": {
+    "value": 0.773994,
+    "unit": "mm_per_px"
+   },
+   "formula": "knownMm / referenceLengthPx",
+   "unit": "mm_per_px"
+  },
+  {
+   "id": "R002",
+   "method": "area_ratio",
+   "inputs": {
+    "maskId": "damage-1",
+    "label": "crack",
+    "componentId": "slab",
+    "componentConfidence": 0.95,
+    "damageAreaPx": 1284,
+    "componentAreaPx": 175890,
+    "ratioRaw": 0.007300017056114617
+   },
+   "output": {
+    "value": 0.73,
+    "unit": "percent"
+   },
+   "formula": "damageAreaPx / componentAreaPx * 100",
+   "unit": "percent"
+  },
+  {
+   "id": "R003",
+   "method": "region_count",
+   "inputs": {
+    "maskId": "damage-1"
+   },
+   "output": {
+    "value": 1,
+    "unit": "count"
+   },
+   "formula": "count of disconnected mask components",
+   "unit": "count"
+  },
+  {
+   "id": "R004",
+   "method": "calibrated_area",
+   "inputs": {
+    "maskId": "damage-1",
+    "damageAreaPx": 1284,
+    "mmPerPx": 0.773994,
+    "scaleReceiptId": "R001"
+   },
+   "output": {
+    "value": 7.69,
+    "unit": "cm2"
+   },
+   "formula": "damageAreaPx * mmPerPx^2 / 100",
+   "unit": "cm2"
+  },
+  {
+   "id": "R005",
+   "method": "calibrated_length",
+   "inputs": {
+    "maskId": "damage-1",
+    "skeletonPx": 306.8,
+    "mmPerPx": 0.773994,
+    "scaleReceiptId": "R001"
+   },
+   "output": {
+    "value": 237.5,
+    "unit": "mm"
+   },
+   "formula": "skeletonPx * mmPerPx",
+   "unit": "mm"
+  },
+  {
+   "id": "R006",
+   "method": "calibrated_width",
+   "inputs": {
+    "maskId": "damage-1",
+    "damageAreaPx": 1284,
+    "skeletonPx": 306.8,
+    "mmPerPx": 0.773994,
+    "scaleReceiptId": "R001"
+   },
+   "output": {
+    "value": 3.2,
+    "unit": "mm"
+   },
+   "formula": "damageAreaPx / skeletonPx * mmPerPx",
+   "unit": "mm"
+  },
+  {
+   "id": "R007",
+   "method": "severity_classification",
+   "inputs": {
+    "maskId": "damage-1",
+    "percent": 0.73,
+    "crackLengthMm": 237.5,
+    "regionCount": 1,
+    "cosmeticMaxRatio": 0.01,
+    "moderateMaxRatio": 0.05,
+    "significantCrackMm": 150,
+    "significantRegionCount": 3
+   },
+   "output": {
+    "value": "significant",
+    "unit": "band"
+   },
+   "formula": "area ratio + calibrated length + region count vs printed thresholds",
+   "unit": "band"
+  }
+ ]
+}
