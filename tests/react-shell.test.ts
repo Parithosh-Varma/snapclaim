@@ -55,6 +55,10 @@ test("Capture has one primary action and camera-free paths", () => {
   }
   assert.ok(!cap.includes("Place a coin to unlock"), "no coin gate blocks the shutter");
   assert.ok(!cap.includes("CoinGate"), "live detection gate is gone");
+  assert.ok(cap.includes("cap-title") && cap.includes("cap-desc") && cap.includes("cap-actions"), "permit card uses the designed cap styles, not dead classes");
+  assert.ok(!cap.includes("permit-hint") && !cap.includes("permit-alt"), "no unstyled permit leftovers");
+  assert.ok(cap.includes("goes to the SnapClaim backend"), "permit copy is honest about photo upload");
+  assert.ok(!cap.includes("Photos stay on this device"), "no false on-device promise on the permit card");
 });
 
 test("Mark gates on crack selection; cloud-only, no model download", () => {
