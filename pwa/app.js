@@ -2404,6 +2404,9 @@ async function loadSample() {
     payloadObj = sample;
     sampleRun = true;
     dmg = { points: [], pointMasks: [], mask: null, iou: 0, source: null };
+    // The sample's precomputed masks come from this photo; show it on the report.
+    stillDataUrl = "./assets/sample-wall.jpg";
+    coinLabel = "India ₹10 · Ø27 mm";
     fillPhotoCard();
     showMeasured(measured.result);
     show("sSay");
