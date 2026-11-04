@@ -14,7 +14,7 @@
 
 > What is real vs mocked: **Measurement (`/v1/measure`, `/v1/observe`, receipts, gate) is keyless and deterministic — runs offline, $0. Live findings / skeptic / SAM / voice use our keys with a spend cap (`SPEND_GUARD_USD`, default $5). Photos stay on the phone except two explicit taps: Cross-check sends the photo once to SAM 3.1 via the backend, and Render attaches it to the annexure.** Demo defaults to mock ($0, no keys).
 
-[![tests](https://img.shields.io/badge/tests-385%20passing-brightgreen)](./tests)
+[![tests](https://img.shields.io/badge/tests-386%20passing-brightgreen)](./tests)
 [![node](https://img.shields.io/badge/node-%3E%3D22.18-339933)](./package.json)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](./LICENSE)
 
@@ -31,7 +31,7 @@ All three commands are free and deterministic; run them yourself.
 | Check | Command | Result on `main` |
 |---|---|---|
 | Measurement code vs known answers (54 scenes drawn in code, coin scale, some on tilted walls) | `npm run bench:truth` | length median error 1.4%, 100% within ±10%; width median error 4.0%, 96.3% within ±10%; 3/3 no-scale refusals held |
-| Regression on dev mask fixtures | `npm run eval` | 7 pass, 0 skip, 0 fail |
+| Regression on dev mask fixtures, plus known-answer error on the 5 synthetic ones | `npm run eval` | 10 pass, 0 skip, 0 fail; 5 scored, median abs error 1.0 mm, 5/5 within ±10% (drawn cracks, not real photos) |
 | Live pipeline on held-out real photos | `npm run bench` | 4 public photos run live 2026-11-02: 4/4 refused millimetres, but only 2/4 masks were on the crack and the skeptic flagged neither miss ([details](docs/eval-report.md#failures-and-misses)); 7 team cases UNRUN, so the command still exits 1 on purpose |
 
 What this does not show yet: how well SAM finds the crack on a real photo. `bench:truth` checks the maths given a mask, not the mask itself. No real crack has been tape-measured yet, so `npm run bench:gap` (pipeline vs model-only guess against a tape) still prints UNSCORED. We would rather show that gap than fill it with a number we cannot back.
@@ -292,7 +292,7 @@ The `npm run` commands are free and deterministic; run them yourself. The crack-
 | Check | Command | Result on `main` |
 |---|---|---|
 | Measurement code vs known answers (54 scenes drawn in code, coin scale, some on tilted walls) | `npm run bench:truth` | length median error 1.4%, 100% within ±10%; width median error 4.0%, 96.3% within ±10%; 3/3 no-scale refusals held |
-| Regression on dev mask fixtures | `npm run eval` | 7 pass, 0 skip, 0 fail |
+| Regression on dev mask fixtures, plus known-answer error on the 5 synthetic ones | `npm run eval` | 10 pass, 0 skip, 0 fail; 5 scored, median abs error 1.0 mm, 5/5 within ±10% (drawn cracks, not real photos) |
 | On-device crack masks, one tap per crack (92 held-out photos from a public crack dataset, 276 taps, browser q8 build) | `training/slimsam-crack/browser-check/hybrid.mjs` | mIoU 0.174 with stock SlimSAM, **0.697** with our crack-tuned decoder; coins stay on stock |
 | Live pipeline on held-out real photos | `npm run bench` | 12 cases, 0 archived runs yet (all UNRUN, so the command exits 1 on purpose) |
 
@@ -310,6 +310,19 @@ What this does not show yet: how well SAM finds the crack on our own phone photo
 - `npm run bench:truth` (`bench/truth.ts`) — 54 scenes with exactly known crack length/width, run through the same measurement code a photo goes through. Tests the maths, not SAM.
 - `bench/score.ts` — skeptic DISPUTED scoring with missing-label accounting.
 - Full write-up, baselines protocol and open gaps: [`docs/eval-report.md`](./docs/eval-report.md).
+
+### Synthetic known-answer cases (`npm run eval`)
+
+Every row below is synthetic: the crack was drawn, so its length is known, and no camera, ruler or tape was involved (`rulerGtMm` is only a field name). The `calibrated-*` rows are canvas composites over public wall photos that SAM 3.1 segmented live; `wall-crack` and `tilted-wall` are hand-built masks. This is not real-photo accuracy, which stays UNSCORED until a real crack is tape-measured.
+
+| Case | Provenance | Coin & Pose | Ground Truth (`rulerGtMm`) | Uncalibrated / No-Scale Baseline | SnapClaim Measured | SnapClaim Error | Within ±10%? |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `wall-crack` | Synthetic fixture | India ₹10 (Ø27.0 mm, flat) | 85.0 mm | `null` (refused without scale) / model-only `UNRUN` | **85.9 mm** (w 2.6 mm, 2.19 cm²) | **+1.1%** (+0.9 mm) | Yes |
+| `tilted-wall` | Synthetic 49.5° tilt | US Quarter (Ø24.26 mm, aspect 0.65) | 66.7 mm | **55.6 mm** (-16.6% without tilt stretch) | **66.8 mm** (1.201× stretch) | **+0.1%** (+0.1 mm) | Yes |
+| `calibrated-plaster-hairline-01` | 800×600 composite + live SAM 3.1 (`fixtures/rle/`) | India ₹10 (Ø27.0 mm, tilt 3.3°) | 90.4 mm | `null` (0.76% only) / model-only `UNRUN` | **88.0 mm** (w 2.4 mm, 2.13 cm²) | **-2.7%** (-2.4 mm) | Yes |
+| `calibrated-masonry-step-02` | 800×600 composite + live SAM 3.1 (`fixtures/rle/`) | US Quarter (Ø24.26 mm, tilt 6.0°) | 92.2 mm | `null` (0.95% only) / model-only `UNRUN` | **86.6 mm** (w 3.1 mm, 2.65 cm²) | **-6.1%** (-5.6 mm) | Yes |
+| `calibrated-stone-oblique-03` | 800×600 composite + live SAM 3.1 (`fixtures/rle/`) | Euro €1 (Ø23.25 mm, tilt 36.8°) | 88.5 mm | `null` (0.74% only) / model-only `UNRUN` | **89.5 mm** (w 2.3 mm, 2.05 cm²) | **+1.1%** (+1.0 mm) | Yes |
+| **Summary (all 5 / SAM n = 3)** | `fixtures/expected/*.json` | **3 coins, 0°–49.5° tilt** | — | Refuses mm without scale; model-only `UNRUN` | **Median err: 1.0 mm (SAM n=3: 2.4 mm)** | **Max err: 6.1%** | **5 / 5 (100%)** |
 
 ## Project structure
 
@@ -329,7 +342,7 @@ pwa/            capture app: photo, tap-to-mask, hold-to-speak, report, skeptic,
 eval/           bench + replay CLI
 bench/          held-out split + dispute scorer
 fixtures/       masks, expected outputs, scale references (photos gitignored)
-tests/          385 tests, mock by default, live paths with stubbed fetch, $0
+tests/          386 tests, mock by default, live paths with stubbed fetch, $0
 ```
 
 ## Development

@@ -1,0 +1,15 @@
+{
+  "cases": [
+    {
+      "maskId": "crack-1",
+      "percent": 0.95,
+      "crackLengthMm": 86.6,
+      "rulerGtMm": 92.2,
+      "severity": "cosmetic"
+    }
+  ],
+  "tolerance": {
+    "percent": 0.005,
+    "crackLengthMm": 0.051
+  }
+}
