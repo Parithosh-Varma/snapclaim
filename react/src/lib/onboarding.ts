@@ -11,7 +11,7 @@ export const COACH_CAPTURE_KEY = "snapclaim.coach.captureSeen";
 export const COACH_MIC_KEY = "snapclaim.coach.micSeen";
 export const MAX_ANALYTICS_EVENTS = 200;
 
-export type OnboardingStep = 1 | 2 | 3 | 4 | 5;
+export type OnboardingStep = 1 | 2 | 3 | 4;
 
 export interface OnboardingState {
   step: OnboardingStep;
@@ -60,8 +60,7 @@ function clampStep(n: unknown): OnboardingStep {
   if (v <= 1) return 1;
   if (v === 2) return 2;
   if (v === 3) return 3;
-  if (v === 4) return 4;
-  return 5;
+  return 4;
 }
 
 export function loadOnboarding(storage?: StorageLike): OnboardingState | null {
@@ -122,7 +121,7 @@ export function completeOnboarding(storage?: StorageLike): OnboardingState {
   const prev = loadOnboarding(storage);
   const t = nowIso();
   const next: OnboardingState = {
-    step: 5,
+    step: 4,
     done: true,
     startedAt: prev?.startedAt ?? t,
     updatedAt: t,
@@ -343,7 +342,7 @@ export const STRINGS = {
   appName: "SnapClaim",
   skip: "Skip",
   back: "Back",
-  stepOf: (n: number) => `Step ${n} of 5`,
+  stepOf: (n: number) => `Step ${n} of 4`,
   // Screen 1: welcome
   welcomeTitle: "Document damage in minutes.",
   welcomeSub: "Take a photo, describe what happened, and get a clear measured report you can send to your insurer.",
@@ -396,32 +395,8 @@ export const STRINGS = {
   privacySheetTitle: "How we handle your data",
   privacySheetBody: "Cases stay on this device unless you share the report. Measuring runs on this device after a first online load. Optional cross-checks send the tapped photo to the backend you configure. [PLACEHOLDER: confirm before shipping.]",
   privacySheetClose: "Close",
+  startReport: "Start my report",
   privacyPrimary: "Next",
-  // Screen 5: permissions
-  permTitle: "Two quick permissions.",
-  permSub: "Only what the report needs. You can change your mind any time.",
-  permCameraTitle: "Camera",
-  permCameraBody: "To photograph the damage and the coin.",
-  permCameraAllow: "Allow camera",
-  permCameraGranted: "Camera is on.",
-  permMicOn: "Mic is on.",
-  asking: "Asking…",
-  readingPhoto: "Reading photo…",
-  photoReady: "Photo ready. Review it to start your report.",
-  photoUnreadable: "That photo could not be read. Try another.",
-  permMicTitle: "Microphone",
-  permMicBody: "Only if you want to dictate your description. You can type instead.",
-  permMicAllow: "Allow microphone",
-  permMicNotNow: "Not now",
-  permMicSkipped: "Typing instead. You can allow the mic later.",
-  permStart: "Start my report",
-  permUploadInstead: "Upload a photo instead",
-  permUploadChosen: "Upload chosen. You can pick a photo on the next screen.",
-  permInAppTitle: "You are in an in-app browser",
-  permInAppBody: "Instagram and Facebook block the camera here. Tap the menu, then Open in browser, and continue there.",
-  permDesktopTitle: "No camera here",
-  permDesktopBody: "Upload a photo on this device. Measuring works the same.",
-  permDesktopPrimary: "Upload a photo",
   // Just-in-time prompts
   coachCapture: "Keep the coin flat next to the crack",
   coachCaptureGotIt: "Got it",

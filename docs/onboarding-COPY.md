@@ -11,8 +11,8 @@ hyphens or ellipses as separators.
 ## Global chrome (every screen)
 
 - Back: `Back` (aria: `Back to home` on step 1, `Back to step N` after).
-- Progress: `Step N of 5` (exposed as `Step N of 5` to assistive tech).
-- Skip: `Skip` (screens 1 to 4 only; screen 5 has none).
+- Progress: `Step N of 4` (exposed as `Step N of 4` to assistive tech).
+- Skip: `Skip` (screens 1 to 3 only; screen 4 has none, it ends in the claim flow).
 
 ## Screen 1: Welcome
 
@@ -66,27 +66,3 @@ hyphens or ellipses as separators.
 - Sheet body: `Cases stay on this device unless you share the report. Measuring runs on this device after a first online load. Optional cross-checks send the tapped photo to the backend you configure. [PLACEHOLDER: confirm before shipping.]`
 - Sheet close: `Close`
 - Primary: `Next`
-
-## Screen 5: Permissions primer
-
-- Title: `Two quick permissions.`
-- Sub: `Only what the report needs. You can change your mind any time.`
-- Camera: `Camera` / `To photograph the damage and the coin.` / `Allow camera`
-- Camera granted: `Camera is on.`
-- Mic granted: `Mic is on.`
-- Transient states: `Asking…`, `Reading photo…`
-- Toasts: `Photo ready. Review it to start your report.` / `That photo could not be read. Try another.`
-- Mic: `Microphone` / `Only if you want to dictate your description. You can type instead.` / `Allow microphone` / `Not now`
-- Mic fallback line (screen reader): `Typing instead. You can allow the mic later.`
-- Start: `Start my report`
-- Upload fallback link: `Upload a photo instead`
-- Upload chosen: `Upload chosen. You can pick a photo on the next screen.`
-- In-app browser: `You are in an in-app browser` / `Instagram and Facebook block the camera here. Tap the menu, then Open in browser, and continue there.`
-- Desktop: `No camera here` / `Upload a photo on this device. Measuring works the same.` / `Upload a photo`
-
-## Just-in-time prompts (claim flow)
-
-- Capture coach-mark: `Keep the coin flat next to the crack` / `Got it`
-- Capture framing note: `Framing guide: corner brackets show where to keep damage and coin.`
-- Coin chip: `Coin detected` / `Cannot see the coin yet`
-- Mic tooltip: `Tap to dictate, or just type a line.` / `Got it`

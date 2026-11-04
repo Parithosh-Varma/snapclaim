@@ -1,21 +1,18 @@
-// SnapClaim first-run onboarding: 5 screens + permission primer with real
-// getUserMedia gating. One idea per screen, one primary action, Skip on 1-4.
-// All copy comes from STRINGS (lib/onboarding) so nothing is baked into art.
+// SnapClaim first-run onboarding: 4 screens that land straight in the
+// capture flow (which owns camera/upload/mic itself). One idea per screen,
+// one primary action, Skip on 1-3. All copy comes from STRINGS (lib/onboarding)
+// so nothing is baked into art.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "../App";
 import {
   COACH_CAPTURE_KEY,
   COACH_MIC_KEY,
   STRINGS,
-  cameraRecovery,
-  cameraSupport,
   coachSeen,
   completeOnboarding,
-  isInAppBrowser,
   loadOnboarding,
   logEvent,
   markCoachSeen,
-  micRecovery,
   reducedMotionPreferred,
   setOnboardingStep,
   shouldShowOnboarding,
@@ -25,15 +22,15 @@ import {
 } from "../lib/onboarding";
 
 // ---------------------------------------------------------------------------
-// Reusable pieces (component list deliverable). Each is also used elsewhere:
-// ProgressDots in step headers, PrimaryButton as the sticky action, DoDontCard
-// in coin tips, PermissionCard on screen 5, CoachMark / chips as JIT prompts.
+// Reusable pieces. Each is also used elsewhere: ProgressDots in step
+// headers, PrimaryButton as the sticky action, DoDontCard in coin tips,
+// CoachMark / chips as JIT prompts.
 // ---------------------------------------------------------------------------
 
 export function ProgressDots({ step }: { step: OnboardingStep }) {
   return (
     <ol className="ob-dots" role="img" aria-label={STRINGS.stepOf(step)}>
-      {[1, 2, 3, 4, 5].map((i) => (
+      {[1, 2, 3, 4].map((i) => (
         <li key={i} className={i <= step ? "on" : undefined} aria-hidden="true" />
       ))}
     </ol>
@@ -74,25 +71,6 @@ function IconCross() {
   );
 }
 
-function IconCamera() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4 8h3l2-2h6l2 2h3v11H4z" />
-      <circle cx="12" cy="13" r="3.2" />
-    </svg>
-  );
-}
-
-function IconMic() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-      <rect x="9" y="2.5" width="6" height="11" rx="3" fill="currentColor" stroke="none" />
-      <path d="M6 11.5a6 6 0 0 0 12 0" />
-      <path d="M12 17.5V21M8.5 21h7" />
-    </svg>
-  );
-}
-
 export function DoDontCard({
   kind,
   title,
@@ -118,29 +96,6 @@ export function DoDontCard({
           <li key={line}>{line}</li>
         ))}
       </ul>
-    </div>
-  );
-}
-
-export function PermissionCard({
-  icon,
-  title,
-  body,
-  action,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  body: string;
-  action: React.ReactNode;
-}) {
-  return (
-    <div className="ob-perm">
-      <span className="ob-perm-icon" aria-hidden="true">{icon}</span>
-      <div className="ob-perm-body">
-        <b>{title}</b>
-        <p>{body}</p>
-        {action}
-      </div>
     </div>
   );
 }
@@ -221,57 +176,6 @@ function CoinDontArt() {
 }
 
 // ---------------------------------------------------------------------------
-// Permission request helpers (only ever called from a tap, never on load).
-// ---------------------------------------------------------------------------
-
-type PermState = "idle" | "requesting" | "granted" | "denied" | "blocked" | "unavailable";
-
-async function requestVideo(): Promise<void> {
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: "environment" },
-    audio: false,
-  });
-  try { stream.getTracks().forEach((t) => t.stop()); } catch { /* ignore */ }
-}
-
-async function requestAudio(): Promise<void> {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  try { stream.getTracks().forEach((t) => t.stop()); } catch { /* ignore */ }
-}
-
-function mapCameraError(name: string, hasApi: boolean): PermState {
-  if (!hasApi) return "unavailable";
-  if (name === "NotFoundError" || name === "OverconstrainedError") return "unavailable";
-  if (name === "NotAllowedError" || name === "SecurityError") return "denied";
-  return "denied";
-}
-
-function readPhotoDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      try {
-        URL.revokeObjectURL(url);
-        const side = Math.max(img.width, img.height) > 1024 ? 1024 / Math.max(img.width, img.height) : 1;
-        const cap = document.createElement("canvas");
-        cap.width = Math.max(1, Math.round(img.width * side));
-        cap.height = Math.max(1, Math.round(img.height * side));
-        cap.getContext("2d")?.drawImage(img, 0, 0, cap.width, cap.height);
-        resolve(cap.toDataURL("image/jpeg", 0.85));
-      } catch (e) {
-        reject(e);
-      }
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("photo would not decode"));
-    };
-    img.src = url;
-  });
-}
-
-// ---------------------------------------------------------------------------
 // Main flow.
 // ---------------------------------------------------------------------------
 
@@ -305,21 +209,11 @@ export default function Onboarding({
   onDone(): void;
   onExit(): void;
 }) {
-  const { startCapture, startWithPhoto, toast } = useApp();
+  const { startCapture } = useApp();
   const [step, setStep] = useState<OnboardingStep>(initialStep);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [camState, setCamState] = useState<PermState>("idle");
-  const [micState, setMicState] = useState<PermState>("idle");
-  const [uploadChosen, setUploadChosen] = useState(false);
-  const [busyFile, setBusyFile] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
   const reduceMotion = reducedMotionPreferred();
 
-  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
-  const hasApi = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
-  const support = cameraSupport({ hasApi, ua });
-  const inApp = isInAppBrowser(ua);
-  const desktopNoCam = support === "no-api" && !inApp;
   const startedRef = useRef(false);
 
   // Fresh entry logs started + first view; step changes persist + log views.
@@ -332,17 +226,6 @@ export default function Onboarding({
       logEvent("onboarding_started");
       logEvent("step_viewed", { step });
     } catch { /* onboarding still renders */ }
-    // Pre-check the OS permission state so a previously-blocked user skips
-    // the request button and goes straight to recovery instructions.
-    try {
-      const perms = navigator.permissions as Permissions | undefined;
-      perms?.query?.({ name: "camera" as PermissionName }).then((r) => {
-        if (r.state === "denied") setCamState("blocked");
-      }).catch(() => {});
-      perms?.query?.({ name: "microphone" as PermissionName }).then((r) => {
-        if (r.state === "denied") setMicState("blocked");
-      }).catch(() => {});
-    } catch { /* Permissions API absent: request buttons stay */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -354,9 +237,9 @@ export default function Onboarding({
     } catch { /* ignore */ }
   }, []);
 
-  const skipToPerms = useCallback(() => {
+  const skipToEnd = useCallback(() => {
     try { logEvent("step_skipped", { step }); } catch { /* ignore */ }
-    goto(5);
+    goto(4);
   }, [goto, step]);
 
   const finish = useCallback(() => {
@@ -368,66 +251,6 @@ export default function Onboarding({
     onDone();
     startCapture();
   }, [onDone, startCapture]);
-
-  const askCamera = useCallback(async () => {
-    if (!hasApi) {
-      setCamState("unavailable");
-      return;
-    }
-    setCamState("requesting");
-    try { logEvent("permission_requested", { kind: "camera", step }); } catch { /* ignore */ }
-    try {
-      await requestVideo();
-      setCamState("granted");
-      try { logEvent("permission_granted", { kind: "camera", step }); } catch { /* ignore */ }
-    } catch (e) {
-      const name = (e as { name?: string })?.name ?? "unknown";
-      setCamState(mapCameraError(name, hasApi));
-      try { logEvent("permission_denied", { kind: "camera", step }); } catch { /* ignore */ }
-    }
-  }, [hasApi, step]);
-
-  const askMic = useCallback(async () => {
-    if (!hasApi || !navigator.mediaDevices?.getUserMedia) {
-      setMicState("unavailable");
-      return;
-    }
-    setMicState("requesting");
-    try { logEvent("permission_requested", { kind: "mic", step }); } catch { /* ignore */ }
-    try {
-      await requestAudio();
-      setMicState("granted");
-      try { logEvent("permission_granted", { kind: "mic", step }); } catch { /* ignore */ }
-    } catch {
-      setMicState("denied");
-      try { logEvent("permission_denied", { kind: "mic", step }); } catch { /* ignore */ }
-    }
-  }, [hasApi, step]);
-
-  const onUploadFile = useCallback(async (file: File | undefined) => {
-    if (!file) return;
-    setBusyFile(true);
-    try {
-      const dataUrl = await readPhotoDataUrl(file);
-      try {
-        const done = completeOnboarding();
-        logEvent("permission_granted", { kind: "camera", step });
-        logEvent("onboarding_completed");
-        logEvent("time_to_complete", { ms: timeToCompleteMs(done) });
-      } catch { /* ignore */ }
-      toast(STRINGS.photoReady);
-      onDone();
-      startWithPhoto(dataUrl);
-    } catch {
-      toast(STRINGS.photoUnreadable);
-    } finally {
-      setBusyFile(false);
-    }
-  }, [onDone, startWithPhoto, step, toast]);
-
-  const startEnabled = camState === "granted" || uploadChosen;
-  const camRecovery = cameraRecovery(ua);
-  const micRec = micRecovery(ua);
 
   return (
     <div className="ob-root">
@@ -445,8 +268,8 @@ export default function Onboarding({
             <span aria-hidden="true">‹</span>Back
           </button>
           <ProgressDots step={step} />
-          {step < 5 ? (
-            <button type="button" className="ob-skip" onClick={skipToPerms}>
+          {step < 4 ? (
+            <button type="button" className="ob-skip" onClick={skipToEnd}>
               {STRINGS.skip}
             </button>
           ) : (
@@ -558,167 +381,6 @@ export default function Onboarding({
               </button>
             </>
           )}
-
-          {step === 5 && (
-            <>
-              <h1 className="ob-title">{STRINGS.permTitle}</h1>
-              <p className="ob-sub">{STRINGS.permSub}</p>
-
-              {inApp && (
-                <p className="ob-note" role="alert">
-                  <b style={{ display: "block", marginBottom: 4 }}>{STRINGS.permInAppTitle}</b>
-                  {STRINGS.permInAppBody}
-                </p>
-              )}
-
-              {desktopNoCam ? (
-                <div className="ob-card">
-                  <b style={{ display: "block", fontSize: 16 }}>{STRINGS.permDesktopTitle}</b>
-                  <p className="ob-sub" style={{ margin: "4px 0 12px" }}>{STRINGS.permDesktopBody}</p>
-                  <PrimaryButton onClick={() => fileRef.current?.click()} disabled={busyFile}>
-                    {busyFile ? STRINGS.readingPhoto : STRINGS.permDesktopPrimary}
-                  </PrimaryButton>
-                  {uploadChosen && <p role="status" style={{ fontSize: 14, marginTop: 8 }}>{STRINGS.permUploadChosen}</p>}
-                </div>
-              ) : (
-                <PermissionCard
-                  icon={<IconCamera />}
-                  title={STRINGS.permCameraTitle}
-                  body={STRINGS.permCameraBody}
-                  action={
-                    <>
-                      {camState === "granted" ? (
-                        <p role="status" className="ob-ok">
-                          <IconTick /> {STRINGS.permCameraGranted}
-                        </p>
-                      ) : camState === "blocked" || camState === "denied" ? (
-                        <>
-                          <button type="button" className="ob-perm-btn" onClick={askCamera}>
-                            {STRINGS.permCameraAllow}
-                          </button>
-                          <div className="ob-recover" role="alert">
-                            <b>{camRecovery.title}</b>
-                            <ol>
-                              {camRecovery.steps.map((s) => (
-                                <li key={s}>{s}</li>
-                              ))}
-                            </ol>
-                            <span>{camRecovery.fallback}</span>
-                          </div>
-                          <button
-                            type="button"
-                            className="ob-linkbtn"
-                            onClick={() => {
-                              setUploadChosen(true);
-                              try { logEvent("step_skipped", { step }); } catch { /* ignore */ }
-                            }}
-                          >
-                            {STRINGS.permUploadInstead}
-                          </button>
-                        </>
-                      ) : camState === "unavailable" ? (
-                        <>
-                          <div className="ob-recover" role="alert">
-                            <b>{camRecovery.title}</b>
-                            <ol>
-                              {camRecovery.steps.map((s) => (
-                                <li key={s}>{s}</li>
-                              ))}
-                            </ol>
-                            <span>{camRecovery.fallback}</span>
-                          </div>
-                          <button
-                            type="button"
-                            className="ob-linkbtn"
-                            onClick={() => setUploadChosen(true)}
-                          >
-                            {STRINGS.permUploadInstead}
-                          </button>
-                        </>
-                      ) : (
-                        <button type="button" className="ob-perm-btn" onClick={askCamera} disabled={camState === "requesting"}>
-                          {camState === "requesting" ? STRINGS.asking : STRINGS.permCameraAllow}
-                        </button>
-                      )}
-                      {uploadChosen && camState !== "granted" && (
-                        <p role="status" style={{ fontSize: 14, marginTop: 8 }}>{STRINGS.permUploadChosen}</p>
-                      )}
-                    </>
-                  }
-                />
-              )}
-
-              {!desktopNoCam && (
-                <PermissionCard
-                  icon={<IconMic />}
-                  title={STRINGS.permMicTitle}
-                  body={STRINGS.permMicBody}
-                  action={
-                    <>
-                      {micState === "granted" ? (
-                        <p role="status" className="ob-ok">{STRINGS.permMicOn}</p>
-                      ) : micState === "denied" || micState === "blocked" || micState === "unavailable" ? (
-                        <>
-                          <div className="ob-recover" role="alert">
-                            <b>{micRec.title}</b>
-                            <ol>
-                              {micRec.steps.map((s) => (
-                                <li key={s}>{s}</li>
-                              ))}
-                            </ol>
-                            <span>{micRec.fallback}</span>
-                          </div>
-                          <button
-                            type="button"
-                            className="ob-linkbtn"
-                            onClick={() => {
-                              setMicState("idle");
-                              try { logEvent("step_skipped", { step }); } catch { /* ignore */ }
-                            }}
-                          >
-                            {STRINGS.permMicNotNow}
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button type="button" className="ob-perm-btn" onClick={askMic} disabled={micState === "requesting"}>
-                            {micState === "requesting" ? STRINGS.asking : STRINGS.permMicAllow}
-                          </button>{" "}
-                          <button
-                            type="button"
-                            className="ob-linkbtn"
-                            onClick={() => {
-                              try { logEvent("step_skipped", { step }); } catch { /* ignore */ }
-                              setMicState("idle");
-                            }}
-                          >
-                            {STRINGS.permMicNotNow}
-                          </button>
-                        </>
-                      )}
-                      {micState === "idle" && (
-                        <span className="sr-only" role="status">{STRINGS.permMicSkipped}</span>
-                      )}
-                    </>
-                  }
-                />
-              )}
-
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                hidden
-                aria-hidden="true"
-                tabIndex={-1}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  e.target.value = "";
-                  if (f) void onUploadFile(f);
-                }}
-              />
-            </>
-          )}
         </main>
 
         <footer className="ob-cta">
@@ -732,17 +394,8 @@ export default function Onboarding({
           )}
           {step === 2 && <PrimaryButton onClick={() => goto(3)}>{STRINGS.howPrimary}</PrimaryButton>}
           {step === 3 && <PrimaryButton onClick={() => goto(4)}>{STRINGS.coinPrimary}</PrimaryButton>}
-          {step === 4 && <PrimaryButton onClick={() => goto(5)}>{STRINGS.privacyPrimary}</PrimaryButton>}
-          {step === 5 && (
-            desktopNoCam ? (
-              <PrimaryButton onClick={() => fileRef.current?.click()} disabled={busyFile}>
-                {busyFile ? STRINGS.readingPhoto : STRINGS.permDesktopPrimary}
-              </PrimaryButton>
-            ) : (
-              <PrimaryButton id="obStart" onClick={finish} disabled={!startEnabled}>
-                {STRINGS.permStart}
-              </PrimaryButton>
-            )
+          {step === 4 && (
+            <PrimaryButton id="obStart" onClick={finish}>{STRINGS.startReport}</PrimaryButton>
           )}
         </footer>
       </div>

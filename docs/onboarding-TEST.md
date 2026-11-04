@@ -24,16 +24,12 @@ The rest is manual, one pass per release, on a real phone if possible.
 
 - [ ] First launch shows screen 1; completing all 5 lands in the capture flow.
 - [ ] `I have used SnapClaim before` skips straight to capture.
-- [ ] Skip on screens 1-4 jumps to screen 5, never past it. Screen 5 has no Skip.
+- [ ] Skip on screens 1-3 jumps to screen 4 (privacy). Screen 4 has no Skip; its primary starts the report.
 - [ ] Back on screen 1 exits to home; back elsewhere steps back one screen.
 - [ ] Refresh on screen 3 resumes on screen 3 with the `resuming` note.
 - [ ] Settings → About → `How it works` replays onboarding from step 1.
-- [ ] Camera granted → `Start my report` enables. Mic never gates it.
-- [ ] Camera denied → recovery steps show, `Upload a photo instead` enables Start.
-- [ ] Mic denied → `No problem, type your description` path, Start unaffected.
-- [ ] Camera permission previously blocked → recovery shown immediately, no dead request button.
-- [ ] Desktop with no camera → `Upload a photo` is the primary path; picking a valid photo lands on review with the photo attached.
-- [ ] In-app browser (Instagram/Facebook) → `Open in your browser` guidance shows.
+- [ ] Screen 4 primary `Start my report` lands straight in the capture flow.
+- [ ] Camera / mic permission handling lives in the capture flow itself: first visit enables camera with upload fallback; mic is optional on the describe screen.
 - [ ] Capture screen first visit → coach-mark `Keep the coin flat next to the crack` with `Got it`; second visit → gone.
 - [ ] Say screen first visit → mic tooltip shows; second visit → gone.
 - [ ] `How we handle your data` opens the sheet; `Close` returns to screen 4.
@@ -46,7 +42,7 @@ The rest is manual, one pass per release, on a real phone if possible.
 - [ ] 375-430px phones and ~480px centered column on tablet/desktop.
 - [ ] All tap targets at least 44px; sticky primary has a text label, never a spinner alone.
 - [ ] Visible 2px green focus rings on every control (Tab through all 5 screens).
-- [ ] Screen reader: heading order correct, progress announced as `Step N of 5`, icon buttons labelled, status chips read as text.
+- [ ] Screen reader: heading order correct, progress announced as `Step N of 4`, icon buttons labelled, status chips read as text.
 - [ ] Dynamic Type / large text: no clipped containers, no fixed text heights.
 - [ ] `prefers-reduced-motion`: coin art static, no slide/fade transitions.
 - [ ] Dark mode (Settings → Appearance → Dark, and Auto with OS dark): onboarding follows the theme, all text pairs hold 4.5:1.

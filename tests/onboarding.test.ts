@@ -66,12 +66,12 @@ test("step persists across refresh; resume lands on saved step", () => {
   assert.equal(shouldShowOnboarding(s), true);
 });
 
-test("skip never jumps past the permissions primer: completion only at step 5", () => {
+test("skip lands on the final screen; completion only at step 4", () => {
   const s = memStore();
   startOnboarding(s);
-  setOnboardingStep(5, s);
+  setOnboardingStep(4, s);
   const done = completeOnboarding(s);
-  assert.equal(done.step, 5);
+  assert.equal(done.step, 4);
   assert.equal(done.done, true);
   assert.equal(shouldShowOnboarding(s), false);
 });
@@ -179,7 +179,7 @@ test("copy sheet: every string present, plain words, placeholders explicit", () 
   for (const word of banned) assert.ok(!all.includes(word), `banned word in UI copy: ${word}`);
   assert.match(all, /PLACEHOLDER/);
   assert.match(all, /Unverified/);
-  for (const key of ["welcomeTitle", "coinTitle", "privacyTitle", "permTitle", "coachCapture", "micTooltip", "resumedBanner", "photoReady", "photoUnreadable", "permMicOn", "asking", "readingPhoto"]) {
+  for (const key of ["welcomeTitle", "coinTitle", "privacyTitle", "coachCapture", "micTooltip", "resumedBanner", "startReport"]) {
     assert.equal(typeof (STRINGS as Record<string, unknown>)[key], "string");
   }
 });

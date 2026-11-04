@@ -6,10 +6,9 @@ app theme is untouched. Reuse these elsewhere instead of rebuilding.
 
 | Component | File | Props | Reused in |
 |---|---|---|---|
-| `ProgressDots` | `screens/Onboarding.tsx` | `{ step: 1..5 }` | Step headers; `aria-label` carries `Step N of 5` |
+| `ProgressDots` | `screens/Onboarding.tsx` | `{ step: 1..4 }` | Step headers; `aria-label` carries `Step N of 4` |
 | `PrimaryButton` | `screens/Onboarding.tsx` | `{ id?, children, onClick, disabled? }` | Sticky bottom action on every onboarding screen |
 | `DoDontCard` | `screens/Onboarding.tsx` | `{ kind: "do" \| "dont", title, items, artAlt, children }` | Coin tips sheet in `Capture.tsx` |
-| `PermissionCard` | `screens/Onboarding.tsx` | `{ icon, title, body, action }` | Screen 5 camera and mic cards |
 | `CoinStatusChip` | `screens/Onboarding.tsx` | `{ detected: boolean }` | `Capture.tsx` live framing chip. Icon plus text, never colour alone. The live coin detector plugs into `detected`. |
 | `CaptureCoach` | `screens/Onboarding.tsx` | `{ onGotIt }` | `Capture.tsx` coach-mark over the viewfinder, first capture only |
 | `MicTip` | `screens/Onboarding.tsx` | `{ onGotIt }` | `Say.tsx` tooltip pointing at Dictate, first visit only |
