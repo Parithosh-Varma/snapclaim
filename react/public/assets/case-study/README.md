@@ -7,10 +7,12 @@ to rebuild + redeploy. No HTML edits needed.
 
 ## Provenance
 
-Content mapped from `snapclaim-marketing/site/case-study/` (owner's bench
-case `terrace-slab-tape-01`): numbers, receipts, method, verification,
-`terrace-slab.pdf`, and both photos are copied verbatim from there. The
-landing page shows a strict subset — nothing is reworded or rounded.
+Content mapped from the owner's 5-page report “Comparative Measurement of a
+Terrace-Slab Crack” (Nov 2026): straight tape 227 mm, pin-to-pin 274 mm,
+Snapclaim 232 mm, thread 238.8 mm on a different crack (not comparable).
+The landing page shows a strict subset — nothing reworded or rounded beyond
+the report's own §4–§5. The full PDF is linked from the section (canonical
+copy at https://snapclaim.pages.dev/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf).
 
 ## Files
 
