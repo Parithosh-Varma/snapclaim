@@ -161,6 +161,13 @@ test("React port keeps backend, worker and privacy contracts", () => {
   assert.ok(say.includes("extendedTranscript"), "the extension is stored separately from the verbatim line");
   assert.ok(say.includes('id="locAddBtn"') && say.includes("locationPhoto"), "Say captures an optional location photo");
   assert.ok(say.includes("not measured"), "location photo is labeled unmeasured");
+  assert.ok(say.includes('role="progressbar"') && say.includes("Step 3 of 6"), "Say step progress is an accessible progressbar");
+  assert.ok(say.includes('aria-label="Back to Mark damage"') && say.includes('aria-label="Dictate description"'),
+    "Say back and mic buttons are labelled for assistive tech");
+  assert.ok(say.includes("noticed this morning"), "Say textarea carries a concrete placeholder");
+  assert.ok(say.includes("disabled={sending || !hasText}"), "Continue stays disabled until the field has content");
+  assert.ok(say.includes("Saving…") && say.includes(": \"Continue\""), "Continue keeps its label and names the saving state");
+  assert.ok(say.includes("Measurements captured"), "measurement status is a chip, not an orphan line");
   const tabs = read("react/src/screens/Tabs.tsx");
   assert.ok(tabs.includes('id="metaKeyInput"') && tabs.includes('id="byokSave"') && tabs.includes('id="byokClear"'), "settings offers device-only BYOK fields");
   assert.ok(tabs.includes("never stored server-side"), "BYOK copy states the key handling honestly");
