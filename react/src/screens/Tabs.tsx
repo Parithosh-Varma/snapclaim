@@ -151,7 +151,7 @@ export function Home() {
           <p className="found">Watch the demo (2 min)</p>
           <div style={{ position: "relative", width: "100%", aspectRatio: "16 / 9" }}>
             <iframe
-              src="https://www.youtube-nocookie.com/embed/CdqSvKHyrCg"
+              src="https://www.youtube-nocookie.com/embed/CdqSvKHyrCg?rel=0&controls=0&modestbranding=1&iv_load_policy=3&disablekb=1&fs=0&playsinline=1"
               title="SnapClaim demo: damage measured, not guessed"
               loading="lazy"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
