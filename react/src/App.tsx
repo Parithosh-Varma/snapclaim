@@ -181,7 +181,14 @@ export default function App() {
       Object.assign(sessionRef.current, createSession());
       applyDraft(sessionRef.current, d);
       setDraft(draftSummary(d));
-      setScreen(d.screen);
+      // A draft saved mid-flight (or before a failed measure) can point at
+      // Check/Report with no measurement - landing there is a dead screen.
+      // Mark rebuilds the photo from the still and re-measures from the
+      // restored taps, so route there instead of stranding the user.
+      const hasMeasure = !!(d.measurement && d.payload);
+      const target = (d.screen === "sCheck" || d.screen === "sReport") && !hasMeasure ? "sMark" : d.screen;
+      if (target !== d.screen) toast("That draft had no measurement - taps kept, measure again from Mark");
+      setScreen(target);
     } catch {
       toast("That draft could not be restored - starting fresh");
       try {

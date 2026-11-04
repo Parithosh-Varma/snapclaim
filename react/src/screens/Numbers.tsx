@@ -232,12 +232,13 @@ export default function Numbers() {
             className="btn-dark"
             type="button"
             style={{ width: "100%" }}
+            disabled={measuring || !s.measurement || !s.payload}
             onClick={() => {
               // The auto checks already ran once for this report; going forward only shows them.
               go("sCheck");
             }}
           >
-            Check it twice →
+            {measuring ? "Measuring…" : "Check it twice →"}
           </button>
           <button
             id="skipChecks"

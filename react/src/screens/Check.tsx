@@ -204,13 +204,17 @@ export default function Check() {
   }, [base, s]);
 
   const ran = useRef(false);
+  const ready = !!(s.payload && s.measurement);
   useEffect(() => {
-    if (ran.current) return;
+    // Auto-run once the measurement exists - not before. Landing here early
+    // (or resuming a draft saved mid-flight) must not silently skip: when the
+    // payload arrives later, the checks fire then.
+    if (!ready || ran.current) return;
     ran.current = true;
     if (checksRef.current.skeptic !== "idle" || checksRef.current.xcheck !== "idle") return;
     void runSkeptic(true);
     void runXcheck(true);
-  }, [runSkeptic, runXcheck]);
+  }, [ready, runSkeptic, runXcheck]);
 
   const done = (p: CheckPhase) => p === "ok" || p === "error";
   const canReport = done(checks.skeptic) && done(checks.xcheck);
