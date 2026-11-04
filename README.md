@@ -26,8 +26,24 @@ SnapClaim turns a damage photo plus a one-line description into a replayable evi
 
 **Global by design:** the measurement engine assumes no currency, country, or language — a scale reference is any known-size object (coin, ruler, bank card), and the transcript is free text in any language. Voice is auto-detected by default; callers can still send an optional `languageBias`.
 
+**Who it is for:** tenants and landlords settling security-deposit disputes at move-out, and households filing a home insurance claim. Both sides look at the same crack and argue about how big it is; SnapClaim gives them one measured, replayable record instead of two memories. It documents, it does not advise.
+
+## Meta AI stack
+
+Built on the [Meta AI developer platform](https://dev.meta.ai), with four Meta model families, each doing one job:
+
+| Model | Job in SnapClaim | Served by |
+|---|---|---|
+| **SAM 3.1** | Segments the damage and the coin from a tap (point prompts) | Meta AI API (`api.meta.ai`) |
+| **Muse Spark 1.3** | Drafts the findings; the evidence gate ships a sentence only if every number cites a receipt | Meta AI API |
+| **Spark Open** (open weights) | Independent skeptic that re-checks the findings | **Baseten**, official inference partner (`inference.baseten.co`) |
+| **Muse Voice Transcribe** | Turns the one spoken line into text, any language | Meta AI API (file + realtime) |
+
+On the phone, a SlimSAM model gives an offline mask preview before anything is sent. Endpoints and model IDs: [Meta models used](#meta-models-used).
+
 ## Contents
 
+- [Meta AI stack](#meta-ai-stack)
 - [Quickstart](#quickstart)
 - [How it works](#how-it-works)
 - [Headless API (no UI)](#headless-api-no-ui)
