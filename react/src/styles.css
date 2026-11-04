@@ -641,6 +641,41 @@
     .seg-quad button{font-size:13px}
     .hero-steps>span{font-size:12px}
     .stateline{font-size:12.5px}
+    .settings-head{margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:16px}
+  }
+
+  /* ---------- any viewport: the mark photo never outgrows the screen ----------
+     --ar (photo width / height) is set by the Mark screen. The canvas keeps
+     width:100% so small photos still upscale; the min() only shrinks it when the
+     screen is too short to show the whole photo. Taps map through
+     getBoundingClientRect, so the scaled canvas still maps correctly. */
+  #markCanvas{width:min(100%,calc((100vh - var(--cap,48px)) * var(--ar,10)));
+    width:min(100%,calc((100svh - var(--cap,48px)) * var(--ar,10)));margin:0 auto}
+
+  /* ---------- tablets, desktops and landscape phones: two columns ----------
+     .split / .split-main / .split-side are plain blocks on portrait phones. */
+  .split-main,.split-side{min-width:0}
+  @media (min-width:700px){.wrap{max-width:680px}}
+  @media (min-width:900px), (orientation:landscape) and (min-width:640px) and (max-height:600px){
+    .wrap{max-width:720px}
+    .wrap.wide{max-width:1120px}
+    .split{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:20px;align-items:start}
+    .split.even{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+    .split.even > * > .checkcard{margin-bottom:0}
+    .split-side > .card:first-child,.split-side > .scalecard:first-child{margin-top:0}
+    #caseList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px}
+    .home .split-side .home-duo{grid-template-columns:1fr;margin-top:0}
+    .home .split-side .recent-head{margin-top:6px}
+    .hero-photo{max-height:42vh;max-height:42svh}
+    .hero-photo img{max-height:42vh;max-height:42svh}
+  }
+  @media (min-width:900px) and (min-height:700px){
+    .split.stick .split-main{position:sticky;top:12px}
+    .split.stick #markCanvas{--cap:230px}
+  }
+  @media (min-width:1280px){
+    .wrap.wide{padding-left:32px;padding-right:32px}
+    .split{gap:28px}
   }
 
   /* ---------- dark theme (data-theme from theme.js; auto follows the OS) ---------- */
