@@ -63,12 +63,21 @@
   background: transparent;
   color: var(--ob-navy);
   font: inherit;
-  font-size: 22px;
+  font-size: 16px;
   font-weight: 700;
   line-height: 1;
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   padding: 0 12px;
+}
+
+.ob-back > span {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  transform: translateY(-1px);
 }
 
 .ob-skip {

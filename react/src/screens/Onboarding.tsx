@@ -442,7 +442,7 @@ export default function Onboarding({
               else goto((step - 1) as OnboardingStep);
             }}
           >
-            <span aria-hidden="true">‹&nbsp;</span>Back
+            <span aria-hidden="true">‹</span>Back
           </button>
           <ProgressDots step={step} />
           {step < 5 ? (
