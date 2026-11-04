@@ -205,11 +205,14 @@
   #updateGo{margin-left:auto;flex:none;min-height:44px;border:0;border-radius:0;background:var(--coin);color:#fff;font-weight:800;padding:0 16px}
 
   /* ---------- screens ---------- */
+  /* Mount fade: screens render fresh on every navigation (conditional
+     mount), so a short fade-in is the transition - no loader overlay. */
+  @keyframes screenIn{from{opacity:0}to{opacity:1}}
   .screen{position:fixed;inset:0;z-index:5;background:var(--paper);color:var(--ink);
     transform:translateX(100%);visibility:hidden;overflow-y:auto;
     transition:transform .32s cubic-bezier(.32,.72,.28,1), visibility 0s linear .32s}
   .screen.on{transform:translateX(0);visibility:visible;
-    transition:transform .32s cubic-bezier(.32,.72,.28,1)}
+    transition:transform .32s cubic-bezier(.32,.72,.28,1);animation:screenIn 180ms ease-out}
   .wrap{max-width:560px;margin:0 auto;padding:calc(20px + env(safe-area-inset-top)) 20px calc(28px + env(safe-area-inset-bottom))}
   .navrow{display:flex;align-items:center;gap:8px;margin-bottom:6px}
   .navrow button{border:0;background:none;color:var(--ink);font-weight:700;font-size:16px;padding:10px 6px;min-height:44px;display:inline-flex;align-items:center}
@@ -545,9 +548,6 @@
   #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));z-index:22;
     background:var(--ink);color:#fff;border-radius:0;padding:10px 18px;font-size:13px;font-weight:700;
     box-shadow:0 10px 30px rgba(0,0,0,.3);max-width:92vw;text-align:center}
-  #stepLoading{position:fixed;inset:0;z-index:30;background:var(--paper);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
-  #stepLoading .spin{width:34px;height:34px;border-radius:50%;border:4px solid var(--line);border-top-color:var(--coin);animation:spin .7s linear infinite}
-  #stepLoading b{font-size:15px;font-weight:800;color:var(--slate)}
   #toast[hidden]{display:none}
   .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
   dialog#caseDlg{position:fixed;inset:0;margin:auto;width:min(520px,calc(100vw - 24px));

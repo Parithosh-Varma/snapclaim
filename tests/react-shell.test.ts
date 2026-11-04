@@ -29,10 +29,9 @@ test("React app exists with the full screen set", () => {
   for (const screen of ["tHome", "tCases", "tSettings", "capture", "sReview", "sMark", "sSay", "sNum", "sCheck", "sReport"]) {
     assert.ok(app.includes(`"${screen}"`), `screen ${screen} in the React state machine`);
   }
-  assert.ok(app.includes('id="stepLoading"'), "slow transitions keep a step loader");
-  assert.ok(app.includes("250"), "the loader waits 250 ms so instant screens never flash");
-  assert.ok(app.includes("persistDraftSoon"), "step-change draft save is deferred past paint");
-  assert.ok(app.includes("requestIdleCallback") && app.includes("requestAnimationFrame(() => requestAnimationFrame"), "deferred save runs idle/post-paint, never pre-paint in-frame");
+  assert.ok(!app.includes('id="stepLoading"'), "no fake loader overlay over loaded pages");
+  assert.ok(!app.includes("stepTimer"), "no loader timers on navigation");
+  assert.ok(app.includes("persistDraftSoon"), "step-change draft save stays deferred past paint");
   assert.ok(app.includes("20 * 60 * 1000"), "long-lived app polls for worker updates");
   const mark = read("react/src/screens/Mark.tsx");
   assert.ok(mark.includes("taking too long to load"), "a stalled photo decode fails visible, never silent");
@@ -201,6 +200,7 @@ test("React port keeps backend, worker and privacy contracts", () => {
   const css = read("react/src/styles.css");
   assert.ok(css.includes(".tab-pill") && css.includes("border-radius:999px"), "active tab is a rounded pill, not a hard rectangle");
   assert.ok(css.includes("@media (min-width:900px)") && css.includes("border-radius:22px"), "desktop gets a floating dock, not a stranded phone bar");
+  assert.ok(css.includes("@keyframes screenIn"), "screen changes fade instead of a loader overlay");
   assert.ok(css.includes(".samplecell .imgph") && css.includes("aspect-ratio:4/3"), "sample thumbs reserve their box so the first tap cannot miss on reflow");
   for (const sel of [".field-input{", ".text-input{", 'dialog#caseDlg input[type="text"]']) {
     const i = css.indexOf(sel);

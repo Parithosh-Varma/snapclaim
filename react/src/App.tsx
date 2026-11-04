@@ -123,10 +123,6 @@ export default function App() {
     store.setSettings({ baseUrl: url.trim().replace(/\/$/, "") });
   }, [store, toast]);
 
-  const [stepLoading, setStepLoading] = useState(false);
-  const stepTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const stepHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   /* Draft: autosave the in-progress claim on every step change and when the
      page hides, so a reload or crash never wastes progress. Finished or
      abandoned claims clear it (see startCapture / Report save). */
@@ -166,25 +162,14 @@ export default function App() {
     }
   }, [persistDraft]);
 
-  /* Slow-transition cover only: instant screens render with no flash. The
-     loader appears only when a screen takes longer than 250 ms to settle,
-     then clears itself - rapid taps never stack it. */
+  /* Navigation is instant with a fade: no scripted loader. The step-change
+     draft save stays deferred past paint (see persistDraftSoon), and every
+     slow screen owns its own honest loading state (Mark skeleton, Say
+     status, Numbers skeletons). */
   const go = useCallback((s: Screen) => {
     setScreen(s);
-    setStepLoading(false);
-    if (stepTimer.current) clearTimeout(stepTimer.current);
-    if (stepHideTimer.current) clearTimeout(stepHideTimer.current);
-    stepTimer.current = setTimeout(() => {
-      setStepLoading(true);
-      stepHideTimer.current = setTimeout(() => setStepLoading(false), 700);
-    }, 250);
     persistDraftSoon(s);
   }, [persistDraftSoon]);
-
-  useEffect(() => () => {
-    if (stepTimer.current) clearTimeout(stepTimer.current);
-    if (stepHideTimer.current) clearTimeout(stepHideTimer.current);
-  }, []);
 
   const resumeDraft = useCallback(() => {
     try {
@@ -197,13 +182,6 @@ export default function App() {
       applyDraft(sessionRef.current, d);
       setDraft(draftSummary(d));
       setScreen(d.screen);
-      setStepLoading(false);
-      if (stepTimer.current) clearTimeout(stepTimer.current);
-      if (stepHideTimer.current) clearTimeout(stepHideTimer.current);
-      stepTimer.current = setTimeout(() => {
-        setStepLoading(true);
-        stepHideTimer.current = setTimeout(() => setStepLoading(false), 700);
-      }, 250);
     } catch {
       toast("That draft could not be restored - starting fresh");
       try {
@@ -464,12 +442,6 @@ export default function App() {
         </div>
       )}
       {toastMsg && <div id="toast" role="status">{toastMsg}</div>}
-      {stepLoading && (
-        <div id="stepLoading" role="status" aria-label="Loading next step">
-          <span className="spin" aria-hidden="true" />
-          <b>Loading…</b>
-        </div>
-      )}
     </Ctx.Provider>
   );
 }
