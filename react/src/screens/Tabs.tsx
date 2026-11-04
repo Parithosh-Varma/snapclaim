@@ -148,13 +148,13 @@ export function Home() {
           </div>
           <div className="tipcard">
             <p className="tipcard-title">How accuracy works</p>
-            <p className="tipcard-copy">The coin sets the millimetres. Tilt is corrected from its ellipse - no coin, percent-only report. Terrace proof: 232 mm vs 227 mm manual straight-tape. Receipts R001–R007. Crack width 3.2 mm Unverified.</p>
+            <p className="tipcard-copy">The coin sets the millimetres. Tilt is corrected from its ellipse - no coin, percent-only report. Terrace proof (25 mm coin): report 232 mm, re-run 237.5 mm (~2% apart) vs 227 mm tape span. Receipts R001–R007. Crack width 3.2 mm Unverified.</p>
           </div>
         </div>
 
         <div className="card" role="note" aria-label="Live terrace-slab proof">
           <p className="found">Live proof — terrace slab</p>
-          <p className="sub">232 mm length [R005] Confirmed · 0.73% [R002] · 7.48 cm2 [R004] · significant [R007] · width 3.2mm [R006] Unverified.</p>
+          <p className="sub">232 mm report [R005] · 237.5 mm re-run (~2% apart, 25 mm coin) · 0.73% [R002] · 7.48 cm2 [R004] · significant [R007] · width 3.2mm [R006] Unverified.</p>
           <p className="sub"><a className="link-btn" href="/reports/snapclaim-SC-D8ECE64B.pdf">See report: snapclaim-SC-D8ECE64B.pdf</a></p>
         </div>
 
@@ -805,7 +805,7 @@ export function Settings() {
             <span className="about-row"><span>Version</span><b>{APP_VERSION}</b></span>
             <span className="about-row"><span>Field proof</span><b>232 mm · 0.73% · 7.48 cm²</b></span>
             <p className="fineprint" style={{ marginTop: 0 }}>
-              Terrace slab SC-D8ECE64B: 232 mm length [R005] · 0.73% extent [R002] · 7.48 cm² area [R004] · significant [R007] · width 3.2 mm [R006] Unverified.
+              Terrace slab SC-D8ECE64B (25 mm measured coin): report 232 mm [R005] · re-run 237.5 mm (~2% apart) · 0.73% extent [R002] · 7.48 cm² area [R004] · significant [R007] · width 3.2 mm [R006] Unverified.
             </p>
             <a className="about-row about-link" href="/reports/snapclaim-SC-D8ECE64B.pdf">
               <span>Sample report (SC-D8ECE64B)</span><b aria-hidden="true">→</b>

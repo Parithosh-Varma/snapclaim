@@ -100,7 +100,7 @@ Every public dataset used here gets its name, license and exact split listed.
 
 Ref `SC-D8ECE64B` — "crack on the pavement slab of the terrace", photo-pixel outlines scaled by coin diameter tilt-corrected from ellipse.
 
-- Crack length **232 mm [R005]** (Confirmed) vs straight-tape **227 mm** (225–230).
+- Crack length **232 mm [R005] filed report** (Confirmed; engine re-run of the same photo 237.5 mm — ~2% run variance at the same 25 mm measured coin) vs straight-tape **227 mm** (225–230).
 - Thread **238.8 mm**: different horizontal crack, NOT comparable.
 - Pin-to-pin **274 mm** (5.2+4.8+4.5+4.2+2.9+5.8 cm), path-following.
 - Surface **0.73% [R002]**, area **7.48 cm² [R004]**, severity **significant [R007]**.

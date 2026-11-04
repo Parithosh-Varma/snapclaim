@@ -1,1 +1,49 @@
-{"areaCm2":7.48,"crackLengthMm":232,"crackWidthMm":3.2,"date":"2026-11-04","manual":{"pintopinMm":274,"segmentsCm":[5.2,4.8,4.5,4.2,2.9,5.8],"tapeMm":227,"tapeRange":[225,230],"threadMm":238.8,"threadNote":"different crack"},"pdfs":["https://snapclaim.pages.dev/reports/snapclaim-SC-D8ECE64B.pdf","https://snapclaim.pages.dev/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf"],"percent":0.73,"receipts":{"area":"R004","length":"R005","ratio":"R002","severity":"R007","width":"R006"},"ref":"SC-D8ECE64B","severity":"significant","transcript":"crack on the pavement slab of the terrace","verification":{"gate":"passed","skeptic":"verified","xcheck":"verified"},"widthStatus":"Unverified"}
+{
+  "areaCm2": 7.48,
+  "crackLengthMm": 232,
+  "crackWidthMm": 3.2,
+  "date": "2026-11-04",
+  "manual": {
+    "pintopinMm": 274,
+    "segmentsCm": [
+      5.2,
+      4.8,
+      4.5,
+      4.2,
+      2.9,
+      5.8
+    ],
+    "tapeMm": 227,
+    "tapeRange": [
+      225,
+      230
+    ],
+    "threadMm": 238.8,
+    "threadNote": "different crack"
+  },
+  "pdfs": [
+    "https://snapclaim.pages.dev/reports/snapclaim-SC-D8ECE64B.pdf",
+    "https://snapclaim.pages.dev/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf"
+  ],
+  "percent": 0.73,
+  "receipts": {
+    "area": "R004",
+    "length": "R005",
+    "ratio": "R002",
+    "severity": "R007",
+    "width": "R006"
+  },
+  "ref": "SC-D8ECE64B",
+  "severity": "significant",
+  "transcript": "crack on the pavement slab of the terrace",
+  "verification": {
+    "gate": "passed",
+    "skeptic": "verified",
+    "xcheck": "verified"
+  },
+  "widthStatus": "Unverified",
+  "coinMm": 25,
+  "coinNote": "25 mm measured (case study)",
+  "rerunLengthMm": 237.5,
+  "rerunNote": "engine re-run of the same photo, ~2% run variance at the same coin"
+}

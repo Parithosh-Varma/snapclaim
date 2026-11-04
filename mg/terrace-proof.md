@@ -6,7 +6,7 @@
 
 Crack on the pavement slab of the terrace. Photo-pixel outlines scaled by coin diameter, tilt-corrected from ellipse.
 
-- Crack length **232 mm [R005]** (Confirmed)
+- Crack length **232 mm [R005] filed report** (Confirmed; re-run 237.5 mm, ~2% apart at 25 mm coin)
 - Surface coverage **0.73% [R002]** (Confirmed)
 - Damage area **7.48 cm² [R004]** (Confirmed)
 - Severity **significant [R007]** (Confirmed)
