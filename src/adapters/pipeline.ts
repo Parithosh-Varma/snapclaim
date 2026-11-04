@@ -10,7 +10,7 @@ import { META_MODELS } from "../../backend/metaApi.ts";
  *
  * Four live integrations, one per stage:
  * - segment  -> sam-3.1            (SAM 3.1 point/box + multi-object + negative prompts, Meta Responses API)
- * - findings -> muse-spark        (Spark chat completions, text + multimodal image_url, response_format json_object)
+ * - findings -> muse-spark        (Spark chat completions, text + multimodal image_url, plain-text JSON array: response_format json_object makes both models echo the request)
  * - describe -> muse-spark        (Spark vision: photo + note to prose, Meta chat completions)
  * - skeptic  -> muse-spark-open   (Spark Open on Baseten, independent check)
  * - voice    -> muse-voice        (Muse Voice Transcribe, Meta Model API)

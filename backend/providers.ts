@@ -190,7 +190,6 @@ export class MetaFindingsProvider implements FindingsProvider {
         base: this.#opts.base,
         model: this.#opts.model,
         maxTokens: 8192,
-        responseFormat: { type: "json_object" },
         messages: findingsMessages,
         fetchFn: this.#opts.fetchFn,
       });
@@ -316,7 +315,6 @@ export class BasetenSkepticProvider implements FindingsProvider {
         base: this.#opts.base,
         model: this.#opts.model,
         maxTokens: 8192,
-        responseFormat: { type: "json_object" },
         messages: skepticMessages,
         fetchFn: this.#opts.fetchFn,
       });

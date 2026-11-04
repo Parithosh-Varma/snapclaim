@@ -21,7 +21,7 @@ function captureFetch(drafts: unknown) {
   return { fetchFn, seen: () => seen };
 }
 
-test("multimodal findings send the photo to Muse Spark with structured output", async () => {
+test("multimodal findings send the photo to Muse Spark without structured output", async () => {
   const session = wallSession();
   const { fetchFn, seen } = captureFetch(citingDrafts(session.findings));
   const provider = new MetaFindingsProvider({
@@ -38,7 +38,7 @@ test("multimodal findings send the photo to Muse Spark with structured output", 
   });
   const body = JSON.parse(seen()!.body!);
   assert.equal(body.model, "muse-spark-1.3");
-  assert.deepEqual(body.response_format, { type: "json_object" });
+  assert.ok(!("response_format" in body), "no response_format: json_object forces an object and both models echo the request instead of the findings array");
   const user = body.messages.find((m: { role: string }) => m.role === "user");
   assert.ok(Array.isArray(user.content), "multimodal user content is an array");
   assert.ok(user.content.some((p: { type: string }) => p.type === "image_url"), "photo travels as image_url");
@@ -56,7 +56,7 @@ test("text-only findings stay text-only when no photo is given", async () => {
   await provider.draftFindings({ transcript: "crack", findings: session.findings, receipts: session.receipts });
   const body = JSON.parse(seen()!.body!);
   assert.equal(body.model, "muse-spark-1.3");
-  assert.deepEqual(body.response_format, { type: "json_object" });
+  assert.ok(!("response_format" in body), "no response_format: json_object forces an object and both models echo the request instead of the findings array");
   const user = body.messages.find((m: { role: string }) => m.role === "user");
   assert.equal(typeof user.content, "string", "no photo means plain text content");
 });
