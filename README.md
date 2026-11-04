@@ -7,7 +7,7 @@
 
 > Point your phone at damage, speak one line about it - get a claim-ready report where every shipped number cites a machine-checkable receipt. **Computed, not generated.**
 
-**[Try the live app](https://snapclaim.pages.dev) · [Marketing site](https://landing.snapclaim.pages.dev) · [Demo video](https://youtu.be/9SBcmEPJwW4) · [Gallery](https://snapclaim-gallery.parithosh.workers.dev) · [Case study (PDF)](https://snapclaim.pages.dev/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf)**
+**[Try the live app](https://snapclaim.pages.dev) · [Marketing site](https://landing.snapclaim.pages.dev) · [Demo video](https://youtu.be/CdqSvKHyrCg) · [Alt cut](https://youtu.be/9SBcmEPJwW4) · [Gallery](https://snapclaim-gallery.parithosh.workers.dev) · [Case study (PDF)](https://snapclaim.pages.dev/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf)**
 
 **Built on Meta AI, a 4-model pipeline:** SAM 3.1 (damage masks) + Muse Spark 1.3 (evidence-gated findings) + **Muse Spark Open**, open weights served by Baseten (independent skeptic) + Muse Voice Transcribe (spoken intake). **Open-weights fine-tuning:** our crack-tuned SlimSAM-77 mask decoder is on the Hugging Face Hub as [`tariqkhalif/slimsam-77-crack`](https://huggingface.co/tariqkhalif/slimsam-77-crack) (held-out crack mIoU 0.174 stock vs 0.697 tuned, [`training/slimsam-crack/`](./training/slimsam-crack/)), and [`finetune/`](./finetune/) holds a LoRA (PEFT) recipe for Muse Glimmer and Muse Spark Open (smoke-tested, no trained weights yet).
 
@@ -59,7 +59,7 @@ What this does not show yet: how well SAM finds the crack on a real photo. `benc
 
 Watch the full loop — photo + coin, tap to mask, gated findings, skeptic, SVG annexure:
 
-<https://youtu.be/9SBcmEPJwW4>
+<https://youtu.be/CdqSvKHyrCg> (alt cut: <https://youtu.be/9SBcmEPJwW4>)
 
 > _More walkthroughs coming — this section will grow with new cuts._
 

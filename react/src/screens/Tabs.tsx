@@ -151,15 +151,15 @@ export function Home() {
           <p className="found">Watch the demo (2 min)</p>
           <div style={{ position: "relative", width: "100%", aspectRatio: "16 / 9" }}>
             <iframe
-              src="https://www.youtube-nocookie.com/embed/9SBcmEPJwW4"
-              title="SnapClaim — Turn Crack Photos Into Measured Evidence"
+              src="https://www.youtube-nocookie.com/embed/CdqSvKHyrCg"
+              title="SnapClaim demo: damage measured, not guessed"
               loading="lazy"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
               style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }}
             />
           </div>
-          <p className="sub"><a className="link-btn" href="https://youtu.be/9SBcmEPJwW4">Open on YouTube</a></p>
+          <p className="sub"><a className="link-btn" href="https://youtu.be/CdqSvKHyrCg">Open on YouTube</a> · <a className="link-btn" href="https://youtu.be/9SBcmEPJwW4">Alt cut</a></p>
         </div>
 
         {draft && (
