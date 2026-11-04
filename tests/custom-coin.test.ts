@@ -53,13 +53,7 @@ test("custom coin remembers the last valid value the way last-coin does", () => 
   assert.equal(loadLastCustomCoin(), 24.3, "empty input keeps the remembered value in session helper");
 });
 
-test("both apps validate the same rule and surface an inline message", () => {
-  const pwa = read("pwa/app.js");
-  assert.match(pwa, /15.*40/, "PWA names the range");
-  assert.match(pwa, /one decimal at most/, "PWA explains one decimal");
-  assert.match(pwa, /coinHintMark/, "PWA shows the message inline under the picker");
-  assert.ok(pwa.includes("parseCustomCoinMm") && pwa.includes("customCoinError"), "PWA carries the shared rule");
-  assert.ok(pwa.includes("snapclaim.lastCustomCoin"), "PWA remembers custom separately like last-coin");
+test("the app validates the rule and surfaces an inline message", () => {
   const mark = read("react/src/screens/Mark.tsx");
   assert.match(mark, /coinCustomErr/, "React renders the inline error");
   assert.match(mark, /id="coinCustomErr"/, "React error has a stable id");

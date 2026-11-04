@@ -5,8 +5,8 @@ import { safeEqual } from "../backend/admin.ts";
 import { SpendGuard } from "../src/config/spend-guard.ts";
 import { validateFindings } from "../src/findings/evidence-gate.ts";
 import { measureSession } from "../src/engine/measure.ts";
-import { decodeRle } from "../pwa/rle.js";
-import { unionMasks } from "../pwa/mask-ops.js";
+import { decodeRle } from "../react/src/lib/rle.ts";
+import { unionMasks } from "../react/src/lib/mask.ts";
 import { stripMetadata } from "../src/vision/exif.ts";
 import { replay } from "../eval/replay.ts";
 

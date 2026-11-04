@@ -33,15 +33,13 @@ function parseSessionOptions(src: string): Map<string, number> {
 
 test("INR coin diameters agree across pickers and coin-model tables", () => {
   const sources: Record<string, Map<string, number>> = {
-    "pwa/coin-model.js": parseCoinModel(read("pwa/coin-model.js")),
     "react/public/coin-model.js": parseCoinModel(read("react/public/coin-model.js")),
-    "pwa/index.html": parsePwaOptions(read("pwa/index.html")),
     "react/src/lib/session.ts": parseSessionOptions(read("react/src/lib/session.ts")),
   };
   for (const [name, table] of Object.entries(sources)) {
     assert.ok(table.size >= 4, `${name} lists the four INR denominations (got ${table.size})`);
   }
-  const denoms = [...sources["pwa/coin-model.js"]!.keys()].sort();
+  const denoms = [...sources["react/public/coin-model.js"]!.keys()].sort();
   for (const [name, table] of Object.entries(sources)) {
     assert.deepEqual([...table.keys()].sort(), denoms, `${name} covers the same INR denominations`);
   }
@@ -56,10 +54,8 @@ test("INR coin diameters agree across pickers and coin-model tables", () => {
 });
 
 test("Rs 2 keeps varies-by-issue note and custom diameter input exists", () => {
-  assert.match(read("pwa/index.html"), /sizes vary by issue/, "PWA picker says sizes vary by issue");
-  assert.match(read("pwa/index.html"), /id="coinCustomMm"/, "PWA has custom diameter input");
   assert.match(read("react/src/screens/Mark.tsx"), /id="coinCustomMm"/, "React has custom diameter input");
-  for (const f of ["pwa/coin-model.js", "react/public/coin-model.js"] as const) {
+  for (const f of ["react/public/coin-model.js"] as const) {
     assert.match(read(f), /varies by issue/, `${f} notes the coin varies by issue`);
   }
 });

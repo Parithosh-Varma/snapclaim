@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { checkPhoto, laplacianVariance } from "../pwa/photo-check.js";
+import { checkPhoto, laplacianVariance } from "../react/src/lib/photo-check.ts";
 
 function gray(w: number, h: number, fn: (x: number, y: number) => number) {
   const data = new Uint8ClampedArray(w * h * 4);

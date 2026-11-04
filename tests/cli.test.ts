@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { headers, loadImage, parseArgs, parseCoin, parseTap } from "../cli/snapclaim.ts";
 
 test("cli reads real photo dimensions and builds the data URL", () => {
-  const png = loadImage(fileURLToPath(new URL("../pwa/icons/icon-192.png", import.meta.url)));
+  const png = loadImage(fileURLToPath(new URL("../react/public/icons/icon-192.png", import.meta.url)));
   assert.deepEqual({ width: png.width, height: png.height }, { width: 192, height: 192 });
   assert.equal(png.mime, "image/png");
   assert.ok(png.dataUrl.startsWith("data:image/png;base64,"));

@@ -37,9 +37,6 @@ function parseSw(src: string): { cache: string; shell: string[] } {
 
 /** SHELL entry ("./x") -> repo-relative file backing it. Null = unresolvable. */
 function resolveShell(swPath: string, entry: string): string | null {
-  if (swPath === "pwa/sw.js") {
-    return entry === "./" ? "pwa/index.html" : `pwa/${entry.slice(2)}`;
-  }
   // react/public/sw.js: built index.html is a Vite artifact, so the source
   // react/index.html is the honest proxy for both "./" and "./index.html".
   if (swPath === "react/public/sw.js") {
@@ -49,7 +46,7 @@ function resolveShell(swPath: string, entry: string): string | null {
   return null;
 }
 
-for (const swPath of ["pwa/sw.js", "react/public/sw.js"]) {
+for (const swPath of ["react/public/sw.js"]) {
   test(`${swPath}: shell edits ship with a cache bump`, () => {
     const src = read(swPath);
     const { cache, shell } = parseSw(src);
@@ -88,30 +85,3 @@ for (const swPath of ["pwa/sw.js", "react/public/sw.js"]) {
     );
   });
 }
-
-test("pwa shell coverage: every runtime script is precached, no dead weight", () => {
-  const sw = read("pwa/sw.js");
-  const { shell } = parseSw(sw);
-  const html = read("pwa/index.html");
-  const app = read("pwa/app.js");
-
-  // ESM imports in app.js must be precached or the offline shell breaks.
-  for (const m of app.matchAll(/from\s+"(\.[^"]+)"/g)) {
-    const dep = m[1]!;
-    assert.ok(shell.includes(dep), `app.js import ${dep} is in the SW SHELL`);
-  }
-  // Classic scripts + workers + manifest are runtime too.
-  for (const dep of ["./coin-model.js", "./theme.js", "./sam-worker.js", "./voice-worker.js"]) {
-    assert.ok(shell.includes(dep), `${dep} is in the SW SHELL`);
-  }
-  assert.ok(html.includes('rel="manifest"'), "manifest is linked");
-  assert.ok(shell.includes("./manifest.webmanifest"), "manifest is precached");
-
-  // coin-detect.js was pure test-only code sitting in the shipped folder: it
-  // is not imported by app.js, not loaded by index.html, and not in SHELL.
-  // It now lives at src/vision/coin-detect.js (algorithm harness, no DOM) so
-  // pwa/ ships only runtime. This pins that decision: do not re-add it.
-  assert.ok(!existsSync(new URL("pwa/coin-detect.js", root)), "pwa/coin-detect.js stays out of the shipped folder");
-  assert.ok(existsSync(new URL("src/vision/coin-detect.js", root)), "detector harness lives at src/vision/coin-detect.js");
-  assert.ok(!shell.some((s) => s.includes("coin-detect")), "no dead detector in the precache");
-});

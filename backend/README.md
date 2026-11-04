@@ -42,7 +42,7 @@ All replies are enveloped `{ok, requestId, durationMs, result}`; errors are verb
 - `MOCK_MODE=0`: live routes fail closed — `503` without `META_API_KEY`. Measure still needs no key.
  - Bring your own key: send `x-meta-key` and/or `x-baseten-key` and that request uses them instead of the worker secrets. Nothing is stored or logged.
 - Live findings call Muse Spark at `META_API_BASE/chat/completions`. Usage (`prompt_tokens`, `completion_tokens`) is recorded to the spend ledger via `backend/spend.ts`; `usd` stays `0` until Meta pricing is confirmed — no guessed rates. `$0 remaining` fails closed with `429` before any fetch.
- - Operator keys live only in local `.env` / Worker secrets and are never committed. BYOK device keys are different: the PWA sends them per-request as truncated headers and the backend never stores or logs them.
+ - Operator keys live only in local `.env` / Worker secrets and are never committed. BYOK device keys are different: the app sends them per-request as truncated headers and the backend never stores or logs them.
 
 ## Limits
 
@@ -51,7 +51,7 @@ All replies are enveloped `{ok, requestId, durationMs, result}`; errors are verb
 
 ## Not yet (verified live, honestly blocked)
 
-- SAM 3.1 masks: live and verified 2026-10-29 (`200`, 1 record + full-frame RLE on a 1024x1024 photo, `$0.0025` ledgered). PWA tries `/v1/segment` first, on-device SlimSAM on any failure. Wire lesson: the official parser wants the mask payload WITH its `!`/`~` marker.
+- SAM 3.1 masks: live and verified 2026-10-29 (`200`, 1 record + full-frame RLE on a 1024x1024 photo, `$0.0025` ledgered). the app tries `/v1/segment` first, on-device SlimSAM on any failure. Wire lesson: the official parser wants the mask payload WITH its `!`/`~` marker.
 - Voice transcribe: endpoint verified live 2026-10-29 (`POST /v1/asr/transcribe`, multipart WAV, `200`, ~$0.0001). The `/v1/transcribe` proxy is implemented and stub-tested; the first non-English clip through the proxy is still pending.
 - Skeptic inference: `403` until the Baseten form/access is granted. Code complete with real pricing.
 
@@ -73,8 +73,9 @@ gets `403 origin_not_allowed` before any cost; requests without Origin (curl,
 server-to-server) are not blocked. Set `REQUIRE_ORIGIN_FOR_EXPENSIVE=1` to also
 reject no-Origin on expensive routes. Health badge flips `mock` → `live` when `MOCK_MODE=0` plus a key.
 
-## Deploy (PWA)
+## Deploy (app)
 
-Any static host serves `pwa/` (no build step). Point the Backend URL box at the
-Worker (it defaults to the public mock Worker). Installable via
-`manifest.webmanifest`; `sw.js` caches the shell, never `/v1`.
+`npm --prefix react run build`, serve `react/dist/` (Cloudflare Pages: build
+`npm run build`, output `dist/`). Point the Backend URL box at the Worker (it
+defaults to the public mock Worker). Installable via `manifest.webmanifest`;
+`sw.js` caches the shell, never `/v1`.

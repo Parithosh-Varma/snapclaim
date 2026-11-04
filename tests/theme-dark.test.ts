@@ -14,7 +14,6 @@ const MUTED = "#ada595";
 const ACCENT = "#52d18a";
 
 const APPS = [
-  { name: "pwa", theme: "pwa/theme.js", html: "pwa/index.html", css: "pwa/index.html" },
   { name: "react", theme: "react/public/theme.js", html: "react/index.html", css: "react/src/styles.css" },
 ] as const;
 
@@ -41,7 +40,7 @@ function contrast(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-test("dark theme is warm graphite in both apps, forced and auto", () => {
+test("dark theme is warm graphite, forced and auto", () => {
   for (const app of APPS) {
     const css = darkSection(app.css);
     for (const token of [BG, SURFACE, RAISED, TEXT, MUTED, ACCENT, "#ece7dc"]) {
@@ -75,12 +74,11 @@ test("dark palette keeps AA text contrast", () => {
 });
 
 test("browser chrome follows the chosen theme, not just the OS", () => {
-  assert.equal(read("pwa/theme.js"), read("react/public/theme.js"), "theme.js stays one implementation");
-  const js = read("pwa/theme.js");
+  const js = read("react/public/theme.js");
   for (const part of ["meta[name=\"theme-color\"]", "(prefers-color-scheme: dark)", BG, "MutationObserver"]) {
     assert.ok(js.includes(part), `theme.js handles ${part}`);
   }
-  for (const app of [APPS[0], APPS[1]]) {
+  for (const app of [APPS[0]]) {
     const html = read(app.html);
     assert.equal((html.match(/name="theme-color"/g) ?? []).length, 1, `${app.name}: one theme-color tag`);
     assert.ok(!/name="theme-color"[^>]*media=/.test(html), `${app.name}: theme-color is not pinned to the OS`);
