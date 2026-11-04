@@ -54,6 +54,16 @@ npm run typecheck
 npm run backend:start   # http://127.0.0.1:8787
 ```
 
+Or run everything in Docker (mock mode, no keys):
+
+```bash
+docker compose up --build
+# app:     http://localhost:8080   (Settings -> Backend: http://localhost:8787)
+# backend: http://localhost:8787/v1/health
+```
+
+For live calls, put `MOCK_MODE=0` and your keys in `.env`; compose passes it to the backend at run time and nothing is baked into the image.
+
 Then open `pwa/index.html` (or serve `pwa/` with any static server) and press **Use sample measurement** - the full loop runs in one tap: measure → gated findings → skeptic → SVG annexure. No photo needed.
 
 ```bash
