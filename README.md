@@ -20,6 +20,8 @@
 
 [Try the live app](https://snapclaim.pages.dev) · [Marketing site](https://landing.snapclaim.pages.dev) · [Field case study](https://landing.snapclaim.pages.dev/#case-study)
 
+**Demo video:** <https://youtu.be/Xd6pyXRWyf4>
+
 SnapClaim turns a damage photo plus a one-line description into a replayable evidence package: calibrated measurements (% damaged, crack length/width, area in cm²), each backed by a machine-checkable receipt, with AI-written findings that the server refuses to ship unless every number cites its receipt.
 
 **Try it:** <https://snapclaim.pages.dev> (no login needed).
