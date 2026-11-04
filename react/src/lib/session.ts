@@ -100,6 +100,26 @@ export interface Payload {
   [key: string]: unknown;
 }
 
+/** Background measurement started from Mark, overlapping the Describe step.
+ *  The promise itself is transient (never drafted); only completed
+ *  payload/measurement persist. `seq` guards staleness: a new measure(),
+ *  new taps/coin/photo, or a new case bumps `measureSeq` so a late landing
+ *  is discarded. */
+export interface MeasureJob {
+  seq: number;
+  state: "running" | "done" | "error";
+  error?: string;
+  promise: Promise<void>;
+  /** Input snapshot: a late landing whose inputs no longer match is stale. */
+  photoFor: string;
+  points: [number, number][];
+  coinKindMm: number;
+  noScaleMode: boolean;
+  coinPt: [number, number] | null;
+  hasGateCoin: boolean;
+  dmgLabel: string;
+}
+
 export interface Session {
   stillDataUrl: string;
   photo: HTMLCanvasElement | null;
@@ -153,6 +173,9 @@ export interface Session {
   workingHist: ("crack" | "coin")[];
   /** One-shot resume target for Mark's mount after a draft restore. */
   resumeAngle: 1 | 2 | null;
+  /** Overlap plumbing: monotonic seq + the in-flight background job. */
+  measureSeq: number;
+  measureJob: MeasureJob | null;
 }
 
 export function createSession(): Session {
@@ -194,6 +217,8 @@ export function createSession(): Session {
     activeAngle: 1,
     workingHist: [],
     resumeAngle: null,
+    measureSeq: 0,
+    measureJob: null,
   };
 }
 
@@ -239,8 +264,8 @@ export const COIN_OPTIONS: CoinOption[] = [
   { value: 20.3, label: "UK 1p · 20.3 mm", group: "UK" },
   { value: 18, label: "UK 5p · 18 mm", group: "UK" },
   { value: 27, label: "India ₹10 · 27 mm", group: "India" },
-  { value: 25, label: "India ₹5 · 25 mm", group: "India" },
-  { value: 23, label: "India ₹2 · 23 mm", group: "India" },
+  { value: 25, label: "India ₹5 · 25 mm (nominal — verify yours)", group: "India" },
+  { value: 25, label: "India ₹2 · 25 mm (nominal — verify yours)", group: "India" },
   { value: 22, label: "India ₹1 · 22 mm", group: "India" },
   { value: 26.5, label: "Japanese ¥500 · 26.5 mm", group: "Japan" },
   { value: 23.5, label: "Japanese ¥10 · 23.5 mm", group: "Japan" },
@@ -257,3 +282,78 @@ export const COIN_GROUPS: { name: string; options: CoinOption[] }[] = (() => {
     .map((name) => ({ name, options: COIN_OPTIONS.filter((o) => o.group === name) }))
     .filter((g) => g.options.length);
 })();
+
+/* The coin size the user last confirmed. The on-device coin classifier is a
+ * colour-only guess (silver coins all look alike without absolute scale), so
+ * its guess never sets the scale: on 16 real photos of a 25 mm coin it named
+ * six different coins, 20-27 mm, at 33-38% confidence. The user's own last
+ * pick is the default instead, and the Mark screen still asks them to confirm. */
+const LAST_COIN_KEY = "snapclaim.lastCoin";
+
+export function loadLastCoin(): { mm: number; label: string } | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(LAST_COIN_KEY) ?? "null") as { mm?: unknown; label?: unknown } | null;
+    const mm = Number(v?.mm);
+    if (!(mm > 0 && mm <= 200)) return null;
+    return { mm, label: typeof v?.label === "string" ? v.label : "" };
+  } catch {
+    return null;
+  }
+}
+
+export function saveLastCoin(mm: number, label: string): void {
+  try {
+    if (mm > 0 && mm <= 200) localStorage.setItem(LAST_COIN_KEY, JSON.stringify({ mm, label }));
+    else localStorage.removeItem(LAST_COIN_KEY);
+  } catch { /* storage may be unavailable; the claim flow must not break */ }
+}
+
+/** Custom diameter typed by the user: 15–40 mm, at most one decimal place. */
+export function parseCustomCoinMm(raw: string): number | null {
+  const t = raw.trim();
+  if (t === "") return null;
+  if (!/^\d+(\.\d)?$/.test(t)) return null;
+  const mm = Number(t);
+  if (!Number.isFinite(mm) || mm < 15 || mm > 40) return null;
+  return mm;
+}
+
+/** Inline message for the custom field: null when empty or valid. */
+export function customCoinError(raw: string): string | null {
+  if (raw.trim() === "") return null;
+  if (parseCustomCoinMm(raw) !== null) return null;
+  return "Enter 15–40 mm, one decimal at most.";
+}
+
+const LAST_CUSTOM_COIN_KEY = "snapclaim.lastCustomCoin";
+
+/** Last custom diameter, remembered the same way as the last-coin pick. */
+export function loadLastCustomCoin(): number | null {
+  try {
+    const raw = localStorage.getItem(LAST_CUSTOM_COIN_KEY);
+    if (raw === null) return null;
+    const v = JSON.parse(raw) as { mm?: unknown } | number | null;
+    const mm = typeof v === "number" ? v : Number((v as { mm?: unknown } | null)?.mm);
+    if (!Number.isFinite(mm) || mm < 15 || mm > 40) return null;
+    if (!/^\d+(\.\d)?$/.test(String(mm))) return null;
+    return mm;
+  } catch {
+    return null;
+  }
+}
+
+export function saveLastCustomCoin(raw: string): void {
+  try {
+    if (raw.trim() === "") return;
+    const mm = parseCustomCoinMm(raw);
+    if (mm === null) return;
+    localStorage.setItem(LAST_CUSTOM_COIN_KEY, JSON.stringify({ mm }));
+  } catch { /* storage may be unavailable; the claim flow must not break */ }
+}
+
+/** Put the user's last confirmed coin size (or none) on the session. */
+export function applyLastCoin(s: Pick<Session, "coinKindMm" | "coinLabel">): void {
+  const last = loadLastCoin();
+  s.coinKindMm = last?.mm ?? 0;
+  s.coinLabel = last?.label ?? "";
+}

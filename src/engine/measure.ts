@@ -90,6 +90,20 @@ export function measureSession(input: MeasureSessionInput): MeasureSessionResult
   const minConfidence = input.minReferenceConfidence ?? DEFAULT_MIN_REFERENCE_CONFIDENCE;
   const ledger = new ReceiptLedger();
 
+  // No masks at all (clean wall, empty tap): record a verdict receipt so the
+  // pipeline can answer "no damage" with a citation instead of failing the
+  // gate on an empty evidence set.
+  if (masks.length === 0) {
+    ledger.add({
+      method: "damage_refuted",
+      inputs: { masks: 0 },
+      output: { value: "no-damage", unit: "band" },
+      formula: "no masks supplied - nothing to measure",
+      confidence: 1,
+      notes: ["no input masks; report stays empty by verdict, not by error"],
+    });
+  }
+
   let scale: { receiptId: string; mmPerPx: number; reference: ScaleReference } | null = null;
 
   if (input.scaleReference !== undefined) {
@@ -127,12 +141,64 @@ export function measureSession(input: MeasureSessionInput): MeasureSessionResult
     }
   }
 
-  const findings: MeasuredFinding[] = masks.map((mask) => measureMask(mask, component, ledger, scale, thresholds, minConfidence));
+  // Not-a-crack filter: a crack mask whose every region was flagged
+  // blocky (thick, not long-and-thin) or straight-edged (ledge/frame) is
+  // the segmenter catching non-damage. Refute it with a receipt instead of
+  // measuring noise as damage. Anything with an unflagged region still
+  // measures - missing real damage is worse than measuring a false tap.
+  const refuted: import("./types.ts").RefutedMask[] = [];
+  const measurable = masks.filter((mask) => {
+    if ((mask.regionCount ?? 1) === 0) {
+      refuted.push({
+        maskId: mask.id,
+        label: mask.label,
+        reason: "empty",
+        detail: "mask has no regions - the segmenter found nothing to measure",
+      });
+      ledger.add({
+        method: "damage_refuted",
+        inputs: { maskId: mask.id, label: mask.label, regionCount: 0 },
+        output: { value: "no-damage", unit: "band" },
+        formula: "empty mask - refuted as not-damage",
+        confidence: mask.confidence,
+        notes: ["empty segmenter output; excluded from findings by verdict, not by error"],
+      });
+      return false;
+    }
+    if (mask.label !== "crack") return true;
+    const blocky = mask.blockyRegionCount ?? 0;
+    const regions = mask.regionCount ?? 1;
+    if (blocky < regions) return true;
+    refuted.push({
+      maskId: mask.id,
+      label: mask.label,
+      reason: "blocky",
+      detail: `${regions} region(s), all blocky-flagged (thick, not long-and-thin) - not crack geometry`,
+    });
+    ledger.add({
+      method: "damage_refuted",
+      inputs: {
+        maskId: mask.id,
+        label: mask.label,
+        regionCount: regions,
+        blockyRegionCount: blocky,
+      },
+      output: { value: "no-damage", unit: "band" },
+      formula: "all regions blocky - refuted as not-damage",
+      confidence: mask.confidence,
+      notes: ["tap caught non-damage geometry; excluded from findings by verdict, not by error"],
+    });
+    return false;
+  });
+
+  const findings: MeasuredFinding[] = measurable.map((mask) => measureMask(mask, component, ledger, scale, thresholds, minConfidence));
 
   return {
     findings,
     receipts: ledger.all(),
     mode: scale === null ? "percent-only" : "absolute",
+    verdict: findings.length > 0 ? "damage" : "no-damage",
+    refuted,
     provenance: verified ? "pixel-verified" : "self-reported",
   };
 }
@@ -182,18 +248,23 @@ function measureMask(
   let crackWidthValue: number | null = null;
   let widthReceiptId: string | null = null;
 
+  // Area on the wall: photo pixels, or the tilt-corrected area when there is one.
+  const plane: Record<string, number> = mask.planeAreaPx === undefined ? { damageAreaPx: mask.areaPx } : { planeAreaPx: mask.planeAreaPx };
+  const planeName = mask.planeAreaPx === undefined ? "damageAreaPx" : "planeAreaPx";
+  const planeAreaPx = mask.planeAreaPx ?? mask.areaPx;
+
   if (scale !== null) {
-    areaCm2Value = areaCm2(mask.areaPx, scale.mmPerPx);
+    areaCm2Value = areaCm2(planeAreaPx, scale.mmPerPx);
     const areaReceipt = ledger.add({
       method: "calibrated_area",
       inputs: {
         maskId: mask.id,
-        damageAreaPx: mask.areaPx,
+        ...plane,
         mmPerPx: round(scale.mmPerPx, 6),
         scaleReceiptId: scale.receiptId,
       },
       output: { value: areaCm2Value, unit: "cm2" },
-      formula: "damageAreaPx * mmPerPx^2 / 100",
+      formula: `${planeName} * mmPerPx^2 / 100`,
       confidence: round(mask.confidence * scale.reference.confidence, 3),
       notes: [],
     });
@@ -219,19 +290,19 @@ function measureMask(
       lengthReceiptId = lengthReceipt.id;
     }
     if (mask.skeletonPx > 0) {
-      crackWidthValue = crackWidthMm(mask.areaPx, mask.skeletonPx, scale.mmPerPx);
+      crackWidthValue = crackWidthMm(planeAreaPx, mask.skeletonPx, scale.mmPerPx);
       if (crackWidthValue !== null) {
         const widthReceipt = ledger.add({
           method: "calibrated_width",
           inputs: {
             maskId: mask.id,
-            damageAreaPx: mask.areaPx,
+            ...plane,
             skeletonPx: mask.skeletonPx,
             mmPerPx: round(scale.mmPerPx, 6),
             scaleReceiptId: scale.receiptId,
           },
           output: { value: crackWidthValue, unit: "mm" },
-          formula: "damageAreaPx / skeletonPx * mmPerPx",
+          formula: `${planeName} / skeletonPx * mmPerPx`,
           confidence: round(mask.confidence * scale.reference.confidence, 3),
           notes: [],
         });

@@ -44,7 +44,7 @@ const COLORS: Record<string, string> = { ok: "#1f7a4d", flatter: "#a86a00", refu
  * sensors (desktops). On iOS the sensors need a tap first, so a button asks.
  * Returns a function that stops listening.
  */
-type TiltWindow = Pick<typeof globalThis, "addEventListener" | "removeEventListener" | "requestAnimationFrame"> & {
+export type TiltWindow = Pick<typeof globalThis, "addEventListener" | "removeEventListener" | "requestAnimationFrame"> & {
   DeviceOrientationEvent?: typeof DeviceOrientationEvent & { requestPermission?: () => Promise<string> };
   matchMedia?: (query: string) => { matches: boolean };
 };
@@ -71,7 +71,7 @@ export function mountTiltMeter(el: HTMLElement | null, { win = globalThis as Til
   const text = el.querySelector("[data-text]");
   const ask = el.querySelector("[data-ask]") as HTMLButtonElement | null;
   const row = el.firstElementChild as HTMLElement | null;
-  const surfaceButtons = [...el.querySelectorAll("[data-surface]")] as HTMLButtonElement[];
+  const surfaceButtons = Array.from(el.querySelectorAll("[data-surface]")) as HTMLButtonElement[];
   if (!bubble || !text || !ask || !row) return () => {};
   const bubbleEl: Element = bubble;
   const textEl: Element = text;

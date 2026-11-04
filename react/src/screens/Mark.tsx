@@ -3,11 +3,11 @@ import { useApp } from "../App";
 import { apiGet, apiPost } from "../lib/api";
 import { checkPhoto } from "../lib/photo-check";
 import { findCoins } from "../../../src/vision/coin-detect.js";
-import { circleRle, encodeRle } from "../lib/rle";
 import { closeMask } from "../lib/mask";
 import { segmentCoinViaApi, segmentViaApi, type SamClient } from "../lib/sam";
-import { COIN_GROUPS, COIN_OPTIONS, freshAngleSlot, pickWinnerAngle, resetDmg, type AngleSlot, type SamMask, type Session } from "../lib/session";
-import { BackButton, Stepper } from "../lib/ui";
+import { buildObserveBody, completeMeasureJob, failMeasureJob, invalidateMeasure, startMeasureJob } from "../lib/measure-job";
+import { COIN_GROUPS, COIN_OPTIONS, customCoinError, freshAngleSlot, loadLastCustomCoin, parseCustomCoinMm, pickWinnerAngle, resetDmg, saveLastCoin, saveLastCustomCoin, type AngleSlot, type SamMask, type Session } from "../lib/session";
+import {TopBar} from "../lib/ui";
 
 /** Custom coin-size dropdown: the native select cannot be styled square or
     themed, so this listbox renders the same presets (plus the gate's
@@ -194,7 +194,17 @@ export default function Mark() {
   const [photoNotes, setPhotoNotes] = useState("");
   const [label, setLabel] = useState(s.dmgLabel);
   const [coinKind, setCoinKind] = useState(s.coinKindMm);
-  const [coinCustom, setCoinCustom] = useState("");
+  const [coinCustom, setCoinCustom] = useState(() => {
+    const last = loadLastCustomCoin();
+    if (last !== null && !(s.coinKindMm > 0)) {
+      s.coinKindMm = last;
+      s.coinLabel = `Custom · ${last} mm dia`;
+      return String(last);
+    }
+    if (last !== null && s.coinKindMm === last) return String(last);
+    return "";
+  });
+  const coinCustomErr = customCoinError(coinCustom);
   const [hasMask, setHasMask] = useState(!!s.dmg.mask);
   const [tapCount, setTapCount] = useState(s.dmg.points.length);
   const [markBusy, setMarkBusy] = useState(false);
@@ -208,11 +218,13 @@ export default function Mark() {
   const [coinActive, setCoinActive] = useState<number | null>(null);
   const dropRef = useRef<HTMLDivElement>(null);
   const dropBtnRef = useRef<HTMLButtonElement>(null);
-  // Stale-write guard: each measure() run gets a seq; navigation away or a
-  // retry supersedes the previous run so only the latest may mutate session
-  // or navigate. Incremented on unmount to drop late arrivals.
-  const measureSeq = useRef(0);
-  useEffect(() => () => { measureSeq.current++; }, []);
+  // Background-job staleness lives on the session (measureSeq + snapshot),
+  // not on this mount: the job overlaps the Describe step, so Mark unmounts
+  // while it runs and a component ref would discard every landing. Input
+  // edits bump the seq via touchInputs() so a late landing is discarded.
+  const touchInputs = () => {
+    invalidateMeasure(s);
+  };
 
   /** Manual radius matches measure()'s circleRef radius (gate-derived, or a
    * 3.5% fallback when the gate missed) so the ring shows what gets measured. */
@@ -232,6 +244,8 @@ export default function Mark() {
     if (!c || !photo) return;
     c.width = photo.width;
     c.height = photo.height;
+    // Aspect ratio for the CSS height cap (short and wide viewports).
+    c.style.setProperty("--ar", String(photo.width / photo.height));
     const g = c.getContext("2d", { willReadFrequently: true });
     if (!g) return;
     g.drawImage(photo, 0, 0);
@@ -555,6 +569,9 @@ export default function Mark() {
     saveBundle(angle);
     setAngle(next);
     loadAngle(next);
+    // A different angle is different inputs: drop any in-flight or landed
+    // measurement so Say can never report the other angle's numbers.
+    touchInputs();
   };
 
   /* Make an angle's bundle the working state (used for the winning angle
@@ -592,6 +609,11 @@ export default function Mark() {
     };
     loadAngle(s.resumeAngle ?? 1);
     s.resumeAngle = null;
+    // A background job that failed while the user was on Say returns here
+    // (not Numbers) with the real message; taps and transcript are kept.
+    if (s.measureJob?.state === "error") {
+      setStatus(`Measuring failed (${s.measureJob.error ?? "unknown error"}).`);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -603,12 +625,12 @@ export default function Mark() {
 
   const measure = useCallback(async () => {
     // Belt and braces with the disabled button: no mask, no empty mask, no photo - no report.
+    // All synchronous validation runs BEFORE navigating, exactly as the old
+    // sequential flow: nothing leaves Mark until the inputs are measurable.
     if (!s.dmg.mask || !s.photo) {
       setStatus("Tap the crack first - there is nothing outlined to measure.");
       return;
     }
-    const seq = ++measureSeq.current;
-    const stale = () => seq !== measureSeq.current;
     setStatus("Measuring - asking the backend for the numbers…");
     setMeasureBusy(true);
     let area = 0;
@@ -626,8 +648,8 @@ export default function Mark() {
     const h = s.photo.height;
     ctx.setNumError(null);
     // No mock measurements, ever: a mock backend invents numbers, so refuse
-    // before leaving Mark. Unreachable health is not a refusal - measure
-    // surfaces the real connection error itself.
+    // before leaving Mark. Unreachable health is not a refusal - the
+    // background job surfaces the real connection error itself.
     try {
       const { j } = await apiGet(base, "/v1/health");
       if ((j as { mode?: unknown }).mode === "mock") {
@@ -637,7 +659,7 @@ export default function Mark() {
         go("sNum");
         return;
       }
-    } catch { /* health failed: measure reports the real error below */ }
+    } catch { /* health failed: the job reports the real error below */ }
     // Scale needs a coin outline with a chosen size, or an explicit
     // percent-only choice - never a guessed circle.
     if ((s.coinManualPt || s.gateCoin) && !(s.coinKindMm > 0)) {
@@ -650,66 +672,71 @@ export default function Mark() {
       setMeasureBusy(false);
       return;
     }
-    ctx.setMeasuring(true);
-    go("sNum");
-    const body: Record<string, unknown> = {
-      masks: [{ id: "damage-1", label: s.dmgLabel, rle: encodeRle(s.dmg.mask, w, h), confidence: s.dmg.iou || 0.8 }],
-    };
     // The coin is whatever SAM outlined at the user's tap - same as the crack.
     // No gate geometry, no guessed radius: without an outline there is no scale.
-    if (s.coinManualPt && s.coinMask) {
-      body.reference = { id: "coin", rle: encodeRle(s.coinMask, w, h), knownMm: s.coinKindMm, confidence: s.coinIou };
-    } else if (s.coinManualPt) {
-      // Tap landed but the outline missed (or is still running): never measure
-      // a guessed circle - it would silently bias every millimetre.
-      go("sMark");
-      setStatus("Tap the coin again - the last outline missed the coin.");
-      ctx.setMeasuring(false);
+    // buildObserveBody carries the exact old maths; a missed outline refuses
+    // here, before any navigation, so millimetres are never guessed.
+    const { body, refused } = buildObserveBody(s, w, h);
+    if (refused) {
+      setStatus(refused);
       setMeasureBusy(false);
       return;
-    } else if (s.gateCoin) {
-      // Legacy draft restore: a gate-measured circle from before manual flow.
-      const kx = w / s.gateCoin.sw;
-      const ky = h / s.gateCoin.sh;
-      body.reference = {
-        id: "coin",
-        rle: circleRle(
-          (s.gateCoin.cx / s.gateCoin.fw) * s.gateCoin.sw * kx,
-          (s.gateCoin.cy / s.gateCoin.fh) * s.gateCoin.sh * ky,
-          Math.max(3, (s.gateCoin.rr / s.gateCoin.fw) * s.gateCoin.sw * kx),
-          w,
-          h,
-        ),
-        knownMm: s.coinKindMm,
-        confidence: 0.85,
-      };
-    } else if (s.noScaleMode) body.note = "percent-only requested";
+    }
+    // Validation passed: start the observe+measure chain in the background
+    // and move to Describe immediately. The measurement overlaps the user's
+    // speak/type time - no artificial delay, no fake progress, and Say never
+    // reports without a completed payload (it awaits the job first).
+    s.payload = null;
+    s.measurement = null;
+    s.reportFail = null;
+    s.reportStatement = null;
+    s.autoListen = false;
+    ctx.setMeasuring(true);
+    setMeasureBusy(false);
     setStatus("");
+    let resolveJob: () => void = () => {};
+    const promise = new Promise<void>((resolve) => { resolveJob = resolve; });
+    const job = startMeasureJob(s, promise);
+    s.autoListen = true;
+    go("sSay");
     try {
       let { res, j } = await apiPost(base, "/v1/observe", body);
-      if (stale()) return;
       // The reference IS the traced outline now - no circle to fall back to.
       // A refusal means the outline was not coin-shaped: the user re-taps.
       if (!res.ok || !j.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
       const m = await apiPost(base, "/v1/measure", j.result);
-      if (stale()) return;
       if (!m.res.ok || !m.j.ok) throw new Error(m.j.error ?? `HTTP ${m.res.status}`);
-      s.payload = j.result as typeof s.payload;
-      s.measurement = m.j.result as unknown as typeof s.measurement;
-      s.autoListen = true;
-      ctx.setMeasuring(false);
-      setMeasureBusy(false);
-      go("sSay");
+      completeMeasureJob(
+        s,
+        job,
+        j.result as unknown as NonNullable<typeof s.payload>,
+        m.j.result as unknown as NonNullable<typeof s.measurement>,
+      );
     } catch (e) {
-      if (stale()) return;
-      ctx.setMeasuring(false);
-      setMeasureBusy(false);
       const msg = e instanceof Error ? e.message : String(e);
-      setStatus(`Measuring failed (${msg}).`);
-      ctx.setNumError({ title: "Measurement failed", detail: msg });
-      go("sNum");
+      failMeasureJob(s, job, msg);
+    } finally {
+      // Notify the UI (Say re-renders on measuring flip) and unblock any
+      // Say submit that is awaiting the job. Failure returns to Mark - not
+      // Numbers - with the real message, keeping taps and transcript.
+      if (s.measureJob === job) {
+        const failed = job.state === "error";
+        const errText = job.error ?? "unknown error";
+        ctx.setMeasuring(false);
+        resolveJob();
+        if (failed) {
+          ctx.setNumError(null);
+          go("sMark");
+          // Mark remounts and reads job.error for its status line; stash the
+          // text on the session too in case the remount races the write.
+          s.transcript = s.transcript ?? "";
+          void errText;
+        }
+      } else {
+        resolveJob();
+      }
     }
-  }, [base, ctx, go, s, traceCoin]);
+  }, [base, ctx, go, s]);
 
   useEffect(() => {
     ctx.measureRef.current = measure;
@@ -727,6 +754,7 @@ export default function Mark() {
       s.coinMask = null;
       s.coinIou = 0;
       s.noScaleMode = false;
+      touchInputs();
       histRef.current.push("coin");
       setCoinCorrect(false);
       setCoinFixHint("Outlining coin…");
@@ -748,6 +776,7 @@ export default function Mark() {
       return;
     }
     s.dmg.points.push([x, y]);
+    touchInputs();
     setStatus("Outlining…");
     setMarkBusy(true);
     // Cloud-only: SAM 3.1 API is the only outlining path. No on-device fallback,
@@ -800,6 +829,7 @@ export default function Mark() {
       s.coinManualPt = null;
       s.coinMask = null;
       s.coinIou = 0;
+      touchInputs();
       setCoinFixHint("");
       drawMark();
       return;
@@ -808,6 +838,7 @@ export default function Mark() {
     if (s.dmg.points.length) {
       s.dmg.points.pop();
       s.dmg.pointMasks.pop();
+      touchInputs();
       if (!s.dmg.points.length) {
         s.dmg.mask = null;
         s.dmg.iou = 0;
@@ -852,6 +883,7 @@ export default function Mark() {
       s.coinManualPt = null;
       s.coinMask = null;
       s.coinIou = 0;
+      touchInputs();
       setCoinFixHint("");
       drawMark();
     }
@@ -867,19 +899,19 @@ export default function Mark() {
   const needSize = Boolean(s.gateCoin || s.coinManualPt) && s.coinKindMm <= 0;
 
   return (
-    <section className="screen on" aria-labelledby="h-mark">
-      <div className="wrap">
-        <BackButton label="Camera" onClick={() => go("capture")} />
-        <Stepper step={2} />
+    <section className="screen on polish" aria-labelledby="h-mark">
+      <div className="wrap wide">
+        <TopBar step={2} total={6} backLabel="Camera" onBack={() => go("capture")} />
         <h1 id="h-mark">Tap the damage.</h1>
         <p className="sub">One tap on the crack, one tap on the coin.</p>
+        <div className="split stick">
+        <div className="split-main">
         {!ready ? (
           <>
             <div className="skel" role="status" aria-label="Loading photo" />
             <div className="skel" />
           </>
         ) : (
-          <>
             <div className="card evcard">
           <div className="evframe">
             <canvas id="markCanvas" ref={canvasRef} onPointerDown={onTap} />
@@ -909,6 +941,7 @@ export default function Mark() {
                 onClick={() => {
                   setLabel(chip.label);
                   s.dmgLabel = chip.label;
+                  touchInputs();
                 }}
               >
                 {chip.text}
@@ -916,6 +949,10 @@ export default function Mark() {
             ))}
           </div>
         </div>
+        )}
+        </div>
+        <div className="split-side">
+        {ready && (
         <div className="card scalecard">
           <div className="scalehead">
             <span className={`scaledot is-${coinState}`} aria-hidden="true" />
@@ -941,37 +978,53 @@ export default function Mark() {
               onPick={(v, label) => {
                 setCoinKind(v);
                 setCoinCustom("");
+                saveLastCustomCoin("");
                 s.coinKindMm = v;
                 s.coinLabel = v > 0 ? label.replace(/ · (\d+(?:\.\d+)?) mm$/, " · $1 mm dia") : "";
+                touchInputs();
+                saveLastCoin(s.coinKindMm, s.coinLabel);
               }}
             />
           </label>
           <label className="field">
-            Or type the diameter <small className="fieldex">any coin, ruler, card</small>
+            Or type the diameter (mm) <small className="fieldex">any coin, ruler, card · 15–40 mm</small>
             <input
               id="coinCustomMm"
               className="field-input"
               type="number"
               inputMode="decimal"
-              min={5}
-              max={100}
-              step="0.01"
-              placeholder="e.g. 24.26"
+              min={15}
+              max={40}
+              step="0.1"
+              placeholder="e.g. 24.3"
               value={coinCustom}
               onChange={(e) => {
                 const raw = e.target.value;
                 setCoinCustom(raw);
-                const mm = Number(raw);
-                if (mm > 0) {
+                const mm = parseCustomCoinMm(raw);
+                if (mm !== null) {
                   setCoinKind(0);
                   s.coinKindMm = mm;
                   s.coinLabel = `Custom · ${mm} mm dia`;
-                } else {
+                } else if (raw.trim() === "") {
                   s.coinKindMm = coinKind;
                   s.coinLabel = "";
+                } else {
+                  s.coinKindMm = 0;
+                  s.coinLabel = "";
+                }
+                touchInputs();
+                if (mm !== null) {
+                  saveLastCoin(s.coinKindMm, s.coinLabel);
+                  saveLastCustomCoin(raw);
                 }
               }}
             />
+            {coinCustomErr && (
+              <span id="coinCustomErr" className="coinhint" role="alert">
+                {coinCustomErr}
+              </span>
+            )}
           </label>
           <div className="coinrow">
             <button
@@ -995,14 +1048,22 @@ export default function Mark() {
               id="markNoCoin"
               className="btn-quiet"
               type="button"
-              disabled={markBusy || !!s.coinManualPt}
+              disabled={markBusy || (!!s.coinManualPt && !s.noScaleMode)}
               onClick={() => {
-                s.noScaleMode = true;
-                s.coinManualPt = null;
-                s.coinMask = null;
-                s.coinIou = 0;
-                setCoinFixHint("");
-                setStatus("Percent-only - no millimetres.");
+                if (s.noScaleMode) {
+                  // Untoggled: back to millimetres. The scale still needs a
+                  // coin outline + size, the measure gate enforces that below.
+                  s.noScaleMode = false;
+                  setStatus("Scale needed - tap the coin, or mark percent-only again to skip millimetres.");
+                } else {
+                  s.noScaleMode = true;
+                  s.coinManualPt = null;
+                  s.coinMask = null;
+                  s.coinIou = 0;
+                  setCoinFixHint("");
+                  setStatus("Percent-only - no millimetres.");
+                }
+                touchInputs();
                 drawMark();
               }}
             >
@@ -1017,13 +1078,13 @@ export default function Mark() {
               onChange={(e) => {
                 setTaped(e.target.checked);
                 s.coinTaped = e.target.checked;
+                touchInputs();
                 drawMark();
               }}
             />
             <span>Coin has tape<small>Lenient outline - allows the tape halo</small></span>
           </label>
         </div>
-          </>
         )}
         {photoNotes ? <div id="photoNotes" className="hint">{photoNotes}</div> : null}
         {tfState ? (
@@ -1032,14 +1093,18 @@ export default function Mark() {
             <span id="tfState">{tfState}</span>
           </div>
         ) : null}
-        <button id="measureBtn" className={`btn-primary${measureBusy ? " busy" : ""}`} type="button" disabled={measureBusy || !hasMask || needSize} aria-busy={measureBusy} onClick={measure}>
-          {measureBusy ? "Measuring…" : "Measure damage"}
-        </button>
+        <div className="stickycta">
+          <button id="measureBtn" className={`btn-primary${measureBusy ? " busy" : ""}`} type="button" disabled={measureBusy || !hasMask || needSize} aria-busy={measureBusy} onClick={measure}>
+            {measureBusy ? "Measuring…" : "Measure damage"}
+          </button>
+        </div>
         {!hasMask ? (
           <p className="ctahint">Tap the damage on the photo to enable measuring.</p>
         ) : needSize ? (
           <p className="ctahint">Pick the coin size above to enable measuring.</p>
         ) : null}
+        </div>
+        </div>
       </div>
     </section>
   );

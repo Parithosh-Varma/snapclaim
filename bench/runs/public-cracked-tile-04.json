@@ -1,0 +1,27 @@
+{
+  "caseId": "public-cracked-tile-04",
+  "provenance": {
+    "gitSha": "4f9697491f450b9f44a3828a679793e074e9e216",
+    "model": "sam-3.1 + muse-spark-1.3 (findings) + muse-spark-open-1026 (skeptic); deployed worker",
+    "promptVersion": "prompts at 4f96974",
+    "timestamp": "2026-11-02T13:32:40+00:00"
+  },
+  "findings": [
+    {
+      "maskId": "damage-1",
+      "crackLengthMm": null,
+      "verdict": "CONFIRMED"
+    }
+  ],
+  "receipts": [
+    {
+      "unit": "percent"
+    },
+    {
+      "unit": "count"
+    },
+    {
+      "unit": "band"
+    }
+  ]
+}

@@ -36,6 +36,28 @@ export function BackButton({ label, onClick }: { label: string; onClick(): void 
   );
 }
 
+/** Step top bar: 44px back chevron, centered "Step N of M", progressbar.
+ *  One component so all six steps share layout, tap targets and labels. */
+export function TopBar({ step, total, backLabel, onBack }: { step: number; total: number; backLabel: string; onBack(): void }) {
+  const label = `Step ${step} of ${total}`;
+  return (
+    <div className="topbar">
+      <button type="button" className="topback" aria-label={`Back to ${backLabel}`} onClick={onBack}>
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M14.5 5.5 8 12l6.5 6.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      <div className="topstep">
+        <span id={`topStepLabel-${step}`}>{label}</span>
+        <div className="topprog" role="progressbar" aria-labelledby={`topStepLabel-${step}`} aria-valuenow={step} aria-valuemin={1} aria-valuemax={total}>
+          <i style={{ width: `${Math.round((step / total) * 100)}%` }} />
+        </div>
+      </div>
+      <span className="topbar-spacer" aria-hidden="true" />
+    </div>
+  );
+}
+
 function fmtReceipt(r: Receipt): string {
   const raw = r.output?.value;
   const num = typeof raw === "number" ? String(Math.abs(raw) < 10 ? Math.round(raw * 100) / 100 : Math.round(raw * 10) / 10) : String(raw ?? "");

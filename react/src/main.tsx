@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./styles.css";
+import "./onboarding.css";
 
 // No StrictMode: its dev double-effect would acquire/release the camera and
 // speech/mic streams twice. Production behavior is identical either way.

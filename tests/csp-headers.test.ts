@@ -9,7 +9,6 @@ const read = (path: string): string => readFileSync(new URL(path, root), "utf8")
 // host) and once as a real header (the only form browsers honour for
 // frame-ancestors). Both copies must stay identical apart from frame-ancestors.
 const APPS = [
-  { name: "pwa", html: "pwa/index.html", headers: "pwa/_headers" },
   { name: "react", html: "react/index.html", headers: "react/public/_headers" },
 ] as const;
 

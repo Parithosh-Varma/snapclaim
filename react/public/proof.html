@@ -25,10 +25,10 @@ img{max-width:100%;height:auto;border-radius:8px}
 <li>Severity: <b>significant</b> [R007]</li>
 </ul>
 <p>Report: <a href="/reports/snapclaim-SC-D8ECE64B.pdf">snapclaim-SC-D8ECE64B.pdf</a> | Case study: <a href="/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf">Terrace-Slab Crack case-study PDF</a></p>
-<p>Same-photo check, updated <span id="d">2026-11-01</span>. Every measured cell below is the deterministic engine (<span class="mono">npm run eval</span>, 7 pass / 0 fail today) — no model in the loop.</p>
+<p>Same-photo check, updated <span id="d">2026-11-04</span>. Every measured cell below is the deterministic engine (<span class="mono">npm run eval</span>, 7 pass / 0 fail today) — no model in the loop.</p>
 <table>
-<tr><th>Case</th><th>Measured (code)</th><th>Tape / Spark-only guess</th></tr>
-<tr><td>terrace-slab, 2 Nov <b>(real ground truth)</b></td><td><b>218.5&nbsp;mm</b> [R005] — err 8.5 mm (3.7%), <b>inside ±10%</b></td><td>Spark photo-alone <b>315&nbsp;mm</b> — err 88 mm (38.8%), outside. Truth: tape <b>227&nbsp;mm</b></td></tr>
+<tr><th>Case</th><th>Measured (code)</th><th>Span / Spark-only guess</th></tr>
+<tr><td>terrace-slab, 4 Nov <b>(tape span ground truth 227 mm [225–230], n = 1 — span is context, never scored)</b></td><td><b>237.5&nbsp;mm</b> [R005, 25&nbsp;mm user-supplied coin] — err +10.5&nbsp;mm (+4.6%) vs span; width 3.2&nbsp;mm unverified (no width ground truth)</td><td>Span <b>227&nbsp;mm</b> [225–230]. Spark photo-alone <b>315&nbsp;mm</b>, unscored without scale. Coin ±0.5&nbsp;mm scales mm values ±2%.</td></tr>
 <tr><td>wall-crack fixture</td><td><b>5.17% / 85.9&nbsp;mm</b> (significant) + stain 1.29% percent-only</td><td><span class="badge">NOT RUN</span> — no <span class="mono">bench/model-only/</span> file, <span class="mono">bench:gap</span> prints UNSCORED</td></tr>
 <tr><td>tilted-wall fixture</td><td><b>0.27% / 66.8&nbsp;mm</b> (cosmetic, tilt-corrected)</td><td><span class="badge">NOT RUN</span></td></tr>
 <tr><td>facade-crack (real photo)</td><td><b>0.74%</b> percent-only — refused mm with no scale reference</td><td><span class="badge">NOT RUN</span></td></tr>
@@ -46,7 +46,7 @@ img{max-width:100%;height:auto;border-radius:8px}
 fetch("https://snapclaim-backend.parithosh.workers.dev/v1/health").then(r=>r.json()).then(j=>{
 document.getElementById("live").innerHTML='Worker <span class="badge">LIVE</span> <span class="mono">'+JSON.stringify(j.result||j)+"</span>";
 }).catch(e=>{document.getElementById("live").textContent="Worker unreachable from here ("+e+"). Mode badge lives in the app.";
-document.getElementById("d").textContent="2026-11-01";
+document.getElementById("d").textContent="2026-11-04";
 });
 </script>
 </body>

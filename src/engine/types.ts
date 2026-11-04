@@ -6,6 +6,12 @@ export interface MaskObservation {
   id: string;
   label: DamageLabel;
   areaPx: number;
+  /**
+   * Damage area on the wall itself when the photo was tilt-corrected
+   * (areaPx times the stretch factor). Square millimetres and crack width use
+   * it; the percent stays in photo pixels, like the component it is a share of.
+   */
+  planeAreaPx?: number;
   /** Skeleton length in pixels. Required for calibrated length on cracks. */
   skeletonPx?: number;
   /** Disconnected regions of damage; defaults to 1 when the segmenter does not report it. */
@@ -88,10 +94,25 @@ export interface MeasureSessionInput {
   minReferenceConfidence?: number;
 }
 
+export interface RefutedMask {
+  maskId: string;
+  label: DamageLabel;
+  reason: "blocky" | "straight" | "empty";
+  detail: string;
+}
+
 export interface MeasureSessionResult {
   findings: MeasuredFinding[];
   receipts: Receipt[];
   mode: "absolute" | "percent-only";
+  /**
+   * "damage" when at least one finding measured; "no-damage" when zero
+   * findings - every supplied mask was refuted as not-damage, or no masks
+   * were supplied at all. Lets the pipeline answer "this is not a crack"
+   * instead of failing closed with an empty gate.
+   */
+  verdict: "damage" | "no-damage";
+  refuted: RefutedMask[];
   /**
    * "pixel-verified" only when EVERY mask carried an `rle` whose decoded
    * pixels agree with the claimed areaPx (and skeletonPx, when present).
