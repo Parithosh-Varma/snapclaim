@@ -31,7 +31,12 @@ test("pipeline registry lists muse-spark, sam-3.1 and muse-voice", () => {
   assert.ok(models.includes("muse-voice-transcribe-1.0"), "muse-voice integrated");
   assert.ok(PIPELINE_STAGES.some((s) => s.stage === "segment" && s.model === "sam-3.1"));
   assert.ok(PIPELINE_STAGES.some((s) => s.stage === "findings" && s.model.includes("muse-spark")));
+  assert.ok(PIPELINE_STAGES.some((s) => s.stage === "describe" && s.model.includes("muse-spark")), "multimodal Spark describe");
   assert.ok(PIPELINE_STAGES.some((s) => s.stage === "voice" && s.model.includes("muse-voice")));
+  assert.ok(
+    PIPELINE_STAGES.some((s) => s.stage === "findings" && s.transport.includes("multimodal")),
+    "findings are multimodal (receipts + optional image_url)",
+  );
 });
 
 test("verification flags are consistent booleans", () => {

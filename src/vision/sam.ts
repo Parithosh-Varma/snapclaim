@@ -284,6 +284,12 @@ export interface SamFetchRequest {
   points: SamPoint[];
   box?: SamBoxPrompt;
   objectId?: number;
+  /**
+   * Multi-object prompts (damage + coin in one billed image). When set,
+   * points/box/objectId above are ignored and every entry becomes one
+   * `<id>tokens` group in the SAM prompt (max 16 objects).
+   */
+  objects?: SamObjectPrompt[];
 }
 
 export interface SamFetchResult {
@@ -306,10 +312,19 @@ export async function segmentWithSam(input: {
 }): Promise<SamFetchResult> {
   const fetchFn = input.fetchFn ?? fetch;
   const model = input.model ?? "sam-3.1";
-  const { imageUrl, size, points } = input.request;
+  const { imageUrl, size } = input.request;
   assertSize(size);
-  if (points.length === 0) throw new MeasurementError("at least one point prompt is required");
-  const prompt = buildObjectPrompt(size, [{ id: input.request.objectId ?? 1, points, ...(input.request.box ? { box: input.request.box } : {}) }]);
+  const multi = input.request.objects;
+  let prompt: string;
+  if (multi !== undefined) {
+    if (multi.length === 0 || multi.length > 16) throw new MeasurementError("objects needs 1-16 entries");
+    for (const o of multi) for (const p of o.points ?? []) assertPointInMedia(p, size);
+    prompt = buildObjectPrompt(size, multi);
+  } else {
+    const { points } = input.request;
+    if (points.length === 0) throw new MeasurementError("at least one point prompt is required");
+    prompt = buildObjectPrompt(size, [{ id: input.request.objectId ?? 1, points, ...(input.request.box ? { box: input.request.box } : {}) }]);
+  }
 
   const res = await (fetchFn as typeof fetch)(`${input.base}/responses`, {
     method: "POST",

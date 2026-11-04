@@ -20,10 +20,10 @@ npm run replay -- request.json measurement.json
 | `POST /v1/measure` | any | Deterministic math only: masks in, findings + receipts out. No model, no keys. |
 | `POST /v1/observe` | any | Pixel masks (COCO RLE) → component/masks/scaleReference that `/v1/report` takes. No model, no keys. |
 | `POST /v1/report` | mock default | measure → findings draft → Evidence Gate. Uncited numbers return `422` with `details[]`. Client may pass `drafts[]` to test the gate. |
-| `POST /v1/segment` | mock/live | Mock requires `body.fixture {component, masks}` — the backend invents no masks. Live calls SAM 3.1 point prompts (`imageUrl` + `width/height` + `points[1..16]`), parses the Responses output text and decodes masks with `@meta-sam/parser`; returns `{records: [{objectId, box, confidence, rle}]}` with full-frame RLE, `$0.0025`/image metered. Empty output throws, never fakes. |
+| `POST /v1/segment` | mock/live | Live calls SAM 3.1 point/box/negative prompts (`imageUrl` + `width/height` + `points[1..16]`), or multi-object `objects[{id?, points[1..16], label?}]` for damage + coin in one billed image; parses the Responses output text and decodes masks with `@meta-sam/parser`; returns `{records: [{objectId, box, confidence, rle}]}` with full-frame RLE, `$0.0025`/image metered. Empty output throws, never fakes. |
 | `POST /v1/crosscheck` | any | `{a, b}` COCO RLE masks of one frame, `threshold?` — IoU + Dice agreement with AGREED/DISPUTED verdict. Keyless, deterministic. |
 | `POST /v1/transcribe` | mock/live | Spoken line to text via Muse Voice Transcribe (`/asr/transcribe`, multipart, `PUSH_TO_TALK`, optional caller-supplied `languageBias` + claim keywords). Mock requires `body.fixtureTranscript`. Audio priced at $0.18/hr on the ledger. |
-| `POST /v1/findings` | mock/live | Drafts findings from measured facts, then gates them. Live path records token usage to the spend ledger. |
+| `POST /v1/findings` | mock/live | Drafts findings from measured facts, then gates them. Live path records token usage to the spend ledger. Accepts optional `imageUrl` for multimodal Spark grounding (photo + receipts, still gated). |
 | `POST /v1/skeptic` | mock/live | Independent re-check via Spark Open on Baseten, gated. Real per-token pricing charged to the ledger. `503` without `BASETEN_API_KEY`. |
 | `POST /v1/render` | mock/live | Gated report → code-drawn SVG annexure `{svg, gate}`. |
 | `GET /v1/spend` | any | `{spentUsd, remainingUsd, limitUsd, entries}`. Mock runs stay `$0`. |

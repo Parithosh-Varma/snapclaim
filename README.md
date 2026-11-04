@@ -2,7 +2,7 @@
 
 > Point your phone at damage, speak one line about it - get a claim-ready report where every number is measured, cited, and checked before it ships. **Computed, not generated.**
 
-[![tests](https://img.shields.io/badge/tests-347%20passing-brightgreen)](./tests)
+[![tests](https://img.shields.io/badge/tests-351%20passing-brightgreen)](./tests)
 [![node](https://img.shields.io/badge/node-%3E%3D22.18-339933)](./package.json)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](./LICENSE)
 
@@ -99,7 +99,8 @@ For local development, Settings → Developer → **Open admin panel** flips the
 | Role | Model | Where |
 |---|---|---|
 | Perception - damage masks | **SAM 3.1** | `https://api.meta.ai/v1` |
-| Reasoning - evidence-gated findings | **Muse Spark 1.3** | `https://api.meta.ai/v1/chat/completions` |
+| Reasoning - evidence-gated findings | **Muse Spark 1.3** (multimodal: receipts + optional damage photo `image_url`, `response_format: json_object`) | `https://api.meta.ai/v1/chat/completions` |
+| Damage description (vision) | **Muse Spark 1.3** (`/v1/describe`: photo + reporter note → prose) | `https://api.meta.ai/v1/chat/completions` |
 | Independent skeptic (open weights) | **Spark Open** | `https://inference.baseten.co/v1` · `meta-models/muse-spark-open-1026` |
 | Voice intake (any language; auto-detected, optional `languageBias`) | **Muse Voice Transcribe** | `POST https://api.meta.ai/v1/asr/transcribe` (file) · `wss://api.meta.ai/v1/asr/realtime` (live) |
 

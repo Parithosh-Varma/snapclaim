@@ -15,8 +15,9 @@
     "verified_how": "scripts/verify-meta.mjs calls GET {endpoint}/models with the Bearer key (read-only, $0). Verified live 2026-11-03: models muse-spark-1.3, sam-3.1, muse-voice-transcribe-1.0 listed."
   },
   "pipeline": [
-    { "stage": "segment", "model": "sam-3.1", "transport": "Meta Responses API", "code": "backend/app.ts:segmentBody + src/vision/sam.ts:segmentWithSam" },
-    { "stage": "findings", "model": "muse-spark-1.3", "transport": "Meta chat completions", "code": "backend/providers.ts:MetaFindingsProvider" },
+    { "stage": "segment", "model": "sam-3.1", "transport": "Meta Responses API", "code": "backend/app.ts:segmentBody + src/vision/sam.ts:segmentWithSam", "prompts": "point/box/negative + multi-object objects[] (damage+coin, one billed image)" },
+    { "stage": "findings", "model": "muse-spark-1.3", "transport": "Meta chat completions multimodal", "code": "backend/providers.ts:MetaFindingsProvider", "prompts": "receipts + optional image_url vision input, response_format json_object" },
+    { "stage": "describe", "model": "muse-spark-1.3", "transport": "Meta chat completions vision", "code": "backend/app.ts:describeBody" },
     { "stage": "skeptic", "model": "meta-models/muse-spark-open-1026", "transport": "Baseten chat completions", "code": "backend/providers.ts:BasetenSkepticProvider" },
     { "stage": "voice", "model": "muse-voice-transcribe-1.0", "transport": "Meta transcribe multipart", "code": "backend/transcribe.ts:transcribeWithMuse" }
   ],
