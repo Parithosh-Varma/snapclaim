@@ -96,7 +96,10 @@ export default function Report() {
     }
     try {
       const ctl = new AbortController();
-      const timer = setTimeout(() => ctl.abort(), 30000);
+      // /v1/render runs the full evidence pipeline including the model-written
+      // findings drafts: ~18 s server-side on the fixture, plus the photo
+      // upload on mobile. 30 s timed out real claims; 90 s covers them.
+      const timer = setTimeout(() => ctl.abort(), 90000);
       let out: Awaited<ReturnType<typeof apiPost>>;
       try {
         out = await apiPost(base, "/v1/render", body, ctl.signal);
@@ -131,7 +134,7 @@ export default function Report() {
       setState("");
       saveCaseFromReport();
     } catch (e) {
-      const what = e instanceof Error && e.name === "AbortError" ? "timed out after 30 s" : e instanceof Error ? e.message : String(e);
+      const what = e instanceof Error && e.name === "AbortError" ? "timed out after 90 s - the connection or backend is very slow, try again on a stronger signal" : e instanceof Error ? e.message : String(e);
       setRenderError(what);
       setState("");
     } finally {
