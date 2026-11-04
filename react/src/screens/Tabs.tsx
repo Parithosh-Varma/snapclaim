@@ -182,7 +182,7 @@ export function Home() {
         <div className="card" role="note" aria-label="Live terrace-slab proof">
           <p className="found">Live proof — terrace slab</p>
           <p className="sub">232 mm length [R005] Confirmed · 0.73% [R002] · 7.48 cm2 [R004] · significant [R007] · width 3.2mm [R006] Unverified.</p>
-          <p className="sub"><a className="link-btn" href="/reports/snapclaim-SC-D8ECE64B.pdf">See report: snapclaim-SC-D8ECE64B.pdf</a></p>
+          <p className="sub"><a className="link-btn" href="/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf">See case study: Terrace-Slab Crack (PDF)</a></p>
         </div>
 
         <div className="recent-head">
