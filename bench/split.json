@@ -237,14 +237,17 @@
       "coin": {
         "id": "coin-2inr",
         "knownMm": 25.0,
-        "note": "2 INR coin taped beside the crack, same plane"
+        "knownMmNote": "25 mm user-supplied 2026-11-04 (+/-0.5); replaces a mistaken prior value, do not use it",
+        "note": "2 INR coin taped beside the crack, same plane; engine recompute at 25 mm (R001 0.773994, R004 7.69 cm², R005 237.5 mm, R006 3.2 mm unverified — no width ground truth; n = 1)"
       },
       "groundTruth": {
         "maskId": "damage-1",
-        "crackLengthMm": 227
+        "spanMm": 227,
+        "spanRangeMm": [225, 230],
+        "spanNote": "straight tape span ~127 cm to ~149.5-150 cm, midpoint; pipeline measures path, not span"
       },
       "expected": "one crack, coin in the crack's plane, millimetre length with coin receipts",
-      "note": "First tape ground truth. Builder's physical tape reading 2026-11-02: crack spans ~127 cm to ~149.5-150 cm = 22.5-23 cm; recorded 227 mm (midpoint). Pipeline Ref SC-25D35C5E measured 218.5 mm (R005). maskId damage-1 is the tap-mask id the PWA sends (pwa/app.js). Model-only guess shown DSC_0710.JPG (same crack, tape not legible) so the guess can't be read off the tape."
+      "note": "First tape ground truth, n = 1. Builder tape 2026-11-02: crack spans ~127 cm to ~149.5-150 cm = 22.5-23 cm; recorded 227 mm span (midpoint, range 225-230, +/-2.5). Pipeline at 25 mm coin: R005 237.5 mm vs span err +10.5 mm (+4.6%, span is context, never scored); coin uncertainty +/-0.5 mm scales all mm values +/-2%. Width 3.2 mm unverified (no width ground truth). maskId damage-1 is the tap-mask id the PWA sends (pwa/app.js). Model-only guess shown DSC_0710.JPG (same crack)."
     }
   ]
 }

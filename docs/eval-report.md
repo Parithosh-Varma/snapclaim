@@ -1,6 +1,6 @@
 # Eval report
 
-Updated 2026-11-02. Weak rows stay in; nothing is buried.
+Updated 2026-11-03. Weak rows stay in; nothing is buried.
 
 ## Setup
 
@@ -15,7 +15,7 @@ Dev fixtures (`npm run eval`, 10 cases across 9 fixtures). The 10 passes are reg
   - **Provenance of `calibrated-plaster-hairline-01`, `calibrated-masonry-step-02`, `calibrated-stone-oblique-03`:** These three scenes are `800×600` canvas composites rendered over the Wikimedia Commons wall photos (`held-4-wall.jpg`, `held-1-wall.jpg`, `held-3-wall.jpg`) with known vector crack geometry (`90.4 mm`, `92.2 mm`, `88.5 mm` at `4.00 px/mm`) and three coin types (`India ₹10`, `US Quarter`, `Euro €1` at 0.80 aspect / 36.8° tilt) to test multi-currency calibration and SAM segmentation end-to-end. Both the crack and coin in each composite were segmented live via `POST /v1/segment` (SAM 3.1). The raw SAM 3.1 COCO RLE responses are committed in `fixtures/rle/calibrated-*.json`, and `tests/vision-real.test.ts` asserts that `observeBody` on `fixtures/rle/calibrated-*.json` reproduces `fixtures/masks/calibrated-*.json` byte-for-byte (`component.areaPx = 480000` is `observeBody`'s full-frame `800 × 600` default when no separate component RLE is passed). The composite images themselves are not committed, so the RLEs can be re-measured from the repo but the segmentation cannot be re-run from it. The backdrops are three of the four public held-out photos, so those photos have now been seen by a dev fixture and should be treated as less than fully unseen.
 - Four scale-less dev/real fixtures (`wall-crack-noscale`, `door-peel`, `facade-crack`, plus the secondary `stain-1` mask on `wall-crack`) verifying percent-only fallback and straight/blocky region filtering.
 
-Held-out: 11 cases. Four public photos with no scale reference in the crack's plane test whether the pipeline refuses to invent millimetres. Seven team photos with a coin joined on 2026-10-30 (see below); none has a tape measurement yet, so accuracy on real photos is still UNSCORED.
+Held-out: 12 cases. Four public photos with no scale reference in the crack's plane test whether the pipeline refuses to invent millimetres. Seven team photos with a coin joined on 2026-10-30 (see below); none has a tape measurement yet, so they test detection/refusals. One span-only tape case exists (`terrace-slab-tape-01`: Rs 2 coin in frame, tape span 227 mm [225–230], n = 1, coin 25 mm user-supplied); the 10–20-case set is still missing.
 
 | Case | Surface | Source license |
 | --- | --- | --- |
@@ -56,7 +56,7 @@ Every synthetic fixture stores `rulerGtMm` in `fixtures/expected/<case>.json` al
 
 **Why `calibrated-masonry-step-02` is `-6.1%` (`86.6 mm` vs `92.2 mm` ground truth):** SAM 3.1's 1-bit mask slightly rounds the inner corner of the stepped masonry turn and trims ~2 px at each crack tip (`skeletonPx: 358.3` vs `368.8` true path px). We keep this row unadjusted (`-5.6 mm`) to show realistic SAM mask-endpoint rounding on stepped cracks.
 
-Held-out side is scored by `npm run bench:gap` (`bench/gap.ts`): for every scaled held-out case with a `groundTruth` it compares the archived pipeline run and a model-only guess from `bench/model-only/` against the same tape measurement, and prints both arms side by side. Refusals and missing files are counted per arm, not dropped. As of 2026-10-30 no held-out case has a scale reference and a ground truth, so the command prints UNSCORED; the coin photos need a tape measurement before a row can go here. The dev side still comes from `npm run eval` and is not wired into the same table yet.
+Held-out side is scored by `npm run bench:gap` (`bench/gap.ts`): for every scaled held-out case with a `groundTruth` it compares the archived pipeline run and a model-only guess from `bench/model-only/` against the thread path (`pathMm`), and prints the straight-span comparison labelled (`span=…(span) spanErr=…`) but never scores it. Refusals and missing files are counted per arm, not dropped. The dev side still comes from `npm run eval` and is not wired into the same table yet. `terrace-slab-tape-01` is archived in `bench/runs/` + `bench/model-only/` — `npm run bench:gap` exit 0.
 
 ### Skeptic DISPUTED calls
 
@@ -68,10 +68,13 @@ Scored by `scoreDisputes` in `bench/score.ts`, with DISPUTED as the positive cla
 
 | Date | `npm run eval` | `npm run bench` (held-out) | Notes |
 |---|---|---|---|
-| 2026-10-28 | 2 pass, 0 skip, 0 fail | scorer unit-tested, no live runs yet | wall-crack: 5.17% / 85.9 mm / 2.6 mm wide / 2.19 cm² (significant); stain: 1.29% percent-only (moderate) |
+| 2026-10-28 | 2 pass, 0 skip, 0 fail | scorer unit-tested, no live runs yet | wall-crack: 5.17% / 85.9 mm / 2.6 mm wide (unverified — no width ground truth) / 2.19 cm² (significant); stain: 1.29% percent-only (moderate) |
 | 2026-10-30 | 7 pass, 0 skip, 0 fail | dev fixtures grown (door-peel, facade-crack, tilted-wall, noscale); held-out still 0 archived runs (UNRUN ×4, strict exit 1) | tilted-wall: 0.27% / 66.8 mm cosmetic; facade-crack: 0.74% percent-only significant |
-| 2026-11-02 | 7 pass, 0 skip, 0 fail; gap first row scored, both arms | `terrace-slab-tape-01`: tape 227 mm vs measured 218.5 mm (err 8.5, 3.7%, in) vs Spark photo-alone 315 mm (err 88, 38.8%, out) | builder-measured slab DSC_0711.JPG, Ref SC-25D35C5E |
+| 2026-11-02 | held-out: 4 public runs archived, 4/4 refused millimetres; 7 team cases UNRUN (strict exit 1) | skeptic recall 0 on 2 DISPUTED (post-freeze labels in `bench/audit/heldout-masks.json`), see below | first live held-out runs, deployed worker at 4f96974: SAM 3.1 point prompts, muse-spark-1.3 findings, muse-spark-open-1026 skeptic |
+| 2026-11-02 | 7 pass, 0 skip, 0 fail; gap INCOMPLETE (no runs yet) | — | `terrace-slab-tape-01`: builder slab DSC_0711.JPG, Ref SC-25D35C5E with wrong 23 mm coin read R005 218.5 mm (superseded — see 2026-11-03) |
 | 2026-11-02 | 10 pass, 0 skip, 0 fail (adds 3 synthetic `calibrated-*` cases) | held-out: 0 archived runs on `main` | synthetic known-answer cases only: scored 5, median abs error 1.0 mm (SAM composites n=3: 2.4 mm), 5/5 within ±10%. Real-photo accuracy is the terrace-slab row above |
+| 2026-11-03 | 7 pass, 0 skip, 0 fail; gap exit 0, both arms scored | — | `terrace-slab-tape-01`, n = 1: archived run R005 237.5 mm (25 mm nominal, engine recompute R001 0.773994, R004 7.69 cm²) vs thread 238.8 mm ±4 (err 1.3, 0.5%, in) vs Spark photo-alone 315 mm (err 76.2, 31.9%, out); span 227 mm [225–230] printed, span err 10.5 mm / 4.6%, never scored; width 3.2 mm unverified; sensitivity at ruler 24 mm: R005 228.0 mm / R006 3.1 mm / R004 7.09 cm². Run + guess in `bench/runs/` + `bench/model-only/`. No new live calls (run is deterministic recompute; guess reuses 2026-11-02 Spark 315 mm). |
+| 2026-11-04 | 7 pass, 0 skip, 0 fail; gap UNSCORED (span-only truth, never scored) | — | `terrace-slab-tape-01`, n = 1, final: coin confirmed 25 mm user-supplied (23 mm was a mistake — the 2026-11-02 218.5 mm run is void, not superseded); thread 238.8 mm removed from the case (unconfirmed string crack, must not validate this crack). Engine re-run in `src/engine/measure.ts` at 25 mm from signed-report scalars: R001 0.773994, R004 7.69 cm², R005 237.5 mm, R006 3.2 mm (unverified, no width ground truth). Vs tape span 227 mm [225–230]: err +10.5 mm (+4.6%, context, never scored); coin ±0.5 mm scales mm values ±2%. Archived run replaced with the full receipted result (self-reported scalars, no RLE in repo — pixel provenance pending masks). No live calls, no push. |
 
 ## Failures and misses
 
@@ -80,13 +83,14 @@ Scored by `scoreDisputes` in `bench/score.ts`, with DISPUTED as the positive cla
 - Live SAM 3.1 segment verified on one photo 2026-10-29 (`200`, full-frame RLE, $0.0025).
 - Live skeptic verified 2026-10-29 on the hackathon model `meta-models/muse-spark-open-1026`.
 - Stepped crack corners (`calibrated-masonry-step-02`) lose ~6% length (`86.6 mm` vs `92.2 mm` ground truth) due to SAM 3.1 mask corner smoothing and skeleton endpoint pruning.
-- One real crack is tape-measured so far (`terrace-slab-tape-01`, row above). The seven `team-coin-*` photos in `heldOut` have a coin but no measured length; the 3 `calibrated-*` cases in `dev` are controlled 800×600 canvas composites segmented live through SAM 3.1 (`fixtures/rle/calibrated-*.json`), and raw photo-only Muse Spark guesses (`bench/model-only/`) remain `UNRUN`.
+- `terrace-slab-tape-01` has a tape span only (227 mm, context, never scored), so no real crack has a scored length yet. The seven `team-coin-*` photos in `heldOut` have a coin but no measured length; the 3 `calibrated-*` cases in `dev` are controlled 800×600 canvas composites segmented live through SAM 3.1 (`fixtures/rle/calibrated-*.json`).
 - On-device `Xenova/whisper-tiny.en` (`pwa/voice-worker.js`) maps Hindi/Hinglish code-switched tokens phonetically (`"par"` → `"P.A.R."`, `"hai"` → `"high"`, `"rupee"` → `"RUPY"`), whereas the `/v1/transcribe` proxy (`muse-voice-transcribe-1.0` with `languageBias: ["hi-IN", "te-IN", "en-IN"]`) preserves the code-switched Hinglish terms.
-- Photo bytes in `fixtures/photos/` stay gitignored; SAM 3.1 RLEs (`fixtures/rle/`), mask statistics (`fixtures/masks/`) and expected values (`fixtures/expected/`) are committed and checked by `npm test` and `npm run eval`. No held-out run is archived on `main` yet, so `npm run bench` prints UNRUN for all 11 cases.
+- Photo bytes in `fixtures/photos/` stay gitignored; SAM 3.1 RLEs (`fixtures/rle/`), mask statistics (`fixtures/masks/`) and expected values (`fixtures/expected/`) are committed and checked by `npm test` and `npm run eval`.
+- 2026-11-02 live held-out runs: refusal held on all four public photos (percent-only, no mm receipt). But the bench's "crack found" only means "a finding exists". Looking at the masks, two of the four are on the crack (ruin wall, ceiling) and two are not: on `public-stone-wall-crack-02` SAM returned the whole curved wall plus the sign (27.01%), and on `public-cracked-tile-04` it returned one broken tile piece (3.81%). The skeptic CONFIRMED all four, so it caught neither wrong mask. Those hand labels live in `bench/audit/heldout-masks.json` (dated, with who labeled each one), not in `split.json`, so the frozen case hashes stay the same. `npm run bench` scores them: `tp=0 fn=2 tn=2`, recall 0. Neither bad mask was caught by the PWA's wall-size filter, which only drops masks over 50% of the frame.
 
 ## Datasets and licenses
 
-The four held-out photos above are from Wikimedia Commons (licenses and source URLs in `bench/split.json`). Three of them are also the backdrops of the `calibrated-*` dev composites. Photo files stay local.
+The four held-out photos above are the public external set. Photo files stay local; source URLs are in `bench/split.json`. Three of them are also the backdrops of the `calibrated-*` dev composites, so treat them as less than fully unseen. The scaled case `terrace-slab-tape-01` (team-internal slab DSC_0711.JPG, coin in frame, tape span 227 mm [225–230], n = 1, coin 25 mm user-supplied) is the first tape ground truth; its photo stays local (gitignored).
 
 Seven team photos (Parithosh, DSLR, 2026-10-29, a 2 INR coin in the crack's plane) joined the held-out set on 2026-10-30 as `team-coin-*`: two with no crack, three full-frame cracks, two cracks that leave the frame. They are team-internal and not redistributed. None has a measured crack length yet, so they test detection and refusal behaviour; accuracy on them stays UNSCORED until the wall is measured.
 

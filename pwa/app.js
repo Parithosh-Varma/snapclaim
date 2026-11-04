@@ -281,6 +281,8 @@ function startShot(k) {
   frames = frames || { a: newFrameSlot(), b: newFrameSlot(), context: newFrameSlot() };
   // A retake only clears the slot being taken; the other slots are kept.
   frames[k] = newFrameSlot();
+  // A new photo supersedes any in-flight background job.
+  measureSeq++; measureJob = null; payloadObj = null; lastMeasurement = null;
   shotStage = k;
   backToCam();
   updateShotChrome();
@@ -417,16 +419,38 @@ function placeRing(det, fw, fh) {
   ring.style.left = cx - r + "px"; ring.style.top = cy - r + "px";
   ring.style.width = r * 2 + "px"; ring.style.height = r * 2 + "px";
 }
-/** Diameter in mm from the custom field (wins) or the preset select. */
+/** Custom diameter: 15–40 mm, at most one decimal place. Null when empty/invalid. */
+function parseCustomCoinMm(raw) {
+  const t = String(raw ?? "").trim();
+  if (t === "") return null;
+  if (!/^\d+(\.\d)?$/.test(t)) return null;
+  const mm = Number(t);
+  if (!Number.isFinite(mm) || mm < 15 || mm > 40) return null;
+  return mm;
+}
+/** Inline message for the custom field: null when empty or valid. */
+function customCoinError(raw) {
+  if (String(raw ?? "").trim() === "") return null;
+  if (parseCustomCoinMm(raw) !== null) return null;
+  return "Enter 15–40 mm, one decimal at most.";
+}
+/** Diameter in mm from the custom field (wins when valid) or the preset select. */
 function getCoinSizeMm() {
-  const custom = Number($("coinCustomMm")?.value);
-  if (custom > 0 && custom <= 200) return custom;
+  const customRaw = $("coinCustomMm")?.value ?? "";
+  if (customRaw.trim() !== "") {
+    const mm = parseCustomCoinMm(customRaw);
+    if (mm !== null) return mm;
+    return 0;
+  }
   return Number($("coinKind")?.value) || 0;
 }
 /** Hint under the coin picker: what the user must do next for scale. */
 function updateCoinHintMark() {
   const el = $("coinHintMark");
   if (!el) return;
+  const customRaw = $("coinCustomMm")?.value ?? "";
+  const err = customCoinError(customRaw);
+  if (err) { el.textContent = err; return; }
   const hasCoin = !!(gateCoin || coinManualPt);
   const mm = getCoinSizeMm();
   if (hasCoin && !(mm > 0)) el.textContent = "Choose the reference size so the scale is known.";
@@ -434,14 +458,46 @@ function updateCoinHintMark() {
   else el.textContent = "";
 }
 const LAST_COIN_KEY = "snapclaim.lastCoin";
+const LAST_CUSTOM_COIN_KEY = "snapclaim.lastCustomCoin";
 function rememberCoin(mm, label) {
   try {
     if (mm > 0 && mm <= 200) localStorage.setItem(LAST_COIN_KEY, JSON.stringify({ mm, label }));
     else localStorage.removeItem(LAST_COIN_KEY);
   } catch { /* storage may be unavailable; the claim flow must not break */ }
 }
+function loadLastCustomCoinMm() {
+  try {
+    const raw = localStorage.getItem(LAST_CUSTOM_COIN_KEY);
+    if (raw === null) return null;
+    const v = JSON.parse(raw);
+    const mm = typeof v === "number" ? v : Number(v?.mm);
+    if (!Number.isFinite(mm) || mm < 15 || mm > 40) return null;
+    if (!/^\d+(\.\d)?$/.test(String(mm))) return null;
+    return mm;
+  } catch { return null; }
+}
+function saveLastCustomCoinMm(raw) {
+  try {
+    if (String(raw ?? "").trim() === "") return;
+    const mm = parseCustomCoinMm(raw);
+    if (mm === null) return;
+    localStorage.setItem(LAST_CUSTOM_COIN_KEY, JSON.stringify({ mm }));
+  } catch { /* storage may be unavailable; the claim flow must not break */ }
+}
 /** Default the coin size to the user's last confirmed pick (or none). */
 function restoreCoinSize() {
+  const customMm = loadLastCustomCoinMm();
+  if (customMm !== null) {
+    const custom = $("coinCustomMm");
+    if (custom) custom.value = String(customMm);
+    setCoinSizeKeepCustom(customMm, "Custom");
+    let last = null;
+    try { last = JSON.parse(localStorage.getItem(LAST_COIN_KEY) || "null"); } catch { /* ignore */ }
+    coinLabel = `Custom · ${customMm} mm dia`;
+    if (typeof last?.label === "string" && last.label) coinLabel = last.label;
+    updateCoinHintMark();
+    return;
+  }
   let last = null;
   try { last = JSON.parse(localStorage.getItem(LAST_COIN_KEY) || "null"); } catch { /* ignore */ }
   const mm = Number(last?.mm);
@@ -452,6 +508,19 @@ function restoreCoinSize() {
     setCoinSize(0);
     coinLabel = "";
   }
+}
+/** Select a known diameter without clearing the custom field (for restore). */
+function setCoinSizeKeepCustom(mm, label) {
+  const sel = $("coinKind");
+  if (!sel) return;
+  if (!(mm > 0)) { sel.value = "0"; updateCoinHintMark(); return; }
+  let opt = [...sel.options].find((o) => Number(o.value) === mm);
+  if (!opt) {
+    opt = new Option(label ? `${label} · ${mm} mm` : `${mm} mm reference`, String(mm));
+    sel.add(opt);
+  }
+  sel.value = String(mm);
+  updateCoinHintMark();
 }
 /** Select a known diameter, adding a one-off option when the coin is outside the preset list. */
 function setCoinSize(mm, label) {
@@ -715,6 +784,8 @@ fab.addEventListener("click", () => {
 });
 $("retake").onclick = () => {
   releaseSam(); releaseVoice();
+  // A retake is a new photo: any in-flight background job is stale.
+  measureSeq++; measureJob = null; payloadObj = null; lastMeasurement = null;
   // In a multi-shot set a retake only re-takes the current slot; A is kept.
   if (multiShotActive()) { startShot(shotStage); return; }
   backToCam();
@@ -1175,7 +1246,10 @@ $("markCanvas").addEventListener("pointerdown", async (ev) => {
 $("coinKind").addEventListener("change", () => {
   const opt = $("coinKind").selectedOptions[0];
   const custom = $("coinCustomMm");
-  if (custom && Number(opt?.value) > 0) custom.value = "";
+  if (custom && Number(opt?.value) > 0) {
+    custom.value = "";
+    try { localStorage.removeItem(LAST_CUSTOM_COIN_KEY); } catch { /* ignore */ }
+  }
   // The user's confirmation wins over the gate's size guess (it can name a
   // coin outside this list, e.g. a nickel, while the scale uses this value).
   coinLabel = opt && Number(opt.value) > 0 ? opt.textContent.replace(/ · (\d+(?:\.\d+)?) mm$/, " · $1 mm dia") : "";
@@ -1183,11 +1257,15 @@ $("coinKind").addEventListener("change", () => {
   updateCoinHintMark();
 });
 $("coinCustomMm")?.addEventListener("input", () => {
-  const mm = Number($("coinCustomMm").value);
-  if (mm > 0) {
+  const raw = $("coinCustomMm").value;
+  const mm = parseCustomCoinMm(raw);
+  if (mm !== null) {
     $("coinKind").value = "0";
     coinLabel = `Custom · ${mm} mm dia`;
     rememberCoin(mm, coinLabel);
+    saveLastCustomCoinMm(raw);
+  } else if (raw.trim() === "") {
+    coinLabel = "";
   } else {
     coinLabel = "";
   }
@@ -1213,20 +1291,47 @@ function checkPhotoNotes() {
   let checkState = { skeptic: "idle", xcheck: "idle" }; // idle|loading|ok|error per check
 
 let measureBusy = false;
+/* Overlap: single-shot measurement runs in the background while the user is
+ * on Say. Only completed payloads are used; a late landing whose inputs no
+ * longer match (new taps, coin, photo, or case) is discarded. Multi-shot
+ * stays sequential: frame B is captured only after frame A lands. */
+let measureSeq = 0;
+let measureJob = null; // { seq, state: "running"|"done"|"error", error?, promise, snap }
+function snapshotPwaInputs() {
+  return {
+    still: stillDataUrl,
+    points: (dmg.points || []).map(([x, y]) => [x, y]),
+    size: getCoinSizeMm(),
+    noScale: !!noScaleMode,
+    coinPt: coinManualPt ? [coinManualPt[0], coinManualPt[1]] : null,
+    gate: !!gateCoin,
+  };
+}
+function pwaInputsMatch(snap) {
+  if (!snap) return false;
+  if (stillDataUrl !== snap.still) return false;
+  if (!!noScaleMode !== !!snap.noScale) return false;
+  if (getCoinSizeMm() !== snap.size) return false;
+  if (!!gateCoin !== !!snap.gate) return false;
+  const a = coinManualPt, b = snap.coinPt;
+  if (!!a !== !!b) return false;
+  if (a && b && (a[0] !== b[0] || a[1] !== b[1])) return false;
+  const p = dmg.points || [];
+  if (p.length !== snap.points.length) return false;
+  for (let i = 0; i < p.length; i++) {
+    if (p[i][0] !== snap.points[i][0] || p[i][1] !== snap.points[i][1]) return false;
+  }
+  return true;
+}
+function pwaJobStale(job) {
+  return !job || measureJob !== job || job.seq !== measureSeq || !pwaInputsMatch(job.snap);
+}
 $("measureBtn").onclick = async () => {
   if (!dmg.mask || measureBusy) return;
   measureBusy = true; $("measureBtn").disabled = true;
   checkPhotoNotes();
   const w = photo.width, h = photo.height;
-  show("sNum");
-  fillPhotoCard();
-  setNumLoading(true);
-  $("numError").hidden = true;
-  $("measured").innerHTML = "";
-  $("findings").innerHTML = "";
-  drawScheme([]);
-  const body = { masks: [{ id: "damage-1", label: dmgLabel, rle: encodeRle(dmg.mask, w, h), confidence: dmg.iou || 0.8 }] };
-  let circleRef = null;
+  // Synchronous validation BEFORE any navigation: same messages as the old flow.
   // Manual coin tap wins over the gate - taped coin or missed detection.
   const coinCxCyR = (() => {
     if (coinManualPt) {
@@ -1238,37 +1343,50 @@ $("measureBtn").onclick = async () => {
     return { cx: (gateCoin.cx / gateCoin.fw) * gateCoin.sw * kx, cy: (gateCoin.cy / gateCoin.fh) * gateCoin.sh * ky, r: Math.max(3, (gateCoin.rr / gateCoin.fw) * gateCoin.sw * kx) };
   })();
   if (coinCxCyR) {
-    const { cx, cy, r } = coinCxCyR;
     const knownMm = getCoinSizeMm();
-    if (!(knownMm > 0)) { setNumLoading(false); show("sMark"); $("status").textContent = "Choose the reference size first."; updateCoinHintMark(); return; }
-    circleRef = { id: "coin", rle: circleRle(cx, cy, r, w, h), knownMm, confidence: coinManualPt ? 0.9 : 0.85 };
-    // The coin's real outline, not the gate's circle: a tilted wall shows the coin as an
-    // ellipse, and the backend uses that ellipse to correct the crack lengths.
-    const traced = await traceCoin(cx, cy, r, w, h);
-    body.reference = traced ? { ...circleRef, rle: encodeRle(traced.mask, w, h), confidence: traced.iou } : circleRef;
-  } else if (noScaleMode) body.note = "percent-only requested";
-  $("status").textContent = "";
-  try {
-    const observe = (b) => fetch(base() + "/v1/observe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) });
-    let res = await observe(body);
-    let j = await res.json();
-    // a traced outline the backend refuses (not coin-shaped) falls back to the gate's circle
-    if (res.status === 422 && circleRef && body.reference !== circleRef) {
-      console.info(`[coin] traced outline refused (${j.error}); using the detected circle`);
-      body.reference = circleRef;
-      res = await observe(body);
-      j = await res.json();
+    if (!(knownMm > 0)) {
+      measureBusy = false; $("measureBtn").disabled = !dmg.mask;
+      show("sMark"); $("status").textContent = "Choose the reference size first."; updateCoinHintMark(); return;
     }
-    if (!res.ok || !j.ok) throw new Error(j.error ?? res.status);
-    const mres = await fetch(base() + "/v1/measure", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(j.result) });
-    const measured = await mres.json();
-    if (!mres.ok || !measured.ok) throw new Error(measured.error ?? mres.status);
-    payloadObj = j.result;
-    lastMeasurement = measured.result;
-    // Multi-shot: frame A is stashed and the set continues on the camera;
-    // frame B is compared against A, A is restored as the working headline,
-    // and the location frame comes next. Single-shot flows straight to Say.
-    if (multiShotActive() && MEASURE_SLOTS.includes(shotStage)) {
+  }
+  // Multi-shot stays sequential: the set advances only once each frame lands.
+  if (multiShotActive() && MEASURE_SLOTS.includes(shotStage)) {
+    show("sNum");
+    fillPhotoCard();
+    setNumLoading(true);
+    $("numError").hidden = true;
+    $("measured").innerHTML = "";
+    $("findings").innerHTML = "";
+    drawScheme([]);
+    const body = { masks: [{ id: "damage-1", label: dmgLabel, rle: encodeRle(dmg.mask, w, h), confidence: dmg.iou || 0.8 }] };
+    let circleRef = null;
+    if (coinCxCyR) {
+      const { cx, cy, r } = coinCxCyR;
+      const knownMm = getCoinSizeMm();
+      circleRef = { id: "coin", rle: circleRle(cx, cy, r, w, h), knownMm, confidence: coinManualPt ? 0.9 : 0.85 };
+      // The coin's real outline, not the gate's circle: a tilted wall shows the coin as an
+      // ellipse, and the backend uses that ellipse to correct the crack lengths.
+      const traced = await traceCoin(cx, cy, r, w, h);
+      body.reference = traced ? { ...circleRef, rle: encodeRle(traced.mask, w, h), confidence: traced.iou } : circleRef;
+    } else if (noScaleMode) body.note = "percent-only requested";
+    $("status").textContent = "";
+    try {
+      const observe = (b) => fetch(base() + "/v1/observe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) });
+      let res = await observe(body);
+      let j = await res.json();
+      // a traced outline the backend refuses (not coin-shaped) falls back to the gate's circle
+      if (res.status === 422 && circleRef && body.reference !== circleRef) {
+        console.info(`[coin] traced outline refused (${j.error}); using the detected circle`);
+        body.reference = circleRef;
+        res = await observe(body);
+        j = await res.json();
+      }
+      if (!res.ok || !j.ok) throw new Error(j.error ?? res.status);
+      const mres = await fetch(base() + "/v1/measure", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(j.result) });
+      const measured = await mres.json();
+      if (!mres.ok || !measured.ok) throw new Error(measured.error ?? mres.status);
+      payloadObj = j.result;
+      lastMeasurement = measured.result;
       stashWorkingFrame();
       frames[shotStage].payload = payloadObj;
       frames[shotStage].measurement = lastMeasurement;
@@ -1290,17 +1408,81 @@ $("measureBtn").onclick = async () => {
       renderAgreeBox();
       showMultiNext("Capture location shot →", () => { hideMultiNext(); startShot("context"); });
       return;
+    } catch (e) {
+      setNumLoading(false);
+      $("status").textContent = `Measuring failed (${e.message ?? e}).`;
+      showNumError("Measurement failed", String(e.message ?? e), () => $("measureBtn").click());
+    } finally {
+      measureBusy = false; $("measureBtn").disabled = !dmg.mask;
     }
-    hideMultiNext();
-    showMeasured(lastMeasurement);
-    show("sSay");
-    startListening();
+    return;
+  }
+  // Single-shot overlap: start the observe+measure chain in the background
+  // and move to Say immediately. No artificial delay, no fake progress, and
+  // Say never reports without a completed payloadObj (runReport awaits first).
+  $("numError").hidden = true;
+  $("measured").innerHTML = "";
+  $("findings").innerHTML = "";
+  drawScheme([]);
+  const seq = ++measureSeq;
+  const snap = snapshotPwaInputs();
+  payloadObj = null;
+  lastMeasurement = null;
+  let resolveJob = () => {};
+  const promise = new Promise((resolve) => { resolveJob = resolve; });
+  const job = measureJob = { seq, state: "running", promise, snap };
+  measureBusy = false; $("measureBtn").disabled = !dmg.mask;
+  $("status").textContent = "";
+  show("sSay");
+  startListening();
+  try {
+    const body = { masks: [{ id: "damage-1", label: dmgLabel, rle: encodeRle(dmg.mask, w, h), confidence: dmg.iou || 0.8 }] };
+    let circleRef = null;
+    if (coinCxCyR) {
+      const { cx, cy, r } = coinCxCyR;
+      const knownMm = getCoinSizeMm();
+      circleRef = { id: "coin", rle: circleRle(cx, cy, r, w, h), knownMm, confidence: coinManualPt ? 0.9 : 0.85 };
+      const traced = await traceCoin(cx, cy, r, w, h);
+      body.reference = traced ? { ...circleRef, rle: encodeRle(traced.mask, w, h), confidence: traced.iou } : circleRef;
+    } else if (noScaleMode) body.note = "percent-only requested";
+    const observe = (b) => fetch(base() + "/v1/observe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) });
+    let res = await observe(body);
+    let j = await res.json();
+    if (pwaJobStale(job)) return;
+    if (res.status === 422 && circleRef && body.reference !== circleRef) {
+      console.info(`[coin] traced outline refused (${j.error}); using the detected circle`);
+      body.reference = circleRef;
+      res = await observe(body);
+      j = await res.json();
+    }
+    if (pwaJobStale(job)) return;
+    if (!res.ok || !j.ok) throw new Error(j.error ?? res.status);
+    const mres = await fetch(base() + "/v1/measure", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(j.result) });
+    const measured = await mres.json();
+    if (pwaJobStale(job)) return;
+    if (!mres.ok || !measured.ok) throw new Error(measured.error ?? mres.status);
+    payloadObj = j.result;
+    lastMeasurement = measured.result;
+    // Populate the Numbers screen now so the later report keeps its numbers.
+    try { showMeasured(lastMeasurement); } catch { /* Numbers fills in when visited */ }
+    job.state = "done";
   } catch (e) {
-    setNumLoading(false);
-    $("status").textContent = `Measuring failed (${e.message ?? e}).`;
-    showNumError("Measurement failed", String(e.message ?? e), () => $("measureBtn").click());
+    if (pwaJobStale(job)) return;
+    job.state = "error";
+    job.error = String(e.message ?? e);
   } finally {
-    measureBusy = false; $("measureBtn").disabled = !dmg.mask;
+    if (measureJob === job) {
+      const failed = job.state === "error";
+      resolveJob();
+      if (failed) {
+        // Back to Mark - not Numbers - with the real message. Taps stay,
+        // and the transcript box is untouched so dictation survives.
+        show("sMark");
+        $("status").textContent = `Measuring failed (${job.error}).`;
+      }
+    } else {
+      resolveJob();
+    }
   }
 };
 let coinManualPt = null, coinCorrectMode = false;
@@ -1811,6 +1993,19 @@ $("backSay").onclick = () => {
 /* ---------- report / skeptic / render ---------- */
 let reportBusy = false;
 async function runReport() {
+  if (reportBusy) return;
+  // Overlap: the single-shot measurement runs while the user types. Never
+  // run /v1/report without a completed payloadObj: await the job first with
+  // an honest status. A failed job has already returned to Mark.
+  const job = measureJob;
+  if (job && job.state === "running") {
+    reportBusy = true; sendBtn.disabled = true;
+    setPill("busy", "Finishing the measurement…");
+    try { await job.promise; } catch { /* job records its own error */ }
+    reportBusy = false; syncSend();
+    setPill("idle", "Tap Dictate, or just type.");
+    if (job.state !== "done" || !payloadObj) return;
+  }
   if (!payloadObj || reportBusy) return;
   reportBusy = true; sendBtn.disabled = true;
   $("findings").innerHTML = "";
@@ -2109,6 +2304,7 @@ $("newClaimBtn").onclick = () => {
   currentCaseId = null;
   autoChecksFor = null;
   payloadObj = null; lastMeasurement = null;
+  measureSeq++; measureJob = null;
   releaseSam(); releaseVoice();
   resetShots();
   dmg = { points: [], pointMasks: [], mask: null, iou: 0, source: null };
@@ -2192,6 +2388,7 @@ $("renderBtn").onclick = async () => {
 async function loadSample() {
   // The sample is always single-shot: it bypasses the three-shot set.
   resetShots();
+  measureSeq++; measureJob = null; payloadObj = null; lastMeasurement = null;
   const sample = {
     component: { id: "wall-panel-north", areaPx: 480000, confidence: 0.93 },
     masks: [
@@ -2207,6 +2404,9 @@ async function loadSample() {
     payloadObj = sample;
     sampleRun = true;
     dmg = { points: [], pointMasks: [], mask: null, iou: 0, source: null };
+    // The sample's precomputed masks come from this photo; show it on the report.
+    stillDataUrl = "./assets/sample-wall.jpg";
+    coinLabel = "India ₹10 · Ø27 mm";
     fillPhotoCard();
     showMeasured(measured.result);
     show("sSay");

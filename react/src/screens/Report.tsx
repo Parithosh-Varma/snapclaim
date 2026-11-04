@@ -227,11 +227,11 @@ export default function Report() {
         }
       }
       if (!photos.length) throw new Error("no figures rendered - retake or reselect the photo");
-      const row = (item: string, value: string | null, ev: string | undefined): { item: string; value: string; evidence: string; status: string } => ({
+      const row = (item: string, value: string | null, ev: string | undefined, status = "Confirmed"): { item: string; value: string; evidence: string; status: string } => ({
         item,
         value: value ?? "-",
         evidence: ev ?? "-",
-        status: "Confirmed",
+        status,
       });
       const bytes = buildReportPdf({
         brand: "SnapClaim",
@@ -241,7 +241,7 @@ export default function Report() {
         quote: s.transcript.trim(),
         rows: [
           ...(f.crackLengthMm != null ? [row("Crack length", `${String(f.crackLengthMm)} mm`, refs.length)] : []),
-          ...(f.crackWidthMm != null ? [row("Crack width", `${String(f.crackWidthMm)} mm`, refs.width)] : []),
+          ...(f.crackWidthMm != null ? [row("Crack width", `${String(f.crackWidthMm)} mm`, refs.width, "Unverified — no width ground truth")] : []),
           row("Surface affected", `${String(f.percent)} %`, refs.ratio),
           ...(f.areaCm2 != null ? [row("Area", `${String(f.areaCm2)} cm2`, refs.area)] : []),
           row("Severity", String(f.severity), refs.severity),
@@ -357,7 +357,7 @@ export default function Report() {
 
   return (
     <section className="screen on" aria-labelledby="h-send">
-      <div className="wrap">
+      <div className="wrap wide">
         <BackButton label="Checks" onClick={() => go("sCheck")} />
         <Stepper step={6} />
         <h1 id="h-send">Send the report.</h1>
@@ -366,6 +366,8 @@ export default function Report() {
           <p className="stateline" role="status">No crack found — the marked region is not damage. Nothing to send.</p>
         )}
 
+        <div className="split">
+        <div className="split-main">
         <article className="doc" id="reportDoc" aria-label="Damage report preview">
           <header className="doc-head">
             <div>
@@ -434,7 +436,7 @@ export default function Report() {
                       <th scope="row">Crack width</th>
                       <td data-h="Value">{String(f.crackWidthMm)} mm</td>
                       <td data-h="Evidence" className="mono">{refs.width ?? "-"}</td>
-                      <td data-h="Status"><Badge kind="ok">Confirmed</Badge></td>
+                      <td data-h="Status"><Badge kind="wait">Unverified — no width ground truth</Badge></td>
                     </tr>
                   )}
                   <tr>
@@ -491,7 +493,9 @@ export default function Report() {
 
           <p className="doc-foot">Generated on this device by SnapClaim · Ref {refNo}</p>
         </article>
+        </div>
 
+        <div className="split-side">
         <div className="card">
           <button id="renderBtn" className={`btn-primary${rendering ? " busy" : ""}`} type="button" onClick={render} disabled={rendering} aria-busy={rendering}>
             {rendering ? "Generating…" : "Generate report"}
@@ -618,6 +622,8 @@ export default function Report() {
             <pre id="raw">{s.raw}</pre>
           </div>
         </details>
+        </div>
+        </div>
       </div>
     </section>
   );

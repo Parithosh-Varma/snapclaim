@@ -143,7 +143,7 @@ export function renderAnnexureSvg(input: AnnexureInput): string {
       const y = 150 + i * 38;
       const mm = f.crackLengthMm === null ? "percent-only" : `${f.crackLengthMm} mm`;
       const area = f.areaCm2 === null ? "" : ` · ${f.areaCm2} cm2`;
-      const width = f.crackWidthMm === null ? "" : ` · w ${f.crackWidthMm} mm`;
+      const width = f.crackWidthMm === null ? "" : ` · w ${f.crackWidthMm} mm (unverified — no width ground truth)`;
       const statement = input.statements?.[i]?.statement ?? "";
       return (
         `<rect x="24" y="${y}" width="14" height="14" fill="${severityColor(f.severity)}"/>` +

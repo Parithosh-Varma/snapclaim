@@ -6,7 +6,7 @@ Zero-dependency TypeScript. Same router (`app.ts:handleRequest`) runs on Node an
 
 ```bash
 npm install
-npm test         # 105 tests, mock mode, $0 spend
+npm test         # 364 tests, mock mode, $0 spend
 npm run typecheck
 npm run eval       # deterministic bench
 npm run replay -- request.json measurement.json
@@ -20,6 +20,7 @@ npm run replay -- request.json measurement.json
 | `POST /v1/measure` | any | Deterministic math only: masks in, findings + receipts out. No model, no keys. |
 | `POST /v1/observe` | any | Pixel masks (COCO RLE) → component/masks/scaleReference that `/v1/report` takes. No model, no keys. |
 | `POST /v1/report` | mock default | measure → findings draft → Evidence Gate. Uncited numbers return `422` with `details[]`. Client may pass `drafts[]` to test the gate. |
+| `POST /v1/claim` | mock (masks) / live (photo) | One-call pipeline: `masks` (COCO RLE) or `imageUrl` + `damage[]` taps (+ optional `coin`) → `{measurement, findings, gate, overlay, svg?, replay, segmentation?}`. Composes segment → observe → report → render without re-billing the second report. See `docs/API.md`. |
 | `POST /v1/segment` | mock/live | Mock requires `body.fixture {component, masks}` — the backend invents no masks. Live calls SAM 3.1 point prompts (`imageUrl` + `width/height` + `points[1..16]`), parses the Responses output text and decodes masks with `@meta-sam/parser`; returns `{records: [{objectId, box, confidence, rle}]}` with full-frame RLE, `$0.0025`/image metered. Empty output throws, never fakes. |
 | `POST /v1/crosscheck` | any | `{a, b}` COCO RLE masks of one frame, `threshold?` — IoU + Dice agreement with AGREED/DISPUTED verdict. Keyless, deterministic. |
 | `POST /v1/transcribe` | mock/live | Spoken line to text via Muse Voice Transcribe (`/asr/transcribe`, multipart, `PUSH_TO_TALK`, optional caller-supplied `languageBias` + claim keywords). Mock requires `body.fixtureTranscript`. Audio priced at $0.18/hr on the ledger. |
@@ -63,8 +64,14 @@ npx wrangler secret put BASETEN_API_KEY    # Spark Open skeptic (when access gra
 ```
 
 Optional guardrails: set `SPEND_GUARD_USD` (default 5) and `MIN_REFERENCE_CONFIDENCE`
-(default 0.6) as Worker vars; restrict the PWA origin if you replace the
-open-CORS default. Health badge flips `mock` → `live` when `MOCK_MODE=0` plus a key.
+(default 0.6) as Worker vars; set `ALLOWED_ORIGINS` to a comma-separated exact-match
+list (default: `https://snapclaim.pages.dev`, `http://localhost:8787`,
+`http://127.0.0.1:8787`, `http://localhost:5173`, `http://127.0.0.1:5173`).
+Entries are normalised (trim, lowercase scheme/host, strip trailing slash);
+entries with paths or wildcards are ignored. A browser Origin not on the list
+gets `403 origin_not_allowed` before any cost; requests without Origin (curl,
+server-to-server) are not blocked. Set `REQUIRE_ORIGIN_FOR_EXPENSIVE=1` to also
+reject no-Origin on expensive routes. Health badge flips `mock` → `live` when `MOCK_MODE=0` plus a key.
 
 ## Deploy (PWA)
 

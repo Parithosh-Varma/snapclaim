@@ -4,8 +4,14 @@
 // assets are immutable, so runtime cache-first is safe). No photo bytes
 // are cached. Updates wait: the page shows #updateBar and posts
 // SKIP_WAITING on Reload.
-const CACHE = "snapclaim-react-v18";
-const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./hero-crack.jpg",
+//
+// Navigations are network-first on purpose. A cache-first index.html pinned
+// phones to whatever build they first cached: every later deploy shipped a
+// new hashed bundle the old HTML never referenced, so the app looked frozen
+// no matter how many times it was reloaded. The HTML is the one file whose
+// URL never changes, so it must come from the network when there is one.
+const CACHE = "snapclaim-react-v26";
+const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./hero-crack.jpg", "./snapclaim-mark.png", "./snapclaim-mark-dark.png",
   "./coin-model.js", "./theme.js", "./sam-worker.js", "./voice-worker.js",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/maskable-512.png", "./icons/apple-touch-icon.png"];
 
