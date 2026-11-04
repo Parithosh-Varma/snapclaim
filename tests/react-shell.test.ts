@@ -29,8 +29,9 @@ test("React app exists with the full screen set", () => {
   for (const screen of ["tHome", "tCases", "tSettings", "capture", "sReview", "sMark", "sSay", "sNum", "sCheck", "sReport"]) {
     assert.ok(app.includes(`"${screen}"`), `screen ${screen} in the React state machine`);
   }
-  assert.ok(app.includes('id="stepLoading"'), "every screen change shows the forced step loader");
-  assert.ok(app.includes("1000"), "step loader is scripted to a full second");
+  assert.ok(app.includes('id="stepLoading"'), "slow transitions keep a step loader");
+  assert.ok(app.includes("250"), "the loader waits 250 ms so instant screens never flash");
+  assert.ok(!app.includes("for a full second"), "no scripted full-second stall on every screen");
   assert.ok(app.includes("20 * 60 * 1000"), "long-lived app polls for worker updates");
   const mark = read("react/src/screens/Mark.tsx");
   assert.ok(mark.includes("taking too long to load"), "a stalled photo decode fails visible, never silent");
@@ -156,8 +157,12 @@ test("React port keeps backend, worker and privacy contracts", () => {
   assert.ok(check.includes("console.error"), "React logs backend errors with status");
   assert.ok(check.includes("Skeptic unavailable") && check.includes("Cross-check unavailable"), "React names 4xx states");
   assert.ok(check.includes('id="xPhotoCard"') && check.includes('id="xChip"'), "React shows both cross-check outlines over the photo");
+  assert.ok(check.includes("Same model, fresh prompt"), "cross-check copy is honest about re-prompting SAM");
+  assert.ok(!check.includes("on this device (SlimSAM-vs-SAM IoU)"), "no stale on-device comparison story");
+  assert.ok(!check.includes("segmentOnDevice"), "dead on-device fallback is gone from Check");
   const num = read("react/src/screens/Numbers.tsx");
   assert.ok(num.includes('id="skipChecks"'), "Numbers offers skipping the double-check");
+  assert.ok(num.includes("Back to Describe and retry"), "report failure offers a way back, not a JSON dump");
   const say = read("react/src/screens/Say.tsx");
   assert.ok(!say.includes('id="aiDescribeBtn"'), "Say stays manual - no auto-fill button");
   assert.ok(say.includes("/v1/describe"), "the manual line is AI-extended on the way to the report");
@@ -167,10 +172,15 @@ test("React port keeps backend, worker and privacy contracts", () => {
   assert.ok(say.includes('role="progressbar"') && say.includes("Step 3 of 6"), "Say step progress is an accessible progressbar");
   assert.ok(say.includes('aria-label="Back to Mark damage"') && say.includes('aria-label="Dictate description"'),
     "Say back and mic buttons are labelled for assistive tech");
-  assert.ok(say.includes("noticed this morning"), "Say textarea carries a concrete placeholder");
+  assert.ok(say.includes("e.g. Crack on the pavement slab"), "Say textarea carries a concrete placeholder");
   assert.ok(say.includes("disabled={sending || !hasText}"), "Continue stays disabled until the field has content");
-  assert.ok(say.includes("Saving…") && say.includes(": \"Continue\""), "Continue keeps its label and names the saving state");
+  assert.ok(say.includes("Generating…") && say.includes(": \"Continue\""), "Continue keeps its label and names the generating state");
   assert.ok(say.includes("Measurements captured"), "measurement status is a chip, not an orphan line");
+  assert.ok(say.includes("body.imageUrl = photoDataUrl"), "the report photo grounds Spark multimodally");
+  const tabsScreen = read("react/src/screens/Tabs.tsx");
+  assert.ok(tabsScreen.includes("openCaseId"), "Home recent items open the case dialog, not the bare list");
+  const markScreen = read("react/src/screens/Mark.tsx");
+  assert.ok(markScreen.includes("the list is ignored"), "Mark states which coin size wins");
   assert.ok(read("react/src/lib/ui.tsx").includes('role="progressbar"'), "TopBar exposes the step progress");
   for (const [screen, step] of [["Mark", 2], ["Numbers", 4], ["Check", 5], ["Report", 6], ["Shared", 6]] as const) {
     const src = read(`react/src/screens/${screen}.tsx`);

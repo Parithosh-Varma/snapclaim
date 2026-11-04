@@ -205,6 +205,7 @@ export default function Mark() {
     return "";
   });
   const coinCustomErr = customCoinError(coinCustom);
+  const coinCustomMm = coinCustomErr ? null : parseCustomCoinMm(coinCustom);
   const [hasMask, setHasMask] = useState(!!s.dmg.mask);
   const [tapCount, setTapCount] = useState(s.dmg.points.length);
   const [markBusy, setMarkBusy] = useState(false);
@@ -1020,11 +1021,13 @@ export default function Mark() {
                 }
               }}
             />
-            {coinCustomErr && (
+            {coinCustomErr ? (
               <span id="coinCustomErr" className="coinhint" role="alert">
                 {coinCustomErr}
               </span>
-            )}
+            ) : coinCustomMm !== null ? (
+              <span className="coinhint">Using {coinCustomMm} mm from below — the list is ignored.</span>
+            ) : null}
           </label>
           <div className="coinrow">
             <button

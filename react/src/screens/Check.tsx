@@ -2,8 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp, type CheckPhase } from "../App";
 import { apiPost, backendError } from "../lib/api";
 import { encodeRle } from "../lib/rle";
-import { segmentViaApi, type SamClient } from "../lib/sam";
-import type { SamMask, Session } from "../lib/session";
+import { segmentViaApi } from "../lib/sam";
 import {TopBar, Badge} from "../lib/ui";
 
 /** Dilated bounding box of a mask (photo pixels): constrains a re-prompt to the damage region. */
@@ -66,20 +65,6 @@ function XOverlay({ photo, api, other }: { photo: HTMLCanvasElement; api: Uint8A
   );
 }
 
-async function segmentOnDevice(sam: SamClient, s: Session): Promise<SamMask | null> {
-  while (s.dmg.pointMasks.length < s.dmg.points.length) {
-    s.dmg.pointMasks.push(await sam.decodeDamage(s.dmg.points[s.dmg.pointMasks.length] as [number, number]));
-  }
-  const found = s.dmg.pointMasks.filter((m): m is SamMask => !!m);
-  if (!found.length) return null;
-  const union = new Uint8Array((found[0] as SamMask).mask.length);
-  for (const { mask } of found) for (let i = 0; i < union.length; i++) union[i] = (union[i] ?? 0) | (mask[i] ?? 0);
-  let n = 0;
-  for (let i = 0; i < union.length; i++) if (union[i]) n++;
-  if (n > union.length * 0.5) return null;
-  return { mask: union, iou: Math.min(...found.map((f) => f.iou)) } as SamMask;
-}
-
 function verdictBadge(verdict: string) {
   if (verdict === "AGREED") return <Badge kind="ok">AGREED</Badge>;
   if (verdict === "DISPUTED") return <Badge kind="fail">DISPUTED</Badge>;
@@ -88,7 +73,7 @@ function verdictBadge(verdict: string) {
 
 export default function Check() {
   const ctx = useApp();
-  const { session: s, go, base, sam, embeddings, checks, setChecks } = ctx;
+  const { session: s, go, base, checks, setChecks } = ctx;
   const [skStatus, setSkStatus] = useState("");
   const [skRows, setSkRows] = useState<{ disputed: boolean; statement: string; citations: string }[] | null>(null);
   const [skError, setSkError] = useState<{ title: string; message: string; details: string[] } | null>(null);
@@ -216,7 +201,7 @@ export default function Check() {
       setPhase("xcheck", "error");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [base, embeddings, s, sam]);
+  }, [base, s]);
 
   const ran = useRef(false);
   useEffect(() => {
@@ -308,7 +293,7 @@ export default function Check() {
             <h3>Mask cross-check</h3>
             {xHead}
           </div>
-          <p>Sends this photo once to SAM 3.1 and compares its outline with the one measured on this device (SlimSAM-vs-SAM IoU). This is the real segmentation check - it auto-runs with the skeptic.</p>
+          <p>Asks SAM 3.1 to outline the damage a second time — constrained to the measured mask's own box so a thin crack comes back as the crack — and compares overlap (IoU). Same model, fresh prompt: it catches prompt luck, not model error. The skeptic above is the prose check; both auto-run and both must resolve before the report unlocks.</p>
           <button
             id="xcheckBtn"
             className="btn-ghostline"
@@ -353,7 +338,7 @@ export default function Check() {
               <span className="chip">
                 <i aria-hidden="true" />
                 <span id="xChip">
-                  Red measured ({s.dmg.source === "api" ? "SAM 3.1" : "on-device"}) · Green second check ({xOther.by})
+                  Red measured (SAM 3.1) · Green second check ({xOther.by})
                 </span>
               </span>
             </figure>

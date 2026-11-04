@@ -426,7 +426,7 @@ export default function Say() {
             aria-busy={sending}
             onClick={runReport}
           >
-            {sending ? (<><span className="sayspin" aria-hidden="true" /> Saving…</>) : "Continue"}
+            {sending ? (<><span className="sayspin" aria-hidden="true" /> Generating…</>) : "Continue"}
           </button>
           <button type="button" className="saybacklink" onClick={() => go("sMark")}>
             Back

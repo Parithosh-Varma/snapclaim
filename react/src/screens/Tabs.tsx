@@ -73,7 +73,7 @@ function CaseItem({ c, onOpen }: { c: SnapCase; onOpen: (id: string) => void }) 
 
 export function Home() {
   const ctx = useApp();
-  const { store, casesVersion, startCapture, go } = ctx;
+  const { store, casesVersion, startCapture, go, session } = ctx;
   const { draft, resumeDraft, discardDraft } = ctx;
   const cases = store.list();
   void casesVersion;
@@ -196,7 +196,7 @@ export function Home() {
         {recent.length > 0 && (
           <div id="recentList" className="recent-list">
             {recent.map((c) => (
-              <CaseItem key={c.id} c={c} onOpen={() => go("tCases")} />
+              <CaseItem key={c.id} c={c} onOpen={(id) => { session.openCaseId = id; go("tCases"); }} />
             ))}
           </div>
         )}
@@ -242,6 +242,19 @@ export function Cases() {
     setPdfMsg("");
     dlgRef.current?.showModal();
   };
+
+  /* Home's recent list lands here with a one-shot case id: open that case's
+     dialog instead of leaving the user on the bare list. */
+  const consumedOpen = useRef(false);
+  useEffect(() => {
+    if (consumedOpen.current) return;
+    consumedOpen.current = true;
+    const id = ctx.session.openCaseId;
+    if (!id) return;
+    ctx.session.openCaseId = null;
+    if (store.get(id)) openCase(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /** Offline PDF straight from the saved case - no backend, no re-measure.
       Yesterday's claim opens here, not on the Report screen, so this is the

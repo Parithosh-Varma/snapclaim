@@ -173,6 +173,8 @@ export interface Session {
   workingHist: ("crack" | "coin")[];
   /** One-shot resume target for Mark's mount after a draft restore. */
   resumeAngle: 1 | 2 | null;
+  /** One-shot: Home's recent list opens this case dialog on the Cases tab. */
+  openCaseId: string | null;
   /** Overlap plumbing: monotonic seq + the in-flight background job. */
   measureSeq: number;
   measureJob: MeasureJob | null;
@@ -217,6 +219,7 @@ export function createSession(): Session {
     activeAngle: 1,
     workingHist: [],
     resumeAngle: null,
+    openCaseId: null,
     measureSeq: 0,
     measureJob: null,
   };

@@ -202,7 +202,21 @@ export default function Numbers() {
           {s.reportFail ? (
             <>
               <Badge kind="fail">{s.reportFail.split("\n")[0]}</Badge>
-              <pre>{s.reportFail.split("\n").slice(1).join("\n")}</pre>
+              <p style={{ margin: "10px 0 0", color: "#5b6b8c" }}>
+                The report didn't pass its own checks, so no numbers were shipped. Your taps and words are kept — retry to draft it again.
+              </p>
+              <details className="learn" style={{ marginTop: 8 }}>
+                <summary>What went wrong</summary>
+                <pre>{s.reportFail.split("\n").slice(1).join("\n")}</pre>
+              </details>
+              <button
+                className="btn-dark"
+                type="button"
+                style={{ width: "100%", marginTop: 8 }}
+                onClick={() => go("sSay")}
+              >
+                Back to Describe and retry
+              </button>
             </>
           ) : s.reportStatement ? (
             <>

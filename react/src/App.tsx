@@ -125,6 +125,7 @@ export default function App() {
 
   const [stepLoading, setStepLoading] = useState(false);
   const stepTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stepHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /* Draft: autosave the in-progress claim on every step change and when the
      page hides, so a reload or crash never wastes progress. Finished or
@@ -148,19 +149,24 @@ export default function App() {
     } catch { /* autosave is best-effort; the claim continues */ }
   }, []);
 
-  /* Forced scripted transition: every screen change shows the step loader
-     for a full second, even when the next screen is instant. Timer resets
-     on rapid taps; cleared on unmount. */
+  /* Slow-transition cover only: instant screens render with no flash. The
+     loader appears only when a screen takes longer than 250 ms to settle,
+     then clears itself - rapid taps never stack it. */
   const go = useCallback((s: Screen) => {
     persistDraft(s);
     setScreen(s);
-    setStepLoading(true);
+    setStepLoading(false);
     if (stepTimer.current) clearTimeout(stepTimer.current);
-    stepTimer.current = setTimeout(() => setStepLoading(false), 1000);
+    if (stepHideTimer.current) clearTimeout(stepHideTimer.current);
+    stepTimer.current = setTimeout(() => {
+      setStepLoading(true);
+      stepHideTimer.current = setTimeout(() => setStepLoading(false), 700);
+    }, 250);
   }, [persistDraft]);
 
   useEffect(() => () => {
     if (stepTimer.current) clearTimeout(stepTimer.current);
+    if (stepHideTimer.current) clearTimeout(stepHideTimer.current);
   }, []);
 
   const resumeDraft = useCallback(() => {
@@ -174,9 +180,13 @@ export default function App() {
       applyDraft(sessionRef.current, d);
       setDraft(draftSummary(d));
       setScreen(d.screen);
-      setStepLoading(true);
+      setStepLoading(false);
       if (stepTimer.current) clearTimeout(stepTimer.current);
-      stepTimer.current = setTimeout(() => setStepLoading(false), 1000);
+      if (stepHideTimer.current) clearTimeout(stepHideTimer.current);
+      stepTimer.current = setTimeout(() => {
+        setStepLoading(true);
+        stepHideTimer.current = setTimeout(() => setStepLoading(false), 700);
+      }, 250);
     } catch {
       toast("That draft could not be restored - starting fresh");
       try {
