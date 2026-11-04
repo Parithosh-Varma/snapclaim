@@ -1,5 +1,7 @@
 # SnapClaim — Ref SC-25D35C5E - Measured damage report
 
+> Void (4 Nov 2026): this report was generated with a 23 mm coin. The coin is 25 mm, so the lengths here read about 8% low and the area about 15% low. Current numbers for this photo: R005 237.5 mm, R004 7.69 cm2, R006 3.2 mm (unverified). See `CASE STUDY/README.md` and `docs/eval-report.md`.
+
 Generated 2 Nov 2026 - 1 finding: "crack above the slab"
 
 ## Measurements
