@@ -31,7 +31,8 @@ test("React app exists with the full screen set", () => {
   }
   assert.ok(app.includes('id="stepLoading"'), "slow transitions keep a step loader");
   assert.ok(app.includes("250"), "the loader waits 250 ms so instant screens never flash");
-  assert.ok(!app.includes("for a full second"), "no scripted full-second stall on every screen");
+  assert.ok(app.includes("persistDraftSoon"), "step-change draft save is deferred past paint");
+  assert.ok(app.includes("requestAnimationFrame"), "deferred save waits for a painted frame");
   assert.ok(app.includes("20 * 60 * 1000"), "long-lived app polls for worker updates");
   const mark = read("react/src/screens/Mark.tsx");
   assert.ok(mark.includes("taking too long to load"), "a stalled photo decode fails visible, never silent");

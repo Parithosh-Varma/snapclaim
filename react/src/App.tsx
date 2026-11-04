@@ -149,11 +149,24 @@ export default function App() {
     } catch { /* autosave is best-effort; the claim continues */ }
   }, []);
 
+  /* Deferred step-change save: collectDraft serializes full photo data URLs
+     (stills + location + payload overlays), which can block first paint past
+     the loader delay - loader first, page second. Save after the browser has
+     painted so taps feel instant. Crash coverage stays synchronous via the
+     pagehide/visibilitychange handlers below, which must run before death. */
+  const persistDraftSoon = useCallback((forScreen: string) => {
+    const save = () => persistDraft(forScreen);
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => { setTimeout(save, 0); });
+    } else {
+      setTimeout(save, 0);
+    }
+  }, [persistDraft]);
+
   /* Slow-transition cover only: instant screens render with no flash. The
      loader appears only when a screen takes longer than 250 ms to settle,
      then clears itself - rapid taps never stack it. */
   const go = useCallback((s: Screen) => {
-    persistDraft(s);
     setScreen(s);
     setStepLoading(false);
     if (stepTimer.current) clearTimeout(stepTimer.current);
@@ -162,7 +175,8 @@ export default function App() {
       setStepLoading(true);
       stepHideTimer.current = setTimeout(() => setStepLoading(false), 700);
     }, 250);
-  }, [persistDraft]);
+    persistDraftSoon(s);
+  }, [persistDraftSoon]);
 
   useEffect(() => () => {
     if (stepTimer.current) clearTimeout(stepTimer.current);
