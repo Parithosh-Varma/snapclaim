@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 340" width="1200" height="340" role="img" aria-label="Cost per live claim versus the 5 dollar hard cap">
+<rect x="8" y="8" width="1184" height="324" rx="24" fill="#ffffff" stroke="#e4ded2" stroke-width="2"/>
+<text x="64" y="72" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="30" font-weight="700" fill="#0b2557" text-anchor="start" letter-spacing="0">What $5 buys</text>
+<text x="64" y="100" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="15" font-weight="400" fill="#5d6880" text-anchor="start" letter-spacing="0">Hard spend cap · live routes fail closed at $0</text>
+<text x="64" y="150" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14" font-weight="700" fill="#8a6d1a" text-anchor="start" letter-spacing="0.06em">PER LIVE CLAIM  ≈ $0.003</text>
+<rect x="64" y="162" width="466" height="34" rx="7" fill="#0f7a36"/>
+<rect x="530" y="162" width="94" height="34" rx="7" fill="#e6c34a"/>
+<text x="64" y="222" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" fill="#3d4a66" text-anchor="start" letter-spacing="0">SAM segment ≈ $0.0025 / image</text>
+<text x="444" y="222" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" fill="#3d4a66" text-anchor="start" letter-spacing="0">Voice ≈ $0.0005 / 10 s line</text>
+<text x="64" y="244" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" fill="#5d6880" text-anchor="start" letter-spacing="0">Findings metered at $0 until Meta publishes pricing</text>
+<text x="700" y="150" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14" font-weight="700" fill="#8a6d1a" text-anchor="start" letter-spacing="0.06em">HARD CAP  $5</text>
+<rect x="700" y="162" width="436" height="34" rx="7" fill="#f3eee4" stroke="#e4ded2" stroke-width="2"/>
+<rect x="700" y="162" width="3" height="34" rx="2" fill="#c41f29"/>
+<text x="700" y="222" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" fill="#3d4a66" text-anchor="start" letter-spacing="0">429 at $0 remaining — abuse-proof by design</text>
+<text x="700" y="244" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" fill="#0b2557" text-anchor="start" letter-spacing="0">$5 ÷ ≈$0.003  →  well over a thousand live claims</text>
+</svg>

@@ -1,6 +1,7 @@
 import { strict as assert } from "node:assert";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import { observeBody } from "../backend/app.ts";
 import { decodeRle } from "../src/vision/mask.ts";
 import { observeMask } from "../src/vision/observe.ts";
 
@@ -19,6 +20,37 @@ function observe(id: string) {
 test("real facade masks reproduce the bench statistics", () => {
   // If the vision code changes these numbers, update fixtures/masks/facade-crack.json and its expected file on purpose.
   assert.deepEqual(observe("crack-taps"), bench.masks[0]);
+});
+
+test("calibrated SAM 3.1 RLE fixtures reproduce fixtures/masks/calibrated-*.json via observeBody", () => {
+  for (const id of [
+    "calibrated-plaster-hairline-01",
+    "calibrated-masonry-step-02",
+    "calibrated-stone-oblique-03",
+  ]) {
+    const rawRle = read(`../fixtures/rle/${id}.json`);
+    const maskFixture = read(`../fixtures/masks/${id}.json`);
+    const observed = observeBody({ masks: rawRle.masks, reference: rawRle.reference });
+    assert.equal(observed.ok, true);
+    if (!observed.ok) throw new Error("observeBody failed");
+    const res = observed.result as {
+      component: unknown;
+      masks: unknown;
+      scaleReference: unknown;
+    };
+    assert.deepEqual(
+      {
+        component: res.component,
+        masks: res.masks,
+        scaleReference: res.scaleReference,
+      },
+      {
+        component: maskFixture.component,
+        masks: maskFixture.masks,
+        scaleReference: maskFixture.scaleReference,
+      },
+    );
+  }
 });
 
 test("real facade: built pieces are flagged, the crack itself is not", () => {

@@ -3,7 +3,9 @@ import { fileURLToPath } from "node:url";
 import type { CaseRun, HeldOutCase, Provenance, SplitFile } from "./run.ts";
 
 /** A scaled held-out case with a tape-measured length to score against. */
-export type GapCase = HeldOutCase & { groundTruth: { maskId: string; crackLengthMm: number } };
+export type GapCase = HeldOutCase & {
+  groundTruth: NonNullable<HeldOutCase["groundTruth"]> & ({ pathMm: number } | { crackLengthMm: number });
+};
 
 /** Muse Spark looking at the photo alone: one number in mm, or null when it refused to guess. */
 export interface ModelOnlyGuess {
@@ -28,7 +30,12 @@ export interface ArmScore {
 
 export interface GapRow {
   caseId: string;
+  /** Primary truth the arms are scored against: pathMm, else legacy crackLengthMm. */
   truthMm: number;
+  /** Which quantity the primary truth is. Legacy rows predate the path/span split. */
+  truthKind: "path" | "legacy";
+  /** Straight tape span in mm, shown for context but never scored. */
+  spanMm: number | null;
   /** undefined: no run archived. null: run found the crack but claimed no length. */
   measuredMm: number | null | undefined;
   modelOnlyMm: number | null | undefined;
@@ -44,7 +51,9 @@ type NamedFile = { name: string; text: string };
 
 /** Held-out cases that can be scored for accuracy: scaled, with a ground truth. */
 export const gapCases = (heldOut: HeldOutCase[]): GapCase[] =>
-  heldOut.filter((c): c is GapCase => c.hasScaleReference && c.groundTruth !== undefined);
+  heldOut.filter(
+    (c): c is GapCase => c.hasScaleReference && c.groundTruth !== undefined && ((c.groundTruth.pathMm ?? c.groundTruth.crackLengthMm) !== undefined),
+  );
 
 function median(values: number[]): number | null {
   if (values.length === 0) return null;
@@ -98,7 +107,9 @@ export function scoreGap(
 ): GapScore {
   const rows: GapRow[] = cases.map((c) => ({
     caseId: c.id,
-    truthMm: c.groundTruth.crackLengthMm,
+    truthMm: c.groundTruth.pathMm ?? c.groundTruth.crackLengthMm!,
+    truthKind: c.groundTruth.pathMm !== undefined ? "path" : "legacy",
+    spanMm: c.groundTruth.spanMm ?? null,
     measuredMm: measured.get(c.id),
     modelOnlyMm: modelOnly.get(c.id),
   }));
@@ -170,7 +181,12 @@ export function evaluateGap(split: SplitFile, runFiles: NamedFile[], guessFiles:
   const score = scoreGap(cases, measuredLengths(cases, runs), modelOnly);
   lines.push(`gap: ${cases.length} scaled cases with ground truth`);
   for (const r of score.rows) {
-    lines.push(`${r.caseId}: truth=${r.truthMm} measured=${fmt(r.measuredMm)} modelOnly=${fmt(r.modelOnlyMm)}`);
+    const kind = r.truthKind === "legacy" ? "" : `(${r.truthKind})`;
+    const span =
+      r.spanMm === null
+        ? ""
+        : ` span=${r.spanMm}(span)${typeof r.measuredMm === "number" ? ` spanErr=${Math.round(Math.abs(r.measuredMm - r.spanMm) * 10) / 10}` : ""}`;
+    lines.push(`${r.caseId}: truth=${r.truthMm}${kind} measured=${fmt(r.measuredMm)} modelOnly=${fmt(r.modelOnlyMm)}${span}`);
   }
   lines.push(armLine("measured", score.measured));
   lines.push(armLine("model-only", score.modelOnly));

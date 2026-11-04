@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { closeMask, unionMasks } from "../pwa/mask-ops.js";
+import { closeMask, unionMasks } from "../react/src/lib/mask.ts";
 import { connectedRegions } from "../src/vision/mask.ts";
 
 function maskWith(w: number, h: number, pts: [number, number][]): Uint8Array {

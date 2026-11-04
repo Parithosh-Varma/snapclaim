@@ -5,10 +5,38 @@ export interface Rle {
   counts: number[];
 }
 
+// Same pixel budget as the backend (src/vision/mask.ts MAX_MASK_PIXELS): a
+// compromised allowlisted backend must not be able to OOM the tab with a
+// 20000x20000 size header (~400MB allocation from one JSON reply).
+export const MAX_RLE_PIXELS = 16777216;
+
 /** Decodes one COCO RLE into a row-major Uint8Array of 0/1. */
 export function decodeRle(rle: Rle): Uint8Array {
   const [h, w] = rle.size;
-  const out = new Uint8Array(h * w);
+  if (!Number.isInteger(h) || !Number.isInteger(w) || h <= 0 || w <= 0) {
+    throw new Error("rle.size must be [height, width] positive integers");
+  }
+  if (h * w > MAX_RLE_PIXELS) {
+    throw new Error(`rle ${h}x${w} exceeds the ${MAX_RLE_PIXELS}-pixel cap`);
+  }
+  if (!Array.isArray(rle.counts)) {
+    throw new Error("rle.counts must be an array");
+  }
+  const total = h * w;
+  let sum = 0;
+  for (const run of rle.counts) {
+    if (!Number.isInteger(run) || run < 0) {
+      throw new Error("rle run must be a non-negative integer");
+    }
+    sum += run;
+    if (sum > total) {
+      throw new Error("rle runs exceed the image size");
+    }
+  }
+  if (sum !== total) {
+    throw new Error(`rle covers ${sum} pixels, image has ${total}`);
+  }
+  const out = new Uint8Array(total);
   let i = 0;
   let v = 0;
   for (const run of rle.counts) {

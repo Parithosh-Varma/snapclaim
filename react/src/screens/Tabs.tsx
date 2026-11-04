@@ -68,7 +68,7 @@ export function Home() {
   };
   return (
     <section className="screen tab on home" aria-labelledby="h-home">
-      <div className="wrap home-wrap">
+      <div className="wrap wide home-wrap">
         <header className="home-top">
           <span className="brand">
             <span className="brand-mark" aria-hidden="true">
@@ -84,6 +84,8 @@ export function Home() {
         <h1 id="h-home">Damage, measured.</h1>
         <p className="sub home-sub">Coin for scale, photo for proof - a report in minutes.</p>
 
+        <div className="split">
+        <div className="split-main">
         <button id="ctaNew" className="hero-tap" type="button" onClick={startCapture} aria-describedby="heroSteps">
           <span className="hero-art" aria-hidden="true">
             <LoadImg className="hero-photo" src="./hero-crack.jpg" alt="" />
@@ -132,7 +134,9 @@ export function Home() {
             </div>
           </div>
         )}
+        </div>
 
+        <div className="split-side">
         <div className="home-duo">
           <div className="tipcard">
             <p className="tipcard-title">Coin tips</p>
@@ -173,6 +177,8 @@ export function Home() {
             <button type="button" className="btn-primary empty-cta" onClick={startCapture}>Start your first claim</button>
           </div>
         )}
+        </div>
+        </div>
       </div>
     </section>
   );
@@ -385,6 +391,8 @@ export function Settings() {
   const [metaDraft, setMetaDraft] = useState("");
   const [basetenDraft, setBasetenDraft] = useState("");
   const [keyMsg, setKeyMsg] = useState("");
+  const [computeMsg, setComputeMsg] = useState("");
+  const [onDevice, setOnDevice] = useState(() => Boolean(store.getSettings().onDevice));
   const savedMeta = String(store.getSettings().metaKey ?? "");
   const savedBaseten = String(store.getSettings().basetenKey ?? "");
   const maskKey = (k: string) => (k.length <= 4 ? "••••" : `••••${k.slice(-4)}`);
@@ -723,6 +731,23 @@ export function Settings() {
               Clear saved keys
             </button>
           </div>
+        </Section>
+
+        <Section
+          label="Compute"
+          icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M9 9h6v6H9zM4 10h-2M4 14h-2M22 10h-2M22 14h-2M10 4V2M14 4V2M10 22v-2M14 22v-2" /></svg>}
+        >
+          <label className="checkline" htmlFor="onDeviceToggle">
+            <input
+              id="onDeviceToggle"
+              type="checkbox"
+              checked={onDevice}
+              onChange={(e) => { const v = e.target.checked; setOnDevice(v); store.setSettings({ onDevice: v }); setComputeMsg(v ? "On-device outlining on - the model downloads once, then taps work offline." : "On-device outlining off - taps outline via the cloud."); }}
+            />
+            <span>Outline on this device</span>
+          </label>
+          {computeMsg ? <p className="fineprint" role="status">{computeMsg}</p> : null}
+          <p className="fineprint">Cloud is the default: taps outline via the backend and low-memory phones never download the ~200 MB model. Turn this on only on a strong device, ideally on Wi-Fi - the first outline still downloads the model once.</p>
         </Section>
 
         <Section

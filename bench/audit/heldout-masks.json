@@ -1,0 +1,36 @@
+{
+  "labels": [
+    {
+      "caseId": "public-ruin-wall-crack-01",
+      "maskId": "damage-1",
+      "expected": "CONFIRMED",
+      "reason": "mask is on the crack (partial), 0.96% of frame",
+      "labeledBy": "RizgarOzan",
+      "labeledAt": "2026-11-02"
+    },
+    {
+      "caseId": "public-stone-wall-crack-02",
+      "maskId": "damage-1",
+      "expected": "DISPUTED",
+      "reason": "SAM took the whole curved wall plus the sign, 27.01% of frame",
+      "labeledBy": "RizgarOzan",
+      "labeledAt": "2026-11-02"
+    },
+    {
+      "caseId": "public-interior-wall-cracks-03",
+      "maskId": "damage-1",
+      "expected": "CONFIRMED",
+      "reason": "mask is on the ceiling crack, 0.2% of frame",
+      "labeledBy": "RizgarOzan",
+      "labeledAt": "2026-11-02"
+    },
+    {
+      "caseId": "public-cracked-tile-04",
+      "maskId": "damage-1",
+      "expected": "DISPUTED",
+      "reason": "mask is one broken tile piece, not the crack line, 3.81% of frame",
+      "labeledBy": "RizgarOzan",
+      "labeledAt": "2026-11-02"
+    }
+  ]
+}
