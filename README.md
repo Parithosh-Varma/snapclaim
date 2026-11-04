@@ -7,25 +7,50 @@
 
 > Point your phone at damage, speak one line about it - get a claim-ready report where every shipped number cites a machine-checkable receipt. **Computed, not generated.**
 
-**Built on Meta AI, a 4-model pipeline:** SAM 3.1 (damage masks) + Muse Spark 1.3 (evidence-gated findings) + **Muse Spark Open**, open weights served by Baseten (`meta-models/muse-spark-open-1026`, independent skeptic) + Muse Voice Transcribe (spoken intake). **Open-weights fine-tuning:** our crack-tuned SlimSAM-77 mask decoder is published on the Hugging Face Hub as [`tariqkhalif/slimsam-77-crack`](https://huggingface.co/tariqkhalif/slimsam-77-crack) (held-out crack mIoU 0.174 stock vs 0.697 tuned, [`training/slimsam-crack/`](./training/slimsam-crack/)). [`finetune/`](./finetune/) holds a LoRA (PEFT) distillation recipe for Muse Glimmer and Muse Spark Open; it is smoke-tested only, with no trained weights yet.
+**[Try the live app](https://snapclaim.pages.dev) · [Marketing site](https://landing.snapclaim.pages.dev) · [Demo video](https://youtu.be/CdqSvKHyrCg) · [Gallery](https://snapclaim-gallery.parithosh.workers.dev) · [Case study (PDF)](https://snapclaim.pages.dev/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf)**
 
 [![tests](https://github.com/Parithosh-Varma/snapclaim/actions/workflows/ci.yml/badge.svg)](https://github.com/Parithosh-Varma/snapclaim/actions/workflows/ci.yml)
-> Live: <https://snapclaim.pages.dev> — open to anyone. Admin panel (`/admin`) is behind team login.
-
-> Accuracy status: **n = 1 tape-span case** (terrace slab: pipeline 237.5 mm [R005, 25 mm user-supplied coin] vs span 227 mm [225–230], err +10.5 mm / +4.6% (span is context, never scored); photo-alone guess 315 mm (outside). Width 3.2 mm is unverified (no width ground truth). Coin ±0.5 mm scales all mm values ±2%. The 54-scene bench tests the maths given a mask, not phone capture. Treat “measured” as receipt-backed, not tape-proven, until the 10–20 tape set lands. 2D in-plane only (no depth/volume). Documentation, not advice.
-
-> What is real vs mocked: **Measurement (`/v1/measure`, `/v1/observe`, receipts, gate) is keyless and deterministic — runs offline, $0. Live findings / skeptic / SAM / voice use our keys with a spend cap (`SPEND_GUARD_USD`, default $5). Photos stay on the phone except two explicit taps: Cross-check sends the photo once to SAM 3.1 via the backend, and Render attaches it to the annexure.** Demo defaults to mock ($0, no keys).
-
 [![node](https://img.shields.io/badge/node-%3E%3D22.18-339933)](./package.json)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](./LICENSE)
 
-[Try the live app](https://snapclaim.pages.dev) · [Marketing site](https://landing.snapclaim.pages.dev) · [Field case study](https://landing.snapclaim.pages.dev/#case-study)
+## Why it exists
 
-**Demo video:** <https://youtu.be/CdqSvKHyrCg>
+Damage claims run on vibes: a photo, a guess ("looks like ~30 cm"), and whoever argues hardest wins. VLMs make this worse — they guess measurements fluently and confidently.
 
-SnapClaim turns a damage photo plus a one-line description into a replayable evidence package: calibrated measurements (% damaged, crack length/width, area in cm²), each backed by a machine-checkable receipt, with AI-written findings that the server refuses to ship unless every number cites its receipt.
+SnapClaim inverts the burden of proof. The numbers come from deterministic code over segmentation masks, never from a model's imagination. Models only write sentences, and a server-side evidence gate rejects any sentence whose numbers don't trace back to a receipt. The result is a report a skeptic — human or model — can re-derive from scratch.
 
-**Try it:** <https://snapclaim.pages.dev> (no login needed).
+Three principles run through all of it:
+
+1. **No LLM touches the numbers.** Models write sentences; arithmetic is code.
+2. **Fail closed.** No key → 503. No evidence → 422. Empty model output → error. The backend never invents a mask, a transcript, or a number.
+3. **Everything replays.** `npm run replay` recomputes a report from request + receipts and prints MATCH or DRIFT.
+
+## Proven on a real crack
+
+One terrace-slab crack, ref `SC-D8ECE64B` — "crack on the pavement slab of the terrace". Photo-pixel outlines scaled by coin diameter, tilt-corrected from the ellipse:
+
+- Crack length **232 mm [R005]** (Confirmed) · width **3.2 mm [R006]** (Unverified — no width ground truth) · surface **0.73% [R002]** (Confirmed) · area **7.48 cm² [R004]** (Confirmed) · severity **significant [R007]** (Confirmed)
+- Verification: evidence gate passed / skeptic verified / mask cross-check verified.
+- Manual refs: straight tape 227 mm (225–230, context only — a path must exceed its chord); thread 238.8 mm (different horizontal crack, NOT comparable); pin-to-pin 274 mm.
+- Live PDFs: [report](https://snapclaim.pages.dev/reports/snapclaim-SC-D8ECE64B.pdf) · [case study](https://snapclaim.pages.dev/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf)
+
+Honest headline: n = 1, and a span is context, not a scored length. Treat "measured" as receipt-backed, not tape-proven, until the 10–20 tape set lands. An earlier run on a different photo measured 237.5 mm with a user-supplied 25 mm coin (see [Evaluation](#evaluation)) — separate run, separate inputs, never averaged with this one.
+
+## What is measured today
+
+All three commands are free and deterministic; run them yourself.
+
+| Check | Command | Result on `main` |
+|---|---|---|
+| Measurement code vs known answers (54 scenes drawn in code, coin scale, some on tilted walls) | `npm run bench:truth` | length median error 1.4%, 100% within ±10%; width median error 4.0%, 96.3% within ±10%; 3/3 no-scale refusals held |
+| Regression on dev mask fixtures, plus known-answer error on the 5 synthetic ones | `npm run eval` | 10 pass, 0 skip, 0 fail; 5 scored, median abs error 1.0 mm, 5/5 within ±10% (drawn cracks, not real photos) |
+| Live pipeline on held-out real photos | `npm run bench` | 4 public photos run live 2026-11-02: 4/4 refused millimetres, but only 2/4 masks were on the crack and the skeptic flagged neither miss ([details](docs/eval-report.md#failures-and-misses)); 7 team cases UNRUN, so the command still exits 1 on purpose |
+
+What this does not show yet: how well SAM finds the crack on a real photo. `bench:truth` checks the maths given a mask, not the mask itself. One real crack has a tape span (`terrace-slab-tape-01`, n = 1, above), but a span is context, not a scored length, so `npm run bench:gap` still prints UNSCORED. We would rather show that gap than fill it with a number we cannot back.
+
+**Global by design:** the measurement engine assumes no currency, country, or language — a scale reference is any known-size object (coin, ruler, bank card), and the transcript is free text in any language. Voice is auto-detected by default; callers can still send an optional `languageBias`.
+
+**Who it is for:** tenants and landlords settling security-deposit disputes at move-out, and households filing a home insurance claim. Both sides look at the same crack and argue about how big it is; SnapClaim gives them one measured, replayable record instead of two memories. It documents, it does not advise.
 
 ## Demo video
 
@@ -37,49 +62,15 @@ Watch the full loop — photo + coin, tap to mask, gated findings, skeptic, SVG 
 
 ## Project gallery
 
-Photo gallery of captures, pipeline diagrams, and the terrace-slab field proof: <https://gallery.snapclaim.pages.dev> (source: [`gallery/`](./gallery/)).
-
-### What is measured today
-
-All three commands are free and deterministic; run them yourself.
-
-| Check | Command | Result on `main` |
-|---|---|---|
-| Measurement code vs known answers (54 scenes drawn in code, coin scale, some on tilted walls) | `npm run bench:truth` | length median error 1.4%, 100% within ±10%; width median error 4.0%, 96.3% within ±10%; 3/3 no-scale refusals held |
-| Regression on dev mask fixtures, plus known-answer error on the 5 synthetic ones | `npm run eval` | 10 pass, 0 skip, 0 fail; 5 scored, median abs error 1.0 mm, 5/5 within ±10% (drawn cracks, not real photos) |
-| Live pipeline on held-out real photos | `npm run bench` | 4 public photos run live 2026-11-02: 4/4 refused millimetres, but only 2/4 masks were on the crack and the skeptic flagged neither miss ([details](docs/eval-report.md#failures-and-misses)); 7 team cases UNRUN, so the command still exits 1 on purpose |
-
-What this does not show yet: how well SAM finds the crack on a real photo. `bench:truth` checks the maths given a mask, not the mask itself. No real crack has been tape-measured yet, so `npm run bench:gap` (pipeline vs model-only guess against a tape) still prints UNSCORED. We would rather show that gap than fill it with a number we cannot back.
-
-**Global by design:** the measurement engine assumes no currency, country, or language — a scale reference is any known-size object (coin, ruler, bank card), and the transcript is free text in any language. Voice is auto-detected by default; callers can still send an optional `languageBias`.
-
-**Who it is for:** tenants and landlords settling security-deposit disputes at move-out, and households filing a home insurance claim. Both sides look at the same crack and argue about how big it is; SnapClaim gives them one measured, replayable record instead of two memories. It documents, it does not advise.
-
-## Meta AI stack
-
-Built on the [Meta AI developer platform](https://dev.meta.ai), with four Meta model families, each doing one job:
-
-| Model | Job in SnapClaim | Served by |
-|---|---|---|
-| **SAM 3.1** | Segments the damage and the coin from a tap (point prompts) | Meta AI API (`api.meta.ai`) |
-| **Muse Spark 1.3** | Drafts the findings; the evidence gate ships a sentence only if every number cites a receipt | Meta AI API |
-| **Muse Spark Open** (open weights) | Independent skeptic that re-checks the findings | **Baseten**, official inference partner (`inference.baseten.co`) |
-| **Muse Voice Transcribe** | Turns the one spoken line into text, any language | Meta AI API (file + realtime) |
-
-On the phone, a SlimSAM model gives an offline mask preview before anything is sent. We fine-tuned its open-weights mask decoder on public crack masks (CC BY 4.0) and published it as [`tariqkhalif/slimsam-77-crack`](https://huggingface.co/tariqkhalif/slimsam-77-crack) on the Hugging Face Hub: held-out crack mIoU 0.174 stock vs 0.697 tuned in the browser build (training code and eval in [`training/slimsam-crack/`](./training/slimsam-crack/)). Endpoints and model IDs: [Meta models used](#meta-models-used).
-## Live proof (terrace slab, 4 Nov 2026)
-
-> Ref `SC-D8ECE64B` — "crack on the pavement slab of the terrace". Method: photo-pixel outlines scaled by coin diameter tilt-corrected from ellipse.
->
-> - Crack length **232 mm [R005]** (Confirmed) · width **3.2 mm [R006]** (Unverified — no width ground truth) · surface **0.73% [R002]** (Confirmed) · area **7.48 cm² [R004]** (Confirmed) · severity **significant [R007]** (Confirmed)
-> - Verification: evidence gate passed / skeptic verified / mask cross-check verified.
-> - Manual refs: straight tape 227 mm (225–230); thread 238.8 mm (different horizontal crack, NOT comparable); pin-to-pin 274 mm (5.2+4.8+4.5+4.2+2.9+5.8 cm).
-> - Live PDFs: [report](https://snapclaim.pages.dev/reports/snapclaim-SC-D8ECE64B.pdf) · [case study](https://snapclaim.pages.dev/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf)
-
-**Global by design:** the measurement engine assumes no currency, country, or language - a scale reference is any known-size object (coin, ruler, bank card), and the transcript is free text in any language. Voice is auto-detected by default; callers can still send an optional `languageBias`.
+Photo gallery of captures, pipeline diagrams, and the terrace-slab field proof: <https://snapclaim-gallery.parithosh.workers.dev> (source: [`gallery/`](./gallery/) — `gallery.snapclaim.pages.dev` custom domain pending).
 
 ## Contents
 
+- [Why it exists](#why-it-exists)
+- [Proven on a real crack](#proven-on-a-real-crack)
+- [What is measured today](#what-is-measured-today)
+- [Demo video](#demo-video)
+- [Project gallery](#project-gallery)
 - [Meta AI stack](#meta-ai-stack)
 - [Quickstart](#quickstart)
 - [How it works](#how-it-works)
@@ -95,6 +86,17 @@ On the phone, a SlimSAM model gives an offline mask preview before anything is s
 - [Development](#development)
 - [Scope and boundaries](#scope-and-boundaries)
 - [Provenance and license](#provenance-and-license)
+
+Built on the [Meta AI developer platform](https://dev.meta.ai), with four Meta model families, each doing one job:
+
+| Model | Job in SnapClaim | Served by |
+|---|---|---|
+| **SAM 3.1** | Segments the damage and the coin from a tap (point prompts) | Meta AI API (`api.meta.ai`) |
+| **Muse Spark 1.3** | Drafts the findings; the evidence gate ships a sentence only if every number cites a receipt | Meta AI API |
+| **Muse Spark Open** (open weights) | Independent skeptic that re-checks the findings | **Baseten**, official inference partner (`inference.baseten.co`) |
+| **Muse Voice Transcribe** | Turns the one spoken line into text, any language | Meta AI API (file + realtime) |
+
+On the phone, a SlimSAM model gives an offline mask preview before anything is sent. We fine-tuned its open-weights mask decoder on public crack masks (CC BY 4.0) and published it as [`tariqkhalif/slimsam-77-crack`](https://huggingface.co/tariqkhalif/slimsam-77-crack) on the Hugging Face Hub: held-out crack mIoU 0.174 stock vs 0.697 tuned in the browser build (training code and eval in [`training/slimsam-crack/`](./training/slimsam-crack/)). Endpoints and model IDs: [Meta models used](#meta-models-used).
 
 ## Quickstart
 
@@ -188,6 +190,8 @@ want an intermediate result - nothing in the app bypasses them.
 
 ## Modes: demo vs live
 
+> What is real vs mocked: **Measurement (`/v1/measure`, `/v1/observe`, receipts, gate) is keyless and deterministic — runs offline, $0. Live findings / skeptic / SAM / voice use our keys with a spend cap (`SPEND_GUARD_USD`, default $5). Photos stay on the phone except two explicit taps: Cross-check sends the photo once to SAM 3.1 via the backend, and Render attaches it to the annexure.** Demo defaults to mock ($0, no keys).
+
 | | Demo (default) | Live (`MOCK_MODE=0` + keys) |
 |---|---|---|
 | Masks | Supplied fixture (`backend invents no masks`) | SAM 3.1 point prompts via `/v1/segment`; the app falls back to on-device SlimSAM on any failure |
@@ -272,6 +276,8 @@ npx wrangler secret put BASETEN_API_KEY   # when Baseten access is granted
 
 **Pages site** (public app, gated admin):
 
+> Live: <https://snapclaim.pages.dev> — open to anyone. Admin panel (`/admin`) is behind team login.
+
 ```bash
 npm --prefix react run build
 npx wrangler pages deploy react/dist --project-name snapclaim
@@ -314,6 +320,8 @@ Hard limits: 50 masks per call (chunk above), 1–16 point prompts per segment c
 - EXIF/XMP metadata is stripped from photos on intake.
 
 ## Evaluation
+
+> Accuracy status: **n = 1 tape-span case** (terrace slab: pipeline 237.5 mm [R005, 25 mm user-supplied coin] vs span 227 mm [225–230], err +10.5 mm / +4.6% (span is context, never scored); photo-alone guess 315 mm (outside). Width 3.2 mm is unverified (no width ground truth). Coin ±0.5 mm scales all mm values ±2%. The 54-scene bench tests the maths given a mask, not phone capture. Treat “measured” as receipt-backed, not tape-proven, until the 10–20 tape set lands. 2D in-plane only (no depth/volume). Documentation, not advice.
 
 ### What is measured today
 
