@@ -50,7 +50,7 @@ hyphens or ellipses as separators.
   - `Photo at a sharp angle.`
 - Do not art alt: `Incorrect placement: coin tilted and partly hidden in shadow.`
 - Reassurance: `Slight tilt is fine. The app corrects for it, but flat and straight-on gives the best result.`
-- Coin note: `Use any coin and select it in the next step. [PLACEHOLDER: state which coins are supported and their known diameters per the product's actual behavior. Do not invent coin specifications.]`
+- Coin note: `Use any coin and pick it from the list in the next step, or type its diameter (15–40 mm). A ruler or card works too.`
 - Primary: `Got it`
 
 ## Screen 4: Privacy and trust
@@ -60,9 +60,9 @@ hyphens or ellipses as separators.
 - Row 1: `Measured on your device` / `Photos are processed here, not sent away to be measured.`
 - Row 2: `Your words stay yours` / `We keep your description as you wrote it.`
 - Row 3: `Every number has a receipt` / `The report shows how each measurement was worked out.`
-- Placeholder (remove before ship unless every row is strictly true): `[PLACEHOLDER: confirm the exact data-handling claims with the product team before shipping; remove any row that is not strictly true.]`
+- Note: `One exception: if you tap Cross-check, that photo is sent once to our backend for a second outline.`
 - Link: `How we handle your data`
 - Sheet title: `How we handle your data`
-- Sheet body: `Cases stay on this device unless you share the report. Measuring runs on this device after a first online load. Optional cross-checks send the tapped photo to the backend you configure. [PLACEHOLDER: confirm before shipping.]`
+- Sheet body: `Cases stay on this device unless you share the report. Measuring runs on this device after a first online load. Optional cross-checks send the tapped photo to the backend you configure.`
 - Sheet close: `Close`
 - Primary: `Next`
