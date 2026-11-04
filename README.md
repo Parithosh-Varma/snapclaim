@@ -14,7 +14,7 @@
 
 > What is real vs mocked: **Measurement (`/v1/measure`, `/v1/observe`, receipts, gate) is keyless and deterministic — runs offline, $0. Live findings / skeptic / SAM / voice use our keys with a spend cap (`SPEND_GUARD_USD`, default $5). Photos stay on the phone except two explicit taps: Cross-check sends the photo once to SAM 3.1 via the backend, and Render attaches it to the annexure.** Demo defaults to mock ($0, no keys).
 
-[![tests](https://img.shields.io/badge/tests-378%20passing-brightgreen)](./tests)
+[![tests](https://img.shields.io/badge/tests-385%20passing-brightgreen)](./tests)
 [![node](https://img.shields.io/badge/node-%3E%3D22.18-339933)](./package.json)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](./LICENSE)
 
@@ -329,7 +329,7 @@ pwa/            capture app: photo, tap-to-mask, hold-to-speak, report, skeptic,
 eval/           bench + replay CLI
 bench/          held-out split + dispute scorer
 fixtures/       masks, expected outputs, scale references (photos gitignored)
-tests/          366 tests, mock by default, live paths with stubbed fetch, $0
+tests/          385 tests, mock by default, live paths with stubbed fetch, $0
 ```
 
 ## Development

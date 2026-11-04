@@ -729,6 +729,22 @@
       <button id="setCheck" class="btn-ghostline" type="button">Check backend</button>
       <span id="setHealth" role="status" style="display:block;font-family:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;margin-top:8px;min-height:1.2em"></span>
     </div>
+    <div class="group">
+      <h3>Your own API keys (optional)</h3>
+      <p class="sub">Measuring needs no key. Mask, findings, voice and the skeptic use the SnapClaim keys unless you add your own here. Keys go only to the backend above, for that one request, and are never stored on the server.</p>
+      <label class="field">Meta API key
+        <input id="byokMeta" class="field-input" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" />
+      </label>
+      <label class="field">Baseten API key
+        <input id="byokBaseten" class="field-input" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" />
+      </label>
+      <label class="switchrow"><input id="byokRemember" type="checkbox" /> Remember on this device</label>
+      <div class="rowbtns">
+        <button id="byokSave" class="btn-ghostline" type="button">Save keys</button>
+        <button id="byokClear" class="btn-ghostline" type="button">Remove keys</button>
+      </div>
+      <p id="byokStatus" class="sub" role="status" style="margin-top:8px"></p>
+    </div>
   </div>
 </section>
 
