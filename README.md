@@ -186,6 +186,10 @@ For local development, Settings → Developer → **Open admin panel** flips the
 | On-device damage masks (offline / fallback) | **SlimSAM-77** (compressed SAM) + our crack-tuned decoder [`tariqkhalif/slimsam-77-crack`](https://huggingface.co/tariqkhalif/slimsam-77-crack) | in the browser, transformers.js · [`training/slimsam-crack/`](./training/slimsam-crack/) |
 | Voice intake (any language; auto-detected, optional `languageBias`) | **Muse Voice Transcribe** | `POST https://api.meta.ai/v1/asr/transcribe` (file) · `wss://api.meta.ai/v1/asr/realtime` (live) |
 
+**Multi-model pipeline:** every claim combines four Meta model families - SAM 3.1 (live masks) + Muse Spark 1.3 (evidence-gated findings) + Muse Spark Open (independent skeptic, served by inference partner Baseten) + Muse Voice Transcribe (spoken intake). The PWA cross-checks the two mask sources against each other (`POST /v1/crosscheck`).
+
+**Open-weights fine-tuning:** the on-device SlimSAM-77 mask decoder is fine-tuned for cracks (stock encoder frozen; decoder-only fine-tune, AdamW, 12 epochs on the public Özgenel Concrete Crack Segmentation Dataset (CC BY 4.0)) and published on the Hugging Face Hub as [`tariqkhalif/slimsam-77-crack`](https://huggingface.co/tariqkhalif/slimsam-77-crack): held-out crack mIoU 0.174 stock vs 0.697 tuned in the browser build. Training script, ONNX export, and evals live in [`training/slimsam-crack/`](./training/slimsam-crack/).
+
 No image generation anywhere: every visual is drawn in code from the masks and the math. (Muse Image is unavailable in our region under Meta's Geographic Use Policy - the receipts pattern turns that constraint into a design principle, not a product boundary.)
 
 ## API reference
