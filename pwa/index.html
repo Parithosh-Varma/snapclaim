@@ -392,6 +392,25 @@
     html[data-theme="auto"] svg.schematic{background:#1d1b17}
     html[data-theme="auto"] .empty{border-color:#4a4438;color:#ada595}
   }
+
+  /* ---------- tablets and desktops: use the width instead of one phone column ---------- */
+  @media (min-width:900px){
+    .wrap{max-width:720px}
+    #sMark .wrap,#sReport .wrap{max-width:1180px;padding-left:32px;padding-right:32px}
+    #sCheck .wrap{max-width:1000px}
+    /* mark: photo left (kept in view while scrolling the controls), controls right */
+    #sMark .card{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(300px,1fr);gap:24px;align-items:start}
+    #markCanvas{width:auto;max-width:100%;max-height:calc(100dvh - 200px);justify-self:center;position:sticky;top:16px}
+    /* check: the two checks side by side */
+    #sCheck .wrap{display:grid;grid-template-columns:1fr 1fr;column-gap:16px;align-items:start}
+    #sCheck .wrap>*{grid-column:1/-1}
+    #sCheck .wrap>.checkcard{grid-column:auto;align-self:stretch}
+    /* report: the document left, actions right */
+    #sReport .wrap{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(320px,1fr);column-gap:24px;align-items:start}
+    #sReport .wrap>*{grid-column:1/-1}
+    #sReport .doc{grid-column:1}
+    #sReport .report-side{grid-column:2}
+  }
 </style>
 </head>
 <body>
@@ -437,6 +456,7 @@
     <p class="sub">One tap on the crack. The coin is already outlined from the gate.</p>
     <div class="card">
       <canvas id="markCanvas"></canvas>
+      <div class="mark-side">
       <div style="display:flex;gap:8px;margin:8px 0 2px">
         <button id="undoBtn" class="btn-ghostline" type="button" style="flex:1;min-height:44px" disabled>↩ Undo last tap</button>
       </div>
@@ -506,6 +526,7 @@
       <div id="tfState" style="font-size:12px;color:var(--slate);font-family:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace"></div>
       <button id="measureBtn" class="btn-primary" type="button" disabled>Measure damage</button>
       <span id="status"></span>
+      </div>
     </div>
   </div>
 </section>
@@ -604,6 +625,7 @@
       <blockquote id="docQuote" hidden></blockquote>
       <table><tbody id="docRows"><tr><th>Measurement</th><td>Generate the report to fill this in.</td></tr></tbody></table>
     </article>
+    <div class="report-side">
     <div id="reportState" aria-live="polite"></div>
     <div class="card">
       <button id="renderBtn" class="btn-primary" type="button">Generate report</button>
@@ -629,6 +651,7 @@
         <pre id="raw">{}</pre>
       </div>
     </details>
+    </div>
   </div>
 </section>
 <!-- Home tab -->
