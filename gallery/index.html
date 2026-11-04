@@ -12,35 +12,34 @@
 <body>
 <header class="site-header">
   <a class="brand" href="https://snapclaim.pages.dev">
-    <img src="assets/snapclaim-mark.png" width="36" height="36" alt="SnapClaim mark">
-    <span>Snap<strong>Claim</strong> <em>Gallery</em></span>
+    <img src="assets/snapclaim-mark.png" width="34" height="34" alt="SnapClaim mark">
+    <span>Snap<strong>Claim</strong> <em>/ gallery</em></span>
   </a>
-  <nav>
-    <a href="#capture">Capture</a>
-    <a href="#pipeline">Pipeline</a>
-    <a href="#proof">Field proof</a>
-    <a href="#cost">Cost</a>
+  <nav aria-label="Exhibits">
+    <a href="#capture">A · Capture</a>
+    <a href="#pipeline">B · Pipeline</a>
+    <a href="#proof">C · Field proof</a>
+    <a href="#cost">D · Cost</a>
   </nav>
 </header>
 
 <main id="main">
   <section class="hero">
-    <div>
-      <p class="kicker">Computed, not generated</p>
-      <h1>Every number has a receipt.</h1>
-      <p>A photo plus one spoken line becomes a claim-ready report — % damaged, crack length and width, area in cm² — each backed by a machine-checkable receipt. The server refuses to ship any sentence whose numbers don't cite one.</p>
-      <p class="cta-row">
-        <a class="btn" href="https://snapclaim.pages.dev">Try the live app</a>
-        <a class="btn ghost" href="https://landing.snapclaim.pages.dev">How it works</a>
-      </p>
-    </div>
-    <figure>
-      <img src="assets/hero-crack.jpg" alt="Close-up of a measured terrace crack with a coin for scale">
-      <figcaption>Terrace-slab crack, photographed with a coin for scale.</figcaption>
+    <p class="kicker">Computed, not generated — field record SC-D8ECE64B</p>
+    <h1><span class="measure" aria-label="232 millimetres">232<span class="unit">mm</span></span></h1>
+    <p class="hero-sub">One terrace crack. Tape said <strong>227&nbsp;mm</strong>, a photo-alone guess said <strong>315&nbsp;mm</strong>, SnapClaim measured <strong>232&nbsp;mm [R005]</strong> — confirmed by gate, skeptic, and mask cross-check.</p>
+    <p class="cta-row">
+      <a class="btn" href="https://snapclaim.pages.dev">Try the live app</a>
+      <a class="btn ghost" href="https://landing.snapclaim.pages.dev">How it works</a>
+    </p>
+    <figure class="hero-photo">
+      <img src="assets/hero-crack.jpg" alt="Close-up of the measured terrace crack with a coin for scale">
+      <figcaption>The crack, photographed with a coin for scale.</figcaption>
     </figure>
   </section>
 
-  <section id="capture">
+  <section id="capture" class="exhibit">
+    <p class="exhibit-tag">Exhibit A</p>
     <h2>Capture — a phone and a coin</h2>
     <p>Sample captures from the team's test set. Tap any photo to enlarge it. In the app, you tap the damage and the coin; on-device SlimSAM previews the masks before anything is sent.</p>
     <div class="grid" id="photo-grid">
@@ -63,7 +62,8 @@
     </div>
   </section>
 
-  <section id="pipeline">
+  <section id="pipeline" class="exhibit">
+    <p class="exhibit-tag">Exhibit B</p>
     <h2>Pipeline — masks to receipts to sentences</h2>
     <p>No LLM touches the numbers. Models write sentences; deterministic code does the arithmetic. The evidence gate ships a finding only if every number cites its receipt — otherwise HTTP 422 with named failures.</p>
     <figure class="wide">
@@ -71,7 +71,8 @@
     </figure>
   </section>
 
-  <section id="proof">
+  <section id="proof" class="exhibit">
+    <p class="exhibit-tag">Exhibit C</p>
     <h2>Field proof — terrace slab, ref SC-D8ECE64B</h2>
     <div class="proof">
       <figure>
@@ -79,13 +80,13 @@
         <figcaption>Tape span 227 mm (225–230) for context; pin-to-pin path 274 mm.</figcaption>
       </figure>
       <div>
-        <table>
-          <tr><th>Length</th><td><strong>232 mm</strong> [R005] — Confirmed</td></tr>
-          <tr><th>Width</th><td><strong>3.2 mm</strong> [R006] — Unverified, no width ground truth</td></tr>
-          <tr><th>Surface</th><td><strong>0.73%</strong> [R002] — Confirmed</td></tr>
-          <tr><th>Area</th><td><strong>7.48 cm²</strong> [R004] — Confirmed</td></tr>
-          <tr><th>Severity</th><td><strong>significant</strong> [R007] — Confirmed</td></tr>
-        </table>
+        <ul class="receipts">
+          <li><span class="r">R005</span><span class="v">232 mm</span><span class="k">length</span><span class="stamp ok">Confirmed</span></li>
+          <li><span class="r">R006</span><span class="v">3.2 mm</span><span class="k">width</span><span class="stamp warn">Unverified — no width ground truth</span></li>
+          <li><span class="r">R002</span><span class="v">0.73%</span><span class="k">surface</span><span class="stamp ok">Confirmed</span></li>
+          <li><span class="r">R004</span><span class="v">7.48 cm²</span><span class="k">area</span><span class="stamp ok">Confirmed</span></li>
+          <li><span class="r">R007</span><span class="v">significant</span><span class="k">severity</span><span class="stamp ok">Confirmed</span></li>
+        </ul>
         <p>Verification: evidence gate passed · skeptic verified · mask cross-check verified. Chart below shows the earlier run (span 227 mm, measured 237.5 mm with a user-supplied 25 mm coin, photo-alone guess 315 mm).</p>
         <p class="cta-row">
           <a class="btn" href="https://snapclaim.pages.dev/reports/snapclaim-SC-D8ECE64B.pdf">Report PDF</a>
@@ -98,7 +99,8 @@
     </figure>
   </section>
 
-  <section id="cost">
+  <section id="cost" class="exhibit">
+    <p class="exhibit-tag">Exhibit D</p>
     <h2>Cost — what the $5 cap buys</h2>
     <p>Live calls are metered on a hard per-isolate spend cap. The demo and CI run in mock mode at $0.</p>
     <figure class="wide">
