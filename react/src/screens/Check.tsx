@@ -4,7 +4,7 @@ import { apiPost, backendError } from "../lib/api";
 import { encodeRle } from "../lib/rle";
 import { segmentViaApi, type SamClient } from "../lib/sam";
 import type { SamMask, Session } from "../lib/session";
-import { BackButton, Badge, Stepper } from "../lib/ui";
+import {TopBar, Badge} from "../lib/ui";
 
 /** Dilated bounding box of a mask (photo pixels): constrains a re-prompt to the damage region. */
 function damageBox(mask: Uint8Array, w: number, h: number): { left: number; top: number; right: number; bottom: number } | null {
@@ -241,10 +241,9 @@ export default function Check() {
     : <Badge kind="wait">Pending</Badge>;
 
   return (
-    <section className="screen on" aria-labelledby="h-check">
+    <section className="screen on polish" aria-labelledby="h-check">
       <div className="wrap wide">
-        <BackButton label="Measurements" onClick={() => go("sNum")} />
-        <Stepper step={5} />
+        <TopBar step={5} total={6} backLabel="Measurements" onBack={() => go("sNum")} />
         <h1 id="h-check">Checked twice.</h1>
         <p className="sub">A second check has to agree. Disagreements print red, never hidden.</p>
 

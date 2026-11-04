@@ -170,7 +170,7 @@ export default function Admin() {
   const mockActive = status?.mockMode !== false;
 
   return (
-    <section className="screen on" aria-labelledby="h-admin">
+    <section className="screen on polish" aria-labelledby="h-admin">
       <div className="wrap">
         <BackButton label="Home" onClick={() => window.location.assign("/")} />
         <h1 id="h-admin">Admin panel.</h1>

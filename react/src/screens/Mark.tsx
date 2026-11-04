@@ -7,7 +7,7 @@ import { closeMask } from "../lib/mask";
 import { segmentCoinViaApi, segmentViaApi, type SamClient } from "../lib/sam";
 import { buildObserveBody, completeMeasureJob, failMeasureJob, invalidateMeasure, startMeasureJob } from "../lib/measure-job";
 import { COIN_GROUPS, COIN_OPTIONS, customCoinError, freshAngleSlot, loadLastCustomCoin, parseCustomCoinMm, pickWinnerAngle, resetDmg, saveLastCoin, saveLastCustomCoin, type AngleSlot, type SamMask, type Session } from "../lib/session";
-import { BackButton, Stepper } from "../lib/ui";
+import {TopBar} from "../lib/ui";
 
 /** Custom coin-size dropdown: the native select cannot be styled square or
     themed, so this listbox renders the same presets (plus the gate's
@@ -899,10 +899,9 @@ export default function Mark() {
   const needSize = Boolean(s.gateCoin || s.coinManualPt) && s.coinKindMm <= 0;
 
   return (
-    <section className="screen on" aria-labelledby="h-mark">
+    <section className="screen on polish" aria-labelledby="h-mark">
       <div className="wrap wide">
-        <BackButton label="Camera" onClick={() => go("capture")} />
-        <Stepper step={2} />
+        <TopBar step={2} total={6} backLabel="Camera" onBack={() => go("capture")} />
         <h1 id="h-mark">Tap the damage.</h1>
         <p className="sub">One tap on the crack, one tap on the coin.</p>
         <div className="split stick">
@@ -1093,9 +1092,11 @@ export default function Mark() {
             <span id="tfState">{tfState}</span>
           </div>
         ) : null}
-        <button id="measureBtn" className={`btn-primary${measureBusy ? " busy" : ""}`} type="button" disabled={measureBusy || !hasMask || needSize} aria-busy={measureBusy} onClick={measure}>
-          {measureBusy ? "Measuring…" : "Measure damage"}
-        </button>
+        <div className="stickycta">
+          <button id="measureBtn" className={`btn-primary${measureBusy ? " busy" : ""}`} type="button" disabled={measureBusy || !hasMask || needSize} aria-busy={measureBusy} onClick={measure}>
+            {measureBusy ? "Measuring…" : "Measure damage"}
+          </button>
+        </div>
         {!hasMask ? (
           <p className="ctahint">Tap the damage on the photo to enable measuring.</p>
         ) : needSize ? (
