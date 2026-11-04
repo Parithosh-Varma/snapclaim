@@ -253,11 +253,11 @@ Production is <https://snapclaim.pages.dev> - open to anyone. Only the dev panel
 
 `react/public/_redirects` rewrites `/admin/*` to the app shell; `react/src/App.tsx` boots straight into the admin screen when the path starts with `/admin`, and Settings → Developer → *Open admin panel* navigates there as a real page load so Access can challenge it.
 
-Manage it in Zero Trust → Access → Applications (`SnapClaim admin`); adding a person means adding one Email include to the allow policy, no redeploy. The login host (`parithosh-varma.cloudflareaccess.com`) is the account-wide team domain, shared with the other Access apps. Check enforcement with:
+Manage it in Zero Trust → Access → Applications (`SnapClaim admin`); adding a person means adding one Email include to the allow policy, no redeploy. The login host (`parithosh-news.cloudflareaccess.com`) is the account-wide team domain, shared with the other Access apps. Check enforcement with:
 
 ```bash
 curl -s -o /dev/null -w '%{http_code} -> %{redirect_url}\n' https://snapclaim.pages.dev/admin
-# 302 -> https://parithosh-varma.cloudflareaccess.com/...
+# 302 -> https://parithosh-news.cloudflareaccess.com/...
 curl -s -o /dev/null -w '%{http_code}\n' https://snapclaim.pages.dev/
 # 200
 ```
@@ -296,11 +296,12 @@ The `npm run` commands are free and deterministic; run them yourself. The crack-
 | Measurement code vs known answers (54 scenes drawn in code, coin scale, some on tilted walls) | `npm run bench:truth` | length median error 1.4%, 100% within ±10%; width median error 4.0%, 96.3% within ±10%; 3/3 no-scale refusals held |
 | Regression on dev mask fixtures, plus known-answer error on the 5 synthetic ones | `npm run eval` | 10 pass, 0 skip, 0 fail; 5 scored, median abs error 1.0 mm, 5/5 within ±10% (drawn cracks, not real photos) |
 | On-device crack masks, one tap per crack (92 held-out photos from a public crack dataset, 276 taps, browser q8 build) | `training/slimsam-crack/browser-check/hybrid.mjs` | mIoU 0.174 with stock SlimSAM, **0.697** with our crack-tuned decoder; coins stay on stock |
-| Live pipeline on held-out real photos | `npm run bench` | 12 cases, 0 archived runs yet (all UNRUN, so the command exits 1 on purpose) |
+| Live pipeline on held-out real photos | `npm run bench` | 12 cases, 5 archived runs: 4 public photos run live 2026-11-02, 4/4 refused millimetres, but only 2/4 masks were on the crack and the skeptic flagged neither miss ([details](docs/eval-report.md#failures-and-misses)); 7 team cases UNRUN, so the command still exits 1 on purpose |
 
-What this does not show yet: how well SAM finds the crack on our own phone photos (the crack-mask row uses a public dataset). `bench:truth` checks the maths given a mask, not the mask itself. One real crack has a thread-and-tape ground truth (`terrace-slab-tape-01`, n = 1, below); `npm run bench:gap` scores the path against the thread and prints the span for context. We would rather show that gap than fill it with a number we cannot back.
+What this does not show yet: how well SAM finds the crack on our own phone photos (the crack-mask row uses a public dataset). `bench:truth` checks the maths given a mask, not the mask itself. One real crack has a tape span (`terrace-slab-tape-01`, n = 1, below), but a span is context, not a scored length, so `npm run bench:gap` still prints UNSCORED. We would rather show that gap than fill it with a number we cannot back.
 
 - `npm run eval` — deterministic bench over `fixtures/masks/*.json` vs `fixtures/expected/` (missing expected file = SKIP, never a pass). Current: wall-crack 5.17% / 85.9 mm / 2.6 mm wide (unverified — no width ground truth) / 2.19 cm² (significant), stain 1.29% percent-only (moderate).
+
 <img src="docs/images/terrace-slab.jpg" width="560" alt="Terrace-slab crack with a taped ₹2 coin; a yellow measuring tape runs alongside as ground truth">
 *Our own field photo: the crack, a taped coin for scale, and the tape as ground truth — [full case-study report](https://landing.snapclaim.pages.dev/assets/case-study/terrace-slab.pdf).*
 
