@@ -3,7 +3,7 @@ import { useApp } from "../App";
 import { apiGet, apiPost } from "../lib/api";
 import { createSession } from "../lib/session";
 import {TopBar, Badge, downloadFile} from "../lib/ui";
-import { buildReportPdf, dataUrlToJpegBytes, type PdfPhoto } from "../lib/pdf";
+import { buildReportPdf, dataUrlToJpegBytes, type PdfFinding, type PdfPhoto, type PdfReceipt } from "../lib/pdf";
 import { shareUrl } from "../lib/share";
 
 /** Mirror of sanitizeSvg in pwa/app.js: the downloaded .svg opens as a
@@ -195,9 +195,64 @@ export default function Report() {
       img.src = url;
     });
 
+  /** Annotated Figure 1b: the marking photo with the measured damage outline
+      in red and the coin scale outline in green, composited on-device from the
+      same masks that were measured. Null when there is nothing to draw. */
+  const buildAnnotatedPhoto = (): PdfPhoto | null => {
+    const base = s.photo;
+    if (!base || base.width < 8 || base.height < 8) return null;
+    try {
+      const c = document.createElement("canvas");
+      c.width = base.width;
+      c.height = base.height;
+      const g = c.getContext("2d", { willReadFrequently: true });
+      if (!g) return null;
+      g.drawImage(base, 0, 0);
+      const tint = (mask: Uint8Array | null, r: number, gg: number, b: number): void => {
+        if (!mask || mask.length !== base.width * base.height) return;
+        const img = g.getImageData(0, 0, c.width, c.height);
+        for (let i = 0; i < mask.length; i++) {
+          if (!mask[i]) continue;
+          const o = i * 4;
+          img.data[o] = (img.data[o] ?? 0) * 0.55 + r * 0.45;
+          img.data[o + 1] = (img.data[o + 1] ?? 0) * 0.55 + gg * 0.45;
+          img.data[o + 2] = (img.data[o + 2] ?? 0) * 0.55 + b * 0.45;
+        }
+        g.putImageData(img, 0, 0);
+      };
+      tint(s.dmg.mask, 192, 57, 43);
+      tint(s.coinMask, 14, 122, 54);
+      if (!s.coinMask && s.gateCoin) {
+        const kx = base.width / s.gateCoin.sw;
+        const ky = base.height / s.gateCoin.sh;
+        g.strokeStyle = "#0e8a4d";
+        g.lineWidth = Math.max(2, base.width / 200);
+        g.beginPath();
+        g.arc(
+          (s.gateCoin.cx / s.gateCoin.fw) * s.gateCoin.sw * kx,
+          (s.gateCoin.cy / s.gateCoin.fh) * s.gateCoin.sh * ky,
+          Math.max(3, (s.gateCoin.rr / s.gateCoin.fw) * s.gateCoin.sw * kx),
+          0, Math.PI * 2,
+        );
+        g.stroke();
+      }
+      if (!s.dmg.mask && !s.coinMask && !s.gateCoin) return null;
+      return {
+        jpeg: dataUrlToJpegBytes(c.toDataURL("image/jpeg", 0.85)),
+        width: c.width,
+        height: c.height,
+        caption: "Measured outlines",
+        alt: "Figure 1b: measured outlines over the photo, red damage outline and green coin scale reference",
+      };
+    } catch {
+      return null;
+    }
+  };
+
   /** Real PDF download: a file the OS saves, with no reliance on the browser's
-      print dialog (which is a silent no-op in installed iOS PWAs). Photo +
-      outlined annexure embedded as JPEG. */
+      print dialog (which is a silent no-op in installed iOS PWAs). Original
+      photo plus annotated overlay as Figures 1a/1b; numbers and receipts
+      render as native selectable text in the evidence annexure. */
   const downloadPdf = async () => {
     if (!f || pdfBusy || !gateOk) return;
     setPdfBusy(true);
@@ -205,51 +260,107 @@ export default function Report() {
       const photos: PdfPhoto[] = [];
       if (s.stillDataUrl) {
         const p = await rasterizeToJpeg(s.stillDataUrl, 1000);
-        p.caption = "Figure 1 - captured photo, full frame";
+        p.caption = "Captured photo, full frame";
+        p.alt = "Figure 1a: captured photo of the damage, full frame";
         photos.push(p);
       }
-      if (s.locationPhoto) {
-        try {
-          const p = await rasterizeToJpeg(s.locationPhoto, 1000);
-          p.caption = "Figure 2 - wider view showing where on the property the damage is. Context only, not measured.";
-          photos.push(p);
-        } catch {
-          setState("Location photo came out blank and was skipped - the numbers below are unaffected.");
-        }
-      }
-      if (annexSrc) {
+      const annotated = buildAnnotatedPhoto();
+      if (annotated) {
+        photos.push(annotated);
+      } else if (annexSrc) {
+        // Last resort when the marking canvas is gone (e.g. draft restore):
+        // the rendered annexure outlines rather than no Figure 1b at all.
         try {
           const p = await rasterizeToJpeg(annexSrc, 1000);
-          p.caption = `Figure ${photos.length + 1} - measured outlines (red damage, green coin scale, from the evidence)`;
+          p.caption = "Measured outlines (rendered annexure)";
+          p.alt = "Figure 1b: measured outlines from the evidence annexure";
           photos.push(p);
         } catch {
-          setState("Annexure came out blank and was skipped - the numbers below are unaffected.");
+          setState("Annotated overlay unavailable - the PDF carries the full-frame photo only.");
         }
       }
       if (!photos.length) throw new Error("no figures rendered - retake or reselect the photo");
-      const row = (item: string, value: string | null, ev: string | undefined, status = "Confirmed"): { item: string; value: string; evidence: string; status: string } => ({
-        item,
-        value: value ?? "-",
-        evidence: ev ?? "-",
-        status,
+      const mapCheck = (v: unknown): "passed" | "failed" | "checking" | "not-run" =>
+        v === "ok" ? "passed" : v === "error" ? "failed" : v === "loading" ? "checking" : "not-run";
+      const skeptic = mapCheck(ctx.checks.skeptic);
+      const xcheck = mapCheck(ctx.checks.xcheck);
+      // Width is the number most likely to be challenged: it stays
+      // Unverified until an independent check (skeptic or cross-check) backs
+      // it, with the reason kept next to the card in plain language.
+      const widthBacked = skeptic === "passed" || xcheck === "passed";
+      const allFindings = (s.measurement?.findings ?? [f]) as typeof f[];
+      const findings: PdfFinding[] = allFindings.map((ff) => {
+        const rids = ((ff as unknown as { receiptIds?: Record<string, string | null> }).receiptIds ?? {}) as Record<string, string | null>;
+        const w = ff.crackWidthMm ?? null;
+        return {
+          label: String(ff.label ?? "damage"),
+          percent: Number(ff.percent ?? 0),
+          lengthMm: ff.crackLengthMm ?? null,
+          widthMm: w,
+          areaCm2: ff.areaCm2 ?? null,
+          severity: String(ff.severity ?? "moderate"),
+          receiptIds: { ratio: rids.ratio ?? null, length: rids.length ?? null, area: rids.area ?? null, width: rids.width ?? null, severity: rids.severity ?? null },
+          widthStatus: w === null ? "confirmed" : widthBacked ? "confirmed" : "unverified",
+          widthNote: "No reference to verify width against",
+          statement: typeof ff.statement === "string" && ff.statement.trim() ? ff.statement : undefined,
+        };
       });
+      const MEASURE_LABEL: Record<string, string> = {
+        area_ratio: "Area ratio",
+        region_count: "Region count",
+        scale_calibration: "Scale calibration",
+        scale_rejected: "Scale reference rejected",
+        calibrated_length: "Calibrated length",
+        calibrated_area: "Calibrated area",
+        calibrated_width: "Calibrated width",
+        severity_classification: "Severity classification",
+      };
+      const capSev = (v: unknown): string => {
+        const l = String(v ?? "").toLowerCase();
+        return l === "significant" ? "Significant" : l === "moderate" ? "Moderate" : "Cosmetic";
+      };
+      const rawReceipts = (s.measurement?.receipts ?? []) as unknown as { id: string; method: string; output: { value: number | string; unit: string }; formula: string }[];
+      const list = Array.isArray(rawReceipts) ? rawReceipts : [];
+      const receipts: PdfReceipt[] = list
+        .filter((rr) => rr && typeof rr.id === "string")
+        .map((rr) => {
+          const method = String(rr.method ?? "measure");
+          const v = (rr.output?.value ?? "") as number | string;
+          const n = typeof v === "number" ? v : Number(v);
+          let value: string;
+          if (method === "scale_calibration" && Number.isFinite(n)) value = `${(n as number).toFixed(6)} mm/px`;
+          else if (method === "area_ratio" && Number.isFinite(n)) value = `${(n as number).toFixed(2)}%`;
+          else if (method === "calibrated_length" && Number.isFinite(n)) value = `${(n as number).toFixed(1)} mm`;
+          else if (method === "calibrated_width" && Number.isFinite(n)) value = `${(n as number).toFixed(1)} mm`;
+          else if (method === "calibrated_area" && Number.isFinite(n)) value = `${(n as number).toFixed(2)} cm²`;
+          else if (method === "region_count") value = String(v);
+          else if (method === "severity_classification") value = capSev(v);
+          else if (rr.output?.unit) value = `${String(v)} ${rr.output.unit}`;
+          else value = String(v);
+          return {
+            id: String(rr.id),
+            measure: MEASURE_LABEL[method] ?? String(method).replace(/_/g, " "),
+            value,
+            formula: String(rr.formula ?? ""),
+            unverified: method === "calibrated_width" && !widthBacked,
+          };
+        });
+      const now = new Date();
+      const pad = (n: number): string => String(n).padStart(2, "0");
       const bytes = buildReportPdf({
         brand: "SnapClaim",
         ref: refNo,
         dateLine: gateOk ? String(document.querySelector("#docMeta")?.textContent ?? dateStr) : dateStr,
+        version: "0.3.0",
+        mode: s.measurement?.mode === "absolute" ? "absolute" : "percent-only",
+        generatedUtc: `${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}-${pad(now.getUTCDate())} ${pad(now.getUTCHours())}:${pad(now.getUTCMinutes())} UTC`,
+        coinLabel: s.coinLabel || undefined,
+        coinMm: s.coinKindMm > 0 ? s.coinKindMm : undefined,
         headerLogo: await rasterizeToJpeg("./snapclaim-mark-dark.png", 160, "#0b1e46").catch(() => undefined),
         quote: s.transcript.trim(),
-        rows: [
-          ...(f.crackLengthMm != null ? [row("Crack length", `${String(f.crackLengthMm)} mm`, refs.length)] : []),
-          ...(f.crackWidthMm != null ? [row("Crack width", `${String(f.crackWidthMm)} mm`, refs.width, "Unverified — no width ground truth")] : []),
-          row("Surface affected", `${String(f.percent)} %`, refs.ratio),
-          ...(f.areaCm2 != null ? [row("Area", `${String(f.areaCm2)} cm2`, refs.area)] : []),
-          row("Severity", String(f.severity), refs.severity),
-        ],
-        method: s.measurement?.mode === "absolute"
-          ? "Outlines measured from photo pixels, scaled by the coin diameter (tilt-corrected from its ellipse). Every number cites its evidence receipt."
-          : "Percent-only report: no coin scale was available, so lengths stay unmeasured. Every number cites its evidence receipt.",
-        checks: `Evidence gate: ${gateOk ? "passed" : "pending"} - Independent skeptic: ${checkText(ctx.checks.skeptic)} - Mask cross-check: ${checkText(ctx.checks.xcheck)}`,
+        findings,
+        receipts,
+        checks: { gate: gateOk ? "passed" : "pending", skeptic, xcheck },
         photos,
       });
       downloadFile(`snapclaim-${refNo}.pdf`, new Blob([bytes as unknown as BlobPart], { type: "application/pdf" }));

@@ -36,7 +36,8 @@ export default function Shared({ rep }: { rep: SharedReport }) {
         jpeg: dataUrlToJpegBytes(rep.img),
         width: Math.max(1, Math.round(img.naturalWidth * scale)),
         height: Math.max(1, Math.round(img.naturalHeight * scale)),
-        caption: "Figure 1 - shared report photograph",
+        caption: "Captured photo, full frame",
+        alt: "Figure 1a: shared report photograph, full frame",
       };
       let logo: PdfPhoto | undefined;
       try {
@@ -64,50 +65,39 @@ export default function Shared({ rep }: { rep: SharedReport }) {
       } catch {
         logo = undefined;
       }
-      const row = (item: string, value: string | null, status = "Confirmed"): { item: string; value: string; evidence: string; status: string } => ({
-        item,
-        value: value ?? "-",
-        evidence: "-",
-        status,
-      });
-      let locFig: PdfPhoto | null = null;
-      if (rep.locationImg) {
-        try {
-          const li = await new Promise<HTMLImageElement>((resolve, reject) => {
-            const im = new Image();
-            im.onload = () => resolve(im);
-            im.onerror = () => reject(new Error("shared location photo would not decode"));
-            im.src = rep.locationImg as string;
-          });
-          const lscale = Math.min(1, 1000 / Math.max(li.naturalWidth, li.naturalHeight));
-          locFig = {
-            jpeg: dataUrlToJpegBytes(rep.locationImg as string),
-            width: Math.max(1, Math.round(li.naturalWidth * lscale)),
-            height: Math.max(1, Math.round(li.naturalHeight * lscale)),
-            caption: "Figure 2 - wider view showing where the damage is. Context only, not measured.",
-          };
-        } catch {
-          locFig = null;
-        }
-      }
+      const findings = [
+        {
+          label: String(rep.label ?? "damage"),
+          percent: Number(rep.percent ?? 0),
+          lengthMm: rep.lengthMm ?? null,
+          widthMm: rep.widthMm ?? null,
+          areaCm2: rep.areaCm2 ?? null,
+          severity: String(rep.severity ?? "moderate"),
+          receiptIds: {},
+          // A shared copy carries no verification reference for the width,
+          // so the caveat travels with it instead of being dropped.
+          widthStatus: (rep.widthMm ?? null) === null ? ("confirmed" as const) : ("unverified" as const),
+          widthNote: "No reference to verify width against",
+        },
+      ];
+      // Note: the wider location view stays on screen only. The PDF keeps the
+      // Figure 1a/1b pair (captured photo plus measured outlines) so the
+      // annexure flow is never pushed apart by context shots.
       const bytes = buildReportPdf({
         brand: "SnapClaim",
         ref: rep.ref,
         dateLine: rep.date,
         quote: rep.transcript,
         headerLogo: logo,
-        rows: [
-          ...(rep.lengthMm != null ? [row("Crack length", `${rep.lengthMm} mm`)] : []),
-          ...(rep.widthMm != null ? [row("Crack width", `${rep.widthMm} mm`, "Unverified — no width ground truth")] : []),
-          row("Surface affected", `${rep.percent} %`),
-          ...(rep.areaCm2 != null ? [row("Area", `${rep.areaCm2} cm2`)] : []),
-          row("Severity", rep.severity),
-        ],
+        findings,
+        receipts: [],
+        generatedUtc: "see the original report",
+        mode: rep.mode === "absolute" ? "absolute" : "percent-only",
         method: rep.mode === "absolute"
-          ? "Outlines measured from photo pixels, scaled by a coin reference. Every number cites its evidence receipt in the original report."
-          : "Percent-only report: no coin scale was available. Every number cites its evidence receipt in the original report.",
+          ? "Outlines were measured from photo pixels and scaled using a coin reference in the original report. This shared copy carries the numbers; the receipts live in the original report."
+          : "No coin scale was in frame, so the original report gives percentages only. This shared copy carries the numbers; the receipts live in the original report.",
         checks: rep.checks,
-        photos: locFig ? [photo, locFig] : [photo],
+        photos: [photo],
       });
       downloadFile(`snapclaim-${rep.ref}.pdf`, new Blob([bytes as unknown as BlobPart], { type: "application/pdf" }));
       setMsg("PDF downloaded.");
