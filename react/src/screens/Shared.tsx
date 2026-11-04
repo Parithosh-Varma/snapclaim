@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useApp } from "../App";
-import { BackButton, Badge, Stepper } from "../lib/ui";
+import {TopBar, Badge} from "../lib/ui";
 import { buildReportPdf, dataUrlToJpegBytes, type PdfPhoto } from "../lib/pdf";
 import { downloadFile } from "../lib/ui";
 import type { SharedReport } from "../lib/share";
@@ -119,10 +119,9 @@ export default function Shared({ rep }: { rep: SharedReport }) {
   };
 
   return (
-    <section className="screen on" aria-labelledby="h-shared">
+    <section className="screen on polish" aria-labelledby="h-shared">
       <div className="wrap wide">
-        <BackButton label="Home" onClick={home} />
-        <Stepper step={6} />
+        <TopBar step={6} total={6} backLabel="Home" onBack={home} />
         <h1 id="h-shared">Shared damage report.</h1>
         <p className="sub">Sent by the reporter - read-only, nothing here measures or edits.</p>
         <p className="stateline" role="note">UNVERIFIED sender — link carries the report with no signature. Confirm by phone before paying. {rep.sig ? "Signature present but not checked on this device." : "No signature present."}</p>
@@ -178,9 +177,11 @@ export default function Shared({ rep }: { rep: SharedReport }) {
 
         <div className="split-side">
         <div className="card">
-          <button id="sharedPdfBtn" className={`btn-primary${pdfBusy ? " busy" : ""}`} type="button" disabled={pdfBusy} aria-busy={pdfBusy} onClick={() => void download()}>
-            {pdfBusy ? "Preparing PDF…" : "Download PDF"}
-          </button>
+          <div className="stickycta">
+            <button id="sharedPdfBtn" className={`btn-primary${pdfBusy ? " busy" : ""}`} type="button" disabled={pdfBusy} aria-busy={pdfBusy} onClick={() => void download()}>
+              {pdfBusy ? "Preparing PDF…" : "Download PDF"}
+            </button>
+          </div>
           {msg ? <div id="sharedState" role="status" className="stateline">{msg}</div> : null}
           <button id="sharedHomeBtn" className="btn-ghostline" type="button" style={{ marginTop: 10 }} onClick={home}>
             Make your own report

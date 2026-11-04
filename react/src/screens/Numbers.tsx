@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useApp } from "../App";
 import { MASK_COLORS, type Session } from "../lib/session";
-import { BackButton, Badge, MetricCards, Stepper, receiptDetails } from "../lib/ui";
+import {TopBar, Badge, MetricCards, receiptDetails} from "../lib/ui";
 
 /** Bounding box of the on pixels, or null when the mask is empty. */
 function maskBox(mask: Uint8Array, w: number, h: number) {
@@ -122,10 +122,9 @@ export default function Numbers() {
   const first = m?.findings[0];
 
   return (
-    <section className="screen on" aria-labelledby="h-num">
+    <section className="screen on polish" aria-labelledby="h-num">
       <div className="wrap wide">
-        <BackButton label="Describe" onClick={() => go("sSay")} />
-        <Stepper step={4} />
+        <TopBar step={4} total={6} backLabel="Describe" onBack={() => go("sSay")} />
         <h1 id="h-num">Get the numbers.</h1>
         <p className="sub">Outlined and measured, not guessed.</p>
         <div className="split">

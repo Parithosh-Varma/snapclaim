@@ -168,6 +168,15 @@ test("React port keeps backend, worker and privacy contracts", () => {
   assert.ok(say.includes("disabled={sending || !hasText}"), "Continue stays disabled until the field has content");
   assert.ok(say.includes("Saving…") && say.includes(": \"Continue\""), "Continue keeps its label and names the saving state");
   assert.ok(say.includes("Measurements captured"), "measurement status is a chip, not an orphan line");
+  assert.ok(read("react/src/lib/ui.tsx").includes('role="progressbar"'), "TopBar exposes the step progress");
+  for (const [screen, step] of [["Mark", 2], ["Numbers", 4], ["Check", 5], ["Report", 6], ["Shared", 6]] as const) {
+    const src = read(`react/src/screens/${screen}.tsx`);
+    assert.ok(src.includes("<TopBar") && src.includes(`step={${step}}`) && src.includes("total={6}"),
+      `${screen} uses the shared step top bar`);
+    assert.ok(!src.includes("<BackButton") && !src.includes("<Stepper"), `${screen} retired the loose back link + stepper`);
+    assert.ok(src.includes("stickycta"), `${screen} keeps its primary action sticky`);
+  }
+  assert.ok(read("react/src/screens/Say.tsx").includes("saytop"), "Say uses the same top-bar pattern");
   const tabs = read("react/src/screens/Tabs.tsx");
   assert.ok(tabs.includes('id="metaKeyInput"') && tabs.includes('id="byokSave"') && tabs.includes('id="byokClear"'), "settings offers device-only BYOK fields");
   assert.ok(tabs.includes("never stored server-side"), "BYOK copy states the key handling honestly");

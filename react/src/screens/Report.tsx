@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useApp } from "../App";
 import { apiGet, apiPost } from "../lib/api";
 import { createSession } from "../lib/session";
-import { BackButton, Badge, Stepper, downloadFile } from "../lib/ui";
+import {TopBar, Badge, downloadFile} from "../lib/ui";
 import { buildReportPdf, dataUrlToJpegBytes, type PdfPhoto } from "../lib/pdf";
 import { shareUrl } from "../lib/share";
 
@@ -356,10 +356,9 @@ export default function Report() {
   };
 
   return (
-    <section className="screen on" aria-labelledby="h-send">
+    <section className="screen on polish" aria-labelledby="h-send">
       <div className="wrap wide">
-        <BackButton label="Checks" onClick={() => go("sCheck")} />
-        <Stepper step={6} />
+        <TopBar step={6} total={6} backLabel="Checks" onBack={() => go("sCheck")} />
         <h1 id="h-send">Send the report.</h1>
         <p className="sub">To your landlord or insurer, in one tap.</p>
         {s.measurement?.verdict === "no-damage" && (
@@ -497,9 +496,11 @@ export default function Report() {
 
         <div className="split-side">
         <div className="card">
-          <button id="renderBtn" className={`btn-primary${rendering ? " busy" : ""}`} type="button" onClick={render} disabled={rendering} aria-busy={rendering}>
-            {rendering ? "Generating…" : "Generate report"}
-          </button>
+          <div className="stickycta">
+            <button id="renderBtn" className={`btn-primary${rendering ? " busy" : ""}`} type="button" onClick={render} disabled={rendering} aria-busy={rendering}>
+              {rendering ? "Generating…" : "Generate report"}
+            </button>
+          </div>
           {state ? <div id="reportState" className="stateline" aria-live="polite">{state}</div> : null}
           <div className="rowbtns">
             <button id="pdfBtn" className={`btn-dark${pdfBusy ? " busy" : ""}`} type="button" disabled={!gateOk || pdfBusy} aria-busy={pdfBusy} onClick={() => void downloadPdf()}>{pdfBusy ? "Preparing PDF…" : "Download PDF"}</button>
