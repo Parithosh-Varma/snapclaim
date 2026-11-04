@@ -373,7 +373,7 @@ type BackendState =
 
 export function Settings() {
   const ctx = useApp();
-  const { store, casesVersion, bumpCases, toast, base, setBase, checkForUpdates, swUpdateReady, applyUpdate, go } = ctx;
+  const { store, casesVersion, bumpCases, toast, base, setBase, checkForUpdates, swUpdateReady, applyUpdate, go, replayOnboarding } = ctx;
   const cases = store.list();
   void casesVersion;
   const [theme, setTheme] = useState(() => String(store.getSettings().theme ?? document.documentElement.dataset.theme ?? "auto"));
@@ -772,6 +772,14 @@ export function Settings() {
         >
           <div className="about-rows">
             <span className="about-row"><span>Version</span><b>{APP_VERSION}</b></span>
+            <button
+              type="button"
+              className="about-row about-link"
+              style={{ border: 0, background: "none", width: "100%", font: "inherit", cursor: "pointer", textAlign: "left" }}
+              onClick={replayOnboarding}
+            >
+              <span>How it works</span><b aria-hidden="true">→</b>
+            </button>
             <details className="learn about-detail">
               <summary>Privacy policy</summary>
               <p>Tapping damage sends the photo to the backend for outlining (falls back to on-device). Optional cross-checks send the tapped photo again to the backend you configure. Sharing for measurement improvement is off by default and per-photo.</p>

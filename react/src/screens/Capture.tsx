@@ -3,6 +3,7 @@ import { useApp } from "../App";
 import { loadSamplePhoto } from "../lib/sample";
 import { SamplePicker } from "./SamplePicker";
 import { freshAngleSlot, resetDmg } from "../lib/session";
+import { CaptureCoach, CoinStatusChip, dismissCaptureCoach, shouldShowCaptureCoach } from "./Onboarding";
 
 const CAM_ERRORS: Record<string, string> = {
   NotAllowedError: "Camera permission is off - tap Enable camera",
@@ -29,6 +30,14 @@ export default function Capture() {
   const [live, setLive] = useState(false);
   const [acquiring, setAcquiring] = useState(false);
   const [noScale, setNoScale] = useState(false);
+  /* Just-in-time coach-mark: first capture only, dismissible, persisted. */
+  const [coachOn, setCoachOn] = useState(() => {
+    try { return shouldShowCaptureCoach(); } catch { return true; }
+  });
+  const hideCoach = useCallback(() => {
+    setCoachOn(false);
+    try { dismissCaptureCoach(); } catch { /* ignore */ }
+  }, []);
   const sheetRef = useRef<HTMLDivElement>(null);
   const dragY = useRef<number | null>(null);
   /* tips: closed by default; auto-open only on first visit */
@@ -373,6 +382,17 @@ export default function Capture() {
             </button>
           </div>
           <div id="coinHint" role="status">{statusLine}</div>
+          {live && !noScale && (
+            <div style={{ alignSelf: "center", marginTop: 8 }}>
+              {/* Live detector plugs in here: detected flips the chip with
+                  icon + text, never colour alone. Until then it honestly
+                  reports that no coin is confirmed yet. */}
+              <CoinStatusChip detected={false} />
+            </div>
+          )}
+          {live && !enableCam && coachOn && !noScale && (
+            <CaptureCoach onGotIt={hideCoach} />
+          )}
           <input
             ref={fileRef}
             type="file"

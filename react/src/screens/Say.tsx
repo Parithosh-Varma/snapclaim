@@ -3,6 +3,7 @@ import { useApp } from "../App";
 import { apiPost } from "../lib/api";
 import { blobToBase64, cleanTranscript, encodeWav, resampleTo16k, transcribeOnDevice } from "../lib/voice";
 import { BackButton, Stepper } from "../lib/ui";
+import { MicTip, dismissMicTip, shouldShowMicTip } from "./Onboarding";
 
 const MAXLEN = 280;
 
@@ -18,6 +19,14 @@ export default function Say() {
   const [locErr, setLocErr] = useState("");
   const [, setLocTick] = useState(0);
   const locFileRef = useRef<HTMLInputElement>(null);
+  /* Just-in-time mic tooltip: first visit only, dismissible. */
+  const [micTipOn, setMicTipOn] = useState(() => {
+    try { return shouldShowMicTip(); } catch { return true; }
+  });
+  const hideMicTip = useCallback(() => {
+    setMicTipOn(false);
+    try { dismissMicTip(); } catch { /* ignore */ }
+  }, []);
 
   /* Wide context shot: downscaled client-side, stored on the session for the
      report and the saved case. Never measured - placement only. */
@@ -266,6 +275,7 @@ export default function Say() {
             <span className="saycount" aria-hidden="true">{transcript.length} / {MAXLEN}</span>
           </div>
           <p className="fineprint" style={{ margin: "10px 2px 0" }}>Your line stays yours here - AI extends it with the photo when the report runs.</p>
+          {micTipOn && <MicTip onGotIt={hideMicTip} />}
           {voiceErr ? <p id="voiceErr" role="alert">{voiceErr}</p> : null}
         </div>
         <div className="card">

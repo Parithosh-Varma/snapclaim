@@ -18,6 +18,7 @@ import Admin from "./screens/Admin";
 import Shared from "./screens/Shared";
 import { decodeShareHash, type SharedReport } from "./lib/share";
 import { Home, Cases, Settings } from "./screens/Tabs";
+import Onboarding, { useOnboardingGate } from "./screens/Onboarding";
 
 export type Screen =
   | "tHome" | "tCases" | "tSettings" | "tAdmin"
@@ -54,6 +55,10 @@ export interface AppCtx {
   resumeDraft(): void;
   discardDraft(): void;
   clearDraft(): void;
+  /** Enter the claim flow with an already-validated upload (desktop path). */
+  startWithPhoto(dataUrl: string): void;
+  /** Re-open first-run onboarding from Settings / How it works. */
+  replayOnboarding(): void;
 }
 
 const Ctx = createContext<AppCtx | null>(null);
@@ -232,6 +237,34 @@ export default function App() {
     go("capture");
   }, [go]);
 
+  /* Desktop / upload-first path: the photo was already validated during
+     onboarding, so reset the claim then land on review with it attached. */
+  const startWithPhoto = useCallback((dataUrl: string) => {
+    try {
+      clearDraft(localStorage);
+    } catch { /* ignore */ }
+    setDraft(null);
+    const s = sessionRef.current;
+    s.currentCaseId = null;
+    s.capturingAngle = 1;
+    resetDmg(s);
+    s.stillA = dataUrl;
+    s.stillDataUrl = dataUrl;
+    s.still2DataUrl = "";
+    s.bundleA = null;
+    s.bundleB = null;
+    s.measurementA = null;
+    s.measurementB = null;
+    s.payloadA = null;
+    s.payloadB = null;
+    s.winnerAngle = null;
+    s.noScaleMode = true;
+    s.gateCoin = null;
+    s.coinLabel = "";
+    s.coinKindMm = 0;
+    go("sReview");
+  }, [go]);
+
   const bumpCases = useCallback(() => setCasesVersion((v) => v + 1), []);
 
   /* body classes the CSS keys off (tab bar, camera control hiding) */
@@ -240,6 +273,11 @@ export default function App() {
     document.body.classList.toggle("reviewing", screen === "sReview");
     document.body.classList.toggle("step2", screen === "sSay");
   }, [screen]);
+
+  /* First-run onboarding gate: overlay until completed or dismissed. */
+  const obGate = useOnboardingGate();
+  const [obActive, setObActive] = useState(obGate.active);
+  const replayOnboarding = useCallback(() => setObActive(true), []);
 
   useEffect(() => {
     const sync = () => setOnline(navigator.onLine);
@@ -333,6 +371,8 @@ export default function App() {
     screen,
     go,
     startCapture,
+    startWithPhoto,
+    replayOnboarding,
     toast,
     casesVersion,
     bumpCases,
@@ -406,6 +446,14 @@ export default function App() {
           <span>A new version is ready - applies when this claim ends.</span>
           <button id="updateGo" type="button" onClick={applyUpdate}>Reload</button>
         </div>
+      )}
+      {obActive && (
+        <Onboarding
+          initialStep={obGate.initialStep}
+          resumed={obGate.resumed}
+          onDone={() => setObActive(false)}
+          onExit={() => setObActive(false)}
+        />
       )}
       {!online && (
         <div id="offlineBar" role="status">
