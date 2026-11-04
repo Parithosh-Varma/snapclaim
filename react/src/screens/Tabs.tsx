@@ -4,6 +4,7 @@ import { loadSamplePhoto } from "../lib/sample";
 import { SamplePicker } from "./SamplePicker";
 import { DEFAULT_BASE, DEFAULT_BACKEND_HOST, POLICY_BACKEND_MESSAGE, apiGet } from "../lib/api";
 import type { SnapCase } from "../lib/store";
+import { buildReportPdf, dataUrlToJpegBytes, type PdfPhoto } from "../lib/pdf";
 import { Badge, LoadImg, downloadFile } from "../lib/ui";
 
 function formatSize(c: SnapCase): string {
@@ -17,6 +18,32 @@ function formatSize(c: SnapCase): string {
 
 function isSafePhoto(src: unknown): src is string {
   return typeof src === "string" && /^data:image\/(png|jpeg|webp);base64,/.test(src);
+}
+
+/** Any saved photo (jpeg/png/webp data URL) downscaled to capped JPEG bytes
+    for the PDF writer, which passes JPEG through untouched. */
+function rasterizeCasePhoto(src: string, maxSide: number, caption: string): Promise<PdfPhoto> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+        const c = document.createElement("canvas");
+        c.width = Math.max(1, Math.round(img.naturalWidth * scale));
+        c.height = Math.max(1, Math.round(img.naturalHeight * scale));
+        const g = c.getContext("2d");
+        if (!g) throw new Error("no 2d context");
+        g.fillStyle = "#fff";
+        g.fillRect(0, 0, c.width, c.height);
+        g.drawImage(img, 0, 0, c.width, c.height);
+        resolve({ jpeg: dataUrlToJpegBytes(c.toDataURL("image/jpeg", 0.85)), width: c.width, height: c.height, caption });
+      } catch (e) {
+        reject(e instanceof Error ? e : new Error(String(e)));
+      }
+    };
+    img.onerror = () => reject(new Error("photo would not decode"));
+    img.src = src;
+  });
 }
 
 function CaseItem({ c, onOpen }: { c: SnapCase; onOpen: (id: string) => void }) {
@@ -202,6 +229,8 @@ export function Cases() {
   const [name, setName] = useState("");
   const [prop, setProp] = useState("");
   const [notes, setNotes] = useState("");
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfMsg, setPdfMsg] = useState("");
 
   const openCase = (id: string) => {
     const c = store.get(id);
@@ -210,7 +239,67 @@ export function Cases() {
     setName(c.name ?? "");
     setProp(c.property ?? "");
     setNotes(c.notes ?? "");
+    setPdfMsg("");
     dlgRef.current?.showModal();
+  };
+
+  /** Offline PDF straight from the saved case - no backend, no re-measure.
+      Yesterday's claim opens here, not on the Report screen, so this is the
+      only path back to a PDF once the live session is gone. */
+  const downloadCasePdf = async () => {
+    const c = dlgId ? store.get(dlgId) : null;
+    if (!c || pdfBusy) return;
+    setPdfBusy(true);
+    setPdfMsg("");
+    try {
+      const hasNumbers = typeof c.percent === "number" || typeof c.crackLengthMm === "number" || typeof c.areaCm2 === "number";
+      if (!hasNumbers && !isSafePhoto(c.photo)) throw new Error("nothing to put in a PDF yet - no photo or measurements saved");
+      const ref = `SC-${String(c.id).slice(0, 8).toUpperCase()}`;
+      let dateLine = "";
+      try {
+        dateLine = new Date(c.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+      } catch { dateLine = ""; }
+      const photos: PdfPhoto[] = [];
+      if (isSafePhoto(c.photo)) {
+        try {
+          photos.push(await rasterizeCasePhoto(c.photo, 1000, "Figure 1 - captured photo, full frame"));
+        } catch { /* photo skipped, numbers below still stand */ }
+      }
+      if (isSafePhoto(c.locationPhoto)) {
+        try {
+          photos.push(await rasterizeCasePhoto(c.locationPhoto, 1000, "Figure 2 - wider view showing where on the property the damage is. Context only, not measured."));
+        } catch { /* context shot skipped */ }
+      }
+      if (!photos.length) throw new Error("saved photo would not decode - the numbers below are still in Export JSON");
+      const row = (item: string, value: string): { item: string; value: string; evidence: string; status: string } => ({
+        item, value, evidence: "-", status: "Confirmed",
+      });
+      const bytes = buildReportPdf({
+        brand: "SnapClaim",
+        ref,
+        dateLine,
+        headerLogo: await rasterizeCasePhoto("./snapclaim-mark-dark.png", 160, "").then((p) => p).catch(() => undefined),
+        quote: String(c.transcript ?? ""),
+        rows: [
+          ...(typeof c.crackLengthMm === "number" ? [row("Crack length", `${String(c.crackLengthMm)} mm`)] : []),
+          ...(typeof c.crackWidthMm === "number" ? [row("Crack width", `${String(c.crackWidthMm)} mm`)] : []),
+          ...(typeof c.percent === "number" ? [row("Surface affected", `${String(c.percent)} %`)] : []),
+          ...(typeof c.areaCm2 === "number" ? [row("Area", `${String(c.areaCm2)} cm²`)] : []),
+          ...(c.severity ? [row("Severity", String(c.severity))] : []),
+        ],
+        method: c.mode === "absolute"
+          ? "Outlines measured from photo pixels, scaled by the coin diameter (tilt-corrected from its ellipse)."
+          : "Percent-only report: no coin scale was available, so lengths stay unmeasured.",
+        checks: "Saved case - numbers below are the values stored at report time on this device. Evidence receipts live in the exported JSON.",
+        photos,
+      });
+      downloadFile(`snapclaim-${ref}.pdf`, new Blob([bytes as unknown as BlobPart], { type: "application/pdf" }));
+      setPdfMsg("PDF downloaded.");
+    } catch (e) {
+      setPdfMsg(`PDF failed (${e instanceof Error ? e.message : String(e)}).`);
+    } finally {
+      setPdfBusy(false);
+    }
   };
 
   return (
@@ -279,6 +368,20 @@ export function Cases() {
         </div>
         <div className="rowbtns">
           <button
+            id="dlgPdf"
+            className={`btn-dark${pdfBusy ? " busy" : ""}`}
+            type="button"
+            style={{ width: "100%" }}
+            disabled={pdfBusy}
+            aria-busy={pdfBusy}
+            onClick={() => void downloadCasePdf()}
+          >
+            {pdfBusy ? "Preparing PDF…" : "Download PDF"}
+          </button>
+        </div>
+        {pdfMsg ? <div id="dlgPdfMsg" role="status" className="stateline">{pdfMsg}</div> : null}
+        <div className="rowbtns">
+          <button
             id="dlgSave"
             className="btn-primary"
             type="button"
@@ -300,7 +403,7 @@ export function Cases() {
               if (c) downloadFile(`snapclaim-case-${c.id}.json`, JSON.stringify(c, null, 2));
             }}
           >
-            Export
+            Export JSON
           </button>
         </div>
         <div className="rowbtns">

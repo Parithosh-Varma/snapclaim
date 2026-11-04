@@ -230,7 +230,11 @@ export class MetaFindingsProvider implements FindingsProvider {
   }
 }
 
-/** Independent skeptic (Spark Open on Baseten). Re-derives numbers from receipts only; flags what it cannot reproduce. */
+/** Independent skeptic (Spark Open on Baseten). Independent of the writer
+ * (different weights and vendor path), NOT of the segmenter: it re-derives
+ * sentences from the same receipts, while the server re-measures the numbers
+ * from component + masks before any model call. Mask-level independence is
+ * the separate /v1/crosscheck IoU check. */
 export class BasetenSkepticProvider implements FindingsProvider {
   readonly #opts: MetaFindingsOptions;
   constructor(opts: MetaFindingsOptions) {

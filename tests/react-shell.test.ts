@@ -65,6 +65,7 @@ test("Mark gates on crack selection; cloud-only, no model download", () => {
   assert.ok(mark.includes("segmentCoinViaApi"), "coin tap is outlined via SAM like the crack");
   assert.ok(!mark.includes("estR"), "no guessed coin radius feeds the measurement");
   assert.ok(mark.includes("there is nothing outlined to measure"), "measure refuses an empty mask even if forced");
+  assert.ok(!mark.includes("useEffect(() => () => { measureSeq.current++; }, [])"), "no unmount bump: measure navigates mid-run by design, and invalidating it drops every measurement after /v1/observe");
   assert.ok(mark.includes('histRef'), "undo tracks tap order across crack and coin");
   assert.ok(mark.includes('last === "coin"'), "undo pops the last tap first, including the coin");
 });
@@ -120,6 +121,8 @@ test("Report is an official document with PDF and send options", () => {
   assert.ok(rep.includes("locationImg"), "the share link carries the location photo");
   assert.ok(rep.includes('id="linkBtn"'), "report offers a landlord share link");
   assert.ok(rep.includes('id="linkFallback"'), "blocked clipboards get a manual-copy field, never silence");
+  assert.ok(rep.includes("{gateOk &&"), "share/export options appear only after Generate report succeeds");
+  assert.ok(rep.includes("useState(!!s.annexUrl)"), "report state survives leaving and coming back (no second Generate, no duplicate case)");
   assert.ok(rep.includes("/lib/share"), "share link is built locally, nothing uploaded");
   const app = read("react/src/App.tsx");
   assert.ok(app.includes('"sShared"'), "a shared link opens the read-only report view");
@@ -239,6 +242,14 @@ test("React store is the vanilla store contract", () => {
   assert.ok(store.includes('CASES_KEY = "snapclaim.cases.v1"'), "same localStorage key: existing cases survive the switch");
   assert.ok(store.includes('SETTINGS_KEY = "snapclaim.settings.v1"'), "same settings key");
   assert.ok(store.includes("photoDropped"), "quota photo-drop kept");
+  assert.ok(store.includes("crackWidthMm"), "saved cases keep the width so the PDF survives a reload");
+});
+
+test("Saved cases offer a PDF, not just JSON", () => {
+  const tabs = read("react/src/screens/Tabs.tsx");
+  assert.ok(tabs.includes('id="dlgPdf"'), "case dialog has a Download PDF button");
+  assert.ok(tabs.includes("buildReportPdf"), "saved-case PDF is built offline from the stored numbers and photos");
+  assert.ok(tabs.includes("Export JSON"), "raw-data button is labeled JSON so nobody expects a report from it");
 });
 
 test("Percent-only is a toggle, never a trap", () => {

@@ -16,12 +16,15 @@
 import { readFileSync } from "node:fs";
 import { measureSession } from "../src/engine/measure.ts";
 import type { MeasureSessionInput, MeasureSessionResult } from "../src/engine/types.ts";
+import { receiptChainHash } from "../src/receipts/hash.ts";
 
 export interface ReplayResult {
   ok: boolean;
   findings: number;
   receipts: number;
   mode: string;
+  /** SHA-256 over the canonical receipts in ledger order. Stored runs keep it; re-hash on read. */
+  chainHash: string;
   mismatches: string[];
 }
 
@@ -50,7 +53,11 @@ export function replay(request: MeasureSessionInput, stored: MeasureSessionResul
   for (const id of storedById.keys()) {
     if (!freshById.has(id)) mismatches.push(`extra receipt ${id} not reproduced`);
   }
-  return { ok: mismatches.length === 0, findings: fresh.findings.length, receipts: fresh.receipts.length, mode: fresh.mode, mismatches };
+  // Chain-hash the FRESH receipts so a stored run can pin it: equal numbers
+  // with a different hash mean the file was reordered or re-worded. A MATCH
+  // still only proves computation, not provenance - see src/receipts/hash.ts.
+  const chainHash = receiptChainHash(fresh.receipts);
+  return { ok: mismatches.length === 0, findings: fresh.findings.length, receipts: fresh.receipts.length, mode: fresh.mode, chainHash, mismatches };
 }
 
 const invokedAsCli = process.argv[1] !== undefined && process.argv[1].endsWith("replay.ts");
@@ -65,6 +72,8 @@ if (invokedAsCli) {
   const stored = JSON.parse(readFileSync(measurementPath, "utf8")) as MeasureSessionResult;
   const result = replay(request, stored);
   console.log(`replay: ${result.findings} findings, ${result.receipts} receipts, mode ${result.mode}, ${result.ok ? "MATCH" : "DRIFT"}`);
+  console.log(`chain: sha256 ${result.chainHash}`);
+  console.log("note: MATCH proves the report was computed from these inputs, not that the inputs are original - hash the photo at capture and pin the chain (see src/receipts/hash.ts)");
   for (const mismatch of result.mismatches) console.log(`  - ${mismatch}`);
   if (!result.ok) process.exit(1);
 }

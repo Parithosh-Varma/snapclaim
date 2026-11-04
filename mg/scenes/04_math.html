@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>04 math — four outputs, real values</title>
+<script src="../lib/mg.js"></script>
+<style>
+  :root {
+    --ink: #0B0F14; --panel: #131A22; --line: #263241; --text: #EAF0F6; --muted: #8EA0B3;
+    --accent: #5CC8FF; --match: #3DDC97; --drift: #FFB547; --refuse: #FF5C6C;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 100%; height: 100%; background: var(--ink); }
+  #stage { position: relative; width: 100vw; height: 100vh; overflow: hidden;
+    background: var(--ink); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .tag { position: absolute; top: 5vmin; left: 8vmin; font-size: 2.6vmin; letter-spacing: .14em;
+    color: var(--muted); border: 1px solid var(--line); border-radius: 1.2vmin; padding: 1vmin 2vmin; }
+  #coin { position: absolute; top: 5vmin; right: 8vmin; font-size: 2.8vmin; font-weight: 700;
+    color: var(--ink); background: var(--match); border-radius: 99vmin; padding: 1.2vmin 3vmin; }
+  #rows { position: absolute; left: 14vmin; right: 14vmin; top: 24vmin; }
+  .row { display: flex; align-items: baseline; justify-content: space-between;
+    border-bottom: 1px solid var(--line); padding: 2.6vmin 1vmin; }
+  .row .k { font-size: 4vmin; color: var(--muted); font-weight: 600; }
+  .row .v { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums; font-size: 6.4vmin; font-weight: 700; color: var(--accent); }
+  .row .r { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 2.8vmin; color: var(--muted); border: 1px solid var(--line); border-radius: 1vmin;
+    padding: .8vmin 1.6vmin; margin-left: 3vmin; }
+  #gloss { position: absolute; bottom: 6vmin; left: 0; right: 0; text-align: center;
+    font-size: 3.2vmin; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="tag">DEMO MODE · SAMPLE DATA</div>
+  <div id="coin">● scale: 23 mm coin in frame</div>
+  <div id="rows">
+    <div class="row" id="r0"><span class="k">damaged</span><span><span class="v" id="v0">0.00 %</span><span class="r">R002</span></span></div>
+    <div class="row" id="r1"><span class="k">crack length</span><span><span class="v" id="v1">0.0 mm</span><span class="r">R005</span></span></div>
+    <div class="row" id="r2"><span class="k">mean width</span><span><span class="v" id="v2">0.0 mm</span><span class="r">R006</span></span></div>
+    <div class="row" id="r3"><span class="k">area</span><span><span class="v" id="v3">0.00 cm²</span><span class="r">R004</span></span></div>
+  </div>
+  <div id="gloss">Deterministic engine. No model touches the numbers. · terrace slab run</div>
+</div>
+<script>
+(function () {
+  // (b) real terrace-slab run, annexure v0.3.0
+  var VALS = [
+    { el: 'v0', row: 'r0', end: 1.58, dec: 2, unit: ' %' },
+    { el: 'v1', row: 'r1', end: 239.2, dec: 1, unit: ' mm' },
+    { el: 'v2', row: 'r2', end: 4.2, dec: 1, unit: ' mm' },
+    { el: 'v3', row: 'r3', end: 10.03, dec: 2, unit: ' cm²' }
+  ];
+  var gloss = document.getElementById('gloss');
+  var coin = document.getElementById('coin');
+  window.SCENE = {
+    duration: 7, fps: 30, loop: false,
+    seek: function (t) {
+      for (var k = 0; k < 4; k++) {
+        var cfg = VALS[k];
+        var row = document.getElementById(cfg.row);
+        var q = mg.seg(t, 0.5 + k * 0.7, 1.0 + k * 0.7);
+        row.style.opacity = q;
+        row.style.transform = 'translateX(' + ((1 - mg.ease.outCubic(q)) * 8) + 'vmin)';
+        var nq = mg.tween(t, 0.7 + k * 0.7, 1.5 + k * 0.7, 0, cfg.end, mg.ease.outCubic);
+        document.getElementById(cfg.el).textContent = mg.fmt(nq, cfg.dec) + cfg.unit;
+      }
+      coin.style.opacity = mg.seg(t, 0.3, 0.8);
+      gloss.style.opacity = mg.seg(t, 4.6, 5.2);
+    }
+  };
+  SCENE.seek(0);
+})();
+</script>
+</body>
+</html>
