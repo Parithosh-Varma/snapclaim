@@ -64,8 +64,13 @@ RECEIPTS - every value carries its formula, inputs, confidence and id
 FINDINGS - Muse Spark drafts sentences; the evidence gate ships them only if
    every number cites its receipt (else HTTP 422 with named failures)
    ↓
-SKEPTIC - Spark Open re-checks the findings; unreproducible ones are
-   printed DISPUTED, never hidden
+SKEPTIC - Spark Open re-derives the sentences from the receipts; the
+   server separately re-measures the numbers from component + masks, so
+   smuggled receipts fail closed. A DISPUTED verdict alone never kills a
+   claim - independent mask agreement is the /v1/crosscheck IoU check
+   (SlimSAM vs SAM), and a SAM mask error is common to both writer and
+   skeptic. For a stronger check, re-segment with different prompts or
+   thresholds and re-run crosscheck before trusting millimetres.
    ↓
 ANNEXURE - code-drawn SVG: mask outlines, findings, receipts table
 ```
@@ -126,9 +131,9 @@ All replies are enveloped: `{ok: true, requestId, durationMs, result}`. Errors: 
 | `POST /v1/skeptic` | same as findings | `{findings, gate}` |
 | `POST /v1/render` | report body (+ optional `overlay`) | `{svg, gate, findings}` |
 
-**The evidence gate** (`src/findings/evidence-gate.ts`) enforces, per finding: at least one cited measured number; every number matches a cited receipt within rounding tolerance (normalizing shorthand IDs like `r1` → `R001`); `%` numbers match `percent` receipts, `mm` numbers match calibrated-length receipts, and `cm²` numbers match calibrated-area receipts; severity words match the cited severity receipt; all citations belong to one mask; ISO dates never count as evidence. Violations throw `EvidenceError` (HTTP 422), listing each failure.
+**The evidence gate** (`src/findings/evidence-gate.ts`) enforces, per finding: at least one cited measured number; **every** number in the statement matches a cited receipt within `max(0.011, 1%)` - typed, so `%` matches only `percent` receipts, `mm` only calibrated-length receipts, `cm²` only calibrated-area receipts, and a bare number matches nothing (a wrong or irrelevant citation fails: it simply does not back the token, HTTP 422 `EvidenceError` with named failures). All citations belong to one mask; ISO dates/times never count as evidence; severity words must match the cited severity receipt; unverifiable severity language (`severe`, `total loss`, `write-off`, …) fails. What the gate does **not** check: causation ("caused by…", "due to…") - measurement ≠ causation, a human decides; and whether the mask itself is right - that is the segmenter's job plus `/v1/crosscheck` and pixel-verified provenance.
 
-**Measurement rules.** Reference confidence below `MIN_REFERENCE_CONFIDENCE` (default 0.6) drops the report to percent-only with a `scale_rejected` receipt. Default severity bands: cosmetic below 1% damaged, moderate up to 5%, significant above - escalated by crack length ≥ 150 mm or ≥ 3 disconnected regions. Thresholds are configurable per call and printed in the report.
+**Measurement rules.** A coin is a px→mm factor only in the crack's plane with a roughly fronto-parallel photo - an oblique angle or an off-plane coin skews lengths, and no receipt carries a ± range for that yet. What the pipeline does instead: `/v1/observe` fits the coin ellipse and returns `referenceCheck` (`aspect`, `tiltDeg`, `edgeError`, `rejected`), tilt-corrects crack lengths from the ellipse (capped 1.7x), rejects covered/misshapen coins and coins flatter than 0.5 aspect (60° tilt), discounts reference confidence by mask fill, and drops the report to percent-only with a `scale_rejected` receipt below `MIN_REFERENCE_CONFIDENCE` (default 0.6). Every `scale_calibration` receipt carries the coplanar warning in its notes; a crack that leaves the frame is reported as a visible-length lower bound. Default severity bands: cosmetic below 1% damaged, moderate up to 5%, significant above - escalated by crack length ≥ 150 mm or ≥ 3 disconnected regions. Thresholds are configurable per call and printed in the report.
 
 ## Configuration
 
@@ -232,10 +237,20 @@ Hard limits: 50 masks per call (chunk above), 1–16 point prompts per segment c
 
 ## Evaluation
 
-- `npm run eval` - deterministic bench over `fixtures/masks/*.json` vs `fixtures/expected/` (missing expected file = SKIP, never a pass). Current: wall-crack 5.17% / 85.9 mm / 2.6 mm wide / 2.19 cm² (significant), stain 1.29% percent-only (moderate).
-- `bench/split.json` - dev/held-out split, frozen before tuning. Held-out cases are public no-scale photos that must stay percent-only.
+- `npm run eval` - deterministic bench over `fixtures/masks/*.json` vs `fixtures/expected/` (missing expected file = SKIP, never a pass). Current: 7 pass, 0 skip, 0 fail - wall-crack 5.17% / 85.9 mm / 2.6 mm wide / 2.19 cm² (significant), stain 1.29% percent-only (moderate).
+- `npm run bench` - held-out refusal check: 12 cases, 1 archived run; the 4 public no-scale photos must stay percent-only (currently UNRUN until live runs are archived - a missing run fails strict mode, never passes).
+- `npm run bench:gap` - guessed-vs-measured gap on scaled held-out cases with a tape ground truth (`bench/runs/` pipeline vs `bench/model-only/` photo-alone guess, same tape). First scored row, live 2026-11-02 output:
+
+| Case (real fixture) | Tape truth | Measured (pipeline) | Model-only guess (photo alone) |
+|---|---|---|---|
+| `terrace-slab-tape-01` (terrace slab `DSC_0711.JPG`, builder tape 227 mm) | 227 mm | **218.5 mm** (err 8.5 mm, 3.7% - within ±10%) | 315 mm (err 88 mm, 38.8% - outside ±10%) |
+
+  `measured: scored=1 medianAbsErrorMm=8.5 within10pct=100% refused=0 missing=0` · `model-only: scored=1 medianAbsErrorMm=88 within10pct=0% refused=0 missing=0`. Modest on purpose: n=1, and the rest of held-out is UNSCORED until more walls get a tape on them - see `bench/split.json`.
+- `bench/split.json` - dev/held-out split, frozen before tuning (`frozenAt` 2026-10-28; a test fails if a frozen case is edited).
 - `bench/score.ts` - skeptic DISPUTED scoring with missing-label accounting.
 - Full write-up, baselines protocol and open gaps: [`docs/eval-report.md`](./docs/eval-report.md).
+
+**Live demo:** <https://snapclaim.pages.dev> (public app; only `/admin` sits behind Cloudflare Access). The skeptic red-to-green in the demo runs on the real `terrace-slab-tape-01` fixture above - builder-measured slab, tape 227 mm - not a scripted mock.
 
 ## Project structure
 
@@ -274,7 +289,7 @@ tests/          full suite, mock by default, live paths with stubbed fetch
 
 - **Documentation, not advice.** No coverage decisions, no legal claims, no approval predictions. A human decides; SnapClaim produces the evidence package.
 - **Measurement ≠ causation.** The chain proves what was measured, not who broke it.
-- **Staged photos are a known limit.** Receipts make measurement replayable and partly tamper-evident; they do not prove provenance.
+- **Staged photos are a known limit.** Receipts make measurement replayable and partly tamper-evident; they do not prove provenance. `npm run replay` re-runs the math and prints MATCH/DRIFT plus a SHA-256 receipt-chain hash - but a MATCH only proves the report was *computed* from those inputs, not that the inputs are original: anyone can edit the receipts and replay them consistently. Tamper-evidence needs the photo hashed at capture (before EXIF stripping), the chain hash pinned with the run, and a signature at capture - see `src/receipts/hash.ts`. Share links already carry an optional HMAC (`react/src/lib/share.ts`); absent `sig` = UNVERIFIED.
 - No medical, health, or insurance-advice functionality. No image generation - every visual is drawn in code. SVG only (no PDF).
 - No geo-circumvention, no VPN. Credits claimed only with each builder's own registration email; no pooling. Build-time tooling disclosed in `DEV-LOG.md`.
 

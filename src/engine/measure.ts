@@ -38,6 +38,14 @@ export function assertDamageLabel(label: unknown): asserts label is DamageLabel 
  *
  * No model touches the numbers: masks in, receipts out. Every published value
  * carries the formula, inputs and confidence needed to recompute it offline.
+ *
+ * Scale caveat: a coin gives a px→mm factor only when it lies in the same
+ * plane as the damage and the photo is roughly fronto-parallel. Tilt is
+ * corrected from the coin's ellipse (`tiltStretch` in src/vision/observe.ts,
+ * capped at 1.7x, refused past 60°), but a coin off the crack's plane still
+ * skews lengths. The scale receipt carries that warning; /v1/observe returns
+ * the full ellipse diagnostics (aspect/tiltDeg/rejected) so the app can
+ * warn or refuse before measuring.
  */
 export function measureSession(input: MeasureSessionInput): MeasureSessionResult {
   const { component, masks } = input;
@@ -107,7 +115,10 @@ export function measureSession(input: MeasureSessionInput): MeasureSessionResult
         output: { value: "percent-only", unit: "band" },
         formula: "reference rejected when confidence < minConfidence",
         confidence: reference.confidence,
-        notes: ["absolute lengths withheld; report stays in percent-only mode"],
+        notes: [
+          "absolute lengths withheld; report stays in percent-only mode",
+          "scale needs the reference in the damage plane and a near-fronto-parallel photo - re-shoot flatter (see /v1/observe referenceCheck)",
+        ],
       });
     } else {
       const receipt = ledger.add({
@@ -121,7 +132,9 @@ export function measureSession(input: MeasureSessionInput): MeasureSessionResult
         output: { value: round(scaleValue, 6), unit: "mm_per_px" },
         formula: "knownMm / referenceLengthPx",
         confidence: reference.confidence,
-        notes: [],
+        notes: [
+          "scale assumes the reference and the damage are coplanar and the photo is near fronto-parallel; an off-plane coin or an oblique angle skews mm/cm2 - re-shoot flatter when /v1/observe referenceCheck shows tilt",
+        ],
       });
       scale = { receiptId: receipt.id, mmPerPx: scaleValue, reference };
     }
