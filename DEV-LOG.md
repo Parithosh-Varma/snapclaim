@@ -326,3 +326,15 @@ Credits claim ✅ - billing verified, $150 active on 2026-10-27.
 - `npm run bench:gap` exit 0: measured err 8.5 mm (3.7%, in) vs model-only err 88 mm (38.8%, out). `/proof.html` second column filled; rebuilt + redeployed.
 
 **Spend:** $0.00 recorded (Spark pricing unconfirmed; 3,110 tokens metered at $0).
+
+## 2026-11-04 - Hosted SC-D8ECE64B report + case-study PDF
+
+**Shipped**
+
+- `react/public/reports/snapclaim-SC-D8ECE64B.pdf` - field report Ref SC-D8ECE64B: 232 mm R005 Confirmed, 3.2 mm R006 Unverified, 0.73% R002, 7.48 cm2 R004, significant R007.
+- `react/public/reports/Case Study Comparative Measurement of a Terrace-Slab Crack.pdf` - case-study PDF alongside the field report.
+- Deployed under `https://snapclaim.pages.dev/reports/`:
+  - https://snapclaim.pages.dev/reports/snapclaim-SC-D8ECE64B.pdf
+  - https://snapclaim.pages.dev/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf
+
+**Spend:** $0.00.

@@ -1,6 +1,9 @@
 /*
   Typosquat fallback headers: the meta-refresh page is framable without these.
   Served alongside defensive-redirect/index.html.
+
+  NOTE: /reports/* must remain public (not gated like /admin).
+  Do not add auth / access-control headers for /reports/* here.
 */
 /snap-claim/*
   X-Frame-Options: DENY

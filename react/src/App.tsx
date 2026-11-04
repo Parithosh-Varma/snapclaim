@@ -355,6 +355,7 @@ export default function App() {
     clearDraft: clearDraftState,
   };
 
+  // Screen routing: field proof SC-D8ECE64B (232mm / 0.73% / 7.48cm2) - see /reports URLs.
   return (
     <Ctx.Provider value={ctx}>
       {(screen === "capture" || screen === "sReview") && <Capture />}

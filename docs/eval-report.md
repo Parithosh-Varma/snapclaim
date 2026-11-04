@@ -71,3 +71,15 @@ The four held-out photos above are the only external data so far. Photo files st
 Seven team photos (Parithosh, DSLR, 2026-10-29, a 2 INR coin in the crack's plane) joined the held-out set on 2026-10-30 as `team-coin-*`: two with no crack, three full-frame cracks, two cracks that leave the frame. They are team-internal and not redistributed. None has a measured crack length yet, so they test detection and refusal behaviour; accuracy on them stays UNSCORED until the wall is measured.
 
 Every public dataset used here gets its name, license and exact split listed.
+
+## Appendix: Terrace-slab field proof (4 Nov 2026, SC-D8ECE64B)
+
+Ref `SC-D8ECE64B` — "crack on the pavement slab of the terrace", photo-pixel outlines scaled by coin diameter tilt-corrected from ellipse.
+
+- Crack length **232 mm [R005]** (Confirmed) vs straight-tape **227 mm** (225–230).
+- Thread **238.8 mm**: different horizontal crack, NOT comparable.
+- Pin-to-pin **274 mm** (5.2+4.8+4.5+4.2+2.9+5.8 cm), path-following.
+- Surface **0.73% [R002]**, area **7.48 cm² [R004]**, severity **significant [R007]**.
+- Width **3.2 mm [R006]** Unverified — no width ground truth.
+- Verification: evidence gate passed / skeptic verified / mask cross-check verified.
+- Live PDFs: [snapclaim-SC-D8ECE64B.pdf](https://snapclaim.pages.dev/reports/snapclaim-SC-D8ECE64B.pdf) · [Case Study Comparative Measurement of a Terrace-Slab Crack.pdf](https://snapclaim.pages.dev/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf)

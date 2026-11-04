@@ -25,6 +25,7 @@ export interface AnnexureOverlay {
 const OVERLAY_MAX_WIDTH = 752;
 const OVERLAY_MAX_HEIGHT = 420;
 const OVERLAY_TOP = 88;
+/** Overlay palette follows annexure Figure 2 style (SC-D8ECE64B p2): red damage, green coin. */
 const OVERLAY_COLORS = new Map<string, string>([
   ["crack", "#c0392b"],
   ["stain", "#f39c12"],

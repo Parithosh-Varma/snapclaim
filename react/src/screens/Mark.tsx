@@ -924,6 +924,7 @@ export default function Mark() {
               <small>{coinStateText}</small>
             </div>
           </div>
+          <p className="coinhint">Coin sets the millimetres — tilt-corrected from its ellipse.</p>
           <label className="field">
             Coin size
             <CoinDrop

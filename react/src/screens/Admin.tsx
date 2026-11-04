@@ -354,6 +354,13 @@ export default function Admin() {
         )}
 
         <div className="group">
+          <h3>Field proof PDFs</h3>
+          <p className="fineprint" style={{ marginTop: 4 }}>
+            Sample outputs live under <a href="/reports">/reports</a> - reference case SC-D8ECE64B shows a finished field report PDF.
+          </p>
+        </div>
+
+        <div className="group">
           <h3>What changes with the mode</h3>
           <div className="about-rows" style={{ marginTop: 4 }}>
             <span className="about-row"><span>measure · observe · crosscheck</span><b>same</b></span>

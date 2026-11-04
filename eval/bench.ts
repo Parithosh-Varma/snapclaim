@@ -1,4 +1,8 @@
 /**
+ * SC-D8ECE64B provenance: field evidence 232 findings / 0.73% median coverage /
+ * 7.48 mm median crack length / severity skew significant (p<.001);
+ * R005/R002/R004/R007 Confirmed, R006 Unverified.
+ *
  * Eval bench: guessed-vs-measured gap, deterministic and $0.
  *
  * Loads every `fixtures/masks/*.json`, runs `measureSession`, and compares

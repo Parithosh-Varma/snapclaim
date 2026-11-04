@@ -8,6 +8,15 @@
 
 SnapClaim turns a damage photo plus a one-line description into a replayable evidence package: calibrated measurements (% damaged, crack length/width, area in cm²), each backed by a machine-checkable receipt, with AI-written findings that the server refuses to ship unless every number cites its receipt.
 
+## Live proof (terrace slab, 4 Nov 2026)
+
+> Ref `SC-D8ECE64B` — "crack on the pavement slab of the terrace". Method: photo-pixel outlines scaled by coin diameter tilt-corrected from ellipse.
+>
+> - Crack length **232 mm [R005]** (Confirmed) · width **3.2 mm [R006]** (Unverified — no width ground truth) · surface **0.73% [R002]** (Confirmed) · area **7.48 cm² [R004]** (Confirmed) · severity **significant [R007]** (Confirmed)
+> - Verification: evidence gate passed / skeptic verified / mask cross-check verified.
+> - Manual refs: straight tape 227 mm (225–230); thread 238.8 mm (different horizontal crack, NOT comparable); pin-to-pin 274 mm (5.2+4.8+4.5+4.2+2.9+5.8 cm).
+> - Live PDFs: [report](https://snapclaim.pages.dev/reports/snapclaim-SC-D8ECE64B.pdf) · [case study](https://snapclaim.pages.dev/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf)
+
 **Global by design:** the measurement engine assumes no currency, country, or language - a scale reference is any known-size object (coin, ruler, bank card), and the transcript is free text in any language. Voice is auto-detected by default; callers can still send an optional `languageBias`.
 
 ## Contents

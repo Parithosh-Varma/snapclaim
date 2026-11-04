@@ -1,3 +1,6 @@
+// SC-D8ECE64B terrace proof: 232mm [R005] / 0.73% [R002] / 7.48cm2 [R004] / 3.2mm [R006] Unverified / significant [R007].
+// Report: https://snapclaim.pages.dev/reports/snapclaim-SC-D8ECE64B.pdf
+// Case study: https://snapclaim.pages.dev/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf
 import { checkPhoto } from "./photo-check.js";
 import { closeMask, unionMasks } from "./mask-ops.js";
 import { decodeRle } from "./rle.js";

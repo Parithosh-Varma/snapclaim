@@ -1,3 +1,6 @@
+// SC-D8ECE64B measurement replay inputs (comment-only, no logic change):
+// FindingsRequest { transcript: string, findings: MeasuredFinding[], receipts: Receipt[], repairNote?: string }.
+// VisionRequest { imageId: string, labels: DamageLabel[] } is out of scope for this replay.
 import type { ComponentObservation, DamageLabel, MaskObservation, MeasuredFinding } from "../engine/types.ts";
 import type { Receipt } from "../receipts/types.ts";
 import type { FindingDraft } from "../findings/evidence-gate.ts";

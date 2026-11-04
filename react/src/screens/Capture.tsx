@@ -502,6 +502,7 @@ export default function Capture() {
                   <li>Coin flat, touching the damage</li>
                   <li>Both sharp, filling the frame</li>
                   <li>Even light, no flash glare</li>
+                  <li>Terrace proof: coin in frame → 232mm measured</li>
                 </ul>
                 <button type="button" id="tipsGotIt" onClick={closeTips}>Got it</button>
               </div>

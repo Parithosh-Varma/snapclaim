@@ -1,3 +1,5 @@
+// Terrace field point: SnapClaim 232mm vs tape 227mm (+2.2%), pin-to-pin 274mm
+// path-following. Thread 238.8mm is a different-crack caveat (not comparable).
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { scoreDisputes } from "./score.ts";

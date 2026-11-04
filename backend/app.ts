@@ -1,3 +1,7 @@
+// Field proof SC-D8ECE64B: 232mm [R005] / 0.73% [R002] / 7.48cm2 [R004] / significant [R007].
+// Report: /reports/snapclaim-SC-D8ECE64B.pdf
+// Case study: /reports/Case Study Comparative Measurement of a Terrace-Slab Crack.pdf
+// (comment-only, no logic change).
 import { measureSession } from "../src/engine/measure.ts";
 import { assertDamageLabel } from "../src/engine/measure.ts";
 import { type ReferenceDiagnostics, circularReference, observeMask, tiltStretch } from "../src/vision/observe.ts";

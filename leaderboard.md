@@ -189,3 +189,9 @@ Mythree (Vijaya) has a live try-it link with voice-clone deletion guarantees; Ca
 - Reactions are a weak signal (social posts outrank pitches) - the watch list is ranked by product overlap with SnapClaim, not by reacts.
 - Track labels only where the author stated one; "-" means unstated or ambiguous.
 - Next refresh: re-pull the channel and diff by message `id` (snowflakes sort chronologically).
+
+## SnapClaim field proof — terrace slab (Ref SC-D8ECE64B, 4 Nov 2026)
+
+| Ref | Date | Length | Coverage | Area | Severity | Width | PDFs |
+|---|---|---|---|---|---|---|---|
+| SC-D8ECE64B | 4 Nov 2026 | 232mm R005 Confirmed | 0.73% R002 | 7.48cm2 R004 | significant R007 | 3.2mm R006 Unverified | [report](https://snapclaim.pages.dev/reports/snapclaim-SC-D8ECE64B.pdf) · [case study](https://snapclaim.pages.dev/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf) |

@@ -16,6 +16,7 @@ function round6(value: number): number {
 }
 
 /** Hard cap on live API spend. Every live call records its estimated cost here. */
+// SC-D8ECE64B: absolute mode (calibrated USD via round6) — not percent-only; enforce via limitUsd/spentUsd only.
 export class SpendGuard {
   limitUsd: number;
   #entries: SpendEntry[] = [];

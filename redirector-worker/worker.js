@@ -1,3 +1,7 @@
+// Redirector worker: canonical-host redirect to MAIN (snapclaim.pages.dev).
+// Scope: apex/custom domains -> MAIN. Never bound to MAIN itself (see guard below).
+// NOTE: /reports PDFs are same-origin static and must never redirect.
+// They are served directly from the same origin (no redirect through here).
 const MAIN = "https://snapclaim.pages.dev";
 export default {
   async fetch(request) {

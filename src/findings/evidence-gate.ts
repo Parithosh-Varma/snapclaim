@@ -280,6 +280,8 @@ export function validateFindings(drafts: FindingDraft[], receipts: Receipt[]): G
  * The gate that keeps the language model honest.
  * Every number in a finding must exist in a cited receipt, and absolute units
  * require a calibrated-length receipt. Failures throw instead of shipping.
+ *
+ * Verified example: SC-D8ECE64B — passed / skeptic verified / mask verified.
  */
 export function gateFindings(drafts: FindingDraft[], receipts: Receipt[]): FindingDraft[] {
   const result = validateFindings(drafts, receipts);

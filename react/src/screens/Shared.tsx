@@ -98,7 +98,7 @@ export default function Shared({ rep }: { rep: SharedReport }) {
         headerLogo: logo,
         rows: [
           ...(rep.lengthMm != null ? [row("Crack length", `${rep.lengthMm} mm`)] : []),
-          ...(rep.widthMm != null ? [row("Crack width", `${rep.widthMm} mm`)] : []),
+          ...(rep.widthMm != null ? [row("Crack width", `${rep.widthMm} mm`, "Unverified")] : []),
           row("Surface affected", `${rep.percent} %`),
           ...(rep.areaCm2 != null ? [row("Area", `${rep.areaCm2} cm2`)] : []),
           row("Severity", rep.severity),
@@ -159,7 +159,7 @@ export default function Shared({ rep }: { rep: SharedReport }) {
                 <tr><th scope="row">Crack length</th><td>{rep.lengthMm} mm</td></tr>
               )}
               {rep.widthMm != null && (
-                <tr><th scope="row">Crack width</th><td>{rep.widthMm} mm</td></tr>
+                <tr><th scope="row">Crack width</th><td>{rep.widthMm} mm · Unverified</td></tr>
               )}
               {rep.areaCm2 != null && (
                 <tr><th scope="row">Area</th><td>{rep.areaCm2} cm²</td></tr>
@@ -170,7 +170,7 @@ export default function Shared({ rep }: { rep: SharedReport }) {
 
           <h2>3 · Verification</h2>
           <p className="doc-checks">{rep.checks}</p>
-          <p className="doc-foot">Shared SnapClaim report · Ref {rep.ref} · the link itself carries this report - nothing was uploaded</p>
+          <p className="doc-foot">Shared SnapClaim report · Ref {rep.ref} · the link itself carries this report - nothing was uploaded. Every number cites its evidence receipt in the original report.</p>
         </article>
 
         <div className="card">

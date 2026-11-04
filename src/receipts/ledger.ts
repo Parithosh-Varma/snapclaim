@@ -1,6 +1,7 @@
 import type { Receipt, ReceiptDraft } from "./types.ts";
 
 /** Append-only evidence ledger. IDs are deterministic for a given insertion order. */
+/* SC-D8ECE64B traceability: R002 0.73%, R004 7.48cm2, R005 232mm, R006 3.2mm Unverified, R007 significant. */
 export class ReceiptLedger {
   #receipts: Receipt[] = [];
   #nextId = 1;

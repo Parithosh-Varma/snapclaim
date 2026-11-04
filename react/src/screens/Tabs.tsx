@@ -144,8 +144,14 @@ export function Home() {
           </div>
           <div className="tipcard">
             <p className="tipcard-title">How accuracy works</p>
-            <p className="tipcard-copy">The coin sets the millimetres. Tilt is corrected from its ellipse - no coin, percent-only report.</p>
+            <p className="tipcard-copy">The coin sets the millimetres. Tilt is corrected from its ellipse - no coin, percent-only report. Terrace proof: 232 mm vs 227 mm manual straight-tape. Receipts R001–R007. Crack width 3.2 mm Unverified.</p>
           </div>
+        </div>
+
+        <div className="card" role="note" aria-label="Live terrace-slab proof">
+          <p className="found">Live proof — terrace slab</p>
+          <p className="sub">232 mm length [R005] Confirmed · 0.73% [R002] · 7.48 cm2 [R004] · significant [R007] · width 3.2mm [R006] Unverified.</p>
+          <p className="sub"><a className="link-btn" href="/reports/snapclaim-SC-D8ECE64B.pdf">See report: snapclaim-SC-D8ECE64B.pdf</a></p>
         </div>
 
         <div className="recent-head">
@@ -772,6 +778,16 @@ export function Settings() {
         >
           <div className="about-rows">
             <span className="about-row"><span>Version</span><b>{APP_VERSION}</b></span>
+            <span className="about-row"><span>Field proof</span><b>232 mm · 0.73% · 7.48 cm²</b></span>
+            <p className="fineprint" style={{ marginTop: 0 }}>
+              Terrace slab SC-D8ECE64B: 232 mm length [R005] · 0.73% extent [R002] · 7.48 cm² area [R004] · significant [R007] · width 3.2 mm [R006] Unverified.
+            </p>
+            <a className="about-row about-link" href="/reports/snapclaim-SC-D8ECE64B.pdf">
+              <span>Sample report (SC-D8ECE64B)</span><b aria-hidden="true">→</b>
+            </a>
+            <a className="about-row about-link" href="/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf">
+              <span>Terrace-slab case study</span><b aria-hidden="true">→</b>
+            </a>
             <details className="learn about-detail">
               <summary>Privacy policy</summary>
               <p>Tapping damage sends the photo to the backend for outlining (falls back to on-device). Optional cross-checks send the tapped photo again to the backend you configure. Sharing for measurement improvement is off by default and per-photo.</p>

@@ -32,3 +32,10 @@ Backend calls are unchanged (`/v1/measure`, `/v1/observe`, `/v1/report`,
 `/v1/skeptic`, `/v1/crosscheck`, `/v1/render`, `/v1/transcribe`,
 `/v1/segment`, `/v1/health`); the base URL is a setting, defaulting to the
 production Worker.
+
+## Live proof (Ref SC-D8ECE64B, 4 Nov 2026)
+
+Terrace-slab: 232mm [R005] Confirmed, 3.2mm [R006] Unverified, 0.73% [R002], 7.48cm2 [R004], significant [R007].
+
+- Report: https://snapclaim.pages.dev/reports/snapclaim-SC-D8ECE64B.pdf
+- Case study: https://snapclaim.pages.dev/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf

@@ -6,6 +6,10 @@ its most complete member. This page proves that with each project's own public
 statements, all sourced from the two Discord exports in `fixtures/` (see
 `leaderboard.md` for the full catalog).
 
+## Field proof (terrace-slab, Ref SC-D8ECE64B, 4 Nov 2026)
+
+Terrace-slab crack measured 232 mm [R005] with receipts R001–R007: width 3.2 mm [R006], coverage 0.73% [R002], area 7.48 cm² [R004], severity significant [R007]. Manual references: straight tape 227 mm (range 225–230); thread 238.8 mm on a different horizontal crack, not comparable; pin-to-pin 274 mm (5.2+4.8+4.5+4.2+2.9+5.8 cm). Evidence gate passed, skeptic verified, mask cross-check verified. Live PDFs: [report](https://snapclaim.pages.dev/reports/snapclaim-SC-D8ECE64B.pdf) · [case study](https://snapclaim.pages.dev/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf).
+
 Legend: ✅ stated publicly · ➖ not stated in anything they posted · ❌ stated
 absence (they say they don't do it). "Not stated" is not an accusation - it
 means a judge cannot verify it from their materials.

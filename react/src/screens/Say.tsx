@@ -240,7 +240,7 @@ export default function Say() {
             id="transcriptBox"
             rows={3}
             maxLength={MAXLEN}
-            placeholder="e.g. Crack above the window, noticed after the rain…"
+            placeholder="e.g. Crack on the pavement slab of the terrace…"
             value={transcript}
             onChange={(e) => {
               setTranscript(e.target.value);
