@@ -1,1 +1,83 @@
-{"compare": {"heading": "Three readings, one crack", "rows": [{"label": "Straight tape span", "note": "end-to-end only, curves ignored · range 225–230 mm", "value": "227 mm"}, {"label": "Snapclaim predicted", "note": "+5 mm (+2.2%) vs tape", "value": "232 mm"}, {"label": "Pin-to-pin path", "note": "5.2 + 4.8 + 4.5 + 4.2 + 2.9 + 5.8 cm · +47 mm (+20.7%) vs tape", "value": "274 mm"}]}, "measurements": [{"evidence": "report §4", "item": "Straight tape span", "status": "Reported", "value": "227 mm"}, {"evidence": "report §4", "item": "Pin-to-pin path", "status": "Reported", "value": "274 mm"}, {"evidence": "report §4", "item": "Snapclaim predicted", "status": "Reported", "value": "232 mm"}], "method": "Same terrace crack photographed with a coin in frame, then measured three ways per the report: straight tape end-to-end (227 mm), pin-to-pin segments summed to 27.4 cm, and a thread-and-pin path (238.8 mm) read on a different horizontal crack with no coin in frame — not directly comparable to this crack. Snapclaim prediction for the terrace crack is 232 mm.", "outcome": "Per the report: for curved cracks a path-following method (pin-to-pin) is preferred over a straight tape reading. The thread reading is to be repeated on this same crack and percentage errors calculated — straight span (227) and pin-to-pin path (274) differ ~20%, so both cannot sit within 5% of one prediction. Full 5-page PDF with figures and the six-span table.", "pages": [], "photos": [{"alt": "Vertical crack in a terrace slab with a taped coin beside it and a yellow measuring tape held along the crack", "caption": "Photo with tape: end-to-end span 227 mm (range 225–230).", "src": "assets/case-study/photos/DSC_0711.jpg"}, {"alt": "The same terrace-slab crack with the taped coin, photographed for the app measurement", "caption": "Photo used for the app measurement: same crack, photo + coin.", "src": "assets/case-study/photos/DSC_0710.jpg"}], "published": true, "reportPdf": "https://snapclaim.pages.dev/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf", "sub": "Terrace slab · Nov 2026 · tape 227 mm vs pin-to-pin 274 mm · Snapclaim 232 mm · n = 1", "title": "Terrace-slab crack — comparative measurement", "verification": "n = 1. Tape/thread tolerance a few mm. Pin spacing changes the pin-to-pin total. Thread 238.8 mm (±4) is a different crack, no coin — indicative only."}
+{
+  "compare": {
+    "heading": "Three readings, one crack",
+    "rows": [
+      {
+        "label": "Straight tape span",
+        "note": "end-to-end only, curves ignored · range 225–230 mm",
+        "value": "227 mm"
+      },
+      {
+        "label": "Snapclaim predicted",
+        "note": "+5 mm (+2.2%) vs tape",
+        "value": "232 mm"
+      },
+      {
+        "label": "Pin-to-pin path",
+        "note": "5.2 + 4.8 + 4.5 + 4.2 + 2.9 + 5.8 cm · +47 mm (+20.7%) vs tape",
+        "value": "274 mm"
+      }
+    ]
+  },
+  "measurements": [
+    {
+      "evidence": "report §4",
+      "item": "Straight tape span",
+      "status": "Reported",
+      "value": "227 mm"
+    },
+    {
+      "evidence": "report §4",
+      "item": "Pin-to-pin path",
+      "status": "Reported",
+      "value": "274 mm"
+    },
+    {
+      "evidence": "report §4",
+      "item": "Snapclaim predicted",
+      "status": "Reported",
+      "value": "232 mm"
+    }
+  ],
+  "method": "Same terrace crack photographed with a coin in frame, then measured three ways per the report: straight tape end-to-end (227 mm), pin-to-pin segments summed to 27.4 cm, and a thread-and-pin path (238.8 mm) read on a different horizontal crack with no coin in frame — not directly comparable to this crack. Snapclaim prediction for the terrace crack is 232 mm.",
+  "outcome": "Per the report: for curved cracks a path-following method (pin-to-pin) is preferred over a straight tape reading. The thread reading is to be repeated on this same crack and percentage errors calculated — straight span (227) and pin-to-pin path (274) differ ~20%, so both cannot sit within 5% of one prediction. Full 5-page PDF with figures and the six-span table.",
+  "pages": [],
+  "photos": [
+    {
+      "src": "assets/case-study/photos/DSC_0711.jpg",
+      "alt": "Vertical crack in a terrace slab with a taped coin beside it and a yellow measuring tape held along the crack",
+      "caption": "Photo with tape: end-to-end span 227 mm (range 225–230)."
+    },
+    {
+      "src": "assets/case-study/photos/DSC_0710.jpg",
+      "alt": "The same terrace-slab crack with the taped coin, photographed for the app measurement",
+      "caption": "Photo used for the app measurement: same crack, photo + coin."
+    },
+    {
+      "src": "assets/case-study/photos/fig-thread.jpg",
+      "alt": "Yellow thread pinned along a crack path",
+      "caption": "Thread-and-pin path (different crack, no coin — 238.8 mm, indicative only)."
+    },
+    {
+      "src": "assets/case-study/photos/fig-thread-ruler.jpg",
+      "alt": "Straightened thread read against a ruler",
+      "caption": "Thread straightened and read against a ruler."
+    },
+    {
+      "src": "assets/case-study/photos/fig-pins.jpg",
+      "alt": "Pins marking segments along the terrace crack",
+      "caption": "Pins marking the pin-to-pin segments along the terrace crack."
+    },
+    {
+      "src": "assets/case-study/photos/fig-segments.jpg",
+      "alt": "Set-square readings of each pin-to-pin segment",
+      "caption": "Pin-to-pin spans with a set square: 5.2 + 4.8 + 4.5 + 4.2 + 2.9 + 5.8 cm.",
+      "wide": true
+    }
+  ],
+  "published": true,
+  "reportPdf": "assets/case-study/terrace-slab.pdf",
+  "sub": "Terrace slab · Nov 2026 · tape 227 mm vs pin-to-pin 274 mm · Snapclaim 232 mm · n = 1",
+  "title": "Terrace-slab crack — comparative measurement",
+  "verification": "n = 1. Tape/thread tolerance a few mm. Pin spacing changes the pin-to-pin total. Thread 238.8 mm (±4) is a different crack, no coin — indicative only."
+}
