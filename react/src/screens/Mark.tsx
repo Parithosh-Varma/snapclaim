@@ -244,6 +244,8 @@ export default function Mark() {
     if (!c || !photo) return;
     c.width = photo.width;
     c.height = photo.height;
+    // Aspect ratio for the CSS height cap (short and wide viewports).
+    c.style.setProperty("--ar", String(photo.width / photo.height));
     const g = c.getContext("2d", { willReadFrequently: true });
     if (!g) return;
     g.drawImage(photo, 0, 0);
@@ -898,18 +900,19 @@ export default function Mark() {
 
   return (
     <section className="screen on" aria-labelledby="h-mark">
-      <div className="wrap">
+      <div className="wrap wide">
         <BackButton label="Camera" onClick={() => go("capture")} />
         <Stepper step={2} />
         <h1 id="h-mark">Tap the damage.</h1>
         <p className="sub">One tap on the crack, one tap on the coin.</p>
+        <div className="split stick">
+        <div className="split-main">
         {!ready ? (
           <>
             <div className="skel" role="status" aria-label="Loading photo" />
             <div className="skel" />
           </>
         ) : (
-          <>
             <div className="card evcard">
           <div className="evframe">
             <canvas id="markCanvas" ref={canvasRef} onPointerDown={onTap} />
@@ -947,6 +950,10 @@ export default function Mark() {
             ))}
           </div>
         </div>
+        )}
+        </div>
+        <div className="split-side">
+        {ready && (
         <div className="card scalecard">
           <div className="scalehead">
             <span className={`scaledot is-${coinState}`} aria-hidden="true" />
@@ -1071,7 +1078,6 @@ export default function Mark() {
             <span>Coin has tape<small>Lenient outline - allows the tape halo</small></span>
           </label>
         </div>
-          </>
         )}
         {photoNotes ? <div id="photoNotes" className="hint">{photoNotes}</div> : null}
         {tfState ? (
@@ -1088,6 +1094,8 @@ export default function Mark() {
         ) : needSize ? (
           <p className="ctahint">Pick the coin size above to enable measuring.</p>
         ) : null}
+        </div>
+        </div>
       </div>
     </section>
   );

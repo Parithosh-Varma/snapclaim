@@ -247,7 +247,7 @@ export default function Say() {
 
   return (
     <section className="screen on" aria-labelledby="h-say">
-      <div className="wrap">
+      <div className="wrap wide">
         <BackButton label="Mark damage" onClick={() => go("sMark")} />
         <Stepper step={3} />
         <h1 id="h-say">Describe what happened.</h1>
@@ -258,6 +258,8 @@ export default function Say() {
         {s.measureJob?.state === "done" && s.payload && (
           <p id="measureReady" role="status" className="fineprint">Measured — ready when you are.</p>
         )}
+        <div className="split">
+        <div className="split-main">
         <div className="card saycard">
           <label className="field" htmlFor="transcriptBox">What happened</label>
           <textarea
@@ -292,6 +294,8 @@ export default function Say() {
           <p className="fineprint" style={{ margin: "10px 2px 0" }}>Your line stays yours here - AI extends it with the photo when the report runs.</p>
           {voiceErr ? <p id="voiceErr" role="alert">{voiceErr}</p> : null}
         </div>
+        </div>
+        <div className="split-side">
         <div className="card">
           <b>Location photo <small className="fieldex">optional - wide shot showing where the damage is</small></b>
           <input
@@ -331,6 +335,8 @@ export default function Say() {
         <button id="sendBtn" className={`btn-primary${sending ? " busy" : ""}`} type="button" style={{ width: "100%" }} disabled={sending} aria-busy={sending} onClick={runReport}>
           {sending ? "Seeing measurements…" : "See measurements"}
         </button>
+        </div>
+        </div>
       </div>
     </section>
   );

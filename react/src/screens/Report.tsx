@@ -357,7 +357,7 @@ export default function Report() {
 
   return (
     <section className="screen on" aria-labelledby="h-send">
-      <div className="wrap">
+      <div className="wrap wide">
         <BackButton label="Checks" onClick={() => go("sCheck")} />
         <Stepper step={6} />
         <h1 id="h-send">Send the report.</h1>
@@ -366,6 +366,8 @@ export default function Report() {
           <p className="stateline" role="status">No crack found — the marked region is not damage. Nothing to send.</p>
         )}
 
+        <div className="split">
+        <div className="split-main">
         <article className="doc" id="reportDoc" aria-label="Damage report preview">
           <header className="doc-head">
             <div>
@@ -491,7 +493,9 @@ export default function Report() {
 
           <p className="doc-foot">Generated on this device by SnapClaim · Ref {refNo}</p>
         </article>
+        </div>
 
+        <div className="split-side">
         <div className="card">
           <button id="renderBtn" className={`btn-primary${rendering ? " busy" : ""}`} type="button" onClick={render} disabled={rendering} aria-busy={rendering}>
             {rendering ? "Generating…" : "Generate report"}
@@ -618,6 +622,8 @@ export default function Report() {
             <pre id="raw">{s.raw}</pre>
           </div>
         </details>
+        </div>
+        </div>
       </div>
     </section>
   );

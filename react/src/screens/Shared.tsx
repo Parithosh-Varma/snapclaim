@@ -120,13 +120,15 @@ export default function Shared({ rep }: { rep: SharedReport }) {
 
   return (
     <section className="screen on" aria-labelledby="h-shared">
-      <div className="wrap">
+      <div className="wrap wide">
         <BackButton label="Home" onClick={home} />
         <Stepper step={6} />
         <h1 id="h-shared">Shared damage report.</h1>
         <p className="sub">Sent by the reporter - read-only, nothing here measures or edits.</p>
         <p className="stateline" role="note">UNVERIFIED sender — link carries the report with no signature. Confirm by phone before paying. {rep.sig ? "Signature present but not checked on this device." : "No signature present."}</p>
 
+        <div className="split">
+        <div className="split-main">
         <article className="doc" id="reportDoc" aria-label="Shared damage report">
           <header className="doc-head">
             <div>
@@ -172,7 +174,9 @@ export default function Shared({ rep }: { rep: SharedReport }) {
           <p className="doc-checks">{rep.checks}</p>
           <p className="doc-foot">Shared SnapClaim report · Ref {rep.ref} · the link itself carries this report - nothing was uploaded</p>
         </article>
+        </div>
 
+        <div className="split-side">
         <div className="card">
           <button id="sharedPdfBtn" className={`btn-primary${pdfBusy ? " busy" : ""}`} type="button" disabled={pdfBusy} aria-busy={pdfBusy} onClick={() => void download()}>
             {pdfBusy ? "Preparing PDF…" : "Download PDF"}
@@ -181,6 +185,8 @@ export default function Shared({ rep }: { rep: SharedReport }) {
           <button id="sharedHomeBtn" className="btn-ghostline" type="button" style={{ marginTop: 10 }} onClick={home}>
             Make your own report
           </button>
+        </div>
+        </div>
         </div>
       </div>
     </section>
