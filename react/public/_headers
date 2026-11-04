@@ -1,9 +1,11 @@
-# Cloudflare Pages response headers (copied verbatim into dist/ by Vite).
-#
-# This is where frame-ancestors is actually enforced. Browsers ignore the
-# directive inside a <meta> CSP and log a console warning, so the meta policy in
-# index.html deliberately omits it. Keep the two policies identical apart from
-# frame-ancestors; tests/csp-headers.test.ts fails if they drift.
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; connect-src 'self' https://snapclaim-backend.parithosh.workers.dev http://127.0.0.1:8787 http://localhost:8787 https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://*.hf.co; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; worker-src 'self' blob:; media-src blob: data:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://avatars.githubusercontent.com; font-src 'self'; connect-src 'self' https://api.github.com; manifest-src 'self'; base-uri 'self'; form-action 'none'; frame-ancestors 'self'; object-src 'self'; upgrade-insecure-requests
+  X-Content-Type-Options: nosniff
   X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Cross-Origin-Opener-Policy: same-origin
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+
+/assets/*
+  Cache-Control: public, max-age=86400
