@@ -14,7 +14,7 @@
 
 > What is real vs mocked: **Measurement (`/v1/measure`, `/v1/observe`, receipts, gate) is keyless and deterministic — runs offline, $0. Live findings / skeptic / SAM / voice use our keys with a spend cap (`SPEND_GUARD_USD`, default $5). Photos stay on the phone except two explicit taps: Cross-check sends the photo once to SAM 3.1 via the backend, and Render attaches it to the annexure.** Demo defaults to mock ($0, no keys).
 
-[![tests](https://img.shields.io/badge/tests-386%20passing-brightgreen)](./tests)
+[![tests](https://img.shields.io/badge/tests-348%20passing-brightgreen)](./tests)
 [![node](https://img.shields.io/badge/node-%3E%3D22.18-339933)](./package.json)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](./LICENSE)
 
@@ -94,7 +94,7 @@ docker compose up --build
 
 For live calls, put `MOCK_MODE=0` and your keys in `.env`; compose passes it to the backend at run time and nothing is baked into the image.
 
-Then open `pwa/index.html` (or serve `pwa/` with any static server) and press **Use sample measurement** - the full loop runs in one tap: measure → gated findings → skeptic → SVG annexure. No photo needed.
+Then run `npm --prefix react run dev` (http://localhost:5173) and press **Use sample measurement** - the full loop runs in one tap: measure → gated findings → skeptic → SVG annexure. No photo needed.
 
 ```bash
 npm run eval        # deterministic measurement bench
@@ -167,7 +167,7 @@ want an intermediate result - nothing in the app bypasses them.
 
 | | Demo (default) | Live (`MOCK_MODE=0` + keys) |
 |---|---|---|
-| Masks | Supplied fixture (`backend invents no masks`) | SAM 3.1 point prompts via `/v1/segment`; the PWA falls back to on-device SlimSAM on any failure |
+| Masks | Supplied fixture (`backend invents no masks`) | SAM 3.1 point prompts via `/v1/segment`; the app falls back to on-device SlimSAM on any failure |
 | Findings / skeptic | Deterministic mocks ($0) | Muse Spark 1.3 / Muse Spark Open on Baseten |
 | Voice | Supplied `fixtureTranscript` | Muse Voice Transcribe proxy (`/v1/transcribe`) |
 | Measure, observe, gate, render, replay | Real in both modes | Real in both modes |
@@ -186,7 +186,7 @@ For local development, Settings → Developer → **Open admin panel** flips the
 | On-device damage masks (offline / fallback) | **SlimSAM-77** (compressed SAM) + our crack-tuned decoder [`tariqkhalif/slimsam-77-crack`](https://huggingface.co/tariqkhalif/slimsam-77-crack) | in the browser, transformers.js · [`training/slimsam-crack/`](./training/slimsam-crack/) |
 | Voice intake (any language; auto-detected, optional `languageBias`) | **Muse Voice Transcribe** | `POST https://api.meta.ai/v1/asr/transcribe` (file) · `wss://api.meta.ai/v1/asr/realtime` (live) |
 
-**Multi-model pipeline:** every claim combines four Meta model families - SAM 3.1 (live masks) + Muse Spark 1.3 (evidence-gated findings) + Muse Spark Open (independent skeptic, served by inference partner Baseten) + Muse Voice Transcribe (spoken intake). The PWA cross-checks the two mask sources against each other (`POST /v1/crosscheck`).
+**Multi-model pipeline:** every claim combines four Meta model families - SAM 3.1 (live masks) + Muse Spark 1.3 (evidence-gated findings) + Muse Spark Open (independent skeptic, served by inference partner Baseten) + Muse Voice Transcribe (spoken intake). The app cross-checks the two mask sources against each other (`POST /v1/crosscheck`).
 
 **Open-weights fine-tuning:** the on-device SlimSAM-77 mask decoder is fine-tuned for cracks (stock encoder frozen; decoder-only fine-tune, AdamW, 12 epochs on the public Özgenel Concrete Crack Segmentation Dataset (CC BY 4.0)) and published on the Hugging Face Hub as [`tariqkhalif/slimsam-77-crack`](https://huggingface.co/tariqkhalif/slimsam-77-crack): held-out crack mIoU 0.174 stock vs 0.697 tuned in the browser build. Training script, ONNX export, and evals live in [`training/slimsam-crack/`](./training/slimsam-crack/).
 
@@ -244,7 +244,7 @@ npx wrangler secret put META_API_KEY
 npx wrangler secret put BASETEN_API_KEY   # when Baseten access is granted
 ```
 
-**PWA** - any static host serves `pwa/` (no build step). Point the Backend URL box at the Worker. Installable via `manifest.webmanifest`; the service worker caches the shell and never caches `/v1`.
+**App** - `npm --prefix react run build`, serve `react/dist/` (Cloudflare Pages: build `npm run build`, output `dist/`). Point the Backend URL box at the Worker. Installable via `manifest.webmanifest`; the service worker caches the shell and never caches `/v1`.
 
 **Pages site** (public app, gated admin):
 
@@ -270,7 +270,7 @@ The backend Worker is a separate hostname and is **not** behind Access; it relie
 
 ### Self-hosted backend
 
-The app keeps one strict backend policy in places that must stay in sync: the `<meta>` CSP `connect-src` in `pwa/index.html` (and `react/index.html`), the matching `Content-Security-Policy` response header in `pwa/_headers` (and `react/public/_headers`), and the `isAllowedBackendUrl()` allowlist in `pwa/app.js` (and `react/src/lib/api.ts`). Only `https://snapclaim-backend.parithosh.workers.dev` and loopback `http` (`localhost`, `127.0.0.1`, `[::1]`) are allowed; anything else shows "This backend isn't allowed by the app's security policy". To point at your own Worker: add its `https://host` to `connect-src` in both HTML files and both `_headers` files **and** to `DEFAULT_BACKEND_HOST`/`isAllowedBackendUrl` in both JS/TS files. `tests/pwa-csp-allowlist.test.ts` and `tests/csp-headers.test.ts` fail if they drift apart.
+The app keeps one strict backend policy in places that must stay in sync: the `<meta>` CSP `connect-src` in `react/index.html`, the matching `Content-Security-Policy` response header in `react/public/_headers`, and the `isAllowedBackendUrl()` allowlist in `react/src/lib/api.ts`. Only `https://snapclaim-backend.parithosh.workers.dev` and loopback `http` (`localhost`, `127.0.0.1`, `[::1]`) are allowed; anything else shows "This backend isn't allowed by the app's security policy". To point at your own Worker: add its `https://host` to `connect-src` **and** to `DEFAULT_BACKEND_HOST`/`isAllowedBackendUrl`. `tests/csp-allowlist.test.ts` and `tests/csp-headers.test.ts` fail if they drift apart.
 
 ## Cost and limits
 
@@ -278,14 +278,14 @@ Per-claim live cost at current pricing: SAM 3.1 ≈ $0.0025/image, voice ≈ $0.
 
 ![One $5 hard cap versus about $0.003 per live claim: SAM segment plus voice line, findings metered at $0](docs/images/cost-per-claim.svg)
 
-Hard limits: 50 masks per call (chunk above), 1–16 point prompts per segment call, 1 MB JSON body on Node, 4 MB audio uploads, 10 s voice clips, 512 px PWA photo side. The spend guard is per-process (per-isolate on Workers — use Durable Objects/D1 for a global cap).
+Hard limits: 50 masks per call (chunk above), 1–16 point prompts per segment call, 1 MB JSON body on Node, 4 MB audio uploads, 10 s voice clips, 1024 px photo side. The spend guard is per-process (per-isolate on Workers — use Durable Objects/D1 for a global cap).
 
 ## Privacy and security
 
 - The photo stays on the phone: only COCO RLE masks travel to `/v1/observe`. Two explicit exceptions, both your tap: **Cross-check masks** sends the photo once to SAM 3.1 via the backend, and **Render** attaches it to the annexure. Only `data:`/`https:` URLs are accepted.
-- Keys live in server env / Worker secrets, never in the PWA. Fail-closed 503 without them.
+- Keys live in server env / Worker secrets, never in the app. Fail-closed 503 without them.
 - Billable live routes are anonymous by design (public demo), so abuse is throttled in depth: per-IP rate limit keyed on the unspoofable socket address / `cf-connecting-ip` (never `X-Forwarded-For`), a pre-billing spend hold per in-flight call, the hard `SPEND_GUARD_USD` cap, and CORS deny-by-default in live mode without `ALLOWED_ORIGINS`.
-- All model output rendered in the PWA is HTML-escaped; the page ships a Content-Security-Policy.
+- All model output rendered in the app is HTML-escaped; the page ships a Content-Security-Policy.
 - `frame-ancestors` only works as an HTTP response header, so it is sent from `_headers` (`frame-ancestors 'self'` + `X-Frame-Options: SAMEORIGIN`) and deliberately left out of the `<meta>` CSP, where browsers ignore it and log "The Content Security Policy directive 'frame-ancestors' is ignored when delivered via a <meta> element." `tests/csp-headers.test.ts` keeps the header and meta copies of the policy in sync.
 - EXIF/XMP metadata is stripped from photos on intake.
 
@@ -345,11 +345,10 @@ backend/        one router (Node server + Cloudflare Worker), providers, transcr
 cli/            `npm run cli` - headless claim from the shell
 docs/API.md     headless API + CLI contract
 react/          canonical app (capture → mark → say → report)
-pwa/            capture app: photo, tap-to-mask, hold-to-speak, report, skeptic, annexure
 eval/           bench + replay CLI
 bench/          held-out split + dispute scorer
 fixtures/       masks, expected outputs, scale references (photos gitignored)
-tests/          386 tests, mock by default, live paths with stubbed fetch, $0
+tests/          348 tests, mock by default, live paths with stubbed fetch, $0
 ```
 
 ## Development

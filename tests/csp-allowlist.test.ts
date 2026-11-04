@@ -15,7 +15,7 @@ function connectSrc(html: string): string {
   return dir;
 }
 
-for (const htmlPath of ["pwa/index.html", "react/index.html"]) {
+for (const htmlPath of ["react/index.html"]) {
   test(`${htmlPath}: CSP connect-src covers the allowlisted backend, nothing more`, () => {
     const html = read(htmlPath);
     const dir = connectSrc(html);
@@ -33,7 +33,7 @@ for (const htmlPath of ["pwa/index.html", "react/index.html"]) {
   });
 }
 
-for (const srcPath of ["pwa/app.js", "react/src/lib/api.ts"]) {
+for (const srcPath of ["react/src/lib/api.ts"]) {
   test(`${srcPath}: backend allowlist is strict and names the default host`, () => {
     const src = read(srcPath);
     assert.ok(src.includes("DEFAULT_BACKEND_HOST"), "names DEFAULT_BACKEND_HOST");
@@ -54,7 +54,7 @@ for (const srcPath of ["pwa/app.js", "react/src/lib/api.ts"]) {
 }
 
 test("allowlist and CSP connect-src never diverge", () => {
-  for (const htmlPath of ["pwa/index.html", "react/index.html"]) {
+  for (const htmlPath of ["react/index.html"]) {
     const dir = connectSrc(read(htmlPath));
     // Every https backend host the allowlist accepts must appear in the CSP.
     assert.ok(
@@ -62,9 +62,7 @@ test("allowlist and CSP connect-src never diverge", () => {
       `${htmlPath} connect-src must list the allowlisted backend host (edit both together; see README "Self-hosted backend")`,
     );
   }
-  // Functional contract of the shared allowlist (imported from the React copy;
-  // pwa/app.js carries the identical logic but cannot be imported in Node - it
-  // touches the DOM at module top level - so the source-text checks above pin it).
+  // Functional contract of the allowlist (imported from the React copy).
   assert.equal(isAllowedBackendUrl(`https://${DEFAULT_BACKEND_HOST}/v1/health`), true);
   assert.equal(isAllowedBackendUrl("https://evil.example.com/v1/health"), false);
   assert.equal(isAllowedBackendUrl("https://snapclaim-backend.parithosh.workers.dev.evil.com/"), false);

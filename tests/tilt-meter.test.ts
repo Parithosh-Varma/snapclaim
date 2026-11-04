@@ -1,6 +1,7 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { TILT_REFUSE_DEG, TILT_WARN_DEG, mountTiltMeter, tiltFromOrientation, tiltMessage, tiltZone } from "../pwa/tilt-meter.js";
+import { TILT_REFUSE_DEG, TILT_WARN_DEG, mountTiltMeter, tiltFromOrientation, tiltMessage, tiltZone } from "../react/src/lib/tilt.ts";
+import type { TiltWindow } from "../react/src/lib/tilt.ts";
 
 const near = (actual: number | null, expected: number) => {
   assert.ok(actual !== null && Math.abs(actual - expected) < 1e-6, `${actual} ≈ ${expected}`);
@@ -24,7 +25,8 @@ test("side-to-side roll on a floor counts too", () => {
 });
 
 test("missing sensor readings give null and no message", () => {
-  assert.equal(tiltFromOrientation(null, 0), null);
+  // null beta/gamma come from missing sensors at runtime; the guard is Number.isFinite-based.
+  assert.equal(tiltFromOrientation(null as unknown as number, 0), null);
   assert.equal(tiltZone(null), "unknown");
   assert.equal(tiltMessage(null), "");
 });
@@ -41,7 +43,7 @@ test("zones match the coin check: warn past 30°, refuse past 60°", () => {
 });
 
 test("mount does nothing where the browser has no orientation sensors", () => {
-  const stop = mountTiltMeter({}, { win: {} });
+  const stop = mountTiltMeter(null, { win: {} as TiltWindow });
   assert.equal(typeof stop, "function");
   stop();
 });

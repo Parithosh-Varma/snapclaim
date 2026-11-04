@@ -1048,15 +1048,22 @@ export default function Mark() {
               id="markNoCoin"
               className="btn-quiet"
               type="button"
-              disabled={markBusy || !!s.coinManualPt}
+              disabled={markBusy || (!!s.coinManualPt && !s.noScaleMode)}
               onClick={() => {
-                s.noScaleMode = true;
-                s.coinManualPt = null;
-                s.coinMask = null;
-                s.coinIou = 0;
+                if (s.noScaleMode) {
+                  // Untoggled: back to millimetres. The scale still needs a
+                  // coin outline + size, the measure gate enforces that below.
+                  s.noScaleMode = false;
+                  setStatus("Scale needed - tap the coin, or mark percent-only again to skip millimetres.");
+                } else {
+                  s.noScaleMode = true;
+                  s.coinManualPt = null;
+                  s.coinMask = null;
+                  s.coinIou = 0;
+                  setCoinFixHint("");
+                  setStatus("Percent-only - no millimetres.");
+                }
                 touchInputs();
-                setCoinFixHint("");
-                setStatus("Percent-only - no millimetres.");
                 drawMark();
               }}
             >

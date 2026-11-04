@@ -193,7 +193,7 @@ test("React port keeps backend, worker and privacy contracts", () => {
   for (const w of ["react/public/sam-worker.js", "react/public/voice-worker.js"]) {
     assert.ok(read(w).includes('tf.env.logLevel = "error"'), `${w} quiets ONNX Runtime warnings`);
   }
-  for (const w of ["react/public/sam-worker.js", "pwa/sam-worker.js"]) {
+  for (const w of ["react/public/sam-worker.js"]) {
     assert.ok(read(w).includes("photoId: progressPhotoId"), `${w} tags progress with the photo so stale downloads never paint the bar`);
     const src = read(w);
     assert.ok(src.includes('"tariqkhalif/slimsam-77-crack"'), `${w} loads the crack-tuned decoder`);
@@ -223,4 +223,16 @@ test("React store is the vanilla store contract", () => {
   assert.ok(store.includes('CASES_KEY = "snapclaim.cases.v1"'), "same localStorage key: existing cases survive the switch");
   assert.ok(store.includes('SETTINGS_KEY = "snapclaim.settings.v1"'), "same settings key");
   assert.ok(store.includes("photoDropped"), "quota photo-drop kept");
+});
+
+test("Percent-only is a toggle, never a trap", () => {
+  const mark = read("react/src/screens/Mark.tsx");
+  // The button untoggles: tapping it while in percent-only clears the flag
+  // instead of re-setting it, so millimetres are always reachable again.
+  assert.ok(mark.includes("if (s.noScaleMode)"), "percent-only button branches on current state");
+  assert.ok(mark.includes("s.noScaleMode = false"), "untoggle path clears percent-only");
+  // The button stays enabled while percent-only is on (otherwise the
+  // untoggle path is unreachable); it only locks while measuring or after
+  // a coin tap that percent-only has not yet cleared.
+  assert.ok(!mark.includes("disabled={markBusy || !!s.coinManualPt}"), "no one-way latch on the disabled guard");
 });
