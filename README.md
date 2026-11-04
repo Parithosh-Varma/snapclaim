@@ -24,6 +24,18 @@ SnapClaim turns a damage photo plus a one-line description into a replayable evi
 
 **Try it:** <https://snapclaim.pages.dev> (no login needed).
 
+### What is measured today
+
+All three commands are free and deterministic; run them yourself.
+
+| Check | Command | Result on `main` |
+|---|---|---|
+| Measurement code vs known answers (54 scenes drawn in code, coin scale, some on tilted walls) | `npm run bench:truth` | length median error 1.4%, 100% within ±10%; width median error 4.0%, 96.3% within ±10%; 3/3 no-scale refusals held |
+| Regression on dev mask fixtures | `npm run eval` | 7 pass, 0 skip, 0 fail |
+| Live pipeline on held-out real photos | `npm run bench` | 4 public photos run live 2026-11-02: 4/4 refused millimetres, but only 2/4 masks were on the crack and the skeptic flagged neither miss ([details](docs/eval-report.md#failures-and-misses)); 7 team cases UNRUN, so the command still exits 1 on purpose |
+
+What this does not show yet: how well SAM finds the crack on a real photo. `bench:truth` checks the maths given a mask, not the mask itself. No real crack has been tape-measured yet, so `npm run bench:gap` (pipeline vs model-only guess against a tape) still prints UNSCORED. We would rather show that gap than fill it with a number we cannot back.
+
 **Global by design:** the measurement engine assumes no currency, country, or language — a scale reference is any known-size object (coin, ruler, bank card), and the transcript is free text in any language. Voice is auto-detected by default; callers can still send an optional `languageBias`.
 
 **Who it is for:** tenants and landlords settling security-deposit disputes at move-out, and households filing a home insurance claim. Both sides look at the same crack and argue about how big it is; SnapClaim gives them one measured, replayable record instead of two memories. It documents, it does not advise.

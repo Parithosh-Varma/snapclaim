@@ -67,9 +67,10 @@ const claimsMillimetres = (run: CaseRun): boolean =>
  * Walks every held-out case and checks two things against the archived runs:
  * a case with no scale reference must not carry a millimetre value, and the skeptic's
  * DISPUTED calls are scored against the hand labels. A case without a run is reported
- * as unrun so a missing run can't look like a clean one.
+ * as unrun so a missing run can't look like a clean one. `audit` adds labels written
+ * after the freeze, scored the same way as labels in split.json.
  */
-export function runHeldOut(heldOut: HeldOutCase[], runs: CaseRun[]): HeldOutReport {
+export function runHeldOut(heldOut: HeldOutCase[], runs: CaseRun[], audit: DisputeLabel[] = []): HeldOutReport {
   const byCase = new Map(runs.map((r) => [r.caseId, r]));
   const report: HeldOutReport = {
     unrun: [],
@@ -86,12 +87,13 @@ export function runHeldOut(heldOut: HeldOutCase[], runs: CaseRun[]): HeldOutRepo
 
   for (const c of heldOut) {
     const run = byCase.get(c.id);
-    for (const l of c.disputeLabels ?? []) labels.push({ caseId: c.id, ...l });
+    const caseLabels = [...(c.disputeLabels ?? []).map((l) => ({ caseId: c.id, ...l })), ...audit.filter((l) => l.caseId === c.id)];
+    labels.push(...caseLabels);
     if (!run) {
       report.unrun.push(c.id);
       continue;
     }
-    const labeled = new Set((c.disputeLabels ?? []).map((l) => l.maskId));
+    const labeled = new Set(caseLabels.map((l) => l.maskId));
     for (const f of run.findings) {
       if (!f.verdict) continue;
       predictions.push({ caseId: c.id, maskId: f.maskId, verdict: f.verdict });
@@ -140,6 +142,30 @@ export interface SplitFile {
   heldOut: HeldOutCase[];
 }
 
+/** One hand label written after the freeze, with who made it and when, so split.json stays untouched. */
+export interface AuditLabel extends DisputeLabel {
+  labeledBy: string;
+  labeledAt: string;
+}
+
+/** bench/audit/heldout-masks.json: post-freeze labels. Append only, like the split. */
+export interface AuditFile {
+  labels: AuditLabel[];
+}
+
+/** Returns an error message, or null when `value` has the shape of an AuditFile. */
+export function validateAudit(value: unknown): string | null {
+  const v = value as Partial<AuditFile> | null;
+  if (!v || typeof v !== "object" || !Array.isArray(v.labels)) return "labels must be an array";
+  for (const l of v.labels) {
+    if (!l || ![l.caseId, l.maskId, l.labeledBy, l.labeledAt].every((s) => typeof s === "string" && s !== "")) {
+      return "every label needs caseId, maskId, labeledBy and labeledAt";
+    }
+    if (l.expected !== "CONFIRMED" && l.expected !== "DISPUTED") return "expected must be CONFIRMED or DISPUTED";
+  }
+  return null;
+}
+
 export interface BenchOutcome {
   lines: string[];
   /** 0 clean, 1 failed or incomplete, 2 split not frozen or a run file unreadable. */
@@ -147,7 +173,11 @@ export interface BenchOutcome {
 }
 
 /** Everything main() decides, with no file or process access, so the contract can be tested. */
-export function evaluate(split: SplitFile, runFiles: { name: string; text: string }[], opts: { allowUnrun?: boolean } = {}): BenchOutcome {
+export function evaluate(
+  split: SplitFile,
+  runFiles: { name: string; text: string }[],
+  opts: { allowUnrun?: boolean; auditText?: string } = {},
+): BenchOutcome {
   if (!split.frozenAt) {
     return { lines: ["REFUSED: bench/split.json has no frozenAt, so the held-out split is not frozen; nothing was scored"], exitCode: 2 };
   }
@@ -156,6 +186,27 @@ export function evaluate(split: SplitFile, runFiles: { name: string; text: strin
   let bad = false;
   let problems = 0;
   const known = new Set(split.heldOut.map((c) => c.id));
+  let audit: AuditLabel[] = [];
+  if (opts.auditText !== undefined) {
+    let parsed: unknown;
+    let err: string | null;
+    try {
+      parsed = JSON.parse(opts.auditText);
+      err = validateAudit(parsed);
+    } catch (e) {
+      err = `not valid JSON (${(e as Error).message})`;
+    }
+    if (err) {
+      lines.push(`BAD audit: ${err}`);
+      bad = true;
+    } else {
+      audit = (parsed as AuditFile).labels;
+      for (const l of audit.filter((l) => !known.has(l.caseId))) {
+        lines.push(`UNKNOWN audit label: caseId "${l.caseId}" is not in heldOut`);
+        problems++;
+      }
+    }
+  }
   const seen = new Set<string>();
   for (const f of runFiles) {
     let parsed: unknown;
@@ -186,8 +237,8 @@ export function evaluate(split: SplitFile, runFiles: { name: string; text: strin
     seen.add(run.caseId);
     runs.push(run);
   }
-  const r = runHeldOut(split.heldOut, runs);
-  lines.push(`held-out: ${split.heldOut.length} cases, ${runs.length} valid archived runs`);
+  const r = runHeldOut(split.heldOut, runs, audit);
+  lines.push(`held-out: ${split.heldOut.length} cases, ${runs.length} valid archived runs, ${audit.length} audit labels`);
   for (const id of r.unrun) lines.push(`UNRUN ${id}`);
   for (const id of r.invented) lines.push(`FAIL ${id}: reported millimetres without a scale reference`);
   for (const id of r.missed) lines.push(`MISSED ${id}: run found no crack at all`);
@@ -216,7 +267,13 @@ function main(): void {
     if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
   }
   const runFiles = names.map((name) => ({ name, text: readFileSync(fileURLToPath(new URL(name, runsDir)), "utf8") }));
-  const out = evaluate(split, runFiles, { allowUnrun: process.argv.includes("--allow-unrun") });
+  let auditText: string | undefined;
+  try {
+    auditText = readFileSync(fileURLToPath(new URL("./audit/heldout-masks.json", import.meta.url)), "utf8");
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+  }
+  const out = evaluate(split, runFiles, { allowUnrun: process.argv.includes("--allow-unrun"), auditText });
   for (const l of out.lines) console.log(l);
   // exitCode, not exit(): on Windows, exit() while piped stdout is still flushing aborts with a libuv assertion (exit 127)
   process.exitCode = out.exitCode;
