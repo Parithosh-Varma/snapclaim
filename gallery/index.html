@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SnapClaim Gallery — measured damage, receipt by receipt</title>
 <meta name="description" content="Gallery of SnapClaim captures, pipeline diagrams, and the terrace-slab field proof. Every number cites a machine-checkable receipt.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; object-src 'none'; base-uri 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; object-src https://snapclaim.pages.dev; base-uri 'self'">
 <link rel="icon" href="assets/snapclaim-mark.png">
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -19,7 +19,8 @@
     <a href="#capture">A · Capture</a>
     <a href="#pipeline">B · Pipeline</a>
     <a href="#proof">C · Field proof</a>
-    <a href="#cost">D · Cost</a>
+    <a href="#case-study">D · Case study</a>
+    <a href="#cost">E · Cost</a>
   </nav>
 </header>
 
@@ -99,8 +100,22 @@
     </figure>
   </section>
 
-  <section id="cost" class="exhibit">
+  <section id="case-study" class="exhibit">
     <p class="exhibit-tag">Exhibit D</p>
+    <h2>Case study — comparative measurement of a terrace-slab crack</h2>
+    <p>The full 5-page write-up: tape span vs pin-to-pin path vs pipeline vs photo-alone guess, with receipts R001–R007. Read it below or open the PDF.</p>
+    <p class="cta-row">
+      <a class="btn" href="https://snapclaim.pages.dev/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf">Open PDF</a>
+    </p>
+    <figure class="wide pdf-frame">
+      <object data="https://snapclaim.pages.dev/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf" type="application/pdf" aria-label="Terrace-slab crack case study PDF">
+        <p>Your browser can't preview PDFs here — <a href="https://snapclaim.pages.dev/reports/Case%20Study%20Comparative%20Measurement%20of%20a%20Terrace-Slab%20Crack.pdf">open the case-study PDF directly</a>.</p>
+      </object>
+    </figure>
+  </section>
+
+  <section id="cost" class="exhibit">
+    <p class="exhibit-tag">Exhibit E</p>
     <h2>Cost — what the $5 cap buys</h2>
     <p>Live calls are metered on a hard per-isolate spend cap. The demo and CI run in mock mode at $0.</p>
     <figure class="wide">

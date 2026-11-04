@@ -70,6 +70,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.1rem);letter-spacing:-.02em;margin:0 0 .5rem;f
 /* figures */
 .wide{margin:1.2rem 0 0}
 .wide img{width:100%;height:auto;display:block;background:#fff;border:2px solid var(--ink)}
+.pdf-frame object{width:100%;height:min(80vh,820px);display:block;background:var(--card);border:2px solid var(--ink)}
 
 /* proof + receipt strips */
 .proof{display:grid;grid-template-columns:1fr 1fr;gap:2rem;align-items:start}
