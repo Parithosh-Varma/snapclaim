@@ -17,7 +17,7 @@ The rest is manual, one pass per release, on a real phone if possible.
 - [ ] Analytics carry event names only (no photo, transcript, or data URL).
 - [ ] Analytics cap drops oldest past 200 events.
 - [ ] Coach flags persist once dismissed.
-- [ ] Copy has no banned words, keeps PLACEHOLDERs and the Unverified line.
+- [ ] Copy has no banned words, has no PLACEHOLDERs, keeps the Unverified line.
 - [ ] Storage keys are namespaced and distinct.
 
 ## Manual: flows

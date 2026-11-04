@@ -177,7 +177,7 @@ test("copy sheet: every string present, plain words, placeholders explicit", () 
   };
   const all = walk(STRINGS).join("\n");
   for (const word of banned) assert.ok(!all.includes(word), `banned word in UI copy: ${word}`);
-  assert.match(all, /PLACEHOLDER/);
+  assert.doesNotMatch(all, /PLACEHOLDER/);
   assert.match(all, /Unverified/);
   for (const key of ["welcomeTitle", "coinTitle", "privacyTitle", "coachCapture", "micTooltip", "resumedBanner", "startReport"]) {
     assert.equal(typeof (STRINGS as Record<string, unknown>)[key], "string");
