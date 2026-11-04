@@ -143,6 +143,7 @@ For local development, Settings → Developer → **Open admin panel** flips the
 | Perception - damage masks | **SAM 3.1** | `https://api.meta.ai/v1` |
 | Reasoning - evidence-gated findings | **Muse Spark 1.3** | `https://api.meta.ai/v1/chat/completions` |
 | Independent skeptic (open weights) | **Spark Open** | `https://inference.baseten.co/v1` · `meta-models/muse-spark-open-1026` |
+| On-device damage masks (offline / fallback) | **SlimSAM-77** (compressed SAM) + our crack-tuned decoder [`tariqkhalif/slimsam-77-crack`](https://huggingface.co/tariqkhalif/slimsam-77-crack) | in the browser, transformers.js · [`training/slimsam-crack/`](./training/slimsam-crack/) |
 | Voice intake (any language; auto-detected, optional `languageBias`) | **Muse Voice Transcribe** | `POST https://api.meta.ai/v1/asr/transcribe` (file) · `wss://api.meta.ai/v1/asr/realtime` (live) |
 
 No image generation anywhere: every visual is drawn in code from the masks and the math. (Muse Image is unavailable in our region under Meta's Geographic Use Policy - the receipts pattern turns that constraint into a design principle, not a product boundary.)
@@ -248,15 +249,16 @@ Hard limits: 50 masks per call (chunk above), 1–16 point prompts per segment c
 
 ### What is measured today
 
-All three commands are free and deterministic; run them yourself.
+The `npm run` commands are free and deterministic; run them yourself. The crack-mask check needs the public dataset and the exported models (see its README).
 
 | Check | Command | Result on `main` |
 |---|---|---|
 | Measurement code vs known answers (54 scenes drawn in code, coin scale, some on tilted walls) | `npm run bench:truth` | length median error 1.4%, 100% within ±10%; width median error 4.0%, 96.3% within ±10%; 3/3 no-scale refusals held |
 | Regression on dev mask fixtures | `npm run eval` | 7 pass, 0 skip, 0 fail |
+| On-device crack masks, one tap per crack (92 held-out photos from a public crack dataset, 276 taps, browser q8 build) | `training/slimsam-crack/browser-check/hybrid.mjs` | mIoU 0.174 with stock SlimSAM, **0.697** with our crack-tuned decoder; coins stay on stock |
 | Live pipeline on held-out real photos | `npm run bench` | 12 cases, 0 archived runs yet (all UNRUN, so the command exits 1 on purpose) |
 
-What this does not show yet: how well SAM finds the crack on a real photo. `bench:truth` checks the maths given a mask, not the mask itself. One real crack has a thread-and-tape ground truth (`terrace-slab-tape-01`, n = 1, below); `npm run bench:gap` scores the path against the thread and prints the span for context. We would rather show that gap than fill it with a number we cannot back.
+What this does not show yet: how well SAM finds the crack on our own phone photos (the crack-mask row uses a public dataset). `bench:truth` checks the maths given a mask, not the mask itself. One real crack has a thread-and-tape ground truth (`terrace-slab-tape-01`, n = 1, below); `npm run bench:gap` scores the path against the thread and prints the span for context. We would rather show that gap than fill it with a number we cannot back.
 
 - `npm run eval` — deterministic bench over `fixtures/masks/*.json` vs `fixtures/expected/` (missing expected file = SKIP, never a pass). Current: wall-crack 5.17% / 85.9 mm / 2.6 mm wide (unverified — no width ground truth) / 2.19 cm² (significant), stain 1.29% percent-only (moderate).
 <img src="docs/images/terrace-slab.jpg" width="560" alt="Terrace-slab crack with a taped ₹2 coin; a yellow measuring tape runs alongside as ground truth">

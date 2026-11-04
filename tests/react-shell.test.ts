@@ -195,6 +195,11 @@ test("React port keeps backend, worker and privacy contracts", () => {
   }
   for (const w of ["react/public/sam-worker.js", "pwa/sam-worker.js"]) {
     assert.ok(read(w).includes("photoId: progressPhotoId"), `${w} tags progress with the photo so stale downloads never paint the bar`);
+    const src = read(w);
+    assert.ok(src.includes('"tariqkhalif/slimsam-77-crack"'), `${w} loads the crack-tuned decoder`);
+    assert.ok(src.includes("preferSmallest && crackModel") && src.includes("outputs ??= await model(prompt)"),
+      `${w} sends damage taps to the tuned decoder and coins (or a failed load) to stock`);
+    assert.ok(!/get_image_embeddings[^\n]*crackModel|crackModel\.get_image_embeddings/.test(src), `${w} embeds with the stock encoder only`);
   }
   assert.ok(mark.includes("That photo could not be read"), "unreadable photo fails closed instead of keeping a stale mask");
   assert.ok(mark.includes("there is nothing outlined to measure"), "measure refuses an empty mask even if the button is forced");
