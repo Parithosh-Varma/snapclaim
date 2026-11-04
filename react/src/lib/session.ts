@@ -144,10 +144,6 @@ export interface Session {
   measurement: Measurement | null;
   reportStatement: string | null;
   reportFail: string | null;
-  /** Wider location-context photo as a data URL (Say screen capture). */
-  locationPhoto: string | null;
-  /** Extended voice transcript beyond the short statement. */
-  extendedTranscript: string | null;
   raw: string;
   transcript: string;
   /** Optional wide shot showing where the damage is - context only, never measured. */
@@ -202,8 +198,6 @@ export function createSession(): Session {
     measurement: null,
     reportStatement: null,
     reportFail: null,
-    locationPhoto: null,
-    extendedTranscript: null,
     raw: "{}",
     transcript: "",
     locationPhoto: null,
