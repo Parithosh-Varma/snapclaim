@@ -326,3 +326,15 @@ Credits claim ✅ - billing verified, $150 active on 2026-10-27.
 - `npm run bench:gap` exit 0: measured err 8.5 mm (3.7%, in) vs model-only err 88 mm (38.8%, out). `/proof.html` second column filled; rebuilt + redeployed.
 
 **Spend:** $0.00 recorded (Spark pricing unconfirmed; 3,110 tokens metered at $0).
+
+## 2026-11-02 - First live non-English transcribe + live 422 (claim-10 evidence)
+
+**Live proofs** (all against the deployed Worker, `mode:live`, v0.3.0):
+
+- Deploy verified: `GET /v1/health` → `mode:live`; spend ledger `$0/$5` before calls.
+- First non-English clip through `/v1/transcribe` (was pending per backend README): Hinglish line "Deewar par crack hai, baarish ke baad badh gaya" (macOS Aman en-IN voice, mono 16 kHz WAV, 2.9 s) with `languageBias: ["hi"]` → transcript "দেওয়ার পার ক্র্যাক হে, बारिश के बाद बढ़ गया।।" in 2.7 s. Auto-detect at work: Hindi words right, script half-guessed Bengali on synthetic speech.
+- Live `/v1/measure` (wall-crack fixture): R001 0.094077 mm/px, R002 5.17 %, R005 85.9 mm, R006 2.6 mm, R007 significant; mode absolute. Note: live numbers length as R005; the mock PWA sample path numbers it R004 - receipt ids are deterministic per input, not stable across inputs.
+- Live 422 with $0 model spend: `/v1/findings` with R005 tampered 85.9 → 99 plus component/masks → `422 supplied findings/receipts do not match server recomputation`, thrown by the cross-check before any model call.
+- On "85.9 ± 3.9": 3.9 is NOT a tolerance on 85.9. Real bands on 85.9 mm are gate ±0.86 mm (`max(0.011, 1%)`) and cross-frame compare ±2.58 mm (`max(3%, 1.0 mm)`); 3.9 is a percent from the synthetic agreement test (`tests/pwa-multishot.test.ts:60`, verdict CHECK case). Do not label 3.9 as tolerance on camera.
+
+**Spend:** $0.000143 (transcribe 3 s). Measure keyless $0; 422 $0 (no model call).

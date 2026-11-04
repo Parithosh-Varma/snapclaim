@@ -5,6 +5,13 @@
     --ink:#0b1e46; --coin:#0e8a4d; --coin-strong:#0a6b3c; --coin-tint:#e4f3ea;
     --paper:#f4f1ea; --card:#fffdf8; --line:#e2ddd0;
     --slate:#3d4a68; --damage:#c81e2b;
+    /* Capture screen: one dark palette, referenced by every rule on this screen. */
+    --cap-surface-0:#101214; --cap-surface-1:#1d2025; --cap-surface-2:#262b33;
+    --cap-border:rgba(244,241,232,.16); --cap-chip:rgba(244,241,232,.09);
+    --cap-chip-press:rgba(244,241,232,.17); --cap-tint:rgba(61,220,132,.14);
+    --cap-text:#f4f1e8; --cap-text-2:#c8c4b7;
+    --cap-accent:#3ddc84; --cap-accent-btn:#0b6b3d; --cap-danger:#ff9c9c;
+    --cap-radius:12px;
     --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:20px; --s6:24px; --s8:32px;
     --r-sm:12px; --r-md:16px; --r-lg:20px;
     --shadow-1:0 1px 2px rgba(11,30,70,.06),0 4px 14px rgba(11,30,70,.07);
@@ -20,15 +27,21 @@
   @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
   /* ---------- camera: the viewfinder is the instrument ---------- */
-  #cam{position:fixed;inset:0;background:#111}
+  #cam{position:fixed;inset:0;background:var(--cap-surface-0)}
   #cam video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
   /* Centered control column: video stays full-bleed, controls never stretch across desktop. */
   .cam-col{position:absolute;inset:0;z-index:3;margin:0 auto;width:min(480px,100%);
     display:flex;flex-direction:column;pointer-events:none;
-    padding:calc(14px + env(safe-area-inset-top)) 16px calc(20px + env(safe-area-inset-bottom))}
-  .cam-col button,.cam-col .permitcard,.cam-col #tipsCard,.cam-col #tipsScrim{pointer-events:auto}
-  .cam-top{display:flex;align-items:center;gap:10px}
-  #camStep{flex:1;text-align:center}
+    padding:calc(12px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom))}
+  .cam-col button,.permitcard,.cap-actions,.cap-nocoin .cap-link,#tipsCard,#tipsScrim{pointer-events:auto}
+  .cam-col button:focus-visible{outline:2px solid var(--cap-accent);outline-offset:2px}
+  .cam-top{display:flex;align-items:center;gap:12px;min-height:44px}
+  /* header step: quiet label over a 6-segment progress bar, never a bordered pill */
+  .cap-step{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
+  .cap-step-label{font-size:12.5px;font-weight:700;letter-spacing:.02em;color:var(--cap-text-2);white-space:nowrap}
+  .cap-progress{display:flex;gap:5px;width:min(168px,100%)}
+  .cap-progress i{display:block;flex:1;height:4px;border-radius:2px;background:var(--cap-border)}
+  .cap-progress i.on{background:var(--cap-accent)}
   .guide{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:0}
   .guide-frame{position:relative;width:min(78%,320px);aspect-ratio:4/3}
   .guide-frame .g{position:absolute;width:30px;height:30px;border:4px solid #fff;border-radius:0;
@@ -37,22 +50,58 @@
   .guide-frame .tr{right:0;top:0;border-left:0;border-bottom:0;border-radius:0}
   .guide-frame .bl{left:0;bottom:0;border-right:0;border-top:0;border-radius:0}
   .guide-frame .br{right:0;bottom:0;border-left:0;border-top:0;border-radius:0}
-  /* permission-off: one card, one action */
-  .permitcard{margin:auto 0;text-align:center;background:rgba(10,18,36,.92);border:1px solid rgba(255,255,255,.16);
-    border-radius:0;padding:28px 22px;box-shadow:0 16px 48px rgba(0,0,0,.5)}
-  .permit-icon{display:inline-grid;place-items:center;width:56px;height:56px;border-radius:0;
-    background:#ece7dc;color:#0b1e46;margin-bottom:12px}
+  /* idle (camera off): anchored card, content up top, actions pinned at the bottom */
+  .permitcard{flex:1;display:flex;flex-direction:column;margin:12px 0 0;min-height:0;text-align:center;
+    background:var(--cap-surface-1);border:1px solid var(--cap-border);
+    border-radius:var(--cap-radius);padding:24px 20px 16px;box-shadow:0 16px 48px rgba(0,0,0,.5)}
+  .permit-icon{display:inline-grid;place-items:center;width:80px;height:80px;border-radius:50%;
+    background:var(--cap-tint);margin:0 auto 12px}
   .permit-icon svg{width:30px;height:30px}
-  .permit-icon img{width:40px;height:auto;display:block}
+  .permit-icon img{width:44px;height:auto;display:block}
   .permit-icon .mark-dark{display:none}
-  html[data-theme="dark"] .permit-icon{background:#141310;border-color:#34302a}
   html[data-theme="dark"] .permit-icon .mark-light{display:none}
   html[data-theme="dark"] .permit-icon .mark-dark{display:block}
-  .permitcard #permitTitle{font-size:20px;font-weight:800;color:#fff;margin:0 0 6px}
-  .permitcard #permitDesc{font-size:14.5px;line-height:1.55;color:rgba(255,255,255,.82);margin:0 0 18px}
-  .permitcard .btn-primary{width:100%}
-  .permit-alt{margin-top:16px}
-  .permit-hint{font-size:12.5px;line-height:1.5;color:rgba(255,255,255,.65);margin:12px 0 0}
+  .cap-title{font-size:22px;line-height:28px;font-weight:700;color:var(--cap-text);margin:0 0 8px}
+  .cap-desc{font-size:15px;line-height:22px;color:var(--cap-text-2);margin:0 auto;max-width:36ch}
+  .cap-nocoin{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;
+    font-size:13px;line-height:18px;color:var(--cap-text-2);margin:10px 0 0}
+  .cap-nocoin>svg{width:17px;height:17px;flex:none;color:var(--cap-accent)}
+  .cap-link{border:0;background:none;color:var(--cap-accent);font:inherit;font-weight:700;
+    text-decoration:underline;text-underline-offset:3px;min-height:44px;padding:10px 8px;border-radius:8px}
+  .cap-link:active{background:var(--cap-chip)}
+  .cap-link:disabled{opacity:.5}
+  .cap-actions{margin-top:auto;display:flex;flex-direction:column;gap:10px;padding-top:16px}
+  .cap-primary{display:inline-flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:52px;
+    border:0;border-radius:var(--cap-radius);background:var(--cap-accent-btn);color:#fff;font-weight:800;font-size:16.5px;
+    transition:transform .12s ease,filter .15s ease}
+  .cap-primary svg{width:20px;height:20px;flex:none}
+  .cap-primary:active{transform:scale(.98);filter:brightness(1.12)}
+  .cap-primary:disabled{opacity:.55}
+  .cap-primary.busy{position:relative;color:transparent !important;pointer-events:none}
+  .cap-primary.busy::after{content:"";position:absolute;left:50%;top:50%;
+    width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;
+    border:3px solid rgba(255,255,255,.35);border-top-color:#fff;animation:spin .7s linear infinite}
+  .cap-row{display:flex;gap:10px}
+  .cap-row .cap-secondary,.cap-row .cap-tertiary{flex:1;min-width:0}
+  .cap-secondary{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;
+    border-radius:var(--cap-radius);border:1px solid var(--cap-border);background:none;
+    color:var(--cap-text);font-weight:700;font-size:14.5px;
+    transition:transform .12s ease,background .15s ease}
+  .cap-secondary svg{width:19px;height:19px;flex:none}
+  .cap-secondary:active{transform:scale(.98);background:var(--cap-chip)}
+  .cap-secondary:disabled{opacity:.5}
+  .cap-tertiary{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;width:100%;
+    border:0;border-radius:var(--cap-radius);background:none;
+    color:var(--cap-text-2);font-weight:700;font-size:14.5px;
+    transition:transform .12s ease,background .15s ease}
+  .cap-tertiary svg{width:19px;height:19px;flex:none}
+  .cap-tertiary:active{transform:scale(.98);background:var(--cap-chip)}
+  .cap-tertiary:disabled{opacity:.5}
+  /* denied permission: inline notice shown only after a real NotAllowedError */
+  .cap-alert{text-align:left;border:1px solid var(--cap-border);border-radius:var(--cap-radius);
+    background:var(--cap-surface-2);padding:12px 14px}
+  .cap-alert b{display:block;font-size:15px;line-height:22px;color:var(--cap-text)}
+  .cap-alert span{display:block;font-size:13px;line-height:18px;color:var(--cap-text-2);margin-top:2px}
   /* shutter block: one primary action + grouped alternatives */
   .shutter-block{display:flex;flex-direction:column;align-items:center;gap:8px}
   #shutter{width:82px;height:82px;border-radius:50%;border:5px solid #fff;background:#fff;
@@ -66,15 +115,17 @@
   .shutter-label{font-size:13px;font-weight:700;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.6);min-height:1.2em}
   .alt-row{display:flex;gap:8px;width:100%;margin-top:6px}
   .alt-btn{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:50px;
-    border-radius:0;border:1px solid rgba(255,255,255,.35);background:rgba(10,18,36,.62);
-    color:#fff;font-weight:700;font-size:14.5px;backdrop-filter:blur(6px)}
-  .alt-btn:active{transform:scale(.97)}
+    border-radius:var(--cap-radius);border:1px solid var(--cap-border);background:var(--cap-chip);
+    color:var(--cap-text);font-weight:700;font-size:14.5px;backdrop-filter:blur(6px)}
+  .alt-btn:active{transform:scale(.97);background:var(--cap-chip-press)}
+  .alt-btn:disabled{opacity:.5}
   .alt-btn svg{width:19px;height:19px;flex:none}
   .noscale{display:flex;align-items:center;justify-content:center;min-height:48px;width:100%;
-    border:1px solid rgba(255,255,255,.45);border-radius:0;background:rgba(10,18,36,.55);
-    color:#fff;font-weight:700;font-size:14.5px;padding:0 14px}
-  .noscale:active{transform:scale(.97)}
-  .noscale-note{font-size:12.5px;line-height:1.45;color:rgba(255,255,255,.72);text-align:center;margin:2px 0 0}
+    border:1px solid var(--cap-border);border-radius:var(--cap-radius);background:var(--cap-chip);
+    color:var(--cap-text);font-weight:700;font-size:14.5px;padding:0 14px}
+  .noscale:active{transform:scale(.97);background:var(--cap-chip-press)}
+  .noscale:disabled{opacity:.5}
+  .noscale-note{font-size:13px;line-height:18px;color:var(--cap-text-2);text-align:center;margin:2px 0 0}
   .coinring{position:absolute;z-index:2;border:4px solid var(--coin);border-radius:50%;
     box-shadow:0 0 0 2px rgba(255,255,255,.7),0 0 24px rgba(14,138,77,.8);
     display:none;pointer-events:none;
@@ -84,23 +135,27 @@
     text-shadow:0 4px 30px rgba(0,0,0,.5);pointer-events:none}
   #count.pop{animation:pop .3s ease}
   @keyframes pop{from{transform:translate(-50%,-50%) scale(1.35)}to{transform:translate(-50%,-50%) scale(1)}}
-  .cam-close{flex:none;width:44px;height:44px;border-radius:0;border:1px solid rgba(255,255,255,.4);cursor:pointer;
-    background:rgba(10,18,36,.72);backdrop-filter:blur(6px);color:#fff;
-    display:grid;place-items:center;box-shadow:0 4px 16px rgba(0,0,0,.35);
+  .cam-close{flex:none;width:44px;height:44px;border-radius:var(--cap-radius);border:0;cursor:pointer;
+    background:var(--cap-chip);color:var(--cap-text);
+    display:grid;place-items:center;
     transition:transform .12s ease,background .15s ease}
-  .cam-close:active{transform:scale(.92)}
+  .cam-close:active{transform:scale(.92);background:var(--cap-chip-press)}
+  .cam-close:disabled{opacity:.5}
   .cam-close svg{width:20px;height:20px}
-  #tipsBtn{flex:none;min-height:44px;border:1px solid rgba(255,255,255,.4);border-radius:0;cursor:pointer;
-    background:rgba(10,18,36,.72);backdrop-filter:blur(6px);color:#fff;
-    font-size:13px;font-weight:700;padding:0 16px}
-  #tipsBtn:active{transform:scale(.96)}
+  /* header Coin tips: quiet ghost button with an info mark, no heavy border */
+  #tipsBtn{flex:none;display:inline-flex;align-items:center;gap:6px;min-height:44px;min-width:44px;border:0;border-radius:var(--cap-radius);cursor:pointer;
+    background:none;color:var(--cap-text);
+    font-size:14px;font-weight:600;padding:0 10px}
+  #tipsBtn svg{width:18px;height:18px;flex:none}
+  #tipsBtn:active{background:var(--cap-chip)}
+  #tipsBtn:disabled{opacity:.5}
   #tipsScrim{position:fixed;inset:0;z-index:40;border:0;background:rgba(0,0,0,.6);padding:0;cursor:default}
   #tipsCard{position:fixed;z-index:41;left:50%;transform:translateX(-50%);bottom:0;width:min(480px,100%);
-    max-height:82vh;overflow-y:auto;background:#1c1a14;color:#ece7dc;border-top:1px solid rgba(255,255,255,.16);
+    max-height:82vh;overflow-y:auto;background:var(--cap-surface-1);color:var(--cap-text);border-top:1px solid var(--cap-border);
     padding:10px 20px calc(20px + env(safe-area-inset-bottom))}
-  .tips-grab{display:block;width:44px;height:5px;margin:2px auto 12px;background:rgba(255,255,255,.35);border-radius:0}
-  #tipsClose{position:absolute;top:8px;right:8px;width:44px;height:44px;border:0;background:none;color:#ece7dc;
-    display:grid;place-items:center;cursor:pointer}
+  .tips-grab{display:block;width:44px;height:5px;margin:2px auto 12px;background:var(--cap-border);border-radius:3px}
+  #tipsClose{position:absolute;top:8px;right:8px;width:44px;height:44px;border:0;background:none;color:var(--cap-text);
+    display:grid;place-items:center;cursor:pointer;border-radius:8px}
   #tipsClose svg{width:20px;height:20px}
   /* Custom coin dropdown: square, themed, keyboard-operable listbox replacing
      the native select (unstylable, OS-themed). Button and rows all 44px+. */
@@ -119,21 +174,19 @@
   .coindrop-list [role="option"][aria-selected="true"]{font-weight:800}
   .coindrop-group{padding:10px 10px 4px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--slate)}
   #tipsCard #tipsTitle{font-size:15px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;
-    color:#8fe3b0;margin:0 0 10px}
+    color:var(--cap-accent);margin:0 0 10px}
   #tipsCard .tips-diagram{display:block;width:100%;height:auto;margin:0 0 12px;background:#000}
-  #tipsCard ul{margin:0 0 14px;padding-left:20px;color:#ece7dc;font-size:14.5px;line-height:1.65}
-  #tipsGotIt{width:100%;min-height:50px;border:0;border-radius:0;background:var(--coin);
+  #tipsCard ul{margin:0 0 14px;padding-left:20px;color:var(--cap-text-2);font-size:14.5px;line-height:1.65}
+  #tipsGotIt{width:100%;min-height:52px;border:0;border-radius:var(--cap-radius);background:var(--cap-accent-btn);
     color:#fff;font-weight:800;font-size:16px}
   .flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .3s ease;z-index:9}
   .flash.go{opacity:1;transition:none}
   body.reviewing #altEntry,body.reviewing #noCoin,body.reviewing #uploadBtn,
   body.step2 #altEntry,body.step2 #noCoin,body.step2 #uploadBtn{display:none}
-  #camStep{color:#8fe3b0;background:rgba(10,18,36,.72);padding:6px 12px;border-radius:0;
-    border:1px solid rgba(255,255,255,.32);white-space:nowrap}
   #coinHint{align-self:center;max-width:100%;margin-top:10px;
-    font-weight:700;font-size:14px;white-space:normal;text-align:center;
-    color:#fff;background:rgba(10,18,36,.78);padding:9px 16px;border-radius:0;
-    border:1px solid rgba(255,255,255,.3)}
+    font-weight:600;font-size:13px;line-height:18px;white-space:normal;text-align:center;
+    color:var(--cap-text);background:var(--cap-chip);padding:9px 16px;border-radius:999px;
+    border:1px solid var(--cap-border)}
   #updateBar{position:fixed;left:12px;right:12px;top:calc(12px + env(safe-area-inset-top));z-index:21;
     background:var(--ink);color:#fff;border-radius:0;padding:12px 14px;font-size:13px;font-weight:600;
     box-shadow:0 10px 30px rgba(0,0,0,.3);display:flex;align-items:center;gap:10px}
@@ -737,7 +790,6 @@
     html[data-theme="auto"] .brand-mark{background:#141310;border-color:#34302a;color:#ece7dc}
     html[data-theme="auto"] .brand-mark .mark-light{display:none}
     html[data-theme="auto"] .brand-mark .mark-dark{display:block}
-    html[data-theme="auto"] .permit-icon{background:#141310;border-color:#34302a}
     html[data-theme="auto"] .permit-icon .mark-light{display:none}
     html[data-theme="auto"] .permit-icon .mark-dark{display:block}
     html[data-theme="auto"] .hero-art{background:linear-gradient(180deg,#252119,#1d1b17)}

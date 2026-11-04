@@ -29,8 +29,11 @@ export default function Report() {
   const [renderError, setRenderError] = useState<string | null>(null);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [state, setState] = useState("");
-  const [gateOk, setGateOk] = useState(false);
-  const [annexSrc, setAnnexSrc] = useState<string | null>(null);
+  // Report state survives leaving and coming back: the blob URL lives on the
+  // session, so a remount (Back to Checks and forward again) must not hide
+  // the share options or force a second Generate (which would re-save the case).
+  const [gateOk, setGateOk] = useState(!!s.annexUrl);
+  const [annexSrc, setAnnexSrc] = useState<string | null>(s.annexUrl ?? null);
   const [healthOut, setHealthOut] = useState("");
   const [installEvt, setInstallEvt] = useState<Event | null>(null);
 
@@ -60,6 +63,7 @@ export default function Report() {
       percent: f.percent,
       severity: String(f.severity),
       crackLengthMm: f.crackLengthMm ?? null,
+      crackWidthMm: f.crackWidthMm ?? null,
       areaCm2: f.areaCm2 ?? null,
       mode: s.measurement?.mode ?? "",
       photo: s.stillDataUrl || null,
@@ -487,23 +491,26 @@ export default function Report() {
             {rendering ? "Generating…" : "Generate report"}
           </button>
           {state ? <div id="reportState" className="stateline" aria-live="polite">{state}</div> : null}
+          {/* Share and export options appear only after Generate report succeeds. */}
+          {gateOk && (
+          <>
           <div className="rowbtns">
-            <button id="pdfBtn" className={`btn-dark${pdfBusy ? " busy" : ""}`} type="button" disabled={!gateOk || pdfBusy} aria-busy={pdfBusy} onClick={() => void downloadPdf()}>{pdfBusy ? "Preparing PDF…" : "Download PDF"}</button>
+            <button id="pdfBtn" className={`btn-dark${pdfBusy ? " busy" : ""}`} type="button" disabled={pdfBusy} aria-busy={pdfBusy} onClick={() => void downloadPdf()}>{pdfBusy ? "Preparing PDF…" : "Download PDF"}</button>
           </div>
           <div className="rowbtns">
-            <button id="shareBtn" className="btn-ghostline" type="button" disabled={!gateOk} onClick={share}>Share</button>
-            <a id="emailBtn" className="btn-ghostline" href={gateOk ? mailUrl : undefined} aria-disabled={!gateOk} onClick={(e) => { if (!gateOk) e.preventDefault(); }}>Email</a>
+            <button id="shareBtn" className="btn-ghostline" type="button" onClick={share}>Share</button>
+            <a id="emailBtn" className="btn-ghostline" href={mailUrl}>Email</a>
           </div>
           <div className="rowbtns">
-            <button id="copyBtn" className="btn-ghostline" type="button" disabled={!gateOk} onClick={copy}>Copy summary</button>
-            <a id="waBtn" className="btn-ghostline" href={gateOk ? waUrl : undefined} target="_blank" rel="noreferrer noopener" aria-disabled={!gateOk} onClick={(e) => { if (!gateOk) e.preventDefault(); }}>WhatsApp</a>
+            <button id="copyBtn" className="btn-ghostline" type="button" onClick={copy}>Copy summary</button>
+            <a id="waBtn" className="btn-ghostline" href={waUrl} target="_blank" rel="noreferrer noopener">WhatsApp</a>
           </div>
           <button
             id="linkBtn"
             className={`btn-dark${linkBusy ? " busy" : ""}`}
             type="button"
             style={{ width: "100%", marginTop: 10 }}
-            disabled={!gateOk || linkBusy}
+            disabled={linkBusy}
             aria-busy={linkBusy}
             onClick={() => void copyShareLink()}
           >
@@ -525,6 +532,8 @@ export default function Report() {
                 style={{ marginTop: 0 }}
               />
             </details>
+          )}
+          </>
           )}
           <div className="rowbtns">
             {annexSrc && (

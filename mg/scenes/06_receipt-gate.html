@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>06 receipt-gate — refused, then cited</title>
+<script src="../lib/mg.js"></script>
+<style>
+  :root {
+    --ink: #0B0F14; --panel: #131A22; --line: #263241; --text: #EAF0F6; --muted: #8EA0B3;
+    --accent: #5CC8FF; --match: #3DDC97; --drift: #FFB547; --refuse: #FF5C6C;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 100%; height: 100%; background: var(--ink); }
+  #stage { position: relative; width: 100vw; height: 100vh; overflow: hidden;
+    background: var(--ink); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .tag { position: absolute; top: 5vmin; left: 8vmin; font-size: 2.6vmin; letter-spacing: .14em;
+    color: var(--muted); border: 1px solid var(--line); border-radius: 1.2vmin; padding: 1vmin 2vmin; }
+  #sent { position: absolute; top: 30vmin; left: 12vmin; right: 12vmin; text-align: center;
+    font-size: 5.4vmin; font-weight: 600; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 2vmin; padding: 4vmin; }
+  #sent .num { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 800; }
+  #chip { position: absolute; top: 52vmin; left: 50%; width: 30vmin; margin-left: -15vmin;
+    text-align: center; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 3.6vmin; font-weight: 700; background: var(--panel); border: .4vmin solid var(--accent);
+    color: var(--accent); border-radius: 99vmin; padding: 1.6vmin 0; }
+  #gate { position: absolute; left: 20vmin; right: 20vmin; top: 66vmin; height: 1vmin;
+    background: var(--line); border-radius: .5vmin; }
+  #stamp { position: absolute; left: 50%; top: 70vmin; width: 40vmin; margin-left: -20vmin;
+    text-align: center; padding: 2vmin 0; border-radius: 2vmin; font-size: 5.4vmin; font-weight: 800;
+    opacity: 0; }
+  #stamp.bad { border: .8vmin solid var(--refuse); color: var(--refuse); background: rgba(255, 92, 108, .08); }
+  #stamp.good { border: .8vmin solid var(--match); color: var(--match); background: rgba(61, 220, 151, .08); }
+  #gloss { position: absolute; bottom: 6vmin; left: 0; right: 0; text-align: center;
+    font-size: 3.2vmin; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="tag">DEMO MODE · SAMPLE DATA</div>
+  <div id="sent">The crack runs <span class="num">239.2 mm</span> across the slab.</div>
+  <div id="chip">▣ R005 · calibrated length</div>
+  <div id="gate"></div>
+  <div id="stamp" class="bad">REFUSED · 422</div>
+  <div id="gloss">receipt = machine-checkable record of how a number was computed</div>
+</div>
+<script>
+(function () {
+  var sent = document.getElementById('sent');
+  var chip = document.getElementById('chip');
+  var stamp = document.getElementById('stamp');
+  var gloss = document.getElementById('gloss');
+  window.SCENE = {
+    duration: 8, fps: 30, loop: false,
+    seek: function (t) {
+      // approach
+      sent.style.transform = 'translateY(' + mg.tween(t, 0.4, 1.6, -6, 8, mg.ease.inOutCubic) + 'vmin)';
+      // bounce off the gate: refused without the receipt
+      var bq = mg.seg(t, 1.8, 2.6);
+      if (t < 4.2) {
+        sent.style.transform = 'translateY(' + (8 - mg.ease.outBack(bq) * 10) + 'vmin)';
+        stamp.textContent = 'REFUSED · 422';
+        stamp.className = 'bad';
+        stamp.style.opacity = mg.seg(t, 2.2, 2.6);
+        stamp.style.transform = 'scale(' + mg.lerp(1.3, 1, mg.ease.outBack(mg.seg(t, 2.2, 2.7))) + ') rotate(-3deg)';
+      } else {
+        // receipt chip attaches, sentence passes
+        chip.style.opacity = 1;
+        chip.style.transform = 'translateY(' + mg.tween(t, 4.2, 4.9, 6, -9, mg.ease.inOutCubic) + 'vmin)';
+        sent.style.transform = 'translateY(' + mg.tween(t, 4.9, 5.8, -2, 16, mg.ease.inOutCubic) + 'vmin)';
+        sent.style.opacity = 1 - mg.seg(t, 5.8, 6.4);
+        stamp.textContent = 'SHIPPED';
+        stamp.className = 'good';
+        stamp.style.opacity = mg.seg(t, 5.8, 6.2);
+        stamp.style.transform = 'scale(' + mg.lerp(1.3, 1, mg.ease.outBack(mg.seg(t, 5.8, 6.3))) + ') rotate(2deg)';
+      }
+      chip.style.opacity = t < 4.2 ? mg.seg(t, 3.4, 3.9) : 1;
+      gloss.style.opacity = mg.seg(t, 6.4, 7.0);
+    }
+  };
+  SCENE.seek(0);
+})();
+</script>
+</body>
+</html>

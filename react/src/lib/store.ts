@@ -39,6 +39,7 @@ export interface SnapCase {
   percent?: number;
   severity?: string;
   crackLengthMm?: number | null;
+  crackWidthMm?: number | null;
   areaCm2?: number | null;
   mode?: string;
   photo?: string | null;

@@ -572,14 +572,14 @@
     <p class="sub">A second check has to agree. Disagreements print red, never hidden.</p>
     <div class="checkcard">
       <h3>Independent skeptic</h3>
-      <p>Spark Open re-derives every number from the receipts. Anything it cannot reproduce is marked disputed.</p>
+      <p>Spark Open re-derives every number from the receipts. Anything it cannot reproduce is marked disputed. It checks the prose, not the outlines - a wrong mask fools it. The mask cross-check below is the segmentation check; both auto-run and both must resolve before the report unlocks.</p>
       <button id="skepticBtn" class="btn-dark" type="button" style="width:100%">Ask skeptic</button>
       <span id="skStatus" role="status"></span>
       <div id="skOut" aria-live="polite"></div>
     </div>
     <div class="checkcard">
       <h3>Mask cross-check</h3>
-      <p>Sends this photo once to SAM 3.1 and compares its outline with the one measured on this device.</p>
+      <p>Sends this photo once to SAM 3.1 and compares its outline with the one measured on this device (SlimSAM-vs-SAM IoU). This is the real segmentation check - it auto-runs with the skeptic.</p>
       <button id="xcheckBtn" class="btn-ghostline" type="button" style="width:100%">Cross-check masks</button>
       <span id="xStatus" role="status" style="display:block;font-size:13px;color:var(--slate);margin-top:8px;min-height:1.2em"></span>
     </div>

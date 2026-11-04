@@ -35,3 +35,11 @@ with `HF_TOKEN` set.
    `npm run eval`: gate pass rate must not regress vs the API model.
 
 Checkpoints under `finetune/checkpoints/` are gitignored build artifacts.
+
+## Split warning (no leakage claims)
+
+The dataset is tiny (5 fixture rows from a handful of surfaces). Any mIoU or
+gate-pass number from a random row split would be inflated by near-duplicate
+patches from the same surface. Split by source image or by surface, never by
+random patch - and state which. No fine-tune accuracy headline ships from this
+repo until that split is recorded with the run.

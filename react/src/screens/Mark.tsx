@@ -208,11 +208,12 @@ export default function Mark() {
   const [coinActive, setCoinActive] = useState<number | null>(null);
   const dropRef = useRef<HTMLDivElement>(null);
   const dropBtnRef = useRef<HTMLButtonElement>(null);
-  // Stale-write guard: each measure() run gets a seq; navigation away or a
-  // retry supersedes the previous run so only the latest may mutate session
-  // or navigate. Incremented on unmount to drop late arrivals.
+  // Stale-write guard: each measure() run gets a seq; a retry supersedes the
+  // previous run so only the latest may mutate session or navigate. There is
+  // deliberately no unmount bump: measure() itself navigates to Numbers
+  // mid-run by design, and unmounting there must not invalidate the run
+  // (it silently dropped every measurement right after /v1/observe).
   const measureSeq = useRef(0);
-  useEffect(() => () => { measureSeq.current++; }, []);
 
   /** Manual radius matches measure()'s circleRef radius (gate-derived, or a
    * 3.5% fallback when the gate missed) so the ring shows what gets measured. */
@@ -1005,7 +1006,7 @@ export default function Mark() {
                 drawMark();
               }}
             >
-              {s.noScaleMode ? "Percent-only ✓" : "No coin in frame - percent-only"}
+              {s.noScaleMode ? "Percent-only ✓" : s.coinManualPt ? "Coin tapped ✓" : "Skip the coin - percent-only"}
             </button>
           </div>
           <label className="switchcard">

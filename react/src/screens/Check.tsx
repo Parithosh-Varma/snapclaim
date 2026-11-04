@@ -253,7 +253,7 @@ export default function Check() {
             <h3>Independent skeptic</h3>
             {skepticHead}
           </div>
-          <p>Spark Open re-derives every number from the receipts. Anything it cannot reproduce is marked disputed.</p>
+          <p>Spark Open re-derives every number from the receipts. Anything it cannot reproduce is marked disputed. It checks the prose, not the outlines - a wrong mask fools it. The mask cross-check below is the segmentation check; both auto-run and both must resolve before the report unlocks.</p>
           <button
             id="skepticBtn"
             className="btn-dark"
@@ -305,7 +305,7 @@ export default function Check() {
             <h3>Mask cross-check</h3>
             {xHead}
           </div>
-          <p>Sends this photo once to SAM 3.1 and compares its outline with the one measured on this device.</p>
+          <p>Sends this photo once to SAM 3.1 and compares its outline with the one measured on this device (SlimSAM-vs-SAM IoU). This is the real segmentation check - it auto-runs with the skeptic.</p>
           <button
             id="xcheckBtn"
             className="btn-ghostline"

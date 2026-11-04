@@ -336,6 +336,14 @@ export default function Capture() {
     }
   };
 
+  /* Idle retry: same acquire path as the automatic attempt on mount. */
+  const retryAcquire = () => {
+    setEnableCam(false);
+    setBlocked(false);
+    setAcquiring(true);
+    void acquire().finally(() => setAcquiring(false));
+  };
+
   return (
     <>
       <div
@@ -361,18 +369,29 @@ export default function Capture() {
           <div className="cam-top">
             <button
               type="button"
-              className="cam-close"
-              aria-label="Close camera, back to home"
+              className="cam-close cap-close"
+              aria-label="Close"
               onClick={() => go("tHome")}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
             </button>
-            <div id="camStep" className="step-tag">01 / 06 · Capture</div>
-            <button id="tipsBtn" type="button" onClick={() => setTipsOpen(true)}>
+            <div className="cap-step">
+              <span className="cap-step-label" id="capStepLabel">Step 1 of 6 · Capture</span>
+              <div className="cap-progress" role="progressbar" aria-labelledby="capStepLabel" aria-valuemin={0} aria-valuemax={6} aria-valuenow={1}>
+                <i className="on" aria-hidden="true" />
+                <i aria-hidden="true" />
+                <i aria-hidden="true" />
+                <i aria-hidden="true" />
+                <i aria-hidden="true" />
+                <i aria-hidden="true" />
+              </div>
+            </div>
+            <button id="tipsBtn" className="cap-tips" type="button" onClick={() => setTipsOpen(true)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5" /><circle cx="12" cy="7.8" r="1.1" fill="currentColor" stroke="none" /></svg>
               Coin tips
             </button>
           </div>
-          <div id="coinHint" role="status">{statusLine}</div>
+          {!enableCam && <div id="coinHint" role="status">{statusLine}</div>}
           <input
             ref={fileRef}
             type="file"
@@ -386,40 +405,72 @@ export default function Capture() {
           {enableCam ? (
             <div className="permitcard" role="alertdialog" aria-labelledby="permitTitle" aria-describedby="permitDesc">
               <span className="permit-icon" aria-hidden="true">
-                <img className="mark-light" src="./snapclaim-mark.png" alt="" width={40} height={38} />
-                <img className="mark-dark" src="./snapclaim-mark-dark.png" alt="" width={40} height={38} />
+                <img className="mark-light" src="./snapclaim-mark.png" alt="" width={44} height={42} />
+                <img className="mark-dark" src="./snapclaim-mark-dark.png" alt="" width={44} height={42} />
               </span>
-              <p id="permitTitle">{noCam ? "No camera on this device" : "Camera is off"}</p>
-              <p id="permitDesc">{noCam ? "Upload a photo or pick a sample instead - measuring works the same." : "We use your camera to measure your object. Photos stay on this device."}</p>
-              {!noCam && (
-                <button
-                  id="enableCam"
-                  type="button"
-                  className={`btn-primary${acquiring ? " busy" : ""}`}
-                  disabled={acquiring}
-                  aria-busy={acquiring}
-                  onClick={() => {
-                    setEnableCam(false);
-                    setBlocked(false);
-                    setAcquiring(true);
-                    void acquire().finally(() => setAcquiring(false));
-                  }}
-                >
-                  {acquiring ? "Starting…" : "Enable camera"}
-                </button>
+              <p id="permitTitle" className="cap-title">{noCam ? "No camera on this device" : "Photograph the damage"}</p>
+              <p id="permitDesc" className="cap-desc">{noCam ? "Upload a photo or pick a sample instead - measuring works the same." : "Place a coin next to the crack so we can measure it in millimetres. Your photo stays on this device."}</p>
+              {!noCam && !blocked && (
+                <p className="cap-nocoin">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" strokeDasharray="3 2.4" /></svg>
+                  <span>No coin? You&apos;ll get percentages only.</span>
+                  <button type="button" className="cap-link" onClick={() => setTipsOpen(true)}>Coin tips</button>
+                </p>
               )}
-              {blocked && !noCam && (
-                <p className="permit-hint">Blocked in your browser? Click the lock icon in the address bar → Allow camera, then tap Enable camera.</p>
-              )}
-              <div className="alt-row permit-alt">
-                <button id="uploadBtn" className="alt-btn" type="button" onClick={() => fileRef.current?.click()}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5" /><path d="M4 20h16" /></svg>
-                  Upload photo
-                </button>
-                <button id="altEntry" className="alt-btn" type="button" onClick={onSample}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="0" /><circle cx="12" cy="13.5" r="3.4" /></svg>
-                  Use a sample
-                </button>
+              <div className="cap-actions">
+                {blocked && !noCam ? (
+                  <>
+                    <div className="cap-alert" role="alert">
+                      <b>Camera access is blocked.</b>
+                      <span>Open your browser&apos;s site settings, allow Camera for this site, then tap Try again.</span>
+                    </div>
+                    <button
+                      id="enableCam"
+                      type="button"
+                      className={`cap-primary${acquiring ? " busy" : ""}`}
+                      disabled={acquiring}
+                      aria-busy={acquiring}
+                      onClick={retryAcquire}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10a8 8 0 1 1 2 6" /><path d="M4 4v6h6" /></svg>
+                      {acquiring ? "Starting…" : "Try again"}
+                    </button>
+                    <button id="uploadBtn" className="cap-primary" type="button" onClick={() => fileRef.current?.click()}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5" /><path d="M4 20h16" /></svg>
+                      Upload photo
+                    </button>
+                    <button id="altEntry" className="cap-tertiary" type="button" onClick={onSample}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" /><path d="M18.5 15l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" /></svg>
+                      Try a sample
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {!noCam && (
+                      <button
+                        id="enableCam"
+                        type="button"
+                        className={`cap-primary${acquiring ? " busy" : ""}`}
+                        disabled={acquiring}
+                        aria-busy={acquiring}
+                        onClick={retryAcquire}
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 8h3l2-2.5h6L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" /><circle cx="12" cy="13.5" r="3.4" /></svg>
+                        {acquiring ? "Starting…" : "Enable camera"}
+                      </button>
+                    )}
+                    <div className="cap-row">
+                      <button id="uploadBtn" className="cap-secondary" type="button" onClick={() => fileRef.current?.click()}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5" /><path d="M4 20h16" /></svg>
+                        Upload photo
+                      </button>
+                      <button id="altEntry" className="cap-tertiary" type="button" onClick={onSample}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" /><path d="M18.5 15l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" /></svg>
+                        Try a sample
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           ) : (
@@ -447,8 +498,8 @@ export default function Capture() {
                     Upload photo
                   </button>
                   <button id="altEntry" className="alt-btn" type="button" onClick={onSample}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="0" /><circle cx="12" cy="13.5" r="3.4" /></svg>
-                    Use a sample
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" /><path d="M18.5 15l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" /></svg>
+                    Try a sample
                   </button>
                 </div>
                 <button
@@ -467,7 +518,7 @@ export default function Capture() {
               </div>
             </>
           )}
-          {tipsOpen && !enableCam && (
+          {tipsOpen && (
             <>
               <button type="button" id="tipsScrim" aria-label="Close coin tips" onClick={closeTips} />
               <div

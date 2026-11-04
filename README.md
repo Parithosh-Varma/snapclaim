@@ -222,9 +222,9 @@ Base weights resolve from the `HF_MODEL_REPO` env var (no registry URL hardcoded
 
 ## Cost and limits
 
-Per-claim live cost at current pricing: SAM 3.1 ≈ $0.0025/image, voice ≈ $0.0005 per 10 s line, skeptic per Baseten token rates, Spark findings metered at $0 until Meta publishes pricing. The default $5 cap covers well over a thousand full live claims.
+Per-claim live cost at current pricing: SAM 3.1 ≈ $0.0025/image, voice ≈ $0.0005 per 10 s line, skeptic per Baseten token rates, Spark findings metered at $0 until Meta publishes pricing. The default $5 cap covers well over a thousand full live claims on one isolate.
 
-Hard limits: 50 masks per call (chunk above), 1–16 point prompts per segment call, 1 MB JSON body on Node, 4 MB audio uploads, 10 s voice clips, 512 px PWA photo side. The spend guard is per-process (per-isolate on Workers - use Durable Objects/D1 for a global cap).
+Hard limits: 50 masks per call (chunk above), 1–16 point prompts per segment call, 1 MB JSON body on Node, 4 MB audio uploads, 10 s voice clips, 512 px PWA photo side. The spend guard is per-process (per-isolate on Workers - use Durable Objects/D1 for a global cap). Known hackathon limit: billable live routes are anonymous on a public Worker, so N isolates × $5 is the real cap, not $5 total - flagged here, not hidden. Fine for a demo, not for production money.
 
 ## Privacy and security
 
@@ -239,18 +239,18 @@ Hard limits: 50 masks per call (chunk above), 1–16 point prompts per segment c
 
 - `npm run eval` - deterministic bench over `fixtures/masks/*.json` vs `fixtures/expected/` (missing expected file = SKIP, never a pass). Current: 7 pass, 0 skip, 0 fail - wall-crack 5.17% / 85.9 mm / 2.6 mm wide / 2.19 cm² (significant), stain 1.29% percent-only (moderate).
 - `npm run bench` - held-out refusal check: 12 cases, 1 archived run; the 4 public no-scale photos must stay percent-only (currently UNRUN until live runs are archived - a missing run fails strict mode, never passes).
-- `npm run bench:gap` - guessed-vs-measured gap on scaled held-out cases with a tape ground truth (`bench/runs/` pipeline vs `bench/model-only/` photo-alone guess, same tape). First scored row, live 2026-11-02 output:
+- `npm run bench:gap` - guessed-vs-measured gap on scaled held-out cases with a tape ground truth (`bench/runs/` pipeline vs `bench/model-only/` photo-alone guess, same tape). First scored row, live 2026-11-02 output (bench run SC-25D35C5E):
 
-| Case (real fixture) | Tape truth | Measured (pipeline) | Model-only guess (photo alone) |
-|---|---|---|---|
-| `terrace-slab-tape-01` (terrace slab `DSC_0711.JPG`, builder tape 227 mm) | 227 mm | **218.5 mm** (err 8.5 mm, 3.7% - within ±10%) | 315 mm (err 88 mm, 38.8% - outside ±10%) |
+| Case (real fixture) | Chord (tape) | Path truth (pins) | Measured (pipeline) | Model-only guess (photo alone) |
+|---|---|---|---|---|
+| `terrace-slab-tape-01` (terrace slab `DSC_0711.JPG`) | 227 mm chord (127 cm to ~149.5 cm, range 225-230) - context only | **274 mm pin-to-pin polyline** (6 spans, closest path truth) | **218.5 mm** [R005] (-3.7% vs chord, inside; **-20.3% vs pin path, outside - reads low**) | 315 mm (+38.8% vs chord, outside; +15.0% vs pin path, outside - reads high) |
 
-  `measured: scored=1 medianAbsErrorMm=8.5 within10pct=100% refused=0 missing=0` · `model-only: scored=1 medianAbsErrorMm=88 within10pct=0% refused=0 missing=0`. Modest on purpose: n=1, and the rest of held-out is UNSCORED until more walls get a tape on them - see `bench/split.json`.
+  `measured: scored=1 medianAbsErrorMm=8.5 within10pct=100% refused=0 missing=0` scores the **chord** (bench `groundTruth 227`), because that is the segment the archived run covers. Path-length accuracy is the pin row: pipeline reads low, guess reads high. A crack path must exceed its chord, so no "+X% vs span" figure is claimed as path accuracy. Thread 238.8 mm was a different crack with no coin - excluded, not scored. Second live run SC-D8ECE64B 2026-11-04 measured 232 mm [R005] on a different photo/date (-15.3% vs pin path, also low) - labeled separately, never conflated with SC-25D35C5E. The earlier 237.5 mm for SC-25D35C5E was a coin-diameter error (25 mm nominal vs 23 mm bench; ruler 24 mm = 228 mm) and is fixed to the archived 218.5 mm. Modest on purpose: n=1, and the rest of held-out is UNSCORED until more walls get a tape on them - see `bench/split.json`.
 - `bench/split.json` - dev/held-out split, frozen before tuning (`frozenAt` 2026-10-28; a test fails if a frozen case is edited).
 - `bench/score.ts` - skeptic DISPUTED scoring with missing-label accounting.
 - Full write-up, baselines protocol and open gaps: [`docs/eval-report.md`](./docs/eval-report.md).
 
-**Live demo:** <https://snapclaim.pages.dev> (public app; only `/admin` sits behind Cloudflare Access). The skeptic red-to-green in the demo runs on the real `terrace-slab-tape-01` fixture above - builder-measured slab, tape 227 mm - not a scripted mock.
+**Live demo:** <https://snapclaim.pages.dev> (public app; only `/admin` sits behind Cloudflare Access). The skeptic + mask cross-check red-to-green in the demo runs on the real `terrace-slab-tape-01` fixture above - builder-measured slab, chord 227 mm / pin path 274 mm - not a scripted mock. Both checks auto-run on the Check screen and both must resolve before the Report unlocks; the skeptic checks prose from receipts (it does not re-segment - wrong masks fool it, see `docs/eval-report.md`), the SlimSAM-vs-SAM `/v1/crosscheck` IoU is the real segmentation check.
 
 ## Project structure
 
@@ -289,7 +289,7 @@ tests/          full suite, mock by default, live paths with stubbed fetch
 
 - **Documentation, not advice.** No coverage decisions, no legal claims, no approval predictions. A human decides; SnapClaim produces the evidence package.
 - **Measurement ≠ causation.** The chain proves what was measured, not who broke it.
-- **Staged photos are a known limit.** Receipts make measurement replayable and partly tamper-evident; they do not prove provenance. `npm run replay` re-runs the math and prints MATCH/DRIFT plus a SHA-256 receipt-chain hash - but a MATCH only proves the report was *computed* from those inputs, not that the inputs are original: anyone can edit the receipts and replay them consistently. Tamper-evidence needs the photo hashed at capture (before EXIF stripping), the chain hash pinned with the run, and a signature at capture - see `src/receipts/hash.ts`. Share links already carry an optional HMAC (`react/src/lib/share.ts`); absent `sig` = UNVERIFIED.
+- **Staged photos are a known limit.** Receipts make measurement replayable, not tamper-evident; they do not prove provenance. The photo never reaches the server (only RLE masks do, except your explicit Cross-check/Render taps), so nothing server-side can vouch for the shutter moment. `npm run replay` re-runs the math and prints MATCH/DRIFT plus a SHA-256 receipt-chain hash - but a MATCH only proves the report was *computed* from those inputs, not that the inputs are original: anyone can edit the receipts and replay them consistently. Real tamper-evidence would need the photo hashed client-side at capture (before EXIF stripping, see `src/receipts/hash.ts`), the hash pinned in the receipts, and a signature at capture - none of that ships yet. Share links already carry an optional HMAC (`react/src/lib/share.ts`); absent `sig` = UNVERIFIED.
 - No medical, health, or insurance-advice functionality. No image generation - every visual is drawn in code. SVG only (no PDF).
 - No geo-circumvention, no VPN. Credits claimed only with each builder's own registration email; no pooling. Build-time tooling disclosed in `DEV-LOG.md`.
 
