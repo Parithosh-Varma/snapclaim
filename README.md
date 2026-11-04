@@ -37,7 +37,7 @@ Watch the full loop — photo + coin, tap to mask, gated findings, skeptic, SVG 
 
 ## Project gallery
 
-> _Coming soon — screenshots of the capture, check, and report screens will live here._
+Photo gallery of captures, pipeline diagrams, and the terrace-slab field proof: <https://gallery.snapclaim.pages.dev> (source: [`gallery/`](./gallery/)).
 
 ### What is measured today
 
