@@ -356,6 +356,7 @@
   .checkcard p{color:var(--slate);font-size:13px;margin:0 0 12px}
   .stickycta{position:sticky;bottom:calc(12px + env(safe-area-inset-bottom));background:color-mix(in srgb,#f4f1ea 92%,transparent);backdrop-filter:blur(8px);padding:10px 0 2px;margin-top:12px}
   .skel{border-radius:0;background:linear-gradient(100deg,#eee9dc 40%,#f7f3e9 50%,#eee9dc 60%);background-size:200% 100%;animation:shimmer 1.2s infinite;min-height:86px;margin-bottom:8px;border:1px solid #e2ddd0}
+  html[data-theme="dark"] .skel{background:linear-gradient(100deg,#26241f 40%,#33302a 50%,#26241f 60%);background-size:200% 100%;border-color:#4a4438}
   @keyframes shimmer{to{background-position:-200% 0}}
   .statecard{border:1px solid #e2ddd0;border-radius:0;padding:16px;background:#fffdf8;margin-bottom:12px}
   .statecard.err{border-color:#f0b9be;background:#fff7f7}
@@ -858,6 +859,7 @@
     html[data-theme="auto"] .case-chev{color:#ada595}
     html[data-theme="auto"] .btn-dark{background:#ece7dc;color:#141310}
     html[data-theme="auto"] .btn-ghostline,html[data-theme="auto"] .btn-quiet{color:#ece7dc;border-color:#4a4438}
+    html[data-theme="auto"] .skel{background:linear-gradient(100deg,#26241f 40%,#33302a 50%,#26241f 60%);background-size:200% 100%;border-color:#4a4438}
     html[data-theme="auto"] .coindrop-btn{background:#27241e;border-color:#4a4438;color:#ece7dc}
     html[data-theme="auto"] .seg button{background:#27241e;border-color:#4a4438;color:#ece7dc}
     html[data-theme="auto"] .seg button.on{background:var(--damage);border-color:var(--damage);color:#fff}

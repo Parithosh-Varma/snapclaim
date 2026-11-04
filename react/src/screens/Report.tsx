@@ -82,7 +82,7 @@ export default function Report() {
     }
     setRendering(true);
     setRenderError(null);
-    setState("Generating report…");
+    setState("Sending measurement — the findings model drafts next (tens of seconds)…");
     const body = JSON.parse(JSON.stringify(s.payload)) as Record<string, unknown>;
     body.transcript = s.transcript;
     const overlay = body.overlay as { photoHref?: string } | undefined;
@@ -112,6 +112,7 @@ export default function Report() {
       }
       const { res, j } = out;
       if (!res.ok || !j.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
+      setState("Findings received — drawing the annexure…");
       const rawSvg = String((j.result as { svg?: unknown } | undefined)?.svg ?? "");
       // A photo-less annexure renders as outlines on grey with a footer and
       // no photo - never accept that silently.
